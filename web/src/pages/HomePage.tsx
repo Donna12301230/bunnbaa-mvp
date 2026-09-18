@@ -22,7 +22,7 @@ export default function HomePage() {
   const [, navigate] = useLocation();
   const { user, isVendor, isAdmin } = useAuth();
   const { toast } = useToast();
-  const [tab, setTab] = useState<"plans" | "transfer">("plans");
+  const [tab, setTab] = useState<"plans" | "transfer" | "calendar">("plans");
   const [searchInput, setSearchInput] = useState("");
   const [startDate, setStartDate] = useState("2026-09-22");
   const [endDate, setEndDate] = useState("2026-09-26");
@@ -49,6 +49,11 @@ export default function HomePage() {
     toast({ title: "轉讓市集即將推出", description: "這個分頁還在開發中，敬請期待。" });
   }
 
+  function goToMyCalendar() {
+    setTab("calendar");
+    toast({ title: "我的預約日曆即將推出", description: "這個分頁還在開發中，敬請期待。" });
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ── 頂部列 ── */}
@@ -63,7 +68,7 @@ export default function HomePage() {
                 tab === "plans" ? "border-orange-500 text-orange-600" : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              <ClipboardList className="w-4 h-4" /> 計畫方案
+              <ClipboardList className="w-4 h-4" /> 預購餐點
             </button>
             <button
               onClick={goToTransferMarket}
@@ -72,6 +77,14 @@ export default function HomePage() {
               }`}
             >
               <Repeat className="w-4 h-4" /> 轉讓市集
+            </button>
+            <button
+              onClick={goToMyCalendar}
+              className={`flex items-center gap-1.5 h-16 text-sm font-medium border-b-2 transition-colors ${
+                tab === "calendar" ? "border-orange-500 text-orange-600" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <CalendarDays className="w-4 h-4" /> 我的預約日曆
             </button>
           </nav>
 
