@@ -18,6 +18,13 @@ Firebase 專案已建好並完成大半設定：`bunnbaa-mvp-5474`（擁有者�
 
 **GitHub**：新專案已建立獨立的 private repo，不跟舊專案共用：https://github.com/Donna12301230/bunnbaa-mvp
 
+**本機環境的路徑雷（重要，重開機/新 session 記得看）**：專案路徑含中文字和 `+` 號（`D:\雅婷\03赫滋與羊\+程式碼\...`），這會讓 Windows 上兩個工具行為相反：
+- **Firebase Functions emulator**（`firebase emulators:start --only functions,...`）在這個路徑下會卡在「Cannot determine backend specification. Timeout after 10000」——它內部的 discovery 子行程過不了這種路徑。已建一個 ASCII 路徑的 Windows junction 繞過：`C:\Users\USER\bunnbaa-dev` → 指向這個資料夾。**要跑 emulator suite（含 functions）時，cd 到 `C:\Users\USER\bunnbaa-dev` 執行**，不要在原本中文路徑下跑。
+- **Vite dev server**（`npm run dev`）則相反，從 `C:\Users\USER\bunnbaa-dev\web` 跑會出現空白頁（vite 沒有正確 transform TSX，直接吐原始碼給瀏覽器）。**跑 `npm run dev` 時要留在原本的中文路徑**（`.../bunnbaa-prototype/bunnbaa/web`），不要走 junction。
+- 也要裝 Java（Firestore/Auth emulator 需要 JRE）：已用 winget 裝了 Microsoft OpenJDK 21，並加進使用者 PATH。新開的終端機視窗應該會自動抓到；如果 `java -version` 抓不到，重開一下終端機。
+
+**已知：`web/.env.local` 裡設了 `VITE_USE_EMULATORS=true`**，這會讓前端連本機 emulator 而不是正式環境 Firestore/Auth，正式部署前記得確認這個檔案不會被打包進去（已經在 `.gitignore` 排除，不會進 repo，但本機建置時如果沒清掉可能誤連 emulator）。
+
 ## 環境搭建剩餘步驟
 
 - [x] 上面的 Firebase 專案建立
@@ -28,7 +35,7 @@ Firebase 專案已建好並完成大半設定：`bunnbaa-mvp-5474`（擁有者�
 - [ ] 啟用 Hosting（等 `web/` 有 build 產物後再做）
 - [ ] 申請 Gemini API Key（見上方「現在卡在哪」，需人工操作），填入 `functions/.env`（複製自 `functions/.env.example`）
 - [x] 把 `web/src/lib/firebase.ts` 裡的 `firebaseConfig` 換成真實專案設定值（已建立 web app「BunnBaa Web」並填入）
-- [ ] 本機用 emulator 跑通：`firebase emulators:start --only functions,firestore,auth` + `node scripts/seed.js` + `cd web && npm run dev`
+- [x] 本機用 emulator 跑通：`firebase emulators:start --only functions,firestore,auth` + `node scripts/seed.js` + `cd web && npm run dev`（消費者端「鎖定這份」流程已驗證：匿名登入、Firestore 寫入、`onLockCreated` 觸發都正常，只差 Gemini Key 導致折扣說明卡在「產生說明中」，見下方環境注意事項）
 
 已完成：`functions/` 和 `web/` 的 npm 依賴都裝好了，四個 Cloud Functions 檔案語法確認正常，`web` 補了缺失的 `vite-env.d.ts`（原本沒有導致 `import.meta.env` 型別報錯），`npx tsc --noEmit` 已過。
 
