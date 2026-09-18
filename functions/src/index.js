@@ -56,6 +56,11 @@ async function buildVendorHistory(vendorId, { maxPeriods = 14 } = {}) {
     .slice(-maxPeriods);
 }
 
+// Spec ref: README "尚未實作" — reliability_tone was a hand-set field;
+// this ties it to the same accuracy_rate the calibration report already
+// computes, so the badge on the consumer page stays in sync automatically.
+const STABLE_ACCURACY_THRESHOLD = 0.8;
+
 async function runCalibrationForVendor(vendorId) {
   const history = await buildVendorHistory(vendorId);
   if (history.length === 0) {
@@ -70,6 +75,10 @@ async function runCalibrationForVendor(vendorId) {
     horizon: "daily",
     ...report,
     generated_at: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await db.collection("vendors").doc(vendorId).update({
+    reliability_tone: report.accuracy_rate >= STABLE_ACCURACY_THRESHOLD ? "stable" : "variable",
   });
 
   logger.info(`Calibration report ${docRef.id} generated for vendor ${vendorId}`, {
