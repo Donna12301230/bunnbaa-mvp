@@ -73,7 +73,7 @@ export default function VendorRedeemPage() {
     }
   }
 
-  async function markOutcome(outcome: "fulfilled" | "no_show", note?: string) {
+  async function markOutcome(outcome: "fulfilled" | "resold_and_fulfilled" | "no_show", note?: string) {
     if (!foundLock) return;
     setSubmitting(true);
     try {
@@ -137,13 +137,23 @@ export default function VendorRedeemPage() {
                 {foundLock.pickup_window} 取餐 · NT${foundLock.locked_price}
               </div>
             </div>
-            <span className="badge">#{foundLock.id.slice(-8).toUpperCase()}</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              <span className="badge">#{foundLock.id.slice(-8).toUpperCase()}</span>
+              {foundLock.status === "for_resale" && <span className="badge">轉賣中</span>}
+            </div>
           </div>
 
           {alreadyDone ? (
             <>
               <p className="muted" style={{ marginTop: 12 }}>
-                狀態：{foundLock.status === "fulfilled" ? "已完成取餐" : foundLock.status === "no_show" ? "已登記未取餐" : foundLock.status}
+                狀態：
+                {foundLock.status === "fulfilled"
+                  ? "已完成取餐"
+                  : foundLock.status === "resold_and_fulfilled"
+                  ? "已由轉賣對象完成取餐"
+                  : foundLock.status === "no_show"
+                  ? "已登記未取餐"
+                  : foundLock.status}
               </p>
               <button className="secondary" onClick={reset}>
                 查詢下一筆
@@ -153,7 +163,10 @@ export default function VendorRedeemPage() {
             <div style={{ marginTop: 12 }}>
               {!showNoShowForm ? (
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button disabled={submitting} onClick={() => markOutcome("fulfilled")}>
+                  <button
+                    disabled={submitting}
+                    onClick={() => markOutcome(foundLock.status === "for_resale" ? "resold_and_fulfilled" : "fulfilled")}
+                  >
                     {submitting ? "處理中…" : "確認取餐"}
                   </button>
                   <button className="secondary" disabled={submitting} onClick={() => setShowNoShowForm(true)}>

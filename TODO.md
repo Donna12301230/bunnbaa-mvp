@@ -45,7 +45,7 @@ Firebase 專案已建好並完成大半設定：`bunnbaa-mvp-5474`（擁有者�
 
 ## 骨架裡尚未實作的功能（見 `README.md`「尚未實作」清單）
 
-- [ ] 轉賣流程（`for_resale` → `resold_and_fulfilled`）的實際 UI，目前只有 Firestore rules 預留欄位
+- [x] 轉賣流程（`for_resale` → `resold_and_fulfilled`）的實際 UI：消費者端「轉賣這份」按鈕（直接用 `firestore.rules` 原本就允許的 buyer 自轉 `for_resale` 權限，不需要額外 Cloud Function），商家端核對取餐時會依原本狀態自動選 `fulfilled` 或 `resold_and_fulfilled`。已在 emulator 端到端測過。
 - [x] 履約穩定度徽章自動換算：`runCalibrationForVendor`（`dailyCalibration` 和 `triggerCalibrationNow` 都會呼叫到）現在算完 `accuracy_rate` 後會自動更新 `vendor.reliability_tone`（>=80% → stable，否則 variable）。**還沒端到端測過**，因為要真的跑出一份報告需要 Gemini API Key（目前還沒申請），只確認了程式碼語法正確、emulator 有正常 reload；Firestore admin 寫入本身已經在 `markLockOutcome` 驗證過同樣機制沒問題。等 Gemini Key 補上後記得實際點一次「立即產生報告」確認徽章真的會變。
 - [ ] 取餐時段推播提醒（spec §3.7，Firebase Cloud Messaging，跟 AI 無關的純 UX）
 - [x] 商家後台標記 no-show／備註的介面——新增 `/vendor/redeem`（`VendorRedeemPage.tsx`），已在 emulator 驗證完整流程

@@ -5,6 +5,7 @@ import {
   doc,
   onSnapshot,
   serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
 import { signInAnonymously } from "firebase/auth";
@@ -26,6 +27,7 @@ export default function ConsumerLockPage() {
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [locking, setLocking] = useState(false);
   const [myLock, setMyLock] = useState<Lock | null>(null);
+  const [reselling, setReselling] = useState(false);
 
   useEffect(() => {
     signInAnonymously(auth).catch(console.error);
@@ -62,6 +64,19 @@ export default function ConsumerLockPage() {
       setMyLock({ id: ref.id } as Lock);
     } finally {
       setLocking(false);
+    }
+  }
+
+  // firestore.rules only lets the buyer move their own lock to "for_resale" —
+  // every other transition (fulfilled/no_show/resold_and_fulfilled) needs
+  // vendor attestation via the markLockOutcome Cloud Function instead.
+  async function handleResell() {
+    if (!myLock) return;
+    setReselling(true);
+    try {
+      await updateDoc(doc(db, "locks", myLock.id), { status: "for_resale" });
+    } finally {
+      setReselling(false);
     }
   }
 
@@ -116,9 +131,25 @@ export default function ConsumerLockPage() {
         </div>
       )}
 
-      <p className="faint">
-        臨時去不了？鎖定後可在取餐前將這份轉賣給其他人——這是解套機制，不是套利工具。
-      </p>
+      {myLock && myLock.status === "locked" && (
+        <div className="card">
+          <div className="row">
+            <div>
+              <h2>臨時去不了？</h2>
+              <p className="muted">取餐前可以把這份轉賣給其他人，把取餐編號給對方就好——這是解套機制，不是套利工具。</p>
+            </div>
+            <button className="secondary" disabled={reselling} onClick={handleResell}>
+              {reselling ? "處理中…" : "轉賣這份"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {myLock && myLock.status === "for_resale" && (
+        <div className="card tinted">
+          <p className="muted">已標記轉賣中。把上面的取餐編號給接手的人，對方憑編號到店取餐即可。</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -123,7 +123,7 @@ exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request)
  * 1a. Vendor marks pickup outcome (fulfilled / no-show)
  * ------------------------------------------------------------------ */
 
-const VALID_OUTCOMES = ["fulfilled", "no_show"];
+const VALID_OUTCOMES = ["fulfilled", "resold_and_fulfilled", "no_show"];
 
 /**
  * Vendor-side pickup counter action: mark a lock as picked up or not.
