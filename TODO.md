@@ -14,6 +14,10 @@ Firebase 專案已建好並完成大半設定：`bunnbaa-mvp-5474`（擁有者�
 
 **帳號注意**：這個 GCP/Firebase 專案是掛在 `ckchildlikekid@gmail.com`（鍾雅婷），不是 `tom040798@gmail.com`。CLI 登入、瀏覽器操作都要用前者的帳號，否則 `firebase projects:list` 會顯示空的。
 
+**網域**：`bunnbaa.com` 目前掛在舊專案（Parse 版本），這次 MVP 先不動它，暫時用 Firebase 預設網址 `bunnbaa-mvp-5474.web.app`。之後如果要換成 `bunnbaa.com` 或子網域（如 `app.bunnbaa.com`），再另外處理 DNS，不影響舊專案。
+
+**GitHub**：新專案已建立獨立的 private repo，不跟舊專案共用：https://github.com/Donna12301230/bunnbaa-mvp
+
 ## 環境搭建剩餘步驟
 
 - [x] 上面的 Firebase 專案建立
