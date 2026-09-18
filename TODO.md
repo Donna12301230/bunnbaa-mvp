@@ -32,7 +32,7 @@ Firebase 專案已建好並完成大半設定：`bunnbaa-mvp-5474`（擁有者�
 - [x] 在 Firebase Console 啟用 Firestore（asia-east1）、Authentication（匿名登入）
 - [x] 部署 `firestore.rules` 和 `firestore.indexes.json`
 - [ ] 升級到 Blaze 方案（需要人工填信用卡資訊）→ 啟用 Functions
-- [ ] 啟用 Hosting（等 `web/` 有 build 產物後再做）
+- [x] 啟用 Hosting：`web/` 已 build 並部署，正式網址 https://bunnbaa-mvp-5474.web.app （目前正式環境 Firestore 是空的，還沒 seed demo 資料，畫面看不到店家；等要錄 demo 前再灌資料）
 - [ ] 申請 Gemini API Key（見上方「現在卡在哪」，需人工操作），填入 `functions/.env`（複製自 `functions/.env.example`）
 - [x] 把 `web/src/lib/firebase.ts` 裡的 `firebaseConfig` 換成真實專案設定值（已建立 web app「BunnBaa Web」並填入）
 - [x] 本機用 emulator 跑通：`firebase emulators:start --only functions,firestore,auth` + `node scripts/seed.js` + `cd web && npm run dev`（消費者端「鎖定這份」流程已驗證：匿名登入、Firestore 寫入、`onLockCreated` 觸發都正常，只差 Gemini Key 導致折扣說明卡在「產生說明中」，見下方環境注意事項）
