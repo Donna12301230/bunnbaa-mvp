@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../lib/firebase";
-import type { AccuracyReport } from "../types";
+import type { AccuracyReport, Payout } from "../types";
 
 const VENDOR_ID = "cafe-renheya-demo";
 
@@ -19,6 +19,8 @@ export default function VendorDashboard() {
   const [scenarioAnswer, setScenarioAnswer] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const [triggering, setTriggering] = useState(false);
+  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [settling, setSettling] = useState(false);
 
   useEffect(() => {
     const q = query(
@@ -35,6 +37,29 @@ export default function VendorDashboard() {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "payouts"),
+      where("vendor_id", "==", VENDOR_ID),
+      orderBy("created_at", "desc"),
+      limit(5)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setPayouts(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+    });
+    return () => unsub();
+  }, []);
+
+  async function handleSettleNow() {
+    setSettling(true);
+    try {
+      const fn = httpsCallable(functions, "triggerSettlementNow");
+      await fn({ vendor_id: VENDOR_ID });
+    } finally {
+      setSettling(false);
+    }
+  }
 
   async function handleTriggerNow() {
     setTriggering(true);
@@ -117,6 +142,34 @@ export default function VendorDashboard() {
 
           <div className="disclaimer">{report.disclaimer}</div>
         </>
+      )}
+
+      <h1 style={{ marginTop: 32 }}>撥款</h1>
+      <div className="card">
+        <div className="row">
+          <p className="muted" style={{ margin: 0 }}>
+            平台代收後全額撥款，不抽成。目前還沒接 LINE Pay／綠界撥款 API，先以對帳單匯出的方式結算。
+          </p>
+          <button className="secondary" onClick={handleSettleNow} disabled={settling}>
+            {settling ? "結算中…" : "立即結算"}
+          </button>
+        </div>
+      </div>
+
+      {payouts.length === 0 ? (
+        <p className="faint">尚無撥款紀錄。</p>
+      ) : (
+        payouts.map((p) => (
+          <div key={p.id} className="card">
+            <div className="row">
+              <div>
+                <div className="stat">NT${p.amount}</div>
+                <div className="muted">{p.lock_count} 筆已履約訂單</div>
+              </div>
+              <span className="badge">待人工對帳匯出</span>
+            </div>
+          </div>
+        ))
       )}
     </div>
   );

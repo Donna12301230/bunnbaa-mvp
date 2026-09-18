@@ -3,6 +3,7 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
+const { FieldValue } = require("firebase-admin/firestore");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -74,7 +75,7 @@ async function runCalibrationForVendor(vendorId) {
     vendor_id: vendorId,
     horizon: "daily",
     ...report,
-    generated_at: admin.firestore.FieldValue.serverTimestamp(),
+    generated_at: FieldValue.serverTimestamp(),
   });
 
   await db.collection("vendors").doc(vendorId).update({
@@ -156,6 +157,116 @@ exports.markLockOutcome = onCall({ region: "asia-east1" }, async (request) => {
   return { lock_id: lockId, status: outcome };
 });
 
+/**
+ * A second buyer takes over a resold lock. Spec ref: 改造指南 §5.3 — resale
+ * money never flows through the platform (B pays A directly, off-platform);
+ * the platform's only job is reassigning `buyer_uid` in Firestore. Needs
+ * admin rights because the existing rule only lets a lock's *current*
+ * buyer transition their own lock to `for_resale`, not have a stranger
+ * take it over.
+ */
+exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Must be signed in (anonymous is fine) to claim a lock");
+  }
+  const { lock_id: lockId } = request.data || {};
+  if (!lockId) throw new HttpsError("invalid-argument", "lock_id is required");
+
+  const lockRef = db.collection("locks").doc(lockId);
+  const lockSnap = await lockRef.get();
+  if (!lockSnap.exists) {
+    throw new HttpsError("not-found", `No lock found with id ${lockId}`);
+  }
+  const lock = lockSnap.data();
+  if (lock.status !== "for_resale") {
+    throw new HttpsError("failed-precondition", "This lock isn't currently up for resale");
+  }
+  if (lock.buyer_uid === request.auth.uid) {
+    throw new HttpsError("failed-precondition", "You can't claim your own resale listing");
+  }
+
+  await lockRef.update({ buyer_uid: request.auth.uid });
+  return { lock_id: lockId };
+});
+
+/* ------------------------------------------------------------------ *
+ * 1b. Vendor payouts — platform collects, forwards in full, on a
+ * schedule (spec ref: 改造指南 §5.1/§5.4 — "路線 A：平台代收、定期撥款
+ * 商家". No platform cut: the doc is explicit that the full amount gets
+ * forwarded, the platform isn't fronting or holding funds for anything
+ * else. This scaffolds the aggregation + a payout record with mock
+ * data; the actual LINE Pay/綠界 payout API call (or, per the doc's own
+ * fallback, a manual reconciliation export) isn't wired up yet since
+ * there's no merchant account to call it against.
+ * ------------------------------------------------------------------ */
+
+async function settleVendorPayout(vendorId) {
+  // Reuses the same vendor_id index as buildVendorHistory/VendorRedeemPage
+  // rather than adding a composite index for a status-in + not-yet-settled
+  // filter — fine at pilot scale (one vendor, a few hundred locks).
+  const snap = await db
+    .collection("locks")
+    .where("vendor_id", "==", vendorId)
+    .orderBy("created_at", "desc")
+    .limit(500)
+    .get();
+
+  const unsettled = snap.docs.filter((d) => {
+    const data = d.data();
+    return ["fulfilled", "resold_and_fulfilled"].includes(data.status) && !data.payout_settled;
+  });
+
+  if (unsettled.length === 0) {
+    logger.info(`No unsettled fulfilled locks for vendor ${vendorId}, skipping payout.`);
+    return null;
+  }
+
+  const amount = unsettled.reduce((sum, d) => sum + (d.data().locked_price || 0), 0);
+  const lockIds = unsettled.map((d) => d.id);
+
+  const payoutRef = await db.collection("payouts").add({
+    vendor_id: vendorId,
+    amount, // full amount, no platform fee — see comment above
+    lock_ids: lockIds,
+    lock_count: lockIds.length,
+    // No LINE Pay/綠界 merchant payout API to call yet, so this is the
+    // manual-reconciliation fallback the doc describes, not a real transfer.
+    status: "pending_manual_export",
+    created_at: FieldValue.serverTimestamp(),
+  });
+
+  const batch = db.batch();
+  for (const d of unsettled) {
+    batch.update(d.ref, { payout_settled: true, payout_id: payoutRef.id });
+  }
+  await batch.commit();
+
+  logger.info(`Payout ${payoutRef.id} created for vendor ${vendorId}`, { amount, lock_count: lockIds.length });
+  return payoutRef.id;
+}
+
+exports.settleVendorPayouts = onSchedule(
+  { schedule: "every day 20:00", timeZone: "Asia/Taipei", region: "asia-east1" },
+  async () => {
+    const vendorsSnap = await db.collection("vendors").get();
+    for (const vendorDoc of vendorsSnap.docs) {
+      try {
+        await settleVendorPayout(vendorDoc.id);
+      } catch (err) {
+        logger.error(`Payout settlement failed for vendor ${vendorDoc.id}`, err);
+      }
+    }
+  }
+);
+
+/** Manual trigger for local testing / demo, same pattern as triggerCalibrationNow. */
+exports.triggerSettlementNow = onCall({ region: "asia-east1" }, async (request) => {
+  const vendorId = request.data?.vendor_id;
+  if (!vendorId) throw new HttpsError("invalid-argument", "vendor_id is required");
+  const payoutId = await settleVendorPayout(vendorId);
+  return { payout_id: payoutId };
+});
+
 /* ------------------------------------------------------------------ *
  * 2. Vendor what-if follow-up (spec 4.1a)
  * ------------------------------------------------------------------ */
@@ -231,7 +342,7 @@ exports.onLockCreated = onDocumentCreated(
       });
       await cacheRef.set({
         ...explanation,
-        generated_at: admin.firestore.FieldValue.serverTimestamp(),
+        generated_at: FieldValue.serverTimestamp(),
       });
     }
 

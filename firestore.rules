@@ -30,5 +30,12 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    // payouts: written only by settleVendorPayouts (Cloud Function), publicly
+    // readable for MVP transparency, same as accuracy_reports.
+    match /payouts/{payoutId} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }

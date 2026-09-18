@@ -45,7 +45,7 @@ Firebase 專案已建好並完成大半設定：`bunnbaa-mvp-5474`（擁有者�
 
 ## 骨架裡尚未實作的功能（見 `README.md`「尚未實作」清單）
 
-- [x] 轉賣流程（`for_resale` → `resold_and_fulfilled`）的實際 UI：消費者端「轉賣這份」按鈕（直接用 `firestore.rules` 原本就允許的 buyer 自轉 `for_resale` 權限，不需要額外 Cloud Function），商家端核對取餐時會依原本狀態自動選 `fulfilled` 或 `resold_and_fulfilled`。已在 emulator 端到端測過。
+- [x] 轉賣流程（`for_resale` → `resold_and_fulfilled`）的實際 UI：消費者端「轉賣這份」按鈕（用 `firestore.rules` 原本就允許的 buyer 自轉 `for_resale` 權限）+ 「別人轉賣中」列表讓第二個買家「接手這份」（新增 `claimResoldLock` Cloud Function 把 `buyer_uid` 轉移給接手的人，match 改造指南 §5.3：轉賣金流不經過平台，平台只轉移 lock 擁有權），商家核對取餐時會依原本狀態自動選 `fulfilled` 或 `resold_and_fulfilled`。已在 emulator 端到端測過（含兩個不同匿名帳號互相接手）。
 - [x] 履約穩定度徽章自動換算：`runCalibrationForVendor`（`dailyCalibration` 和 `triggerCalibrationNow` 都會呼叫到）現在算完 `accuracy_rate` 後會自動更新 `vendor.reliability_tone`（>=80% → stable，否則 variable）。**還沒端到端測過**，因為要真的跑出一份報告需要 Gemini API Key（目前還沒申請），只確認了程式碼語法正確、emulator 有正常 reload；Firestore admin 寫入本身已經在 `markLockOutcome` 驗證過同樣機制沒問題。等 Gemini Key 補上後記得實際點一次「立即產生報告」確認徽章真的會變。
 - [ ] 取餐時段推播提醒（spec §3.7，Firebase Cloud Messaging，跟 AI 無關的純 UX）
 - [x] 商家後台標記 no-show／備註的介面——新增 `/vendor/redeem`（`VendorRedeemPage.tsx`），已在 emulator 驗證完整流程
@@ -58,9 +58,12 @@ Firebase 專案已建好並完成大半設定：`bunnbaa-mvp-5474`（擁有者�
   - **Cloudinary 上傳**：`ImageUploadField.tsx` 已搬過來、拿掉 shadcn/ui 依賴改用專案原本的純 CSS 風格，但**還沒接到任何頁面**——這個 MVP 還沒有「新增商家/菜單」的表單，先當備用元件放著，等真的要做商家自助上架時再用。需要的話要在 Cloudinary 後台建一個 unsigned upload preset，設定進 `web/.env.local` 的 `VITE_CLOUDINARY_CLOUD_NAME`／`VITE_CLOUDINARY_UPLOAD_PRESET`（範例見 `web/.env.example`）。
   - 新增了 `markLockOutcome` Cloud Function（`functions/src/index.js`），因為 `firestore.rules` 明確禁止 client 端直接改 lock 狀態，核對取餐／登記未取餐都要走這個 callable。
   - **還沒重新部署到正式 Hosting**：因為 Functions 還沒上 Blaze，正式環境呼叫 `markLockOutcome` 會失敗，先留在本機 emulator 驗證過就好，等 Blaze 升級、Functions 部署後再一起重新 `firebase deploy --only hosting`。
-- [ ] 商業邏輯用「參照不複製」原則，依 `locks` 新資料模型重寫（不要逐行翻譯舊的 `cloud/main.js`，資料結構已經不同）
-- [ ] 金流串接：LINE Pay／綠界，平台代收、定期撥款商家（`settleVendorPayouts()` Cloud Scheduler，尚未寫）
-- [ ] 整合測試 → 部署 Firebase Hosting → 錄 Demo（3 分鐘腳本見 v6 §8）→ 撰寫英文版 Proposal → 10/18 前提交
+- [x] 商業邏輯用「參照不複製」原則檢視：舊 `cloud/main.js`（20 個 Cloud Functions）大部分對應到明確排除的功能（`createTableOrder`／`submitBanAppeal`／`processBanAppeal` 對應 TableOrder、BanAppeal，見下方「本次不做」）或不適用單一硬編碼商家的 MVP（`approveVendor`、訂閱管理類）。真正屬於這次範圍且還缺的，只剩撥款——已處理，見下一項。
+- [x] 金流串接（假資料版）：讀了 `BunnBaa_現有雛型改造指南.docx` 第五節才發現兩個跟我原本猜測不一樣的關鍵設計，已照文件修正：
+  - **撥款沒有平台抽成**——文件明確寫「全額撥款商家」。`settleVendorPayouts()`（`functions/src/index.js`）已寫好：daily schedule + `triggerSettlementNow` 手動觸發，彙總每個商家已履約（`fulfilled`／`resold_and_fulfilled`）且未結算過的 lock，寫入 `payouts` collection（狀態 `pending_manual_export`，因為還沒有 LINE Pay／綠界撥款 API 可以接，先做文件講的「人工對帳單匯出」備案），並把該批 lock 標記 `payout_settled` 避免下次重複算。VendorDashboard 新增「撥款」區塊顯示紀錄 + 手動觸發按鈕。**已在 emulator 端到端測過，包含重複點擊確認不會重複結算。**
+  - **轉賣金流不經過平台**（見上方轉賣流程項目）——B 直接私下付錢給 A，平台只轉移 `buyer_uid`。
+  - 過程中還發現並修好一個跟這次改動無關、但會影響既有程式碼的環境 bug：`admin.firestore.FieldValue`（舊式 namespace 寫法）在 Functions Emulator 裡會變成 `undefined`（純 Node 執行不會），已全部改成 `require("firebase-admin/firestore")` 的 modular 寫法。這也是為什麼 `dailyCalibration`／`onLockCreated` 尚未實際跑到 `serverTimestamp()` 那行前都被 Gemini Key 擋住——這個 bug 之前一直沒被踩到。
+- [ ] 整合測試 → 部署 Firebase Hosting → 錄 Demo（3 分鐘腳本見 v6 §8）→ 撰寫英文版 Proposal → 10/18 前提交（Hosting 還沒重新部署最新的轉賣/撥款功能，見上方說明）
 
 ## 本次不做（列入路線圖，不要誤觸）
 

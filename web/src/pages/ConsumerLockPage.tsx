@@ -4,10 +4,14 @@ import {
   collection,
   doc,
   onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
-import { db, auth } from "../lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, auth, functions } from "../lib/firebase";
 import { signInAnonymously } from "firebase/auth";
 import type { Lock, Vendor } from "../types";
 import LockQRCode from "../components/LockQRCode";
@@ -28,6 +32,8 @@ export default function ConsumerLockPage() {
   const [locking, setLocking] = useState(false);
   const [myLock, setMyLock] = useState<Lock | null>(null);
   const [reselling, setReselling] = useState(false);
+  const [resaleListings, setResaleListings] = useState<Lock[]>([]);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
 
   useEffect(() => {
     signInAnonymously(auth).catch(console.error);
@@ -44,6 +50,34 @@ export default function ConsumerLockPage() {
     });
     return () => unsub();
   }, [myLock?.id]);
+
+  // Reuses the same vendor_id + created_at index as the vendor redeem page's
+  // lookup — filtering to for_resale (and excluding the viewer's own listing)
+  // happens client-side rather than adding another composite index for what
+  // is, at pilot scale, a handful of documents.
+  useEffect(() => {
+    const q = query(collection(db, "locks"), where("vendor_id", "==", VENDOR_ID), orderBy("created_at", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      const listings = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock)
+        .filter((l) => l.status === "for_resale" && l.buyer_uid !== auth.currentUser?.uid);
+      setResaleListings(listings);
+    });
+    return () => unsub();
+  }, []);
+
+  async function handleClaim(lockId: string) {
+    setClaimingId(lockId);
+    try {
+      const fn = httpsCallable(functions, "claimResoldLock");
+      await fn({ lock_id: lockId });
+      setMyLock({ id: lockId } as Lock);
+    } catch (err) {
+      alert("接手失敗：" + (err as Error).message);
+    } finally {
+      setClaimingId(null);
+    }
+  }
 
   async function handleLock() {
     if (!auth.currentUser) return;
@@ -148,6 +182,28 @@ export default function ConsumerLockPage() {
       {myLock && myLock.status === "for_resale" && (
         <div className="card tinted">
           <p className="muted">已標記轉賣中。把上面的取餐編號給接手的人，對方憑編號到店取餐即可。</p>
+        </div>
+      )}
+
+      {resaleListings.length > 0 && (
+        <div className="card">
+          <h2>別人轉賣中</h2>
+          <p className="faint" style={{ marginBottom: 8 }}>
+            接手後款項請直接私下轉給對方，平台只負責把這份的歸屬換成你——不經手轉賣金流。
+          </p>
+          {resaleListings.map((lock) => (
+            <div key={lock.id} className="row" style={{ marginBottom: 8 }}>
+              <div>
+                <div>{lock.item_name}</div>
+                <div className="muted">
+                  {lock.pickup_window} 取餐 · NT${lock.locked_price}
+                </div>
+              </div>
+              <button disabled={claimingId === lock.id} onClick={() => handleClaim(lock.id)}>
+                {claimingId === lock.id ? "處理中…" : "接手這份"}
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

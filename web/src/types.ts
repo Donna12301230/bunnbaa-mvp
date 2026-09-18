@@ -29,6 +29,15 @@ export interface Lock {
   created_at: unknown; // Firestore Timestamp
 }
 
+export interface Payout {
+  id: string;
+  vendor_id: string;
+  amount: number;
+  lock_count: number;
+  status: "pending_manual_export";
+  created_at: unknown; // Firestore Timestamp
+}
+
 export interface AccuracyReport {
   id: string;
   vendor_id: string;
