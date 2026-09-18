@@ -477,3 +477,65 @@ export const mockAccuracyReport: MockAccuracyReport = {
   pattern_note: "週五午餐時段常低估約 10%，可考慮提高備料量。",
   disclaimer: "本報告由 AI 產生，僅供參考，實際備料仍請以店家判斷為準。",
 };
+
+// ── 首頁「計畫方案」模板用的假資料（訂閱式計畫餐 + 轉讓市集） ──────────────
+export interface MealPlanTransfer {
+  id: string;
+  sellerName: string;
+  planName: string;
+  daysLeftLabel: string;
+  originalPrice: number;
+  resalePrice: number;
+  location: string;
+}
+
+export const mockMealPlanTransfers: MealPlanTransfer[] = [
+  { id: "t1", sellerName: "王同學", planName: "健康輕食週計畫（剩5天）", daysLeftLabel: "1天後截止", originalPrice: 600, resalePrice: 450, location: "台中公益店" },
+  { id: "t2", sellerName: "陳同學", planName: "健康特惠週省計畫", daysLeftLabel: "1天後截止", originalPrice: 600, resalePrice: 450, location: "台中公益店" },
+  { id: "t3", sellerName: "林同學", planName: "增肌蛋白餐計畫（剩3天）", daysLeftLabel: "2天後截止", originalPrice: 700, resalePrice: 520, location: "嘉義東區店" },
+  { id: "t4", sellerName: "黃同學", planName: "低卡輕食計畫（剩6天）", daysLeftLabel: "3天後截止", originalPrice: 650, resalePrice: 480, location: "嘉義西區店" },
+];
+
+export interface MealPlanOption {
+  id: string;
+  label: string; // "A方案" / "B方案"
+  name: string;
+  description: string;
+  pricePerMeal: number;
+  rating: number;
+  fastestBooking: string;
+}
+
+export interface VendorMealPlanGroup {
+  vendorId: string;
+  vendorName: string;
+  vendorImage?: string;
+  plans: MealPlanOption[];
+}
+
+export const mockVendorMealPlans: VendorMealPlanGroup[] = [
+  {
+    vendorId: "vendor-1",
+    vendorName: "一頭牛日式燒肉",
+    plans: [
+      { id: "p1", label: "A方案", name: "減脂健身餐 (5天)", description: "每日午餐、附贈無糖茶", pricePerMeal: 150, rating: 4.8, fastestBooking: "下週一" },
+      { id: "p2", label: "B方案", name: "增肌蛋白餐 (7天)", description: "每日午餐、附贈蛋白餐食蛋白飯", pricePerMeal: 150, rating: 4.7, fastestBooking: "下週一" },
+    ],
+  },
+  {
+    vendorId: "vendor-2",
+    vendorName: "王媽媽便當",
+    plans: [
+      { id: "p3", label: "A方案", name: "家常均衡餐 (5天)", description: "每日午餐、附贈溫豆漿", pricePerMeal: 140, rating: 4.6, fastestBooking: "下週二" },
+      { id: "p4", label: "B方案", name: "高蛋白便當餐 (7天)", description: "每日午餐、附贈黑豆漿", pricePerMeal: 160, rating: 4.5, fastestBooking: "下週二" },
+    ],
+  },
+  {
+    vendorId: "vendor-3",
+    vendorName: "阿嘉炸雞排",
+    plans: [
+      { id: "p5", label: "A方案", name: "酥脆雞排餐 (5天)", description: "每日午餐、附贈紅茶", pricePerMeal: 130, rating: 4.4, fastestBooking: "下週三" },
+      { id: "p6", label: "B方案", name: "雙拼炸物餐 (7天)", description: "每日午餐、附贈綠茶", pricePerMeal: 155, rating: 4.3, fastestBooking: "下週三" },
+    ],
+  },
+];
