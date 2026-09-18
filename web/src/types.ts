@@ -3,6 +3,7 @@ export interface Vendor {
   name: string;
   item_focus: string;
   reliability_tone: "new" | "variable" | "stable";
+  status?: "active" | "disabled"; // missing = active, for backward compat with seeded data
 }
 
 export type LockStatus =

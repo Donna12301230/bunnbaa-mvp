@@ -2,19 +2,31 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // vendors: publicly readable (browsing), writes only via backend/admin for MVP
+    // Admin backend auth: no Cloud Functions custom claims yet (blocked on
+    // Blaze upgrade), so admin access is a plain email allowlist checked
+    // straight off the Firebase Auth token. Keep this in sync by hand with
+    // ADMIN_EMAILS in web/src/lib/adminAuth.ts.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in ['suw192336@gmail.com'];
+    }
+
+    // vendors: publicly readable (browsing); writes via admin backend only for MVP
     match /vendors/{vendorId} {
       allow read: if true;
-      allow write: if false; // seeded via admin script in MVP; open up with vendor auth later
+      allow write: if isAdmin();
     }
 
     // locks: consumer creates their own lock; read is public (needed to show live availability)
     match /locks/{lockId} {
       allow read: if true;
       allow create: if request.resource.data.buyer_uid == request.auth.uid;
-      // status transitions (resell, fulfilled, no_show) are done via Cloud Functions with admin rights
-      allow update: if request.auth != null && resource.data.buyer_uid == request.auth.uid
-                    && request.resource.data.status == 'for_resale';
+      // status transitions (resell, fulfilled, no_show) are normally done via
+      // Cloud Functions with admin rights; admin backend can also override
+      // directly since those Functions aren't deployed to prod yet (Blaze).
+      allow update: if (request.auth != null && resource.data.buyer_uid == request.auth.uid
+                    && request.resource.data.status == 'for_resale')
+                    || isAdmin();
       allow delete: if false;
     }
 
