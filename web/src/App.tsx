@@ -12,6 +12,7 @@ import VendorRedeemPage from "./pages/VendorRedeemPage";
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 import AdminVendorsPage from "./pages/admin/AdminVendorsPage";
+import AdminAppealsPage from "./pages/admin/AdminAppealsPage";
 import VendorPortalDashboard from "./pages/vendor-portal/VendorPortalDashboard";
 import VendorPortalMenu from "./pages/vendor-portal/VendorPortalMenu";
 import VendorPortalOrders from "./pages/vendor-portal/VendorPortalOrders";
@@ -94,6 +95,9 @@ export default function App() {
           </Route>
           <Route path="/admin/vendors">
             <MarketplacePage><AdminVendorsPage /></MarketplacePage>
+          </Route>
+          <Route path="/admin/appeals">
+            <MarketplacePage><AdminAppealsPage /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/dashboard">
             <MarketplacePage><VendorPortalDashboard /></MarketplacePage>
