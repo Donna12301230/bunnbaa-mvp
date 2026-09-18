@@ -1,65 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── shadcn/ui design tokens (ported from BunnBaa Parse_Ref) ──────────────
+   Drives the new marketplace UI (login/home/admin/vendor-portal pages).
+   Kept separate from the --ink/--brand/... tokens below, which the existing
+   lock-prototype pages (ConsumerLockPage/VendorDashboard/VendorRedeemPage)
+   use — the two systems don't share variable names, so they coexist safely. */
+:root {
+  --background: hsl(36, 40%, 97%);
+  --foreground: hsl(22, 30%, 12%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(22, 30%, 12%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(22, 30%, 12%);
+  --primary: hsl(22, 62%, 35%);
+  --primary-foreground: hsl(36, 60%, 97%);
+  --secondary: hsl(36, 35%, 88%);
+  --secondary-foreground: hsl(22, 40%, 18%);
+  --muted: hsl(36, 25%, 93%);
+  --muted-foreground: hsl(22, 15%, 46%);
+  --accent: hsl(36, 88%, 50%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(36, 20%, 87%);
+  --input: hsl(36, 20%, 87%);
+  --ring: hsl(22, 62%, 35%);
+  --chart-1: hsl(22, 62%, 35%);
+  --chart-2: hsl(36, 88%, 50%);
+  --chart-3: hsl(36, 45%, 65%);
+  --chart-4: hsl(22, 30%, 55%);
+  --chart-5: hsl(36, 70%, 70%);
+  --sidebar: hsl(36, 30%, 95%);
+  --sidebar-foreground: hsl(22, 30%, 12%);
+  --sidebar-primary: hsl(22, 62%, 35%);
+  --sidebar-primary-foreground: hsl(36, 60%, 97%);
+  --sidebar-accent: hsl(36, 35%, 88%);
+  --sidebar-accent-foreground: hsl(22, 62%, 35%);
+  --sidebar-border: hsl(36, 20%, 87%);
+  --sidebar-ring: hsl(22, 62%, 35%);
+  --font-sans: -apple-system, "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: Menlo, monospace;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: hsl(22, 20%, 8%);
+  --foreground: hsl(36, 40%, 92%);
+  --card: hsl(22, 18%, 11%);
+  --card-foreground: hsl(36, 40%, 92%);
+  --popover: hsl(22, 18%, 11%);
+  --popover-foreground: hsl(36, 40%, 92%);
+  --primary: hsl(22, 62%, 50%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(36, 25%, 18%);
+  --secondary-foreground: hsl(36, 40%, 92%);
+  --muted: hsl(22, 15%, 14%);
+  --muted-foreground: hsl(36, 15%, 55%);
+  --accent: hsl(36, 88%, 52%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(22, 15%, 18%);
+  --input: hsl(22, 18%, 16%);
+  --ring: hsl(22, 62%, 50%);
+  --chart-1: hsl(22, 62%, 50%);
+  --chart-2: hsl(36, 88%, 52%);
+  --chart-3: hsl(36, 45%, 45%);
+  --chart-4: hsl(22, 30%, 50%);
+  --chart-5: hsl(36, 70%, 55%);
+  --sidebar: hsl(22, 18%, 11%);
+  --sidebar-foreground: hsl(36, 40%, 92%);
+  --sidebar-primary: hsl(22, 62%, 50%);
+  --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --sidebar-accent: hsl(36, 25%, 18%);
+  --sidebar-accent-foreground: hsl(22, 62%, 50%);
+  --sidebar-border: hsl(22, 15%, 22%);
+  --sidebar-ring: hsl(22, 62%, 50%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+}
+
+/* ── existing lock-prototype design tokens (ConsumerLockPage / VendorDashboard /
+   VendorRedeemPage) — unchanged ──────────────────────────────────────────── */
 :root {
   --ink: #1a1a1a;
   --sub: #555;
   --faint: #888;
   --brand: #8b5e5e;
+  --brand-strong: #6e4749;
   --brand-light: #f4ecec;
   --line: #e3e3e3;
   --bg: #fff;
-  font-family: -apple-system, "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+  --surface: #fff;
+
+  /* status colors — one pair per lock.status value (spec §04 設計代幣) */
+  --status-locked: #8b5e5e;      --status-locked-bg: #f4ecec;
+  --status-resale: #a9762b;      --status-resale-bg: #f8efe0;
+  --status-fulfilled: #4f7a5c;   --status-fulfilled-bg: #eaf2ec;
+  --status-resold: #3d7a7e;      --status-resold-bg: #e7f3f3;
+  --status-noshow: #a1483a;      --status-noshow-bg: #f8e9e6;
 }
 
-* { box-sizing: border-box; }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #f4ece9;
+    --sub: #c9bcb8;
+    --faint: #988c88;
+    --brand: #d59c9c;
+    --brand-strong: #e8bcbc;
+    --brand-light: #382625;
+    --line: #382d2b;
+    --bg: #171211;
+    --surface: #231c1b;
+
+    --status-locked: #d59c9c;      --status-locked-bg: #382625;
+    --status-resale: #d9a75c;      --status-resale-bg: #3a2e17;
+    --status-fulfilled: #7bab8a;   --status-fulfilled-bg: #1f2f24;
+    --status-resold: #6fb8bb;      --status-resold-bg: #17302f;
+    --status-noshow: #d9776a;      --status-noshow-bg: #3a1e1a;
+  }
+}
+
 body { margin: 0; background: var(--bg); color: var(--ink); }
 
-.page { max-width: 720px; margin: 0 auto; padding: 24px 20px 64px; }
+.legacy-ui .page { max-width: 720px; margin: 0 auto; padding: 24px 20px 64px; }
 
-.kicker {
+.legacy-ui .kicker {
   font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
   color: var(--brand); text-transform: uppercase; margin-bottom: 4px;
 }
-h1 { font-size: 26px; margin: 0 0 20px; }
-h2 { font-size: 18px; margin: 0 0 8px; }
+.legacy-ui h1 { font-size: 26px; margin: 0 0 20px; }
+.legacy-ui h2 { font-size: 18px; margin: 0 0 8px; }
 
-.card {
+.legacy-ui .card {
   border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
-  margin-bottom: 14px; background: #fff;
+  margin-bottom: 14px; background: var(--surface);
 }
-.card.tinted { background: var(--brand-light); border-color: transparent; }
+.legacy-ui .card.tinted { background: var(--brand-light); border-color: transparent; }
 
-.badge {
+.legacy-ui .badge {
   display: inline-block; font-size: 12px; font-weight: 600;
   padding: 3px 10px; border-radius: 999px; background: var(--brand-light);
   color: var(--brand);
 }
 
-.muted { color: var(--sub); font-size: 14px; }
-.faint { color: var(--faint); font-size: 12px; }
-.disclaimer { color: var(--faint); font-size: 11px; font-style: italic; margin-top: 8px; }
+/* lock.status badge — color is fixed per status value, shared by both ends (spec §05 元件庫) */
+.legacy-ui .status-badge {
+  display: inline-block; font-size: 12px; font-weight: 700;
+  padding: 3px 10px; border-radius: 999px;
+}
+.legacy-ui .status-badge[data-status="locked"] { background: var(--status-locked-bg); color: var(--status-locked); }
+.legacy-ui .status-badge[data-status="for_resale"] { background: var(--status-resale-bg); color: var(--status-resale); }
+.legacy-ui .status-badge[data-status="fulfilled"] { background: var(--status-fulfilled-bg); color: var(--status-fulfilled); }
+.legacy-ui .status-badge[data-status="resold_and_fulfilled"] { background: var(--status-resold-bg); color: var(--status-resold); }
+.legacy-ui .status-badge[data-status="no_show"] { background: var(--status-noshow-bg); color: var(--status-noshow); }
 
-button {
+.legacy-ui .muted { color: var(--sub); font-size: 14px; }
+.legacy-ui .faint { color: var(--faint); font-size: 12px; }
+.legacy-ui .disclaimer { color: var(--faint); font-size: 11px; font-style: italic; margin-top: 8px; }
+
+.legacy-ui button {
   background: var(--brand); color: #fff; border: none; border-radius: 8px;
   padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
 }
-button:disabled { opacity: 0.5; cursor: default; }
-button.secondary { background: #fff; color: var(--brand); border: 1px solid var(--brand); }
+.legacy-ui button:disabled { opacity: 0.5; cursor: default; }
+.legacy-ui button.secondary { background: var(--surface); color: var(--brand); border: 1px solid var(--brand); }
 
-input[type="text"] {
+.legacy-ui input[type="text"] {
   width: 100%; padding: 8px 10px; border: 1px solid var(--line);
   border-radius: 8px; font-size: 14px;
 }
 
-.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.stat { font-size: 28px; font-weight: 700; color: var(--brand); }
+.legacy-ui .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.legacy-ui .stat { font-size: 28px; font-weight: 700; color: var(--brand); }
 
-.qr-block { display: flex; align-items: center; gap: 16px; }
-.qr-box { padding: 8px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
-.lock-code { font-size: 20px; font-weight: 700; letter-spacing: 0.08em; font-family: monospace; }
+.legacy-ui .qr-block { display: flex; align-items: center; gap: 16px; }
+.legacy-ui .qr-box { padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.legacy-ui .lock-code { font-size: 20px; font-weight: 700; letter-spacing: 0.08em; font-family: monospace; }
 
-.field { margin-bottom: 12px; }
-.field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-.field-error { color: #b23; font-size: 12px; margin-top: 4px; }
+.legacy-ui .field { margin-bottom: 12px; }
+.legacy-ui .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.legacy-ui .field-error { color: var(--status-noshow); font-size: 12px; margin-top: 4px; }
 
-.image-preview { position: relative; width: 100%; height: 128px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); margin-bottom: 8px; }
-.image-preview img { width: 100%; height: 100%; object-fit: cover; }
-.image-preview button { position: absolute; top: 4px; right: 4px; padding: 2px 8px; font-size: 12px; }
+.legacy-ui .image-preview { position: relative; width: 100%; height: 128px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); margin-bottom: 8px; }
+.legacy-ui .image-preview img { width: 100%; height: 100%; object-fit: cover; }
+.legacy-ui .image-preview button { position: absolute; top: 4px; right: 4px; padding: 2px 8px; font-size: 12px; }

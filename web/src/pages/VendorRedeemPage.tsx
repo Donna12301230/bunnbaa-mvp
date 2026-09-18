@@ -139,21 +139,25 @@ export default function VendorRedeemPage() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
               <span className="badge">#{foundLock.id.slice(-8).toUpperCase()}</span>
-              {foundLock.status === "for_resale" && <span className="badge">轉賣中</span>}
+              {foundLock.status === "for_resale" && (
+                <span className="status-badge" data-status="for_resale">轉賣中</span>
+              )}
             </div>
           </div>
 
           {alreadyDone ? (
             <>
-              <p className="muted" style={{ marginTop: 12 }}>
+              <p className="muted" style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
                 狀態：
-                {foundLock.status === "fulfilled"
-                  ? "已完成取餐"
-                  : foundLock.status === "resold_and_fulfilled"
-                  ? "已由轉賣對象完成取餐"
-                  : foundLock.status === "no_show"
-                  ? "已登記未取餐"
-                  : foundLock.status}
+                <span className="status-badge" data-status={foundLock.status}>
+                  {foundLock.status === "fulfilled"
+                    ? "已完成取餐"
+                    : foundLock.status === "resold_and_fulfilled"
+                    ? "已由轉賣對象完成取餐"
+                    : foundLock.status === "no_show"
+                    ? "已登記未取餐"
+                    : foundLock.status}
+                </span>
               </p>
               <button className="secondary" onClick={reset}>
                 查詢下一筆
