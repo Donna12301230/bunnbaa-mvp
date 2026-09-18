@@ -9,6 +9,7 @@ import {
 import { db, auth } from "../lib/firebase";
 import { signInAnonymously } from "firebase/auth";
 import type { Lock, Vendor } from "../types";
+import LockQRCode from "../components/LockQRCode";
 
 const VENDOR_ID = "cafe-renheya-demo";
 const ITEM_NAME = "招牌鮭魚御飯糰便當";
@@ -96,6 +97,12 @@ export default function ConsumerLockPage() {
           </button>
         </div>
       </div>
+
+      {myLock && (
+        <div className="card">
+          <LockQRCode lockId={myLock.id} vendorId={VENDOR_ID} />
+        </div>
+      )}
 
       {myLock && (
         <div className="card">

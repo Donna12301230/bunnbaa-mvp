@@ -111,6 +111,43 @@ exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request)
 });
 
 /* ------------------------------------------------------------------ *
+ * 1a. Vendor marks pickup outcome (fulfilled / no-show)
+ * ------------------------------------------------------------------ */
+
+const VALID_OUTCOMES = ["fulfilled", "no_show"];
+
+/**
+ * Vendor-side pickup counter action: mark a lock as picked up or not.
+ * Runs with admin rights because `firestore.rules` deliberately blocks
+ * clients from writing lock status transitions directly (see rules
+ * comment) — the calibration agent's accuracy numbers depend on this
+ * data being vendor-attested, not self-reported by the buyer.
+ */
+exports.markLockOutcome = onCall({ region: "asia-east1" }, async (request) => {
+  const { lock_id: lockId, outcome, note } = request.data || {};
+  if (!lockId || !VALID_OUTCOMES.includes(outcome)) {
+    throw new HttpsError(
+      "invalid-argument",
+      `lock_id is required and outcome must be one of: ${VALID_OUTCOMES.join(", ")}`
+    );
+  }
+
+  const lockRef = db.collection("locks").doc(lockId);
+  const lockSnap = await lockRef.get();
+  if (!lockSnap.exists) {
+    throw new HttpsError("not-found", `No lock found with id ${lockId}`);
+  }
+
+  const update = { status: outcome };
+  if (outcome === "no_show" && note) {
+    update.no_show_note = note;
+  }
+  await lockRef.update(update);
+
+  return { lock_id: lockId, status: outcome };
+});
+
+/* ------------------------------------------------------------------ *
  * 2. Vendor what-if follow-up (spec 4.1a)
  * ------------------------------------------------------------------ */
 exports.askCalibrationScenario = onCall({ region: "asia-east1" }, async (request) => {

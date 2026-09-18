@@ -48,11 +48,16 @@ Firebase 專案已建好並完成大半設定：`bunnbaa-mvp-5474`（擁有者�
 - [ ] 轉賣流程（`for_resale` → `resold_and_fulfilled`）的實際 UI，目前只有 Firestore rules 預留欄位
 - [ ] 履約穩定度徽章自動換算（目前 `vendor.reliability_tone` 是手動欄位，應該由 `dailyCalibration` 依 `accuracy_rate` 自動更新，例如 >80% = 穩定）
 - [ ] 取餐時段推播提醒（spec §3.7，Firebase Cloud Messaging，跟 AI 無關的純 UX）
-- [ ] 商家後台標記 no-show／備註的介面（目前 `seed.js` 是寫死模擬資料）
+- [x] 商家後台標記 no-show／備註的介面——新增 `/vendor/redeem`（`VendorRedeemPage.tsx`），已在 emulator 驗證完整流程
 
 ## 之後的工作（照架構文件時程表順序）
 
-- [ ] 從 `BunnBaa Parse_Ref` 複製可直接沿用的前端元件：表單（react-hook-form + zod）、QR Code 掃碼核銷、Cloudinary 上傳設定——只改資料請求那幾行（Parse SDK → Firestore SDK）
+- [x] 從 `BunnBaa Parse_Ref` 複製可直接沿用的前端元件：
+  - **QR Code 掃碼核銷**：`LockQRCode.tsx`（消費者端顯示）+ `VendorRedeemPage.tsx`（商家端查詢核對）。舊專案其實也沒真的做相機掃碼（裝了 `html5-qrcode` 但沒用到），核對方式沿用舊版 `vendor/scan.tsx` 的「手動輸入末 8 碼比對」模式。
+  - **表單（react-hook-form + zod）**：用在 `VendorRedeemPage.tsx` 的「登記未取餐」備註欄位（`note` 至少 2 字才能送出）。
+  - **Cloudinary 上傳**：`ImageUploadField.tsx` 已搬過來、拿掉 shadcn/ui 依賴改用專案原本的純 CSS 風格，但**還沒接到任何頁面**——這個 MVP 還沒有「新增商家/菜單」的表單，先當備用元件放著，等真的要做商家自助上架時再用。需要的話要在 Cloudinary 後台建一個 unsigned upload preset，設定進 `web/.env.local` 的 `VITE_CLOUDINARY_CLOUD_NAME`／`VITE_CLOUDINARY_UPLOAD_PRESET`（範例見 `web/.env.example`）。
+  - 新增了 `markLockOutcome` Cloud Function（`functions/src/index.js`），因為 `firestore.rules` 明確禁止 client 端直接改 lock 狀態，核對取餐／登記未取餐都要走這個 callable。
+  - **還沒重新部署到正式 Hosting**：因為 Functions 還沒上 Blaze，正式環境呼叫 `markLockOutcome` 會失敗，先留在本機 emulator 驗證過就好，等 Blaze 升級、Functions 部署後再一起重新 `firebase deploy --only hosting`。
 - [ ] 商業邏輯用「參照不複製」原則，依 `locks` 新資料模型重寫（不要逐行翻譯舊的 `cloud/main.js`，資料結構已經不同）
 - [ ] 金流串接：LINE Pay／綠界，平台代收、定期撥款商家（`settleVendorPayouts()` Cloud Scheduler，尚未寫）
 - [ ] 整合測試 → 部署 Firebase Hosting → 錄 Demo（3 分鐘腳本見 v6 §8）→ 撰寫英文版 Proposal → 10/18 前提交
