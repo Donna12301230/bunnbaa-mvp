@@ -103,10 +103,10 @@ Firebase 專案已建好並完成大半設定：`bunnbaa-mvp-5474`（擁有者�
 
 ## 測試帳號（角色分流，2026-09-18）
 
-`/login` 目前是 `mockAuth.ts` 的假登入，不驗證密碼，純粹依「帳號」字串判斷角色：帳號含 `admin` → 管理員、含 `vendor` → 廠商、其餘 → 一般會員。登入成功後 `App.tsx` 的 `RootGate` 會依角色自動導向：
-- 一般會員 → `/profile`（會員中心）
-- 廠商 → `/vendor-portal/dashboard`（廠商後台）
-- 管理員 → `/admin/vendors`（管理後台）
+`/login` 目前是 `mockAuth.ts` 的假登入，不驗證密碼，純粹依「帳號」字串判斷角色：帳號含 `admin` → 管理員、含 `vendor` → 廠商、其餘 → 一般會員。登入成功後一律先進首頁（`/home`），右上角使用者下拉選單依角色顯示不同後台入口：
+- 一般會員：只看到「會員中心」（`/profile`，新建的頁面）
+- 廠商：多一個「廠商後台」（`/vendor-portal/dashboard`）
+- 管理員：多一個「管理後台」（`/admin/vendors`）
 
 三個測試帳密（密碼隨便打，mock 不檢查）：
 

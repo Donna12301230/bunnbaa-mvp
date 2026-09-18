@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Search, MapPin, Globe, User, ChevronDown, Gift, Clock, CalendarDays,
-  Rocket, Star, ClipboardList, Repeat, LogOut,
+  Rocket, Star, ClipboardList, Repeat, LogOut, Store, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { mockLogout } from "@/lib/mockAuth";
@@ -20,7 +20,7 @@ import {
 // Firestore 時把 queryFn 換掉即可；搜尋框、地址／語言選單目前只是靜態外觀。
 export default function HomePage() {
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, isVendor, isAdmin } = useAuth();
   const { toast } = useToast();
   const [tab, setTab] = useState<"plans" | "transfer">("plans");
   const [searchInput, setSearchInput] = useState("");
@@ -113,6 +113,16 @@ export default function HomePage() {
                   <DropdownMenuItem onClick={() => navigate("/profile")}>
                     <User className="w-4 h-4 mr-2" /> 會員中心
                   </DropdownMenuItem>
+                  {isVendor && (
+                    <DropdownMenuItem onClick={() => navigate("/vendor-portal/dashboard")}>
+                      <Store className="w-4 h-4 mr-2" /> 廠商後台
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => navigate("/admin/vendors")}>
+                      <ShieldCheck className="w-4 h-4 mr-2" /> 管理後台
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-red-600"
