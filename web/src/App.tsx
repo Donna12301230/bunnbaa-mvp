@@ -1,4 +1,4 @@
-import { Switch, Route, Link, Router } from "wouter";
+import { Switch, Route, Link, Router, Redirect } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -11,6 +11,7 @@ import VendorRedeemPage from "./pages/VendorRedeemPage";
 
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
+import ProfilePage from "./pages/ProfilePage";
 import AdminVendorsPage from "./pages/admin/AdminVendorsPage";
 import AdminAppealsPage from "./pages/admin/AdminAppealsPage";
 import VendorPortalDashboard from "./pages/vendor-portal/VendorPortalDashboard";
@@ -35,10 +36,14 @@ function MarketplacePage({ children }: { children: React.ReactNode }) {
   return <div className="font-sans antialiased bg-background text-foreground">{children}</div>;
 }
 
-// 根路徑跟來源專案一致：未登入顯示登入頁、已登入顯示首頁
+// 未登入顯示登入頁；登入後依角色導向對應入口：
+// 一般會員 → 會員中心／廠商 → 廠商後台／管理員 → 管理後台
 function RootGate() {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <HomePage /> : <LoginPage />;
+  const { isAuthenticated, isVendor, isAdmin } = useAuth();
+  if (!isAuthenticated) return <LoginPage />;
+  if (isAdmin) return <Redirect to="/admin/vendors" />;
+  if (isVendor) return <Redirect to="/vendor-portal/dashboard" />;
+  return <Redirect to="/profile" />;
 }
 
 export default function App() {
@@ -68,6 +73,9 @@ export default function App() {
           </Route>
           <Route path="/home">
             <MarketplacePage><HomePage /></MarketplacePage>
+          </Route>
+          <Route path="/profile">
+            <MarketplacePage><ProfilePage /></MarketplacePage>
           </Route>
           <Route path="/admin/vendors">
             <MarketplacePage><AdminVendorsPage /></MarketplacePage>

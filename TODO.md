@@ -101,6 +101,23 @@ Firebase 專案已建好並完成大半設定：`bunnbaa-mvp-5474`（擁有者�
 
 已完成：`functions/` 和 `web/` 的 npm 依賴都裝好了，四個 Cloud Functions 檔案語法確認正常，`web` 補了缺失的 `vite-env.d.ts`（原本沒有導致 `import.meta.env` 型別報錯），`npx tsc --noEmit` 已過。
 
+## 測試帳號（角色分流，2026-09-18）
+
+`/login` 目前是 `mockAuth.ts` 的假登入，不驗證密碼，純粹依「帳號」字串判斷角色：帳號含 `admin` → 管理員、含 `vendor` → 廠商、其餘 → 一般會員。登入成功後 `App.tsx` 的 `RootGate` 會依角色自動導向：
+- 一般會員 → `/profile`（會員中心）
+- 廠商 → `/vendor-portal/dashboard`（廠商後台）
+- 管理員 → `/admin/vendors`（管理後台）
+
+三個測試帳密（密碼隨便打，mock 不檢查）：
+
+| 角色 | 帳號 | 密碼 |
+|---|---|---|
+| 一般會員 | customer@test.com | 任意 |
+| 廠商 | vendor@test.com | 任意 |
+| 管理員 | admin@test.com | 任意 |
+
+之後接上真的 Firebase Auth／正式身分驗證時，這套「帳號字串猜角色」的 mock 邏輯要整個換掉，`role` 改成從 Firestore `users/{uid}` 文件讀。
+
 ## 業務面（不是我能代勞的部分，記得盡快處理）
 
 - [ ] **LINE Pay／綠界特約商店申請**——審核週期可能數個工作天到數週，越早送件越好，避免卡到最後一週才發現金流串不上
