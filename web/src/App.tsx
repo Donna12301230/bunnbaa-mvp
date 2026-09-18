@@ -3,6 +3,7 @@ import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
+import { useAuth } from "@/hooks/useAuth";
 
 import ConsumerLockPage from "./pages/ConsumerLockPage";
 import VendorDashboard from "./pages/VendorDashboard";
@@ -24,9 +25,19 @@ function NotFound() {
   return (
     <div style={{ padding: 40, textAlign: "center" }}>
       <p>找不到這個頁面。</p>
-      <Link href="/home">回首頁</Link>
+      <Link href="/">回首頁</Link>
     </div>
   );
+}
+
+function MarketplacePage({ children }: { children: React.ReactNode }) {
+  return <div className="font-sans antialiased bg-background text-foreground">{children}</div>;
+}
+
+// 根路徑跟來源專案一致：未登入顯示登入頁、已登入顯示首頁
+function RootGate() {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <HomePage /> : <LoginPage />;
 }
 
 export default function App() {
@@ -36,65 +47,69 @@ export default function App() {
         <nav style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 20px", borderBottom: "1px solid var(--line)" }}>
           <strong style={{ color: "var(--brand)" }}>BunnBaa</strong>
           <span style={{ opacity: 0.5 }}>|</span>
-          <Link to="/">鎖定 Demo</Link>
-          <Link to="/vendor">鎖定商家後台 Demo</Link>
-          <Link to="/vendor/redeem">核對取餐 Demo</Link>
+          <Link to="/lock">鎖定 Demo</Link>
+          <Link to="/lock/vendor">鎖定商家後台 Demo</Link>
+          <Link to="/lock/vendor/redeem">核對取餐 Demo</Link>
           <span style={{ opacity: 0.5 }}>|</span>
-          <Link to="/login">登入</Link>
-          <Link to="/home">首頁</Link>
+          <Link to="/">首頁 / 登入</Link>
           <Link to="/admin/vendors">平台管理後台</Link>
           <Link to="/vendor-portal/dashboard">商家後台</Link>
         </nav>
 
         <Switch>
-          {/* 既有的預購鎖定機制 Demo — 維持原樣 */}
+          {/* 根路徑：未登入 = 登入頁，已登入 = 首頁（與 bunnbaa.com 行為一致） */}
           <Route path="/">
+            <MarketplacePage><RootGate /></MarketplacePage>
+          </Route>
+
+          {/* 既有的預購鎖定機制 Demo — 維持原樣，改掛在 /lock 底下 */}
+          <Route path="/lock">
             <div className="legacy-ui"><ConsumerLockPage /></div>
           </Route>
-          <Route path="/vendor">
+          <Route path="/lock/vendor">
             <div className="legacy-ui"><VendorDashboard /></div>
           </Route>
-          <Route path="/vendor/redeem">
+          <Route path="/lock/vendor/redeem">
             <div className="legacy-ui"><VendorRedeemPage /></div>
           </Route>
 
           {/* 搬移自 BunnBaa Parse_Ref 的行銷平台 UI（登入/首頁/後台） */}
           <Route path="/login">
-            <div className="font-sans antialiased bg-background text-foreground"><LoginPage /></div>
+            <MarketplacePage><LoginPage /></MarketplacePage>
           </Route>
           <Route path="/home">
-            <div className="font-sans antialiased bg-background text-foreground"><HomePage /></div>
+            <MarketplacePage><HomePage /></MarketplacePage>
           </Route>
           <Route path="/admin/vendors">
-            <div className="font-sans antialiased bg-background text-foreground"><AdminVendorsPage /></div>
+            <MarketplacePage><AdminVendorsPage /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/dashboard">
-            <div className="font-sans antialiased bg-background text-foreground"><VendorPortalDashboard /></div>
+            <MarketplacePage><VendorPortalDashboard /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/menu">
-            <div className="font-sans antialiased bg-background text-foreground"><VendorPortalMenu /></div>
+            <MarketplacePage><VendorPortalMenu /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/orders">
-            <div className="font-sans antialiased bg-background text-foreground"><VendorPortalOrders /></div>
+            <MarketplacePage><VendorPortalOrders /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/reports">
-            <div className="font-sans antialiased bg-background text-foreground"><VendorPortalReports /></div>
+            <MarketplacePage><VendorPortalReports /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/scan">
-            <div className="font-sans antialiased bg-background text-foreground"><VendorPortalScan /></div>
+            <MarketplacePage><VendorPortalScan /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/sessions/:sessionId/summary">
-            <div className="font-sans antialiased bg-background text-foreground"><VendorPortalSessionSummary /></div>
+            <MarketplacePage><VendorPortalSessionSummary /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/sessions">
-            <div className="font-sans antialiased bg-background text-foreground"><VendorPortalSessions /></div>
+            <MarketplacePage><VendorPortalSessions /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/settings">
-            <div className="font-sans antialiased bg-background text-foreground"><VendorPortalSettings /></div>
+            <MarketplacePage><VendorPortalSettings /></MarketplacePage>
           </Route>
 
           <Route>
-            <div className="font-sans antialiased bg-background text-foreground"><NotFound /></div>
+            <MarketplacePage><NotFound /></MarketplacePage>
           </Route>
         </Switch>
       </Router>

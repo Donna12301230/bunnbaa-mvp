@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,9 +61,11 @@ export default function LoginPage() {
   const [vendorPhone, setVendorPhone] = useState("");
 
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const loginMutation = useMutation({
     mutationFn: () => mockLogin(username, password),
+    onSuccess: () => navigate("/"),
     onError: (err: Error) => toast({ variant: "destructive", title: "登入失敗", description: err.message }),
   });
 
@@ -75,6 +78,7 @@ export default function LoginPage() {
     },
     onSuccess: () => {
       toast({ title: "註冊成功", description: "歡迎加入 飯飽BunnBaa！" });
+      navigate("/");
     },
     onError: (err: Error) => toast({ variant: "destructive", title: "註冊失敗", description: err.message }),
   });
@@ -89,6 +93,7 @@ export default function LoginPage() {
     },
     onSuccess: () => {
       toast({ title: "廠商申請已送出", description: "管理員審核通過後即可使用廠商後台。" });
+      navigate("/");
     },
     onError: (err: Error) => toast({ variant: "destructive", title: "申請失敗", description: err.message }),
   });
