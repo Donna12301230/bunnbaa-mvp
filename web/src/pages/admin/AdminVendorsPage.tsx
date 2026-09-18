@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { mockVendors, mockBanAppeals, mockApproveVendor, mockProcessBanAppeal } from "@/lib/mockData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,8 +23,14 @@ export default function AdminVendorsPage() {
   const { isAdmin, isLoading: authLoading } = useAuth();
   const [, navigate] = useLocation();
 
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      toast({ variant: "destructive", title: "請先登入 / 註冊帳號", description: "此頁面僅限平台管理員使用。" });
+      navigate("/");
+    }
+  }, [authLoading, isAdmin]);
+
   if (!authLoading && !isAdmin) {
-    navigate("/home");
     return null;
   }
 

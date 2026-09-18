@@ -44,16 +44,28 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router hook={useHashLocation}>
-        <nav style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 20px", borderBottom: "1px solid var(--line)" }}>
+        <nav style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 20, padding: "14px 20px", borderBottom: "1px solid var(--line)" }}>
           <strong style={{ color: "var(--brand)" }}>BunnBaa</strong>
-          <span style={{ opacity: 0.5 }}>|</span>
-          <Link to="/lock">鎖定 Demo</Link>
-          <Link to="/lock/vendor">鎖定商家後台 Demo</Link>
-          <Link to="/lock/vendor/redeem">核對取餐 Demo</Link>
-          <span style={{ opacity: 0.5 }}>|</span>
-          <Link to="/">首頁 / 登入</Link>
-          <Link to="/admin/vendors">平台管理後台</Link>
-          <Link to="/vendor-portal/dashboard">商家後台</Link>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.05em", color: "var(--faint)", textTransform: "uppercase" }}>
+              預購鎖定機制 Demo
+            </span>
+            <Link to="/lock">消費者端</Link>
+            <Link to="/lock/vendor">商家後台</Link>
+            <Link to="/lock/vendor/redeem">核對取餐</Link>
+          </div>
+
+          <span style={{ opacity: 0.3, width: 1, height: 20, background: "var(--line)" }} />
+
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.05em", color: "var(--faint)", textTransform: "uppercase" }}>
+              飯飽 BunnBaa 平台
+            </span>
+            <Link to="/">首頁 / 登入</Link>
+            <Link to="/admin/vendors">平台管理後台</Link>
+            <Link to="/vendor-portal/dashboard">商家後台</Link>
+          </div>
         </nav>
 
         <Switch>

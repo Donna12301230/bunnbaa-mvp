@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, UtensilsCrossed, ClipboardList, Settings, ArrowLeft, CalendarDays, Search, TrendingUp, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,8 +28,14 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
   const { user, isVendor, isLoading } = useAuth();
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (!isLoading && !isVendor) {
+      toast({ variant: "destructive", title: "請先登入 / 註冊帳號", description: "此頁面僅限廠商帳號使用。" });
+      navigate("/");
+    }
+  }, [isLoading, isVendor]);
+
   if (!isLoading && !isVendor) {
-    navigate("/home");
     return null;
   }
 
