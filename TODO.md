@@ -2,7 +2,7 @@
 
 對應文件：`../../BunnBaa_0到1架構文件.docx`（唯一權威文件）、`BunnBaa_技術規格文件_v6_消費者端補強版.docx`、`BunnBaa_現有雛型改造指南.docx`。舊雛型參照：`../../BunnBaa Parse_Ref/`。
 
-## UI想法架構圖  https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc
+## UI草圖  https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc  此為設計稿，僅參考框架即可，其他UI依照原模型
 
 ## 模組總覽（依負責人分類，2026-09-18 確認分工）
 
