@@ -349,3 +349,73 @@ exports.onLockCreated = onDocumentCreated(
     await lockRef.update({ discount_explanation: explanation.explanation_text });
   }
 );
+
+/* ------------------------------------------------------------------ *
+ * 4. Pickup-time reminder push (spec §3.7, README "尚未實作") — pure
+ * UX, unrelated to the AI agents. Runs every 15 min looking for locks
+ * whose pickup window starts within the next 30 min.
+ * ------------------------------------------------------------------ */
+
+const REMINDER_WINDOW_MINUTES = 30;
+
+function pickupWindowStart(pickupDate, pickupWindow) {
+  const startTime = pickupWindow.split("-")[0]?.trim(); // "12:00-13:00" -> "12:00"
+  if (!startTime) return null;
+  // pickup_date/pickup_window are both stored in Asia/Taipei local terms
+  // (spec's single-location pilot), so this constructs the instant as UTC+8.
+  return new Date(`${pickupDate}T${startTime}:00+08:00`);
+}
+
+async function sendPickupReminders() {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }); // YYYY-MM-DD
+  const snap = await db
+    .collection("locks")
+    .where("status", "==", "locked")
+    .where("pickup_date", "==", today)
+    .get();
+
+  const now = Date.now();
+  let sent = 0;
+
+  for (const doc of snap.docs) {
+    const lock = doc.data();
+    if (!lock.fcm_token || lock.reminder_sent) continue;
+
+    const start = pickupWindowStart(lock.pickup_date, lock.pickup_window);
+    if (!start) continue;
+    const minutesUntilPickup = (start.getTime() - now) / 60000;
+    if (minutesUntilPickup < 0 || minutesUntilPickup > REMINDER_WINDOW_MINUTES) continue;
+
+    try {
+      await admin.messaging().send({
+        token: lock.fcm_token,
+        notification: {
+          title: "取餐時間快到了",
+          body: `${lock.item_name} 預計 ${lock.pickup_window} 取餐，別忘記囉！`,
+        },
+      });
+      await doc.ref.update({ reminder_sent: true });
+      sent++;
+    } catch (err) {
+      logger.error(`Failed to send pickup reminder for lock ${doc.id}`, err);
+      // Leave reminder_sent unset so a transient failure can retry next run;
+      // an invalid/expired token will just keep failing harmlessly.
+    }
+  }
+
+  logger.info(`Sent ${sent} pickup reminder(s) for ${today}`);
+  return sent;
+}
+
+exports.pickupReminders = onSchedule(
+  { schedule: "every 15 minutes", timeZone: "Asia/Taipei", region: "asia-east1" },
+  async () => {
+    await sendPickupReminders();
+  }
+);
+
+/** Manual trigger for local testing, same pattern as triggerCalibrationNow. */
+exports.triggerPickupRemindersNow = onCall({ region: "asia-east1" }, async () => {
+  const sent = await sendPickupReminders();
+  return { sent };
+});

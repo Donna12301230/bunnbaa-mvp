@@ -12,8 +12,15 @@ import VendorRedeemPage from "./pages/VendorRedeemPage";
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
+import VendorListPage from "./pages/VendorListPage";
+import VendorPage from "./pages/VendorPage";
+import MenuItemPage from "./pages/MenuItemPage";
+import CustomerLayout from "./components/CustomerLayout";
 import AdminVendorsPage from "./pages/admin/AdminVendorsPage";
 import AdminAppealsPage from "./pages/admin/AdminAppealsPage";
+import AdminLocksPage from "./pages/admin/AdminLocksPage";
+import AdminPayoutsPage from "./pages/admin/AdminPayoutsPage";
+import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 import VendorPortalDashboard from "./pages/vendor-portal/VendorPortalDashboard";
 import VendorPortalMenu from "./pages/vendor-portal/VendorPortalMenu";
 import VendorPortalOrders from "./pages/vendor-portal/VendorPortalOrders";
@@ -73,11 +80,29 @@ export default function App() {
           <Route path="/profile">
             <MarketplacePage><ProfilePage /></MarketplacePage>
           </Route>
+          <Route path="/vendors">
+            <MarketplacePage><CustomerLayout><VendorListPage /></CustomerLayout></MarketplacePage>
+          </Route>
+          <Route path="/vendor/:id">
+            <MarketplacePage><CustomerLayout><VendorPage /></CustomerLayout></MarketplacePage>
+          </Route>
+          <Route path="/item/:id">
+            <MarketplacePage><CustomerLayout><MenuItemPage /></CustomerLayout></MarketplacePage>
+          </Route>
           <Route path="/admin/vendors">
             <MarketplacePage><AdminVendorsPage /></MarketplacePage>
           </Route>
           <Route path="/admin/appeals">
             <MarketplacePage><AdminAppealsPage /></MarketplacePage>
+          </Route>
+          <Route path="/admin/locks">
+            <MarketplacePage><AdminLocksPage /></MarketplacePage>
+          </Route>
+          <Route path="/admin/payouts">
+            <MarketplacePage><AdminPayoutsPage /></MarketplacePage>
+          </Route>
+          <Route path="/admin/settings">
+            <MarketplacePage><AdminSettingsPage /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/dashboard">
             <MarketplacePage><VendorPortalDashboard /></MarketplacePage>

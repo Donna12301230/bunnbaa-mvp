@@ -28,6 +28,8 @@ export interface Lock {
   discount_explanation?: string | null; // filled in by onLockCreated
   buyer_uid: string;
   created_at: unknown; // Firestore Timestamp
+  fcm_token?: string | null; // for pickup-time reminder push, see sendPickupReminders
+  reminder_sent?: boolean;
 }
 
 export interface Payout {

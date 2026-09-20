@@ -15,6 +15,7 @@ import { db, auth, functions } from "../lib/firebase";
 import { signInAnonymously } from "firebase/auth";
 import type { Lock, Vendor } from "../types";
 import LockQRCode from "../components/LockQRCode";
+import { registerForPickupReminders } from "../lib/messaging";
 
 const VENDOR_ID = "cafe-renheya-demo";
 const ITEM_NAME = "招牌鮭魚御飯糰便當";
@@ -83,6 +84,11 @@ export default function ConsumerLockPage() {
     if (!auth.currentUser) return;
     setLocking(true);
     try {
+      // Requested before create, not after: firestore.rules only allows a
+      // buyer to update their own lock when moving it to "for_resale", so an
+      // update-after-create to attach the token would be rejected.
+      const fcmToken = await registerForPickupReminders();
+
       const ref = await addDoc(collection(db, "locks"), {
         vendor_id: VENDOR_ID,
         item_name: ITEM_NAME,
@@ -94,6 +100,7 @@ export default function ConsumerLockPage() {
         status: "locked",
         buyer_uid: auth.currentUser.uid,
         created_at: serverTimestamp(),
+        fcm_token: fcmToken,
       });
       setMyLock({ id: ref.id } as Lock);
     } finally {

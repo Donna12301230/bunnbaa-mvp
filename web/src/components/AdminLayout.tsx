@@ -1,6 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Store, ShieldAlert, ArrowLeft } from "lucide-react";
+import { Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
@@ -10,6 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 const navItems = [
   { href: "/admin/vendors", label: "廠商管理", icon: Store },
   { href: "/admin/appeals", label: "解封申訴", icon: ShieldAlert },
+  { href: "/admin/locks", label: "訂單總覽", icon: ClipboardList },
+  { href: "/admin/payouts", label: "撥款總覽", icon: Wallet },
+  { href: "/admin/settings", label: "系統設定", icon: Settings },
 ];
 
 // Sidebar/top-bar layout for the platform admin backend, styled to match

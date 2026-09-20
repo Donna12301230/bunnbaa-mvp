@@ -87,5 +87,5 @@ bunnbaa/
 
 - 轉賣（`for_resale` → `resold_and_fulfilled`）的實際 UI 流程，目前只有 Firestore rules 預留欄位
 - 商家履約穩定度徽章（spec §3.5）目前用 `vendor.reliability_tone` 這個手動欄位示意，實際上應該由 `accuracy_rate` 自動換算等級（例如 >80% = 穩定），可以在 `dailyCalibration` 裡順手更新這個欄位
-- 取餐時段推播提醒（spec §3.7，Firebase Cloud Messaging）——這塊跟 AI 無關，純 UX，還沒做
+- [x] 取餐時段推播提醒（spec §3.7，Firebase Cloud Messaging）——這塊跟 AI 無關，純 UX。程式碼已寫好：消費者鎖定時前端要求通知權限、取 FCM token 存進 lock 文件（`web/src/lib/messaging.ts` + `web/public/firebase-messaging-sw.js`），Functions 端新增 `pickupReminders`（每 15 分鐘掃一次，取餐前 30 分鐘內發送）+ `triggerPickupRemindersNow` 手動觸發。**還沒端到端測過**：一是要去 Firebase Console → Cloud Messaging 拿 Web Push 憑證（VAPID key）填進 `messaging.ts`（免費、跟 Blaze 無關，純 Console 點一下），二是 `pickupReminders`／`triggerPickupRemindersNow` 這兩個 Function 一樣卡在 Blaze 升級沒部署。
 - 商家後台標記 no-show／備註的介面（目前 `seed.js` 是直接寫死模擬資料，實際要讓商家自己在後台標記）

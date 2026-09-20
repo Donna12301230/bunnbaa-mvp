@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Search, MapPin, Globe, User, ChevronDown, Gift, Clock, CalendarDays,
@@ -85,6 +85,12 @@ export default function HomePage() {
               }`}
             >
               <CalendarDays className="w-4 h-4" /> 我的預約日曆
+            </button>
+            <button
+              onClick={() => navigate("/vendors")}
+              className="flex items-center gap-1.5 h-16 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Store className="w-4 h-4" /> 商家
             </button>
           </nav>
 
@@ -241,7 +247,7 @@ export default function HomePage() {
               {vendorPlans.map(group => (
                 <div key={group.vendorId} className="bg-white rounded-xl border border-border p-4 grid grid-cols-1 md:grid-cols-[220px_1fr_1fr] gap-4">
                   {/* 店家資訊 */}
-                  <div className="flex md:flex-col gap-3">
+                  <Link href={`/vendor/${group.vendorId}`} className="flex md:flex-col gap-3 hover:opacity-90">
                     <div className="w-20 h-20 md:w-full md:h-32 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-3xl shrink-0">
                       🥩
                     </div>
@@ -256,7 +262,7 @@ export default function HomePage() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </Link>
 
                   {/* 方案卡片 */}
                   {group.plans.map(plan => (

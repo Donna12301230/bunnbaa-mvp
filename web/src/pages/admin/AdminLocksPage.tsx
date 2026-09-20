@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
-import { db } from "../../lib/firebase";
-import type { Lock, LockStatus, Vendor } from "../../types";
+import { db } from "@/lib/firebase";
+import type { Lock, LockStatus, Vendor } from "@/types";
+import AdminLayout from "@/components/AdminLayout";
+import RequireRealAdmin from "@/components/RequireRealAdmin";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ClipboardList } from "lucide-react";
 
 const STATUS_LABELS: Record<LockStatus, string> = {
   locked: "鎖定中",
@@ -12,12 +18,13 @@ const STATUS_LABELS: Record<LockStatus, string> = {
 };
 
 /**
- * Global cross-vendor view. Follows the same pattern as
+ * Real Firestore data (the `/lock` legacy-ui pre-order flow's `locks`
+ * collection) — global cross-vendor view. Follows the same pattern as
  * ConsumerLockPage/VendorRedeemPage: fetch a recent page ordered by
  * created_at and filter vendor/status client-side, rather than adding a
  * new composite index for what's a handful of documents at pilot scale.
  */
-export default function AdminLocksPage() {
+function LocksContent() {
   const [locks, setLocks] = useState<Lock[]>([]);
   const [vendors, setVendors] = useState<Record<string, Vendor>>({});
   const [statusFilter, setStatusFilter] = useState<LockStatus | "all">("all");
@@ -69,94 +76,93 @@ export default function AdminLocksPage() {
   }
 
   return (
-    <div className="page">
-      <div className="kicker">BunnBaa · 管理後台</div>
-      <h1>訂單總覽</h1>
-
-      <div className="card">
-        <div className="row">
-          <div className="field" style={{ marginBottom: 0, flex: 1 }}>
-            <label>狀態篩選</label>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as LockStatus | "all")}>
-              <option value="all">全部狀態</option>
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field" style={{ marginBottom: 0, flex: 1 }}>
-            <label>商家篩選</label>
-            <select value={vendorFilter} onChange={(e) => setVendorFilter(e.target.value)}>
-              <option value="all">全部商家</option>
-              {Object.values(vendors).map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+    <>
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as LockStatus | "all")}
+          className="border border-border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="all">全部狀態</option>
+          {Object.entries(STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+        <select
+          value={vendorFilter}
+          onChange={(e) => setVendorFilter(e.target.value)}
+          className="border border-border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="all">全部商家</option>
+          {Object.values(vendors).map((v) => (
+            <option key={v.id} value={v.id}>{v.name}</option>
+          ))}
+        </select>
       </div>
 
       {filtered.length === 0 ? (
-        <p className="faint">沒有符合條件的訂單。</p>
+        <div className="text-center py-16 text-muted-foreground">
+          <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>沒有符合條件的訂單</p>
+        </div>
       ) : (
-        filtered.map((lock) => (
-          <div key={lock.id} className="card">
-            <div className="row">
-              <div>
-                <h2>{lock.item_name}</h2>
-                <div className="muted">
-                  {vendors[lock.vendor_id]?.name ?? lock.vendor_id} · {lock.pickup_window} · NT${lock.locked_price}
+        <div className="space-y-3">
+          {filtered.map((lock) => (
+            <Card key={lock.id} className="p-4">
+              <div className="flex items-start justify-between mb-1">
+                <div>
+                  <h3 className="font-semibold text-sm">{lock.item_name}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {vendors[lock.vendor_id]?.name ?? lock.vendor_id} · {lock.pickup_window} · NT${lock.locked_price}
+                  </p>
+                  <p className="text-xs text-muted-foreground">#{lock.id.slice(-8).toUpperCase()}</p>
                 </div>
-                <div className="faint">#{lock.id.slice(-8).toUpperCase()}</div>
+                <Badge className="bg-orange-100 text-orange-800 border-0 shrink-0">
+                  {STATUS_LABELS[lock.status]}
+                </Badge>
               </div>
-              <span className="badge">{STATUS_LABELS[lock.status]}</span>
-            </div>
 
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-              {lock.status !== "fulfilled" && (
-                <button
-                  className="secondary"
-                  disabled={actingId === lock.id}
-                  onClick={() => overrideStatus(lock.id, "fulfilled")}
-                >
-                  標記已完成取餐
-                </button>
-              )}
-              {lock.status !== "resold_and_fulfilled" && (
-                <button
-                  className="secondary"
-                  disabled={actingId === lock.id}
-                  onClick={() => overrideStatus(lock.id, "resold_and_fulfilled")}
-                >
-                  標記轉賣完成取餐
-                </button>
-              )}
-              {lock.status !== "no_show" && (
-                <button
-                  className="secondary"
-                  disabled={actingId === lock.id}
-                  onClick={() => overrideStatus(lock.id, "no_show")}
-                >
-                  標記未取餐
-                </button>
-              )}
-              {lock.status !== "locked" && (
-                <button
-                  className="secondary"
-                  disabled={actingId === lock.id}
-                  onClick={() => overrideStatus(lock.id, "locked")}
-                >
-                  退回鎖定中
-                </button>
-              )}
-            </div>
-          </div>
-        ))
+              <div className="flex flex-wrap gap-2 mt-3">
+                {lock.status !== "fulfilled" && (
+                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
+                    onClick={() => overrideStatus(lock.id, "fulfilled")}>
+                    標記已完成取餐
+                  </Button>
+                )}
+                {lock.status !== "resold_and_fulfilled" && (
+                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
+                    onClick={() => overrideStatus(lock.id, "resold_and_fulfilled")}>
+                    標記轉賣完成取餐
+                  </Button>
+                )}
+                {lock.status !== "no_show" && (
+                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
+                    onClick={() => overrideStatus(lock.id, "no_show")}>
+                    標記未取餐
+                  </Button>
+                )}
+                {lock.status !== "locked" && (
+                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
+                    onClick={() => overrideStatus(lock.id, "locked")}>
+                    退回鎖定中
+                  </Button>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
-    </div>
+    </>
+  );
+}
+
+export default function AdminLocksPage() {
+  return (
+    <AdminLayout>
+      <h2 className="text-lg font-bold mb-3">訂單總覽</h2>
+      <RequireRealAdmin>
+        <LocksContent />
+      </RequireRealAdmin>
+    </AdminLayout>
   );
 }

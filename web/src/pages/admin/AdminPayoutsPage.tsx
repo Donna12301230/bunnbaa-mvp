@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
-import { db } from "../../lib/firebase";
-import type { Payout, Vendor } from "../../types";
+import { db } from "@/lib/firebase";
+import type { Payout, Vendor } from "@/types";
+import AdminLayout from "@/components/AdminLayout";
+import RequireRealAdmin from "@/components/RequireRealAdmin";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Wallet } from "lucide-react";
 
 /**
  * Read-only — payouts are only ever written by settleVendorPayouts
  * (Cloud Function), so there's nothing for the admin UI to write here.
  */
-export default function AdminPayoutsPage() {
+function PayoutsContent() {
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [vendors, setVendors] = useState<Record<string, Vendor>>({});
 
@@ -31,33 +36,46 @@ export default function AdminPayoutsPage() {
   const totalAmount = useMemo(() => payouts.reduce((sum, p) => sum + (p.amount || 0), 0), [payouts]);
 
   return (
-    <div className="page">
-      <div className="kicker">BunnBaa · 管理後台</div>
-      <h1>撥款總覽</h1>
-
-      <div className="card tinted">
-        <div className="stat">NT${totalAmount}</div>
-        <div className="muted">近 {payouts.length} 筆撥款紀錄加總 · 全額撥款商家，平台不抽成</div>
-      </div>
+    <>
+      <Card className="p-5 mb-4 bg-orange-50 border-orange-100">
+        <div className="text-2xl font-bold text-orange-600">NT${totalAmount}</div>
+        <p className="text-sm text-muted-foreground mt-1">
+          近 {payouts.length} 筆撥款紀錄加總 · 全額撥款商家，平台不抽成
+        </p>
+      </Card>
 
       {payouts.length === 0 ? (
-        <p className="faint">尚無撥款紀錄。</p>
+        <div className="text-center py-16 text-muted-foreground">
+          <Wallet className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>尚無撥款紀錄</p>
+        </div>
       ) : (
-        payouts.map((p) => (
-          <div key={p.id} className="card">
-            <div className="row">
+        <div className="space-y-3">
+          {payouts.map((p) => (
+            <Card key={p.id} className="p-4 flex items-center justify-between">
               <div>
-                <h2>{vendors[p.vendor_id]?.name ?? p.vendor_id}</h2>
-                <div className="muted">{p.lock_count} 筆已履約訂單</div>
+                <h3 className="font-semibold text-sm">{vendors[p.vendor_id]?.name ?? p.vendor_id}</h3>
+                <p className="text-xs text-muted-foreground">{p.lock_count} 筆已履約訂單</p>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div className="stat">NT${p.amount}</div>
-                <span className="badge">待人工對帳匯出</span>
+              <div className="text-right">
+                <div className="font-bold text-orange-600">NT${p.amount}</div>
+                <Badge className="bg-gray-100 text-gray-600 border-0 mt-1">待人工對帳匯出</Badge>
               </div>
-            </div>
-          </div>
-        ))
+            </Card>
+          ))}
+        </div>
       )}
-    </div>
+    </>
+  );
+}
+
+export default function AdminPayoutsPage() {
+  return (
+    <AdminLayout>
+      <h2 className="text-lg font-bold mb-3">撥款總覽</h2>
+      <RequireRealAdmin>
+        <PayoutsContent />
+      </RequireRealAdmin>
+    </AdminLayout>
   );
 }
