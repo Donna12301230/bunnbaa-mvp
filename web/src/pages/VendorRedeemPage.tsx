@@ -1,11 +1,21 @@
-import { useState } from "react";
-import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { collection, getDocs, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { format } from "date-fns";
+import { zhTW } from "date-fns/locale";
+import { Search, CheckCircle2, AlertCircle, XCircle, CalendarDays } from "lucide-react";
 import { db, functions } from "../lib/firebase";
 import type { Lock } from "../types";
+import MarketplaceHeader from "@/components/MarketplaceHeader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 const VENDOR_ID = "cafe-renheya-demo";
 
@@ -14,6 +24,22 @@ const noShowSchema = z.object({
 });
 type NoShowForm = z.infer<typeof noShowSchema>;
 
+const LOCK_STATUS_STYLE: Record<string, { label: string; className: string }> = {
+  locked: { label: "已鎖定", className: "bg-orange-100 text-orange-700" },
+  for_resale: { label: "轉賣中", className: "bg-amber-100 text-amber-800" },
+  fulfilled: { label: "已完成取餐", className: "bg-green-100 text-green-700" },
+  resold_and_fulfilled: { label: "已由轉賣對象完成取餐", className: "bg-green-100 text-green-700" },
+  no_show: { label: "已登記未取餐", className: "bg-red-100 text-red-700" },
+};
+
+function formatDateLabel(dateStr: string): string {
+  try {
+    return format(new Date(`${dateStr}T00:00:00`), "M/d (EEE)", { locale: zhTW });
+  } catch {
+    return dateStr;
+  }
+}
+
 /**
  * Spec ref: README「尚未實作」清單 — 商家後台標記 no-show／備註的介面。
  * Ported from the old Parse prototype's vendor/scan.tsx pattern: match by
@@ -21,6 +47,15 @@ type NoShowForm = z.infer<typeof noShowSchema>;
  * old app never actually wired up its html5-qrcode dependency either).
  * Outcome writes go through `markLockOutcome` because firestore.rules
  * blocks direct client writes to lock status transitions.
+ *
+ * 2026-09-21：視覺改成跟全站一致的 Tailwind/shadcn（原本是 legacy-ui 的純 CSS，
+ * 跟其他頁面風格不一致），邏輯完全沒動——這頁是真的接 Firestore + markLockOutcome
+ * Cloud Function 的核對取餐頁，是消費端 MyBookingsPage「使用」面板核銷碼的接受端。
+ *
+ * 2026-09-21（再次調整）：原本只有一個輸入框太陽春，補上「取餐總覽」日曆格
+ * ——依取餐日期（欄）× 取餐時段（列）排成跟消費端 MyBookingsPage 一樣的行事曆
+ * 格式，點格子裡的卡片直接帶入下面的核對結果卡（跟手動輸入編號查詢共用同一套
+ * markOutcome 邏輯，沒有另外寫一套）。
  */
 export default function VendorRedeemPage() {
   const [code, setCode] = useState("");
@@ -30,12 +65,52 @@ export default function VendorRedeemPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showNoShowForm, setShowNoShowForm] = useState(false);
 
+  const [recentLocks, setRecentLocks] = useState<Lock[]>([]);
+  const [loadingCalendar, setLoadingCalendar] = useState(true);
+
   const {
     register,
     handleSubmit,
     reset: resetForm,
     formState: { errors },
   } = useForm<NoShowForm>({ resolver: zodResolver(noShowSchema) });
+
+  // 「取餐總覽」日曆格用——跟下面 handleSearch() 重用同一組 vendor_id +
+  // created_at 索引，即時監聽（onSnapshot）這樣核對完馬上就會從格子裡反映出新狀態。
+  useEffect(() => {
+    const q = query(
+      collection(db, "locks"),
+      where("vendor_id", "==", VENDOR_ID),
+      orderBy("created_at", "desc"),
+      limit(200)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setRecentLocks(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock));
+        setLoadingCalendar(false);
+      },
+      () => setLoadingCalendar(false)
+    );
+    return () => unsub();
+  }, []);
+
+  const pickupDates = Array.from(new Set(recentLocks.map((l) => l.pickup_date))).sort();
+  const pickupSlots = Array.from(new Set(recentLocks.map((l) => l.pickup_window))).sort();
+  const calendarGrid = new Map<string, Lock[]>();
+  for (const lock of recentLocks) {
+    const key = `${lock.pickup_date}__${lock.pickup_window}`;
+    const bucket = calendarGrid.get(key);
+    if (bucket) bucket.push(lock);
+    else calendarGrid.set(key, [lock]);
+  }
+
+  function selectLock(lock: Lock) {
+    setFoundLock(lock);
+    setCode(lock.id.slice(-8).toUpperCase());
+    setSearchError("");
+    setShowNoShowForm(false);
+  }
 
   async function handleSearch() {
     const input = code.trim().toUpperCase();
@@ -101,103 +176,199 @@ export default function VendorRedeemPage() {
   }
 
   const alreadyDone = foundLock && ["fulfilled", "no_show", "resold_and_fulfilled"].includes(foundLock.status);
+  const statusInfo = foundLock ? LOCK_STATUS_STYLE[foundLock.status] : null;
 
   return (
-    <div className="page">
-      <div className="kicker">BunnBaa · 商家後台</div>
-      <h1>核對取餐</h1>
+    <div className="min-h-screen bg-gray-50">
+      <MarketplaceHeader active="bookings" />
 
-      <div className="card">
-        <div className="field">
-          <label>取餐編號（末 8 碼）</label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              type="text"
-              placeholder="例如：AB3F9K2M"
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              maxLength={10}
-              style={{ fontFamily: "monospace", letterSpacing: "0.08em" }}
-            />
-            <button onClick={handleSearch} disabled={!code.trim() || searching}>
-              {searching ? "查詢中…" : "查詢"}
-            </button>
-          </div>
-        </div>
-        {searchError && <div className="field-error">{searchError}</div>}
-      </div>
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
+        <h1 className="text-xl font-bold flex items-center gap-2">
+          <Search className="w-5 h-5 text-orange-500" /> 核對取餐
+        </h1>
 
-      {foundLock && (
-        <div className="card">
-          <div className="row">
-            <div>
-              <h2>{foundLock.item_name}</h2>
-              <div className="muted">
-                {foundLock.pickup_window} 取餐 · NT${foundLock.locked_price}
+        {/* 取餐總覽（日曆格：欄＝取餐日期，列＝取餐時段），跟消費端 MyBookingsPage 同一套版面邏輯 */}
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold flex items-center gap-1.5 text-muted-foreground">
+            <CalendarDays className="w-4 h-4" /> 取餐總覽
+          </h2>
+
+          {loadingCalendar ? (
+            <div className="bg-white border border-border rounded-2xl p-8 text-center text-sm text-muted-foreground">載入中…</div>
+          ) : recentLocks.length === 0 ? (
+            <div className="bg-white border border-border rounded-2xl p-8 text-center text-sm text-muted-foreground">
+              尚無取餐紀錄——消費端在 <span className="font-mono">/lock</span> 鎖定後會出現在這裡。
+            </div>
+          ) : (
+            <div className="bg-white border border-border rounded-2xl overflow-x-auto">
+              <div className="min-w-[560px] grid" style={{ gridTemplateColumns: `96px repeat(${pickupDates.length}, minmax(140px, 1fr))` }}>
+                <div className="border-b border-border" />
+                {pickupDates.map((date) => (
+                  <div key={date} className="border-b border-l border-border px-2 py-2 text-center text-xs font-semibold text-muted-foreground">
+                    {formatDateLabel(date)}
+                  </div>
+                ))}
+
+                {pickupSlots.map((slot) => (
+                  <div key={slot} className="contents">
+                    <div className="border-b border-border px-2 py-3 text-xs font-bold text-muted-foreground flex items-center">
+                      {slot}
+                    </div>
+                    {pickupDates.map((date) => {
+                      const cellLocks = calendarGrid.get(`${date}__${slot}`) ?? [];
+                      return (
+                        <div key={date + slot} className="border-b border-l border-border p-2 flex flex-col gap-1.5 min-h-[76px]">
+                          {cellLocks.length === 0 ? (
+                            <span className="text-[10px] text-gray-300">—</span>
+                          ) : (
+                            cellLocks.map((lock) => {
+                              const style = LOCK_STATUS_STYLE[lock.status];
+                              const isSelected = foundLock?.id === lock.id;
+                              return (
+                                <button
+                                  key={lock.id}
+                                  onClick={() => selectLock(lock)}
+                                  className={`text-left rounded-lg border px-2 py-1.5 text-[11px] transition-colors ${
+                                    isSelected ? "border-orange-400 bg-orange-50" : "border-border bg-gray-50 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  <div className="font-semibold truncate">{lock.item_name}</div>
+                                  <div className="flex items-center justify-between mt-1 gap-1">
+                                    {style && (
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full truncate ${style.className}`}>
+                                        {style.label}
+                                      </span>
+                                    )}
+                                    <span className="text-muted-foreground shrink-0">${lock.locked_price}</span>
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-              <span className="badge">#{foundLock.id.slice(-8).toUpperCase()}</span>
-              {foundLock.status === "for_resale" && (
-                <span className="status-badge" data-status="for_resale">轉賣中</span>
-              )}
-            </div>
-          </div>
+          )}
+        </section>
 
-          {alreadyDone ? (
-            <>
-              <p className="muted" style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                狀態：
-                <span className="status-badge" data-status={foundLock.status}>
-                  {foundLock.status === "fulfilled"
-                    ? "已完成取餐"
-                    : foundLock.status === "resold_and_fulfilled"
-                    ? "已由轉賣對象完成取餐"
-                    : foundLock.status === "no_show"
-                    ? "已登記未取餐"
-                    : foundLock.status}
-                </span>
-              </p>
-              <button className="secondary" onClick={reset}>
-                查詢下一筆
-              </button>
-            </>
-          ) : (
-            <div style={{ marginTop: 12 }}>
-              {!showNoShowForm ? (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    disabled={submitting}
-                    onClick={() => markOutcome(foundLock.status === "for_resale" ? "resold_and_fulfilled" : "fulfilled")}
-                  >
-                    {submitting ? "處理中…" : "確認取餐"}
-                  </button>
-                  <button className="secondary" disabled={submitting} onClick={() => setShowNoShowForm(true)}>
-                    登記未取餐
-                  </button>
+        <div className="max-w-xl space-y-4">
+          {/* 查詢區 */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground font-normal">或直接輸入取餐編號（末 8 碼）</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="例如：AB3F9K2M"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  maxLength={10}
+                  className="font-mono tracking-widest"
+                />
+                <Button
+                  className="bg-orange-500 hover:bg-orange-600 text-white shrink-0"
+                  onClick={handleSearch}
+                  disabled={!code.trim() || searching}
+                >
+                  {searching ? "查詢中…" : "查詢"}
+                </Button>
+              </div>
+
+              {searchError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{searchError}</span>
                 </div>
-              ) : (
-                <form onSubmit={handleSubmit(onNoShowSubmit)}>
-                  <div className="field">
-                    <label>未取餐備註（給校準報告分析落差模式用）</label>
-                    <input type="text" placeholder="例如：客人臨時取消，說今天下雨不方便出門" {...register("note")} />
-                    {errors.note && <div className="field-error">{errors.note.message}</div>}
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button type="submit" disabled={submitting}>
-                      {submitting ? "送出中…" : "送出登記"}
-                    </button>
-                    <button type="button" className="secondary" onClick={() => setShowNoShowForm(false)}>
-                      取消
-                    </button>
-                  </div>
-                </form>
               )}
-            </div>
+            </CardContent>
+          </Card>
+
+          {/* 查詢結果 */}
+          {foundLock && (
+            <Card>
+              <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base">{foundLock.item_name}</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {foundLock.pickup_date}・{foundLock.pickup_window} 取餐 · NT${foundLock.locked_price}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <Badge variant="outline" className="font-mono text-xs">#{foundLock.id.slice(-8).toUpperCase()}</Badge>
+                  {statusInfo && (
+                    <Badge className={`text-xs border-0 ${statusInfo.className}`}>{statusInfo.label}</Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {alreadyDone ? (
+                  <div className="space-y-3 pt-1">
+                    <div
+                      className={`flex items-center justify-center gap-2 py-3 rounded-lg font-medium ${
+                        foundLock.status === "no_show" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+                      }`}
+                    >
+                      {foundLock.status === "no_show" ? <XCircle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+                      {statusInfo?.label}
+                    </div>
+                    <Button variant="outline" className="w-full" onClick={reset}>
+                      查詢下一筆
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="pt-1">
+                    {!showNoShowForm ? (
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                          disabled={submitting}
+                          onClick={() => markOutcome(foundLock.status === "for_resale" ? "resold_and_fulfilled" : "fulfilled")}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                          {submitting ? "處理中…" : "確認取餐"}
+                        </Button>
+                        <Button variant="outline" className="flex-1" disabled={submitting} onClick={() => setShowNoShowForm(true)}>
+                          登記未取餐
+                        </Button>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSubmit(onNoShowSubmit)} className="space-y-3">
+                        <Separator />
+                        <div>
+                          <Label htmlFor="noShowNote" className="text-xs text-muted-foreground">
+                            未取餐備註（給校準報告分析落差模式用）
+                          </Label>
+                          <Input
+                            id="noShowNote"
+                            placeholder="例如：客人臨時取消，說今天下雨不方便出門"
+                            className="mt-1"
+                            {...register("note")}
+                          />
+                          {errors.note && <p className="text-xs text-red-600 mt-1">{errors.note.message}</p>}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white" disabled={submitting}>
+                            {submitting ? "送出中…" : "送出登記"}
+                          </Button>
+                          <Button type="button" variant="outline" className="flex-1" onClick={() => setShowNoShowForm(false)}>
+                            取消
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -1,10 +1,14 @@
 import { ReactNode } from "react";
-import Navbar from "./Navbar";
+import MarketplaceHeader from "./MarketplaceHeader";
 
+// 商家瀏覽動線共用的外框（/vendors、/vendor/:id、/item/:id）。
+// 原本掛的是另一套 Navbar.tsx（購物車／我的訂單／我的開團連結指向的路由其實都
+// 不存在，會 404），2026-09-21 改成跟 /home、/marketplace、/my-bookings 共用同一顆
+// MarketplaceHeader，導覽列在全站保持一致。
 export default function CustomerLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Navbar />
+      <MarketplaceHeader active="vendors" />
       <main className="flex-1 max-w-6xl mx-auto w-full px-3 md:px-4 py-3 md:py-6">
         {children}
       </main>

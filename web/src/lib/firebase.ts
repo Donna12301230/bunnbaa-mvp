@@ -24,5 +24,8 @@ export const auth = getAuth(app);
 if (import.meta.env.VITE_USE_EMULATORS === "true") {
   connectFirestoreEmulator(db, "localhost", 8080);
   connectFunctionsEmulator(functions, "localhost", 5001);
-  connectAuthEmulator(auth, "http://localhost:9099");
+  // disableWarnings: 關掉 Firebase Auth SDK 預設會在畫面底部注入的
+  // 「Running in emulator mode. Do not use with production credentials.」
+  // 警示橫幅（純 UI 提示，不影響 emulator 連線本身）。
+  connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
 }

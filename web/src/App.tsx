@@ -12,6 +12,8 @@ import VendorRedeemPage from "./pages/VendorRedeemPage";
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
+import TransferMarketPage from "./pages/TransferMarketPage";
+import MyBookingsPage from "./pages/MyBookingsPage";
 import VendorListPage from "./pages/VendorListPage";
 import VendorPage from "./pages/VendorPage";
 import MenuItemPage from "./pages/MenuItemPage";
@@ -25,6 +27,8 @@ import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 import VendorPortalDashboard from "./pages/vendor-portal/VendorPortalDashboard";
 import VendorPortalMenu from "./pages/vendor-portal/VendorPortalMenu";
 import VendorPortalOrders from "./pages/vendor-portal/VendorPortalOrders";
+import VendorPortalPrep from "./pages/vendor-portal/VendorPortalPrep";
+import VendorPortalGrowth from "./pages/vendor-portal/VendorPortalGrowth";
 import VendorPortalReports from "./pages/vendor-portal/VendorPortalReports";
 import VendorPortalScan from "./pages/vendor-portal/VendorPortalScan";
 import VendorPortalSessions from "./pages/vendor-portal/VendorPortalSessions";
@@ -68,7 +72,7 @@ export default function App() {
             <div className="legacy-ui"><RequireVendorSignIn><VendorDashboard /></RequireVendorSignIn></div>
           </Route>
           <Route path="/lock/vendor/redeem">
-            <div className="legacy-ui"><RequireVendorSignIn><VendorRedeemPage /></RequireVendorSignIn></div>
+            <RequireVendorSignIn><VendorRedeemPage /></RequireVendorSignIn>
           </Route>
 
           {/* 搬移自 BunnBaa Parse_Ref 的行銷平台 UI（登入/首頁/後台） */}
@@ -80,6 +84,12 @@ export default function App() {
           </Route>
           <Route path="/profile">
             <MarketplacePage><ProfilePage /></MarketplacePage>
+          </Route>
+          <Route path="/marketplace">
+            <MarketplacePage><TransferMarketPage /></MarketplacePage>
+          </Route>
+          <Route path="/my-bookings">
+            <MarketplacePage><MyBookingsPage /></MarketplacePage>
           </Route>
           <Route path="/vendors">
             <MarketplacePage><CustomerLayout><VendorListPage /></CustomerLayout></MarketplacePage>
@@ -114,8 +124,14 @@ export default function App() {
           <Route path="/vendor-portal/orders">
             <MarketplacePage><VendorPortalOrders /></MarketplacePage>
           </Route>
+          <Route path="/vendor-portal/prep">
+            <MarketplacePage><VendorPortalPrep /></MarketplacePage>
+          </Route>
           <Route path="/vendor-portal/reports">
             <MarketplacePage><VendorPortalReports /></MarketplacePage>
+          </Route>
+          <Route path="/vendor-portal/growth">
+            <MarketplacePage><VendorPortalGrowth /></MarketplacePage>
           </Route>
           <Route path="/vendor-portal/scan">
             <MarketplacePage><VendorPortalScan /></MarketplacePage>

@@ -539,3 +539,142 @@ export const mockVendorMealPlans: VendorMealPlanGroup[] = [
     ],
   },
 ];
+
+// ── 轉讓市集（Marketplace.dc.html 草圖）用的假資料 ────────────────────────
+// TODO(firebase): 目前純前端 local state 示意「我要接手／免費領取／取消轉讓」，
+// 之後要接 claimResoldLock（見 functions/src/index.js）與逾時自動釋出的排程，
+// 讀寫改成真的 locks collection 查詢。
+export interface MarketplaceListing {
+  id: string;
+  seller: string;
+  sellerInitial: string;
+  title: string;
+  category: "fit" | "veg" | "seafood" | "other";
+  original: number;
+  resale: number;
+  expiresIn: string;
+  location: string;
+}
+
+export const mockMarketplaceListings: MarketplaceListing[] = [
+  { id: "l1", seller: "王同學", sellerInitial: "王", title: "健康輕食週計畫（剩5天）", category: "fit", original: 600, resale: 450, expiresIn: "1 天", location: "校園咖啡廳" },
+  { id: "l2", seller: "陳同學", sellerInitial: "陳", title: "增肌蛋白餐計畫（剩4天）", category: "fit", original: 600, resale: 430, expiresIn: "3 小時", location: "校園咖啡廳" },
+  { id: "l3", seller: "李同學", sellerInitial: "李", title: "地中海輕食計畫（剩6天）", category: "veg", original: 675, resale: 500, expiresIn: "2 天", location: "校園咖啡廳" },
+  { id: "l4", seller: "林同學", sellerInitial: "林", title: "舒肥雞胸單餐鎖定券", category: "fit", original: 150, resale: 110, expiresIn: "5 小時", location: "校園咖啡廳" },
+];
+
+export interface MarketplaceReleasedListing {
+  id: string;
+  title: string;
+  original: number;
+  location: string;
+}
+
+export const mockMarketplaceReleased: MarketplaceReleasedListing[] = [
+  { id: "r1", title: "塔香牛肉藜麥碗", original: 128, location: "校園咖啡廳" },
+  { id: "r2", title: "地中海鮪魚酪梨碗", original: 116, location: "校園咖啡廳" },
+];
+
+export interface MyMarketplaceListing {
+  id: string;
+  title: string;
+  original: number;
+  resale: number;
+  location: string;
+  outcome: "listed" | "claimed";
+}
+
+export const mockMyMarketplaceListings: MyMarketplaceListing[] = [
+  { id: "m1", title: "舒肥雞胸溫沙拉餐盒", original: 120, resale: 100, location: "校園咖啡廳", outcome: "listed" },
+  { id: "m2", title: "A方案：減脂健身餐（一頭牛日式燒肉丼）", original: 150, resale: 120, location: "校園咖啡廳", outcome: "claimed" },
+];
+
+// ── 商家後台「備料」用的假資料（VendorDashboard.dc.html 草圖新增的分頁） ──────
+// TODO(firebase): 目前是寫死的假資料，之後要改成依 locks collection 依
+// pickup_window 聚合「今日已鎖定、待出餐」的份數，跟消費者端 ConsumerLockPage/
+// Main 草圖的取餐時段（11:30–12:00 等）對齊。
+export interface PrepSlotItem {
+  name: string;
+  qty: number;
+}
+
+export interface PrepSlot {
+  label: string;
+  items: PrepSlotItem[];
+}
+
+export const mockPrepSlots: PrepSlot[] = [
+  { label: "11:30–12:00", items: [{ name: "塔香牛肉藜麥碗", qty: 6 }] },
+  { label: "12:00–12:30", items: [{ name: "舒肥雞胸溫沙拉餐盒", qty: 9 }, { name: "A方案：減脂健身餐", qty: 5 }] },
+  { label: "12:30–13:00", items: [{ name: "地中海鮪魚酪梨碗", qty: 4 }] },
+];
+
+// ── 商家後台「成長獎勵」用的假資料（VendorDashboard.dc.html 草圖新增的分頁） ──
+// 全新機制：商家累積合作營收達門檻，解鎖消費者端抽獎（單抽／十連抽），獎項是
+// 折扣券（8/6/5/3/1折或整份 0 元），對應 Main 草圖新增的跑馬燈「剛抽中...0 元
+// 大獎」。目前完全沒有資料模型與後端邏輯，這裡先用假資料把畫面撐出來。
+// TODO(firebase): 需要新設計 growth_rewards（門檻/累積營收）與 draws（開獎紀錄）
+// collection，抽獎邏輯建議走 Cloud Function（client 不可信任機率計算）。
+export interface GrowthMilestone {
+  id: string;
+  label: string;
+  threshold: number;
+  achieved: boolean;
+}
+
+export interface DrawRecord {
+  id: string;
+  date: string;
+  consumer: string;
+  tierPercentOff: number; // 80/60/50/30/10；0 代表整份免費
+  tierLabel: string;
+  item: string;
+}
+
+export interface MockGrowthRewards {
+  cumulativeRevenue: number;
+  milestones: GrowthMilestone[];
+  voucherRemaining: number;
+  voucherTotal: number;
+  drawHistory: DrawRecord[];
+}
+
+const TIER_LABEL: Record<number, string> = { 80: "8折", 60: "6折", 50: "5折", 30: "3折", 10: "1折", 0: "0元整份" };
+
+export const mockGrowthRewards: MockGrowthRewards = {
+  cumulativeRevenue: 186400,
+  milestones: [
+    { id: "tier1", label: "20 萬門檻・單抽", threshold: 200000, achieved: true },
+    { id: "tier2", label: "100 萬門檻・十連抽", threshold: 1000000, achieved: false },
+  ],
+  voucherRemaining: 3,
+  voucherTotal: 10,
+  drawHistory: [
+    { id: "d1", date: "09/24", consumer: "林＊同學", tierPercentOff: 60, tierLabel: TIER_LABEL[60], item: "舒肥雞胸溫沙拉餐盒" },
+    { id: "d2", date: "09/22", consumer: "陳＊同學", tierPercentOff: 0, tierLabel: TIER_LABEL[0], item: "一頭牛日式燒肉丼 A方案（整份）" },
+    { id: "d3", date: "09/20", consumer: "黃＊同學", tierPercentOff: 80, tierLabel: TIER_LABEL[80], item: "舒肥雞胸溫沙拉餐盒" },
+    { id: "d4", date: "09/18", consumer: "周＊同學", tierPercentOff: 10, tierLabel: TIER_LABEL[10], item: "舒肥雞胸溫沙拉餐盒" },
+    { id: "d5", date: "09/16", consumer: "王＊同學", tierPercentOff: 50, tierLabel: TIER_LABEL[50], item: "舒肥雞胸溫沙拉餐盒" },
+  ],
+};
+
+// ── 首頁「今日推薦鎖定方案」用的假資料（UI草圖 Main.dc.html 新增的單點型卡片區） ──
+// TODO(firebase): 這組卡片目前純前端示意（勾選消保法同意欄位才能按「立即預付
+// 鎖定」），沒有寫入 Firestore。真正端到端接 locks collection 的單一品項示範在
+// pages/ConsumerLockPage.tsx（掛在 /lock，demo 影片用），之後要把這裡串成真的，
+// 可以照那個檔案的 handleLock() 模式擴充成多品項版本。
+export interface LockMealOption {
+  id: string;
+  title: string;
+  time: string;
+  original: number;
+  price: number;
+  photoFrom: string;
+  photoTo: string;
+}
+
+export const mockLockMeals: LockMealOption[] = [
+  { id: "lm1", title: "舒肥雞胸溫沙拉餐盒", time: "12:00–12:30", original: 150, price: 120, photoFrom: "from-emerald-100", photoTo: "to-green-100" },
+  { id: "lm2", title: "塔香牛肉藜麥碗", time: "11:30–12:00", original: 160, price: 128, photoFrom: "from-orange-100", photoTo: "to-amber-100" },
+  { id: "lm3", title: "地中海鮪魚酪梨碗", time: "12:30–13:00", original: 145, price: 116, photoFrom: "from-yellow-100", photoTo: "to-lime-100" },
+];
