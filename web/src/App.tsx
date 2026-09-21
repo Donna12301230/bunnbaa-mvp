@@ -18,6 +18,7 @@ import VendorListPage from "./pages/VendorListPage";
 import VendorPage from "./pages/VendorPage";
 import MenuItemPage from "./pages/MenuItemPage";
 import CustomerLayout from "./components/CustomerLayout";
+import { RequireVendorSignIn } from "./components/RequireRealAdmin";
 import AdminVendorsPage from "./pages/admin/AdminVendorsPage";
 import AdminAppealsPage from "./pages/admin/AdminAppealsPage";
 import AdminLocksPage from "./pages/admin/AdminLocksPage";
@@ -68,10 +69,10 @@ export default function App() {
             <div className="legacy-ui"><ConsumerLockPage /></div>
           </Route>
           <Route path="/lock/vendor">
-            <div className="legacy-ui"><VendorDashboard /></div>
+            <div className="legacy-ui"><RequireVendorSignIn><VendorDashboard /></RequireVendorSignIn></div>
           </Route>
           <Route path="/lock/vendor/redeem">
-            <VendorRedeemPage />
+            <RequireVendorSignIn><VendorRedeemPage /></RequireVendorSignIn>
           </Route>
 
           {/* 搬移自 BunnBaa Parse_Ref 的行銷平台 UI（登入/首頁/後台） */}

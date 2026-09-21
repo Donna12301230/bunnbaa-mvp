@@ -47,7 +47,7 @@
 - QR Code 核銷（交易核心）：emulator 已驗證，因 Functions 未上 Blaze 尚未上正式站（正式環境呼叫 `markLockOutcome` 會失敗）
 - 撥款排程（金流與結算）：`settleVendorPayouts`（daily schedule + 手動觸發）emulator 已驗證重複點擊不會重複結算，卡在 Blaze/Functions 部署未上正式站
 - Firebase Hosting 部署（整合與交付）：已有初版正式站 https://bunnbaa-mvp-5474.web.app，但轉賣/撥款等新功能還沒重新部署（等 Functions 上線後一起做）
-- 取餐提醒推播(FCM)（交易核心，同 SU「通知系統」，合併計算）：2026-09-20 SU 完成程式碼——前端要求通知權限+存 FCM token（`web/src/lib/messaging.ts`）、Functions 端 `pickupReminders`（每 15 分排程）+ `triggerPickupRemindersNow`。卡兩點：VAPID key 還沒去 Console 拿（免費、跟 Blaze 無關）；Functions 部署卡 Blaze。
+- 取餐提醒推播(FCM)（交易核心，同 SU「通知系統」，合併計算）：2026-09-20 SU 完成程式碼——前端要求通知權限+存 FCM token 到私有的 `lock_tokens`（`web/src/lib/messaging.ts`）、Functions 端 `pickupReminders`（每 15 分排程）+ `triggerPickupRemindersNow`。卡兩點：VAPID key 還沒去 Console 拿（免費、跟 Blaze 無關，見下方）；Functions 部署卡 Blaze。
 
 **🔴 卡住，等人工或外部審核（3）**
 - Gemini — 商家校準 Agent（AI Agent）：見上方卡點 2
@@ -78,8 +78,12 @@
 - 商家校準報告呈現(含 what-if 情境追問互動)（商家後台）：`runCalibrationForVendor` 邏輯與徽章自動換算都寫好，但要真的產出報告需要 Gemini Key（見上方卡點 2），目前卡住未端到端測過
 - 通知系統(FCM 取餐提醒,同 Donna「取餐提醒推播」,合併計算)（系統與安全）：2026-09-20 完成程式碼，詳見 README「尚未實作」清單。卡點：VAPID key 待補、Functions 部署卡 Blaze
 
-**⬜ 未開始 / 本文件未提及（1）**
-- ISO27001（系統與安全）：新增項目，本文件尚無內容，需另外確認範圍與進度
+**🔴 卡住，等人工或外部審核**
+- （無）
+
+**⬜ 未開始 / 本文件未提及（0）**
+
+**🟡 ISO27001（系統與安全）**：2026-09-21 完成技術面落差分析＋修補，詳見 [ISO27001_落差分析.md](ISO27001_落差分析.md)。已補：Functions 授權（管理員／商家 owner）、`payouts`／`accuracy_reports` 限管理員與該商家 owner 可讀（`vendors/{id}.owner_uid` 綁定，商家儀表板改為需登入）、FCM token 私有化、`locks` 完整性規則、管理員稽核日誌、Hosting 安全標頭。**待辦**：部署 `firestore.rules`（需要人工執行）；部署後要先照文件「商家帳號綁定」流程幫商家建帳號並設 `owner_uid`，否則儀表板看不到資料；認證所需的 ISMS 管理制度文件尚未建立
 
 ---
 

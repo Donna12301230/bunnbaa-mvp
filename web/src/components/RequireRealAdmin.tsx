@@ -3,28 +3,16 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAdminUser } from "@/lib/adminAuth";
 
-/**
- * The rest of the admin backend (廠商管理/解封申訴) is gated only by the mock
- * login in useAuth/mockAuthStore — fine for UI that reads/writes mock data.
- * These pages do real Firestore writes though, which firestore.rules only
- * lets through for a real Firebase Auth session matching ADMIN_EMAILS — mock
- * login doesn't produce one. So this gate asks for that real sign-in
- * separately, inline, rather than pretending the mock session is enough.
- */
-export default function RequireRealAdmin({ children }: { children: ReactNode }) {
-  const { isAdmin, loading } = useAdminUser();
+// The platform login (useAuth/mockAuthStore) is a mock, so it can't authorize
+// real Firestore/Functions access. These gates ask for a real Firebase Auth
+// sign-in instead; what the signed-in account may actually read or write is
+// enforced by firestore.rules and the Functions, never by the gate itself.
+
+function RealSignInForm({ title, description }: { title: string; description: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  if (loading) {
-    return <p className="text-sm text-muted-foreground">確認登入狀態中…</p>;
-  }
-
-  if (isAdmin) {
-    return <>{children}</>;
-  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -41,10 +29,8 @@ export default function RequireRealAdmin({ children }: { children: ReactNode }) 
 
   return (
     <div className="max-w-sm mx-auto bg-white rounded-xl border border-border p-5">
-      <h2 className="font-semibold mb-1">這裡動到真實資料庫</h2>
-      <p className="text-sm text-muted-foreground mb-4">
-        請用真實管理員帳號（Firebase Auth）登入，跟平台登入頁的帳號是分開的。
-      </p>
+      <h2 className="font-semibold mb-1">{title}</h2>
+      <p className="text-sm text-muted-foreground mb-4">{description}</p>
       <form onSubmit={handleSubmit} className="space-y-3">
         <input
           type="email"
@@ -74,5 +60,38 @@ export default function RequireRealAdmin({ children }: { children: ReactNode }) 
         </button>
       </form>
     </div>
+  );
+}
+
+export default function RequireRealAdmin({ children }: { children: ReactNode }) {
+  const { isAdmin, loading } = useAdminUser();
+
+  if (loading) return <p className="text-sm text-muted-foreground">確認登入狀態中…</p>;
+  if (isAdmin) return <>{children}</>;
+
+  return (
+    <RealSignInForm
+      title="這裡動到真實資料庫"
+      description="請用真實管理員帳號（Firebase Auth）登入，跟平台登入頁的帳號是分開的。"
+    />
+  );
+}
+
+/**
+ * For the vendor dashboard/redeem pages: any real (non-anonymous) sign-in gets
+ * past the gate. Whether that account can see a vendor's payouts or mark its
+ * locks is decided by firestore.rules/Functions (admin, or vendors/{id}.owner_uid).
+ */
+export function RequireVendorSignIn({ children }: { children: ReactNode }) {
+  const { user, loading } = useAdminUser();
+
+  if (loading) return <p className="text-sm text-muted-foreground">確認登入狀態中…</p>;
+  if (user && !user.isAnonymous) return <>{children}</>;
+
+  return (
+    <RealSignInForm
+      title="商家登入"
+      description="這裡有撥款與履約資料，請用商家帳號登入（帳號由平台管理員建立並綁定商家）。"
+    />
   );
 }

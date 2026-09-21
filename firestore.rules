@@ -20,20 +20,57 @@ service cloud.firestore {
     // locks: consumer creates their own lock; read is public (needed to show live availability)
     match /locks/{lockId} {
       allow read: if true;
-      allow create: if request.resource.data.buyer_uid == request.auth.uid;
-      // status transitions (resell, fulfilled, no_show) are normally done via
-      // Cloud Functions with admin rights; admin backend can also override
-      // directly since those Functions aren't deployed to prod yet (Blaze).
+      // A new lock must start as "locked" and can't carry server-managed fields,
+      // otherwise a client could mint an already-fulfilled/settled lock.
+      allow create: if request.auth != null
+                    && request.resource.data.buyer_uid == request.auth.uid
+                    && request.resource.data.status == 'locked'
+                    && !request.resource.data.keys().hasAny(
+                         ['payout_settled', 'payout_id', 'reminder_sent', 'discount_explanation', 'no_show_note']);
+      // status transitions (fulfilled, no_show) are normally done via Cloud
+      // Functions with admin rights; admin backend can also override directly
+      // since those Functions aren't deployed to prod yet (Blaze). A buyer may
+      // only flip their own still-"locked" lock to "for_resale", touching nothing else.
       allow update: if (request.auth != null && resource.data.buyer_uid == request.auth.uid
-                    && request.resource.data.status == 'for_resale')
+                    && resource.data.status == 'locked'
+                    && request.resource.data.status == 'for_resale'
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
                     || isAdmin();
       allow delete: if false;
     }
 
-    // accuracy_reports: written only by Cloud Functions (admin SDK bypasses rules), readable by anyone
-    // for MVP transparency; scope to vendor-authenticated reads if this goes beyond the pilot.
+    // lock_tokens: FCM device tokens for pickup reminders, kept off the public
+    // locks docs. The buyer creates one for a lock they own; only that buyer or
+    // an admin can read it; Cloud Functions (admin SDK) manage the rest.
+    match /lock_tokens/{lockId} {
+      allow create: if request.auth != null
+                    && request.resource.data.keys().hasOnly(['fcm_token', 'buyer_uid'])
+                    && request.resource.data.fcm_token is string
+                    && request.resource.data.fcm_token.size() < 4096
+                    && request.resource.data.buyer_uid == request.auth.uid
+                    && get(/databases/$(database)/documents/locks/$(lockId)).data.buyer_uid == request.auth.uid;
+      allow read: if (request.auth != null && resource.data.buyer_uid == request.auth.uid) || isAdmin();
+      allow update, delete: if false;
+    }
+
+    // admin_audit_logs: append-only record of admin overrides (ISO 27001 A.8.15).
+    match /admin_audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.admin_email == request.auth.token.email;
+      allow update, delete: if false;
+    }
+
+    // A vendor's owner is the Firebase Auth account whose uid an admin stored in
+    // vendors/{id}.owner_uid. Payout and calibration data is business-confidential
+    // (ISO 27001 A.5.34), so only that owner or an admin may read it.
+    function isVendorOwner(vendorId) {
+      return request.auth != null
+        && get(/databases/$(database)/documents/vendors/$(vendorId)).data.get('owner_uid', null) == request.auth.uid;
+    }
+
+    // accuracy_reports: written only by Cloud Functions (admin SDK bypasses rules)
     match /accuracy_reports/{reportId} {
-      allow read: if true;
+      allow read: if isAdmin() || isVendorOwner(resource.data.vendor_id);
       allow write: if false;
     }
 
@@ -43,10 +80,9 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // payouts: written only by settleVendorPayouts (Cloud Function), publicly
-    // readable for MVP transparency, same as accuracy_reports.
+    // payouts: written only by settleVendorPayouts (Cloud Function)
     match /payouts/{payoutId} {
-      allow read: if true;
+      allow read: if isAdmin() || isVendorOwner(resource.data.vendor_id);
       allow write: if false;
     }
   }

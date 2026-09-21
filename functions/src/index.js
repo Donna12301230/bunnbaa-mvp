@@ -11,6 +11,36 @@ const db = admin.firestore();
 const { generateVendorCalibrationReport } = require("./vendorCalibration");
 const { generateDiscountExplanation } = require("./consumerExplanation");
 
+// ISO 27001 A.5.15/A.8.3: privileged and cost-bearing callables fail closed in
+// deployed environments. Callers must be a platform admin, or (for anything
+// scoped to one vendor) the vendor's owner — the account whose Auth uid an admin
+// stored in vendors/{id}.owner_uid. The emulator is exempt so local demos keep
+// working. Keep the admin list in sync with firestore.rules isAdmin() and
+// web/src/lib/adminAuth.ts.
+const ADMIN_EMAILS = ["suw192336@gmail.com"];
+
+function isEmulator() {
+  return process.env.FUNCTIONS_EMULATOR === "true";
+}
+
+function assertAdminOrEmulator(request) {
+  if (isEmulator()) return;
+  const email = request.auth?.token?.email;
+  if (!email || !ADMIN_EMAILS.includes(email)) {
+    throw new HttpsError("permission-denied", "This action is restricted to platform admins.");
+  }
+}
+
+async function assertAdminOrVendorOwner(request, vendorId) {
+  if (isEmulator()) return;
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in required.");
+  const email = request.auth.token?.email;
+  if (email && ADMIN_EMAILS.includes(email)) return;
+  const vendorSnap = await db.collection("vendors").doc(vendorId).get();
+  if (vendorSnap.exists && vendorSnap.data().owner_uid === request.auth.uid) return;
+  throw new HttpsError("permission-denied", "Only this vendor's owner or a platform admin can do this.");
+}
+
 /* ------------------------------------------------------------------ *
  * 1. Vendor calibration — scheduled, batched per vendor (spec 4.4)
  * ------------------------------------------------------------------ */
@@ -116,6 +146,7 @@ exports.dailyCalibration = onSchedule(
 exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request) => {
   const vendorId = request.data?.vendor_id;
   if (!vendorId) throw new HttpsError("invalid-argument", "vendor_id is required");
+  await assertAdminOrVendorOwner(request, vendorId);
   const reportId = await runCalibrationForVendor(vendorId);
   return { report_id: reportId };
 });
@@ -147,6 +178,7 @@ exports.markLockOutcome = onCall({ region: "asia-east1" }, async (request) => {
   if (!lockSnap.exists) {
     throw new HttpsError("not-found", `No lock found with id ${lockId}`);
   }
+  await assertAdminOrVendorOwner(request, lockSnap.data().vendor_id);
 
   const update = { status: outcome };
   if (outcome === "no_show" && note) {
@@ -186,6 +218,8 @@ exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
   }
 
   await lockRef.update({ buyer_uid: request.auth.uid });
+  // The previous owner's device token must not keep receiving this lock's reminders.
+  await db.collection("lock_tokens").doc(lockId).delete();
   return { lock_id: lockId };
 });
 
@@ -263,6 +297,7 @@ exports.settleVendorPayouts = onSchedule(
 exports.triggerSettlementNow = onCall({ region: "asia-east1" }, async (request) => {
   const vendorId = request.data?.vendor_id;
   if (!vendorId) throw new HttpsError("invalid-argument", "vendor_id is required");
+  await assertAdminOrVendorOwner(request, vendorId);
   const payoutId = await settleVendorPayout(vendorId);
   return { payout_id: payoutId };
 });
@@ -275,6 +310,7 @@ exports.askCalibrationScenario = onCall({ region: "asia-east1" }, async (request
   if (!vendorId || !question) {
     throw new HttpsError("invalid-argument", "vendor_id and question are required");
   }
+  await assertAdminOrVendorOwner(request, vendorId);
 
   const history = await buildVendorHistory(vendorId);
   if (history.length === 0) {
@@ -379,16 +415,21 @@ async function sendPickupReminders() {
 
   for (const doc of snap.docs) {
     const lock = doc.data();
-    if (!lock.fcm_token || lock.reminder_sent) continue;
+    if (lock.reminder_sent) continue;
 
     const start = pickupWindowStart(lock.pickup_date, lock.pickup_window);
     if (!start) continue;
     const minutesUntilPickup = (start.getTime() - now) / 60000;
     if (minutesUntilPickup < 0 || minutesUntilPickup > REMINDER_WINDOW_MINUTES) continue;
 
+    // Tokens live in lock_tokens (owner/admin-readable), not on the public lock doc.
+    const tokenSnap = await db.collection("lock_tokens").doc(doc.id).get();
+    const fcmToken = tokenSnap.exists ? tokenSnap.data().fcm_token : null;
+    if (!fcmToken) continue;
+
     try {
       await admin.messaging().send({
-        token: lock.fcm_token,
+        token: fcmToken,
         notification: {
           title: "取餐時間快到了",
           body: `${lock.item_name} 預計 ${lock.pickup_window} 取餐，別忘記囉！`,
@@ -415,7 +456,8 @@ exports.pickupReminders = onSchedule(
 );
 
 /** Manual trigger for local testing, same pattern as triggerCalibrationNow. */
-exports.triggerPickupRemindersNow = onCall({ region: "asia-east1" }, async () => {
+exports.triggerPickupRemindersNow = onCall({ region: "asia-east1" }, async (request) => {
+  assertAdminOrEmulator(request);
   const sent = await sendPickupReminders();
   return { sent };
 });
