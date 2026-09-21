@@ -58,7 +58,14 @@
 
 **⬜ 未開始 / 本文件未提及（0）**
 
-**🟡 ISO27001（系統與安全）**：2026-09-21 完成技術面落差分析＋修補，詳見 [ISO27001_落差分析.md](ISO27001_落差分析.md)。已補：Functions 授權（管理員／商家 owner）、`payouts`／`accuracy_reports` 限管理員與該商家 owner 可讀（`vendors/{id}.owner_uid` 綁定，商家儀表板改為需登入）、FCM token 私有化、`locks` 完整性規則、管理員稽核日誌、Hosting 安全標頭。**待辦**：部署 `firestore.rules`（需要人工執行）；部署後要先照文件「商家帳號綁定」流程幫商家建帳號並設 `owner_uid`，否則儀表板看不到資料；認證所需的 ISMS 管理制度文件尚未建立
+**🟡 ISO27001（系統與安全）**：2026-09-21 完成技術面落差分析＋修補，詳見 [ISO27001_落差分析.md](ISO27001_落差分析.md)。已補：Functions 授權（管理員／商家 owner）、`payouts`／`accuracy_reports` 限管理員與該商家 owner 可讀（`vendors/{id}.owner_uid` 綁定，商家儀表板改為需登入）、FCM token 私有化、`locks` 完整性規則、管理員稽核日誌、Hosting 安全標頭。`firestore.rules` 與前端已於 2026-09-21 部署上線（規則以未登入 REST 請求驗證過：敏感集合回 403）。**待辦**：下方煙霧測試；錄 demo 前照文件「商家帳號綁定」流程建商家帳號並設 `owner_uid`（否則商家儀表板看不到資料）；認證所需的 ISMS 管理制度文件尚未建立
+
+**ISO27001 上線後煙霧測試（尚未做，需登入操作）**
+- [ ] 開 https://bunnbaa-mvp-5474.web.app/#/lock，按「鎖定這份」，看到取餐 QR code 即成功
+- [ ] `/#/login` 用 `admin@test.com`（密碼任意）登入平台 → 開 `/#/admin/locks` → 用真實管理員帳號（`suw192336@gmail.com`）登入 → 對一筆訂單按「標記已完成取餐」再「退回鎖定中」還原
+- [ ] Firestore Console 確認 `admin_audit_logs` 多了兩筆（含 admin_email 與狀態變化）
+- [ ] 瀏覽器 F12 Console 檢查有無 `Content-Security-Policy-Report-Only` 違規；長期無違規後把 `firebase.json` 的 `Content-Security-Policy-Report-Only` 改為 `Content-Security-Policy`
+- [ ] Console 手動項目：帳號 2FA、Firebase API key 加 referrer 限制（`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`localhost:*`，存檔後立刻重測正式站）、Cloud Audit Logs 開資料讀寫、GitHub `master` branch protection（需先與雅婷討論改走 PR）
 
 -------------------------------------------------------------------------------
 
