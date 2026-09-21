@@ -85,7 +85,7 @@ export default function ProfilePage() {
         {/* 快速功能 */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button
-            onClick={() => comingSoon("我的訂單")}
+            onClick={() => navigate("/my-bookings")}
             className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left hover:border-orange-300 transition-colors"
           >
             <ClipboardList className="w-5 h-5 text-orange-500 shrink-0" />

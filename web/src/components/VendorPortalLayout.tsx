@@ -1,6 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, UtensilsCrossed, ClipboardList, Settings, ArrowLeft, CalendarDays, Search, TrendingUp, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, ClipboardList, Settings, ArrowLeft, CalendarDays, Search, TrendingUp, AlertTriangle, ChefHat, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -15,7 +15,9 @@ const navItems = [
   { href: "/vendor-portal/scan", label: "核對取餐", icon: Search },
   { href: "/vendor-portal/menu", label: "菜單管理", icon: UtensilsCrossed },
   { href: "/vendor-portal/orders", label: "訂單管理", icon: ClipboardList },
+  { href: "/vendor-portal/prep", label: "今日備料", icon: ChefHat },
   { href: "/vendor-portal/reports", label: "統計報表", icon: TrendingUp },
+  { href: "/vendor-portal/growth", label: "成長獎勵", icon: Trophy },
   { href: "/vendor-portal/settings", label: "店家設定", icon: Settings },
 ];
 
