@@ -58,7 +58,7 @@
 
 **⬜ 未開始 / 本文件未提及（0）**
 
-**🟡 ISO27001（系統與安全）**：2026-09-21 完成技術面落差分析＋修補，詳見 [ISO27001_落差分析.md](ISO27001_落差分析.md)。已補：Functions 授權（管理員／商家 owner）、`payouts`／`accuracy_reports` 限管理員與該商家 owner 可讀（`vendors/{id}.owner_uid` 綁定，商家儀表板改為需登入）、FCM token 私有化、`locks` 完整性規則、管理員稽核日誌、Hosting 安全標頭。**待辦**：部署 `firestore.rules`（需要人工執行）；部署後要先照文件「商家帳號綁定」流程幫商家建帳號並設 `owner_uid`，否則儀表板看不到資料；關閉 Firebase Auth 自行註冊；認證所需的 ISMS 管理制度文件尚未建立
+**🟡 ISO27001（系統與安全）**：2026-09-21 完成技術面落差分析＋修補，詳見 [ISO27001_落差分析.md](ISO27001_落差分析.md)。已補：Functions 授權（管理員／商家 owner）、`payouts`／`accuracy_reports` 限管理員與該商家 owner 可讀（`vendors/{id}.owner_uid` 綁定，商家儀表板改為需登入）、FCM token 私有化、`locks` 完整性規則、管理員稽核日誌、Hosting 安全標頭。**待辦**：部署 `firestore.rules`（需要人工執行）；部署後要先照文件「商家帳號綁定」流程幫商家建帳號並設 `owner_uid`，否則儀表板看不到資料；認證所需的 ISMS 管理制度文件尚未建立
 
 -------------------------------------------------------------------------------
 
