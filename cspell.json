@@ -15,6 +15,7 @@
     "firebasestorage",
     "firestore",
     "geolocation",
+    "mnifr",
     "muoa",
     "nosniff",
     "noshow",
