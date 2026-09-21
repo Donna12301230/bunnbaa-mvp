@@ -7,6 +7,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -84,11 +85,6 @@ export default function ConsumerLockPage() {
     if (!auth.currentUser) return;
     setLocking(true);
     try {
-      // Requested before create, not after: firestore.rules only allows a
-      // buyer to update their own lock when moving it to "for_resale", so an
-      // update-after-create to attach the token would be rejected.
-      const fcmToken = await registerForPickupReminders();
-
       const ref = await addDoc(collection(db, "locks"), {
         vendor_id: VENDOR_ID,
         item_name: ITEM_NAME,
@@ -100,9 +96,19 @@ export default function ConsumerLockPage() {
         status: "locked",
         buyer_uid: auth.currentUser.uid,
         created_at: serverTimestamp(),
-        fcm_token: fcmToken,
       });
       setMyLock({ id: ref.id } as Lock);
+
+      // locks are publicly readable, so the device token goes in a separate
+      // owner/admin-only doc. Best-effort: never let it break the lock flow.
+      try {
+        const fcmToken = await registerForPickupReminders();
+        if (fcmToken) {
+          await setDoc(doc(db, "lock_tokens", ref.id), { fcm_token: fcmToken, buyer_uid: auth.currentUser.uid });
+        }
+      } catch (err) {
+        console.warn("Could not save pickup-reminder token:", err);
+      }
     } finally {
       setLocking(false);
     }

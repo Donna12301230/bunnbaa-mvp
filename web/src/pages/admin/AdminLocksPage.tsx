@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, writeBatch } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
 import type { Lock, LockStatus, Vendor } from "@/types";
 import AdminLayout from "@/components/AdminLayout";
 import RequireRealAdmin from "@/components/RequireRealAdmin";
@@ -58,16 +58,31 @@ function LocksContent() {
     [locks, statusFilter, vendorFilter]
   );
 
-  async function overrideStatus(lockId: string, status: LockStatus) {
+  async function overrideStatus(lock: Lock, status: LockStatus) {
     let no_show_note: string | undefined;
     if (status === "no_show") {
       no_show_note = window.prompt("未取餐備註（給校準報告分析用，可留空）") ?? undefined;
     }
-    setActingId(lockId);
+    setActingId(lock.id);
     try {
       const update: Record<string, unknown> = { status };
       if (no_show_note) update.no_show_note = no_show_note;
-      await updateDoc(doc(db, "locks", lockId), update);
+
+      // Override + audit record commit together so an override can't exist
+      // without its trail (ISO 27001 A.8.15). Log is append-only per firestore.rules.
+      const batch = writeBatch(db);
+      batch.update(doc(db, "locks", lock.id), update);
+      batch.set(doc(collection(db, "admin_audit_logs")), {
+        admin_email: auth.currentUser?.email ?? null,
+        action: "override_lock_status",
+        lock_id: lock.id,
+        vendor_id: lock.vendor_id,
+        from_status: lock.status,
+        to_status: status,
+        note: no_show_note ?? null,
+        at: serverTimestamp(),
+      });
+      await batch.commit();
     } catch (err) {
       alert("操作失敗：" + (err as Error).message);
     } finally {
@@ -125,25 +140,25 @@ function LocksContent() {
               <div className="flex flex-wrap gap-2 mt-3">
                 {lock.status !== "fulfilled" && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
-                    onClick={() => overrideStatus(lock.id, "fulfilled")}>
+                    onClick={() => overrideStatus(lock, "fulfilled")}>
                     標記已完成取餐
                   </Button>
                 )}
                 {lock.status !== "resold_and_fulfilled" && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
-                    onClick={() => overrideStatus(lock.id, "resold_and_fulfilled")}>
+                    onClick={() => overrideStatus(lock, "resold_and_fulfilled")}>
                     標記轉賣完成取餐
                   </Button>
                 )}
                 {lock.status !== "no_show" && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
-                    onClick={() => overrideStatus(lock.id, "no_show")}>
+                    onClick={() => overrideStatus(lock, "no_show")}>
                     標記未取餐
                   </Button>
                 )}
                 {lock.status !== "locked" && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
-                    onClick={() => overrideStatus(lock.id, "locked")}>
+                    onClick={() => overrideStatus(lock, "locked")}>
                     退回鎖定中
                   </Button>
                 )}
