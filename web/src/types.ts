@@ -9,6 +9,7 @@ export interface Vendor {
 export type LockStatus =
   | "locked"
   | "for_resale"
+  | "for_gift"
   | "resold_and_fulfilled"
   | "fulfilled"
   | "no_show";
@@ -23,6 +24,9 @@ export interface Lock {
   resellable: boolean;
   locked_price: number;
   status: LockStatus;
+  // Set alongside status "for_resale"; a lock past this deadline can be
+  // claimed for free (firestore.rules), no scheduled function needed.
+  resale_deadline?: unknown; // Firestore Timestamp
   no_show_note?: string | null;
   consumer_feedback?: string | null;
   discount_explanation?: string | null; // filled in by onLockCreated

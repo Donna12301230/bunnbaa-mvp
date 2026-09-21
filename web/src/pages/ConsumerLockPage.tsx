@@ -8,6 +8,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  Timestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -20,6 +21,14 @@ import { registerForPickupReminders } from "../lib/messaging";
 
 const VENDOR_ID = "cafe-renheya-demo";
 const ITEM_NAME = "招牌鮭魚御飯糰便當";
+
+// Mirrors functions/src/index.js's pickupWindowStart, but for the window's
+// end — used as the resale_deadline after which anyone may free-claim.
+function pickupWindowEnd(pickupDate: string, pickupWindow: string): Date | null {
+  const endTime = pickupWindow.split("-")[1]?.trim();
+  if (!endTime) return null;
+  return new Date(`${pickupDate}T${endTime}:00+08:00`);
+}
 
 /**
  * Spec ref: tech doc v6 §3.4 (single-location pickup), §4.2 (discount
@@ -36,6 +45,13 @@ export default function ConsumerLockPage() {
   const [reselling, setReselling] = useState(false);
   const [resaleListings, setResaleListings] = useState<Lock[]>([]);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [gifting, setGifting] = useState(false);
+  const [giftLink, setGiftLink] = useState<string | null>(null);
+  const [incomingGiftId, setIncomingGiftId] = useState<string | null>(null);
+  const [claimingGift, setClaimingGift] = useState(false);
+  const [feedbackDraft, setFeedbackDraft] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     signInAnonymously(auth).catch(console.error);
@@ -43,6 +59,18 @@ export default function ConsumerLockPage() {
       if (snap.exists()) setVendor({ id: snap.id, ...(snap.data() as any) });
     });
     return () => unsub();
+  }, []);
+
+  // 別人轉賣中清單裡「已逾時」的判斷是純前端算出來的（沒有排程 Function 把它轉成
+  // 另一個狀態），所以要固定重算一下，逾時的項目才會即時從「我要接手」變成「免費領取」。
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const giftParam = new URLSearchParams(window.location.search).get("gift");
+    if (giftParam) setIncomingGiftId(giftParam);
   }, []);
 
   useEffect(() => {
@@ -78,6 +106,43 @@ export default function ConsumerLockPage() {
       alert("接手失敗：" + (err as Error).message);
     } finally {
       setClaimingId(null);
+    }
+  }
+
+  // Free-claim is intentionally a plain client write, not a Cloud Function:
+  // firestore.rules only allows it once resale_deadline has passed, which
+  // replaces a scheduled "release" job with a check made at claim time.
+  async function handleClaimFree(lockId: string) {
+    if (!auth.currentUser) return;
+    setClaimingId(lockId);
+    try {
+      await updateDoc(doc(db, "locks", lockId), {
+        status: "locked",
+        buyer_uid: auth.currentUser.uid,
+        locked_price: 0,
+      });
+      setMyLock({ id: lockId } as Lock);
+    } catch (err) {
+      alert("領取失敗：" + (err as Error).message);
+    } finally {
+      setClaimingId(null);
+    }
+  }
+
+  async function handleAcceptGift() {
+    if (!auth.currentUser || !incomingGiftId) return;
+    setClaimingGift(true);
+    try {
+      await updateDoc(doc(db, "locks", incomingGiftId), {
+        status: "locked",
+        buyer_uid: auth.currentUser.uid,
+      });
+      setMyLock({ id: incomingGiftId } as Lock);
+      setIncomingGiftId(null);
+    } catch (err) {
+      alert("接受贈送失敗：" + (err as Error).message);
+    } finally {
+      setClaimingGift(false);
     }
   }
 
@@ -121,9 +186,43 @@ export default function ConsumerLockPage() {
     if (!myLock) return;
     setReselling(true);
     try {
-      await updateDoc(doc(db, "locks", myLock.id), { status: "for_resale" });
+      const deadline = pickupWindowEnd(myLock.pickup_date, myLock.pickup_window);
+      await updateDoc(doc(db, "locks", myLock.id), {
+        status: "for_resale",
+        ...(deadline ? { resale_deadline: Timestamp.fromDate(deadline) } : {}),
+      });
     } finally {
       setReselling(false);
+    }
+  }
+
+  // Gifting is a private hand-off (not listed in any public query) — the
+  // recipient needs the link/lock_id itself, same trust model as sharing the
+  // pickup QR code. firestore.rules lets any other signed-in user claim it.
+  async function handleGift() {
+    if (!myLock) return;
+    setGifting(true);
+    try {
+      await updateDoc(doc(db, "locks", myLock.id), { status: "for_gift" });
+      setGiftLink(`${window.location.origin}${window.location.pathname}?gift=${myLock.id}`);
+    } finally {
+      setGifting(false);
+    }
+  }
+
+  // One-shot: firestore.rules only allows this while consumer_feedback isn't
+  // already set, so it can't be edited after the fact.
+  async function handleSubmitFeedback() {
+    if (!myLock) return;
+    const text = feedbackDraft.trim();
+    if (!text) return;
+    setSubmittingFeedback(true);
+    try {
+      await updateDoc(doc(db, "locks", myLock.id), { consumer_feedback: text });
+    } catch (err) {
+      alert("送出回饋失敗：" + (err as Error).message);
+    } finally {
+      setSubmittingFeedback(false);
     }
   }
 
@@ -131,6 +230,20 @@ export default function ConsumerLockPage() {
     <div className="page">
       <div className="kicker">BunnBaa · 消費者端</div>
       <h1>鎖定今天的午餐</h1>
+
+      {incomingGiftId && !myLock && (
+        <div className="card tinted">
+          <div className="row">
+            <div>
+              <h2>有人送你一份餐點 🎁</h2>
+              <p className="muted">有同學把已鎖定的餐點贈送給你，按下方即可收下並取得取餐編號。</p>
+            </div>
+            <button disabled={claimingGift} onClick={handleAcceptGift}>
+              {claimingGift ? "處理中…" : "接受贈送"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {vendor && (
         <div className="card">
@@ -183,18 +296,34 @@ export default function ConsumerLockPage() {
           <div className="row">
             <div>
               <h2>臨時去不了？</h2>
-              <p className="muted">取餐前可以把這份轉賣給其他人，把取餐編號給對方就好——這是解套機制，不是套利工具。</p>
+              <p className="muted">取餐前可以把這份轉賣給其他人或直接贈送給朋友，把取餐編號給對方就好——這是解套機制，不是套利工具。</p>
             </div>
-            <button className="secondary" disabled={reselling} onClick={handleResell}>
-              {reselling ? "處理中…" : "轉賣這份"}
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="secondary" disabled={reselling} onClick={handleResell}>
+                {reselling ? "處理中…" : "轉賣這份"}
+              </button>
+              <button className="secondary" disabled={gifting} onClick={handleGift}>
+                {gifting ? "處理中…" : "贈送給朋友"}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {myLock && myLock.status === "for_resale" && (
         <div className="card tinted">
-          <p className="muted">已標記轉賣中。把上面的取餐編號給接手的人，對方憑編號到店取餐即可。</p>
+          <p className="muted">已標記轉賣中。把上面的取餐編號給接手的人，對方憑編號到店取餐即可；逾時沒人接手會自動開放 $0 元免費領取。</p>
+        </div>
+      )}
+
+      {myLock && myLock.status === "for_gift" && (
+        <div className="card tinted">
+          <p className="muted">已標記贈送中。把下面的連結傳給你要送的朋友，對方打開就能收下：</p>
+          {giftLink && (
+            <p className="muted" style={{ wordBreak: "break-all" }}>
+              <a href={giftLink}>{giftLink}</a>
+            </p>
+          )}
         </div>
       )}
 
@@ -204,19 +333,51 @@ export default function ConsumerLockPage() {
           <p className="faint" style={{ marginBottom: 8 }}>
             接手後款項請直接私下轉給對方，平台只負責把這份的歸屬換成你——不經手轉賣金流。
           </p>
-          {resaleListings.map((lock) => (
-            <div key={lock.id} className="row" style={{ marginBottom: 8 }}>
-              <div>
-                <div>{lock.item_name}</div>
-                <div className="muted">
-                  {lock.pickup_window} 取餐 · NT${lock.locked_price}
+          {resaleListings.map((lock) => {
+            const deadline = lock.resale_deadline as Timestamp | undefined;
+            const expired = !!deadline && deadline.toMillis() < now;
+            return (
+              <div key={lock.id} className="row" style={{ marginBottom: 8 }}>
+                <div>
+                  <div>{lock.item_name}</div>
+                  <div className="muted">
+                    {lock.pickup_window} 取餐 · {expired ? "已逾時・開放 $0 元領取" : `NT$${lock.locked_price}`}
+                  </div>
                 </div>
+                {expired ? (
+                  <button disabled={claimingId === lock.id} onClick={() => handleClaimFree(lock.id)}>
+                    {claimingId === lock.id ? "處理中…" : "免費領取"}
+                  </button>
+                ) : (
+                  <button disabled={claimingId === lock.id} onClick={() => handleClaim(lock.id)}>
+                    {claimingId === lock.id ? "處理中…" : "接手這份"}
+                  </button>
+                )}
               </div>
-              <button disabled={claimingId === lock.id} onClick={() => handleClaim(lock.id)}>
-                {claimingId === lock.id ? "處理中…" : "接手這份"}
+            );
+          })}
+        </div>
+      )}
+
+      {myLock && ["fulfilled", "resold_and_fulfilled", "no_show"].includes(myLock.status) && (
+        <div className="card">
+          <h2>這一餐吃得如何？</h2>
+          {myLock.consumer_feedback ? (
+            <p className="muted">已回饋：「{myLock.consumer_feedback}」</p>
+          ) : (
+            <>
+              <textarea
+                rows={2}
+                maxLength={280}
+                value={feedbackDraft}
+                onChange={(e) => setFeedbackDraft(e.target.value)}
+                placeholder="這餐的心得…（送出後無法修改）"
+              />
+              <button disabled={submittingFeedback || !feedbackDraft.trim()} onClick={handleSubmitFeedback}>
+                {submittingFeedback ? "處理中…" : "送出回饋"}
               </button>
-            </div>
-          ))}
+            </>
+          )}
         </div>
       )}
     </div>

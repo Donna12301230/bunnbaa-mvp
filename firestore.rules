@@ -29,18 +29,69 @@ service cloud.firestore {
                          ['payout_settled', 'payout_id', 'reminder_sent', 'discount_explanation', 'no_show_note']);
       // status transitions (fulfilled, no_show) are normally done via Cloud
       // Functions with admin rights; admin backend can also override directly
-      // since those Functions aren't deployed to prod yet (Blaze). A buyer may
-      // only flip their own still-"locked" lock to "for_resale", touching nothing else.
-      allow update: if (request.auth != null && resource.data.buyer_uid == request.auth.uid
-                    && resource.data.status == 'locked'
-                    && request.resource.data.status == 'for_resale'
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
-                    || isAdmin();
+      // since those Functions aren't deployed to prod yet (Blaze). Everything
+      // below this comment is deliberately expressed as a plain client-side
+      // rule instead of a Cloud Function, so it works today without waiting
+      // on the Blaze upgrade (TODO.md 卡點 1).
+      allow update: if isAdmin()
+                    // Buyer flips their own still-"locked" lock to "for_resale",
+                    // optionally attaching a resale_deadline (pickup-window-based,
+                    // bounded so it can't be back-dated or set absurdly far out —
+                    // once it's past, anyone may free-claim, see below).
+                    || (request.auth != null && resource.data.buyer_uid == request.auth.uid
+                        && resource.data.status == 'locked'
+                        && request.resource.data.status == 'for_resale'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resale_deadline'])
+                        && (!request.resource.data.keys().hasAny(['resale_deadline'])
+                            || (request.resource.data.resale_deadline is timestamp
+                                && request.resource.data.resale_deadline > request.time
+                                && request.resource.data.resale_deadline <= request.time + duration.value(24, 'h'))))
+                    // Buyer privately gifts their own still-"locked" lock — not
+                    // publicly listed anywhere, the recipient needs the lock_id/link
+                    // itself (same trust model as handing someone the pickup QR code).
+                    || (request.auth != null && resource.data.buyer_uid == request.auth.uid
+                        && resource.data.status == 'locked'
+                        && request.resource.data.status == 'for_gift'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+                    // Named friend claims a gifted lock — any signed-in user other
+                    // than the giver, since "naming" happens out-of-band (whoever
+                    // the giver shares the link/lock_id with).
+                    || (request.auth != null && resource.data.status == 'for_gift'
+                        && request.auth.uid != resource.data.buyer_uid
+                        && request.resource.data.status == 'locked'
+                        && request.resource.data.buyer_uid == request.auth.uid
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer_uid']))
+                    // Anyone claims an expired resale listing for free — replaces a
+                    // scheduled "release" Cloud Function with a lazy, rule-enforced
+                    // expiry checked at claim time.
+                    || (request.auth != null && resource.data.status == 'for_resale'
+                        && resource.data.get('resale_deadline', null) != null
+                        && resource.data.resale_deadline < request.time
+                        && request.resource.data.status == 'locked'
+                        && request.resource.data.buyer_uid == request.auth.uid
+                        && request.resource.data.locked_price == 0
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer_uid', 'locked_price']))
+                    // Buyer leaves feedback once the lock is settled — one-shot (the
+                    // field must not already exist) so it can't be edited after the
+                    // fact; this feeds vendor calibration (functions/src/index.js
+                    // buildVendorHistory), so it shouldn't be revisable.
+                    || (request.auth != null && resource.data.buyer_uid == request.auth.uid
+                        && resource.data.status in ['fulfilled', 'resold_and_fulfilled', 'no_show']
+                        && !resource.data.keys().hasAny(['consumer_feedback'])
+                        && request.resource.data.consumer_feedback is string
+                        && request.resource.data.consumer_feedback.size() > 0
+                        && request.resource.data.consumer_feedback.size() <= 280
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['consumer_feedback']));
       allow delete: if false;
     }
 
     // lock_tokens: FCM device tokens for pickup reminders, kept off the public
-    // locks docs. The buyer creates one for a lock they own; only that buyer or
+    // locks docs. Known gap: only Cloud Functions (admin SDK) can delete/replace
+    // one, so after a gift/free-claim/resale handoff the previous buyer's stale
+    // token is left in place instead of being handed to the new buyer — same
+    // pre-existing gap as claimResoldLock. Harmless for now since reminders are
+    // dormant pending VAPID key + Blaze deploy (TODO.md 卡點 1). The buyer creates
+    // one for a lock they own; only that buyer or
     // an admin can read it; Cloud Functions (admin SDK) manage the rest.
     match /lock_tokens/{lockId} {
       allow create: if request.auth != null

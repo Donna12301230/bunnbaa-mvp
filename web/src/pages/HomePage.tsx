@@ -307,7 +307,7 @@ export default function HomePage() {
                         最快履約：{plan.fastestBooking}
                       </span>
                       <Button
-                        className="mt-auto w-full bg-[#0f2a4a] hover:bg-[#16375c] text-white text-sm"
+                        className="mt-auto w-full bg-brand-navy hover:bg-brand-navy-hover text-white text-sm"
                         onClick={() => toast({ title: "已加入計畫", description: `${group.vendorName} · ${plan.name}` })}
                       >
                         預約加入計畫

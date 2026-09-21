@@ -61,6 +61,11 @@ export default {
           border: "var(--sidebar-border)",
           ring: "var(--sidebar-ring)",
         },
+        "brand-navy": {
+          DEFAULT: "var(--brand-navy)",
+          hover: "var(--brand-navy-hover)",
+        },
+        "surface-dark": "var(--surface-dark)",
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

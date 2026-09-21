@@ -40,6 +40,9 @@
   --sidebar-accent-foreground: hsl(22, 62%, 35%);
   --sidebar-border: hsl(36, 20%, 87%);
   --sidebar-ring: hsl(22, 62%, 35%);
+  --brand-navy: #0f2a4a;
+  --brand-navy-hover: #16375c;
+  --surface-dark: #2b2620;
   --font-sans: -apple-system, "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
@@ -79,6 +82,9 @@
   --sidebar-accent-foreground: hsl(22, 62%, 50%);
   --sidebar-border: hsl(22, 15%, 22%);
   --sidebar-ring: hsl(22, 62%, 50%);
+  --brand-navy: #16375c;
+  --brand-navy-hover: #1d4573;
+  --surface-dark: #2b2620;
 }
 
 @layer base {
@@ -173,10 +179,11 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .legacy-ui button:disabled { opacity: 0.5; cursor: default; }
 .legacy-ui button.secondary { background: var(--surface); color: var(--brand); border: 1px solid var(--brand); }
 
-.legacy-ui input[type="text"] {
+.legacy-ui input[type="text"], .legacy-ui textarea {
   width: 100%; padding: 8px 10px; border: 1px solid var(--line);
-  border-radius: 8px; font-size: 14px;
+  border-radius: 8px; font-size: 14px; font-family: inherit;
 }
+.legacy-ui textarea { margin-bottom: 8px; resize: vertical; }
 
 .legacy-ui .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .legacy-ui .stat { font-size: 28px; font-weight: 700; color: var(--brand); }

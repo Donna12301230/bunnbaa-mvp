@@ -32,7 +32,11 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
 
   useEffect(() => {
     if (!isLoading && !isVendor) {
-      toast({ variant: "destructive", title: "請先登入 / 註冊帳號", description: "此頁面僅限廠商帳號使用。" });
+      toast(
+        user
+          ? { variant: "destructive", title: "沒有權限瀏覽此頁面", description: "此頁面僅限廠商帳號使用，目前登入的帳號權限不足。" }
+          : { variant: "destructive", title: "請先登入 / 註冊帳號", description: "此頁面僅限廠商帳號使用，請先登入廠商帳號。" }
+      );
       navigate("/");
     }
   }, [isLoading, isVendor]);
@@ -72,9 +76,9 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
   if (isSubscriptionBlocked) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-[#f5f0e8] border-b border-[#e0d5c0] px-4 h-12 flex items-center justify-between">
+        <div className="bg-sidebar border-b border-sidebar-border px-4 h-12 flex items-center justify-between">
           <img src="/飯飽wordR.png" alt="飯飽BunnBaa" className="h-7" />
-          <Link href="/home" className="flex items-center text-sm text-[#8B6914] opacity-80 hover:opacity-100">
+          <Link href="/home" className="flex items-center text-sm text-sidebar-primary opacity-80 hover:opacity-100">
             <ArrowLeft className="w-4 h-4 mr-1" /> 回首頁
           </Link>
         </div>
@@ -105,11 +109,11 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top bar */}
-      <div className="bg-[#f5f0e8] border-b border-[#e0d5c0] px-4 h-12 flex items-center justify-between">
+      <div className="bg-sidebar border-b border-sidebar-border px-4 h-12 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <img src="/飯飽wordR.png" alt="飯飽BunnBaa" className="h-7" />
         </div>
-        <Link href="/home" className="flex items-center text-sm text-[#8B6914] opacity-80 hover:opacity-100">
+        <Link href="/home" className="flex items-center text-sm text-sidebar-primary opacity-80 hover:opacity-100">
           <ArrowLeft className="w-4 h-4 mr-1" /> 回首頁
         </Link>
       </div>

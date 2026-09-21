@@ -19,12 +19,16 @@ const navItems = [
 // VendorPortalLayout.tsx so the two backends share one visual language.
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
-  const { isAdmin, isLoading } = useAuth();
+  const { user, isAdmin, isLoading } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     if (!isLoading && !isAdmin) {
-      toast({ variant: "destructive", title: "請先登入 / 註冊帳號", description: "此頁面僅限平台管理員使用。" });
+      toast(
+        user
+          ? { variant: "destructive", title: "沒有權限瀏覽此頁面", description: "此頁面僅限平台管理員帳號使用，目前登入的帳號權限不足。" }
+          : { variant: "destructive", title: "請先登入 / 註冊帳號", description: "此頁面僅限平台管理員使用，請先登入平台管理員帳號。" }
+      );
       navigate("/");
     }
   }, [isLoading, isAdmin]);
@@ -42,11 +46,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top bar */}
-      <div className="bg-[#f5f0e8] border-b border-[#e0d5c0] px-4 h-12 flex items-center justify-between">
+      <div className="bg-sidebar border-b border-sidebar-border px-4 h-12 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <img src="/飯飽wordR.png" alt="飯飽BunnBaa" className="h-7" />
         </div>
-        <Link href="/home" className="flex items-center text-sm text-[#8B6914] opacity-80 hover:opacity-100">
+        <Link href="/home" className="flex items-center text-sm text-sidebar-primary opacity-80 hover:opacity-100">
           <ArrowLeft className="w-4 h-4 mr-1" /> 回首頁
         </Link>
       </div>

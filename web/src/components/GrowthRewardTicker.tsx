@@ -12,7 +12,7 @@ export default function GrowthRewardTicker() {
   const items = [...bigWins, ...bigWins]; // 重複一次讓 -50% 位移可以無縫循環
 
   return (
-    <div className="overflow-hidden bg-[#2B2620] py-2.5 whitespace-nowrap">
+    <div className="overflow-hidden bg-surface-dark py-2.5 whitespace-nowrap">
       <div className="inline-flex items-center gap-12 animate-marquee">
         {items.map((win, i) => (
           <span key={`${win.id}-${i}`} className="inline-flex items-center gap-2 text-xs font-bold text-amber-200 shrink-0">

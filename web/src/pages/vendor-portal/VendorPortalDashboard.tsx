@@ -55,7 +55,7 @@ export default function VendorPortalDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{dashboard?.tablePending ?? 0}</div>
+              <div className="text-2xl font-bold text-orange-600">{dashboard?.tablePending ?? 0}</div>
             </CardContent>
           </Card>
           <Card>

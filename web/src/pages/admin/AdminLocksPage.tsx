@@ -12,6 +12,7 @@ import { ClipboardList } from "lucide-react";
 const STATUS_LABELS: Record<LockStatus, string> = {
   locked: "鎖定中",
   for_resale: "轉賣中",
+  for_gift: "贈送中",
   resold_and_fulfilled: "已轉賣完成取餐",
   fulfilled: "已完成取餐",
   no_show: "未取餐",

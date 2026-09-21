@@ -11,10 +11,13 @@ import {
 // 對應 UI草圖 Marketplace.dc.html「轉讓市集」。
 // TODO(firebase): 目前是版面骨架 + 前端 local state 示意（我要接手／免費領取／
 // 取消轉讓皆未寫回後端）。接後端時：
-//   - 「我要接手」「免費領取」呼叫 claimResoldLock（functions/src/index.js）
-//   - 逾時自動開放 $0 元目前 firestore.rules 的 LockStatus 沒有對應狀態，
-//     需另外設計排程（TODO.md「草圖裡後端還接不上的功能」第 1 項）
-//   - 「取消轉讓」目前沒有對應的 Cloud Function
+//   - 「我要接手」呼叫 claimResoldLock（functions/src/index.js）
+//   - 「免費領取」2026-09-21 已有對應機制：firestore.rules 新增了「for_resale
+//     的 lock 一旦 resale_deadline 已過，任何登入用戶可直接 updateDoc 把
+//     status 改成 locked、buyer_uid 換自己、locked_price 設 0」，不用 Cloud
+//     Function/排程。真實端到端範例在 ConsumerLockPage.tsx 的 handleClaimFree
+//     （判斷邏輯：resale_deadline < now，同頁的 pickupWindowEnd() 算法可沿用）
+//   - 「取消轉讓」目前沒有對應的 Cloud Function／規則
 const CATEGORIES: { id: "all" | "fit" | "veg" | "seafood"; label: string }[] = [
   { id: "all", label: "全部" },
   { id: "fit", label: "健身餐" },
