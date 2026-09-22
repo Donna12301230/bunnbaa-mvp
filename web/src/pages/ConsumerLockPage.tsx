@@ -18,9 +18,11 @@ import { signInAnonymously } from "firebase/auth";
 import type { Lock, Vendor } from "../types";
 import LockQRCode from "../components/LockQRCode";
 import { registerForPickupReminders } from "../lib/messaging";
+import { applyEarlyBirdPrice } from "../lib/pricing";
 
 const VENDOR_ID = "cafe-renheya-demo";
 const ITEM_NAME = "招牌鮭魚御飯糰便當";
+const ORIGINAL_PRICE = 120;
 
 // Mirrors functions/src/index.js's pickupWindowStart, but for the window's
 // end — used as the resale_deadline after which anyone may free-claim.
@@ -52,6 +54,7 @@ export default function ConsumerLockPage() {
   const [feedbackDraft, setFeedbackDraft] = useState("");
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const todayPricing = applyEarlyBirdPrice(ORIGINAL_PRICE, new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     signInAnonymously(auth).catch(console.error);
@@ -150,14 +153,16 @@ export default function ConsumerLockPage() {
     if (!auth.currentUser) return;
     setLocking(true);
     try {
+      const pickupDate = new Date().toISOString().slice(0, 10);
+      const { discountPercent, lockedPrice } = applyEarlyBirdPrice(ORIGINAL_PRICE, pickupDate);
       const ref = await addDoc(collection(db, "locks"), {
         vendor_id: VENDOR_ID,
         item_name: ITEM_NAME,
         pickup_window: "12:00-13:00",
-        pickup_date: new Date().toISOString().slice(0, 10),
-        discount_percent: 20,
+        pickup_date: pickupDate,
+        discount_percent: discountPercent,
         resellable: true,
-        locked_price: 96,
+        locked_price: lockedPrice,
         status: "locked",
         buyer_uid: auth.currentUser.uid,
         created_at: serverTimestamp(),
@@ -263,9 +268,9 @@ export default function ConsumerLockPage() {
       <div className="card tinted">
         <div className="row">
           <div>
-            <div style={{ textDecoration: "line-through", color: "var(--faint)" }}>NT$120</div>
-            <div className="stat">NT$96</div>
-            <div className="muted">今日 8 折 · 全額預付，鎖定後直接歸商家</div>
+            <div style={{ textDecoration: "line-through", color: "var(--faint)" }}>NT${ORIGINAL_PRICE}</div>
+            <div className="stat">NT${todayPricing.lockedPrice}</div>
+            <div className="muted">{todayPricing.tierLabel} · 全額預付，鎖定後直接歸商家</div>
           </div>
           <button onClick={handleLock} disabled={locking || !!myLock}>
             {myLock ? "已鎖定" : locking ? "處理中…" : "鎖定這份"}

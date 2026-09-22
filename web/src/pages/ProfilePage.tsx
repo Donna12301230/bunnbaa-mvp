@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
   User, Mail, Phone, GraduationCap, ArrowLeft, LogOut,
-  ClipboardList, Users, Store,
+  ClipboardList, Users, Store, History,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { mockLogout } from "@/lib/mockAuth";
@@ -92,6 +92,16 @@ export default function ProfilePage() {
             <div>
               <p className="font-medium text-sm">我的訂單</p>
               <p className="text-xs text-muted-foreground">查看鎖定與取餐紀錄</p>
+            </div>
+          </button>
+          <button
+            onClick={() => navigate("/my-locks")}
+            className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left hover:border-orange-300 transition-colors"
+          >
+            <History className="w-5 h-5 text-orange-500 shrink-0" />
+            <div>
+              <p className="font-medium text-sm">我的鎖定紀錄</p>
+              <p className="text-xs text-muted-foreground">真實資料簡易列表（開發用）</p>
             </div>
           </button>
           <button

@@ -48,15 +48,15 @@
 - 撥款排程（金流與結算）：`settleVendorPayouts`（daily schedule + 手動觸發）emulator 已驗證重複點擊不會重複結算，卡在 Blaze/Functions 部署未上正式站
 - Firebase Hosting 部署（整合與交付）：已有初版正式站 https://bunnbaa-mvp-5474.web.app，但轉賣/撥款等新功能還沒重新部署（等 Functions 上線後一起做）
 - 取餐提醒推播(FCM)（交易核心，同 SU「通知系統」，合併計算）：2026-09-20 SU 完成程式碼——前端要求通知權限+存 FCM token 到私有的 `lock_tokens`（`web/src/lib/messaging.ts`）、Functions 端 `pickupReminders`（每 15 分排程）+ `triggerPickupRemindersNow`。卡兩點：VAPID key 還沒去 Console 拿（免費、跟 Blaze 無關，見下方）；Functions 部署卡 Blaze。
+- 我的鎖定/訂單記錄頁（交易核心）：2026-09-22 完成，新增 `MyLocksPage.tsx`（`/my-locks`，從「會員中心」連過去）——依 `buyer_uid` 查真實 `locks` 的簡易列表，不是週曆版面。emulator/正式站尚未實測（開發環境連不到外網 Firebase，見下方進度日誌）
 
 **🔴 卡住，等人工或外部審核（3）**
 - Gemini — 商家校準 Agent（AI Agent）：見上方卡點 2
 - Gemini — 消費者折扣說明 Agent（AI Agent）：同上，目前消費者端會卡在「產生說明中」
 - 金流串接(消費端)（金流與結算）：見上方卡點 3
 
-**⬜ 未開始 / 本文件未提及（4）**
+**⬜ 未開始 / 本文件未提及（3）**
 - UI模型建置（基礎建置）：新增項目，本文件尚無內容，需另外確認範圍與進度。UI規格書 https://claude.ai/artifact/QWUhndBuB4GS7izdStzXa8
-- 我的鎖定/訂單記錄頁（交易核心）：本文件未提及
 - 整合測試（整合與交付）：未開始，待 Blaze 升級解除後才能做完整端到端測試
 - Demo 錄製 ＋ Proposal（整合與交付）：未開始，**10/18 前提交**
 
@@ -107,21 +107,22 @@ UI 草圖：https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc （僅參考版面
 |---|---|---|
 | `PlanSchedule.dc.html`（合作店家與計畫） | `HomePage.tsx` | ✅ 已一比一做出來 |
 | `Main.dc.html`「預購鎖定」 | 2026-09-21 補進 `HomePage.tsx` | 🟡 版面＋互動骨架完成，**尚未接後端**——真正端到端接 Firestore 的示範仍在 `/lock`（`ConsumerLockPage.tsx`），兩邊還沒合併 |
-| `Marketplace.dc.html`「轉讓市集」 | `TransferMarketPage.tsx`（`/marketplace`） | 🟡 版面＋互動骨架完成（mock 資料見 `mockData.ts`），**尚未接後端**：`claimResoldLock` 還沒串、逾時自動開放 $0 元沒有對應狀態機／排程 |
+| `Marketplace.dc.html`「轉讓市集」 | `TransferMarketPage.tsx`（`/marketplace`） | 🟡 2026-09-22 接上真實 Firestore：瀏覽轉讓／我要接手（`claimResoldLock`）／免費領取／我的轉讓皆已是真實查詢與寫入。**尚未接後端**：「取消轉讓」（firestore.rules 沒有對應規則讓 owner 把 `for_resale` 改回 `locked`）；已被接手的項目也無法在「我的轉讓」追蹤（資料模型沒記錄原轉讓者） |
 | `MyBookings.dc.html`「我的商品」 | `MyBookingsPage.tsx`（`/my-bookings`） | 🟡 版面＋互動骨架完成（21 格週曆），資料是寫死 mock，**尚未接後端**：核銷要串 `markLockOutcome`、「贈送」指名轉移沒有對應 Function、「留下回饋」無資料模型 |
 | `Login.dc.html`（手機門號 OTP 兩段式） | `LoginPage.tsx`（`mockAuth.ts` 帳號字串猜角色） | 🟡 草圖確認要 OTP 流程，尚未做 |
 | `VendorDashboard.dc.html`（商家後台：訂單/備料/收益/成長獎勵） | 既有 `VendorPortalLayout.tsx` 系列 + 新增備料/成長獎勵頁 | 🟡 見下方「全新機制」 |
 
 ### 草圖裡後端還接不上的功能（待辦清單）
 
-- [ ] 逾時自動開放 $0 元領取（Marketplace）——缺狀態＋排程
+- [x] 逾時自動開放 $0 元領取（Marketplace）——2026-09-22 完成：沿用既有 firestore.rules 的 lazy expiry 規則（不用排程 Function），`TransferMarketPage.tsx` 已接上真實 `locks` 查詢＋`claimResoldLock`／免費領取
+- [ ] 取消轉讓（Marketplace「我的轉讓」）——firestore.rules 沒有對應規則，2026-09-22 盤點時發現
 - [ ] 贈送給指定朋友（MyBookings「贈送」）——現有機制只支援不指名的市集轉讓
-- [ ] 留下回饋／評論（MyBookings 過去餐點）——無資料模型
+- [ ] 留下回饋／評論（MyBookings 過去餐點）——不缺資料模型（沿用 `Lock.consumer_feedback`，規則已支援，範例見 `ConsumerLockPage.tsx`），但 2026-09-22 盤點發現 `MyBookingsPage.tsx` 整頁週曆都是寫死 mock、完全沒接真實 `locks`，要接這個得先把整頁重新接上真實資料（比預期大的工程，非單純加欄位）
 - [ ] 計畫型（訂閱制多日方案）——僅 `mockVendorMealPlans` 前端假資料，Firestore 無 plan／多日排程模型
 - [ ] 認證商家徽章——目前只有 `reliability_tone`（履約穩定度），沒有「認證商家」欄位
-- [ ] 早鳥階梯定價 95/8/7 折——UI 有，後端定價邏輯沒有
+- [x] 早鳥階梯定價 95/8/7 折——2026-09-22 完成，`web/src/lib/pricing.ts`（純函式，可測），已接進 `ConsumerLockPage.tsx` 的 `handleLock()`。`HomePage.tsx` 的 `mockLockMeals` 卡片是純前端 mock、還沒接真實下單流程，沒有一併套用
 - [ ] `growth_rewards`／`draws` collection 重新設計（商家累積營收門檻、開獎紀錄）；抽獎機率計算必須在 Cloud Function 做，不能信任 client
-- [ ] 備料聚合改成依 `locks` collection 的 `pickup_date` + `pickup_window` 即時分組（目前純前端寫死陣列）
+- [x] 備料聚合改成依 `locks` collection 的 `pickup_date` + `pickup_window` 即時分組——2026-09-22 完成，`VendorPortalPrep.tsx` 改用 `onSnapshot`
 
 QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`LockQRCode.tsx` + `VendorRedeemPage.tsx`。
 
@@ -185,6 +186,21 @@ QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`Loc
 ---
 
 ## 進度日誌（歷史記錄，僅供追溯；最新在上）
+
+**2026-09-22（第二次更新）：新增 `MyLocksPage.tsx`（我的鎖定紀錄）＋早鳥階梯定價邏輯 `pricing.ts`**
+
+延續上一次「先做不受三大卡點影響的項目」的方向：
+- 「我的鎖定/訂單記錄頁」原本本文件沒描述範圍，跟使用者確認後決定做一個獨立的真實資料簡易列表頁（不是週曆版面）：新增 `MyLocksPage.tsx`（`/my-locks`），依 `buyer_uid` 查真實 `locks`（單一 equality，不加 `orderBy`，避免要求新複合索引，排序交給前端），從「會員中心」（`ProfilePage.tsx`）新增「我的鎖定紀錄」卡片連過去。之後可以當作把 `MyBookingsPage.tsx` 從 mock 換成真資料的中間步驟
+- 早鳥階梯定價：新增 `web/src/lib/pricing.ts`（純函式 `applyEarlyBirdPrice`，對應 `HomePage.tsx` 側欄「早鳥預約折扣」顯示的三個階梯：今日/明日 95折、提前2–13天 8折、提前14–30天 7折），接進 `ConsumerLockPage.tsx` 的 `handleLock()` 取代原本寫死的 `discount_percent: 20` / `locked_price: 96`（跟側欄階梯不一致的舊值）。瀏覽器實測 `/lock` 正確顯示「今日／明日・95折 → NT$114」
+- `npx tsc --noEmit` 零錯誤；`/my-locks` 頁面渲染正常（沙盒連不到外網 Firebase，卡在 auth 匿名登入無法解析，停在「載入中」——跟前次 `TransferMarketPage.tsx` 遇到的環境限制相同，不是程式碼問題）
+
+**2026-09-22：`VendorPortalPrep.tsx`／`TransferMarketPage.tsx` 接上真實 Firestore（不受三大卡點影響的項目優先做）**
+
+盤點 TODO 後，先挑不受 Blaze／Gemini／LINE Pay 三大卡點影響、純 Firestore client 讀寫就能做完的項目：
+- `VendorPortalPrep.tsx`（今日備料）：改用 `onSnapshot` 監聽 `locks`，沿用 `VendorRedeemPage.tsx` 同一組 `vendor_id + created_at` 索引（不用新增複合索引），前端過濾今日 `pickup_date` 且排除 `fulfilled`／`resold_and_fulfilled`／`no_show`，依 `pickup_window` → `item_name` 即時分組計數。刪除已無用的 `mockPrepSlots`
+- `TransferMarketPage.tsx`（轉讓市集）：沿用 `ConsumerLockPage.tsx` 已驗證過的模式——「瀏覽轉讓」「已逾期開放$0元」改成即時查詢真實 `for_resale` 的 `locks`；「我要接手」呼叫 `claimResoldLock`（正式站要等 Blaze，emulator 可先測）；「免費領取」是純 client-side firestore.rules 寫入，不用排程、不受 Blaze 卡住；「我的轉讓」改查真實資料，但誠實標註「取消轉讓」目前 rules 不支援、已被接手的項目也追蹤不到（資料模型沒記錄原轉讓者），不做假按鈕。刪除已無用的 marketplace mock 資料
+- 盤點時發現 `MyBookingsPage.tsx`（我的餐點）整頁週曆完全是寫死 mock，沒有真實 `locks` 串接，「留下回饋」看似只差一個欄位（`Lock.consumer_feedback` 早就有規則支援），實際要接得先把整頁重新接上真實資料——比預期大得多，先跳過，改做上面兩項
+- `npx tsc --noEmit` 零錯誤；瀏覽器實測兩頁面渲染正常、loading/空清單狀態正確；比對既有已驗證的 `/lock` 頁面確認 `Firestore Listen...transport errored` 是這次測試所在的瀏覽器沙盒連不到外網 Firebase，不是程式碼問題
 
 **2026-09-21（第六次更新）：`/lock/vendor/redeem`（核對取餐）加上取餐總覽日曆格**
 

@@ -1,65 +1,134 @@
-import { useState } from "react";
-import { Link } from "wouter";
-import { Search, Clock, MapPin, ArrowRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { Search, Clock, MapPin } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import {
-  mockMarketplaceListings, mockMarketplaceReleased, mockMyMarketplaceListings,
-} from "@/lib/mockData";
+import { auth, db, functions } from "@/lib/firebase";
+import type { Lock } from "@/types";
 
-// 對應 UI草圖 Marketplace.dc.html「轉讓市集」。
-// TODO(firebase): 目前是版面骨架 + 前端 local state 示意（我要接手／免費領取／
-// 取消轉讓皆未寫回後端）。接後端時：
-//   - 「我要接手」呼叫 claimResoldLock（functions/src/index.js）
-//   - 「免費領取」2026-09-21 已有對應機制：firestore.rules 新增了「for_resale
-//     的 lock 一旦 resale_deadline 已過，任何登入用戶可直接 updateDoc 把
-//     status 改成 locked、buyer_uid 換自己、locked_price 設 0」，不用 Cloud
-//     Function/排程。真實端到端範例在 ConsumerLockPage.tsx 的 handleClaimFree
-//     （判斷邏輯：resale_deadline < now，同頁的 pickupWindowEnd() 算法可沿用）
-//   - 「取消轉讓」目前沒有對應的 Cloud Function／規則
-const CATEGORIES: { id: "all" | "fit" | "veg" | "seafood"; label: string }[] = [
-  { id: "all", label: "全部" },
-  { id: "fit", label: "健身餐" },
-  { id: "veg", label: "蔬食" },
-  { id: "seafood", label: "海鮮" },
-];
+// 對應 UI草圖 Marketplace.dc.html「轉讓市集」。接上真實 Firestore,沿用
+// ConsumerLockPage.tsx 已驗證過的模式:
+//   - 「我要接手」呼叫 claimResoldLock（functions/src/index.js，正式站要等 Blaze）
+//   - 「免費領取」是純 client-side 規則（firestore.rules：for_resale 且
+//     resale_deadline 已過，任何登入用戶可直接 updateDoc），不用排程
+//   - 沿用同一組 vendor_id + created_at 索引，篩選 for_resale 交給前端做，
+//     避免另外要求新的複合索引（跟 VendorRedeemPage/VendorPortalPrep 同慣例）
+// 「取消轉讓」目前 firestore.rules 沒有對應規則（owner 沒辦法把 for_resale 改回
+// locked），所以「我的轉讓」只顯示提示文字，不做假的取消按鈕。同理，已被接手的
+// 項目一旦 buyer_uid 換人就無法再用「我的」查回來（資料模型沒有記錄原轉讓者），
+// 這頁「我的轉讓」只會顯示目前還在轉讓中、尚未被接手的項目。
+// 轉賣價格由買家雙方私下議定、платform 不經手，所以這裡不顯示「轉讓價」，只顯示
+// 原鎖定價（locked_price）。
+const VENDOR_ID = "cafe-renheya-demo";
+
+function formatCountdown(deadline: Date, now: number): string {
+  const diffMin = Math.round((deadline.getTime() - now) / 60000);
+  if (diffMin <= 0) return "已逾期";
+  if (diffMin < 60) return `${diffMin} 分後截止`;
+  return `${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`;
+}
 
 export default function TransferMarketPage() {
   const { toast } = useToast();
   const [browseTab, setBrowseTab] = useState<"browse" | "mine">("browse");
-  const [category, setCategory] = useState<"all" | "fit" | "veg" | "seafood">("all");
   const [search, setSearch] = useState("");
-  const [claimed, setClaimed] = useState<Record<string, boolean>>({});
-  const [released, setReleased] = useState<Record<string, boolean>>({});
-  const [canceled, setCanceled] = useState<Record<string, boolean>>({});
+  const [uid, setUid] = useState<string | null>(null);
+  const [locks, setLocks] = useState<Lock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
+  const [claimingId, setClaimingId] = useState<string | null>(null);
 
-  const listings = mockMarketplaceListings.filter(
-    l => category === "all" || l.category === category
+  useEffect(() => {
+    signInAnonymously(auth).catch(console.error);
+    const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "locks"),
+      where("vendor_id", "==", VENDOR_ID),
+      orderBy("created_at", "desc"),
+      limit(200)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setLocks(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock));
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+    return () => unsub();
+  }, []);
+
+  // 逾時判斷是純前端算的（沒有排程 Function 幫忙轉狀態），要固定重算才會即時從
+  // 「我要接手」變成「免費領取」。
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  function deadlineOf(lock: Lock): Date | null {
+    const ts = lock.resale_deadline as { toDate?: () => Date } | undefined;
+    return ts?.toDate ? ts.toDate() : null;
+  }
+
+  const searchLower = search.trim().toLowerCase();
+  const forResale = useMemo(
+    () =>
+      locks.filter(
+        (l) =>
+          l.status === "for_resale" &&
+          l.buyer_uid !== uid &&
+          (!searchLower || l.item_name.toLowerCase().includes(searchLower))
+      ),
+    [locks, uid, searchLower]
+  );
+  const activeListings = forResale.filter((l) => {
+    const d = deadlineOf(l);
+    return !d || d.getTime() > now;
+  });
+  const expiredListings = forResale.filter((l) => {
+    const d = deadlineOf(l);
+    return d && d.getTime() <= now;
+  });
+  const myListings = useMemo(
+    () => locks.filter((l) => l.status === "for_resale" && l.buyer_uid === uid),
+    [locks, uid]
   );
 
-  function toggleClaim(id: string) {
-    setClaimed(prev => {
-      const next = !prev[id];
-      toast({
-        title: next ? "已接手" : "已取消接手",
-        description: next ? "示意畫面：實際接手需串接 claimResoldLock。" : undefined,
+  async function handleClaim(lockId: string) {
+    setClaimingId(lockId);
+    try {
+      const fn = httpsCallable(functions, "claimResoldLock");
+      await fn({ lock_id: lockId });
+      toast({ title: "已接手", description: "取餐編號可在「我的餐點」查看。" });
+    } catch (err) {
+      toast({ title: "接手失敗", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setClaimingId(null);
+    }
+  }
+
+  async function handleClaimFree(lockId: string) {
+    if (!uid) return;
+    setClaimingId(lockId);
+    try {
+      await updateDoc(doc(db, "locks", lockId), {
+        status: "locked",
+        buyer_uid: uid,
+        locked_price: 0,
       });
-      return { ...prev, [id]: next };
-    });
-  }
-
-  function toggleReleased(id: string) {
-    setReleased(prev => {
-      const next = !prev[id];
-      toast({ title: next ? "已領取" : "已取消領取", description: next ? "示意畫面：$0 元免費領取尚未接後端。" : undefined });
-      return { ...prev, [id]: next };
-    });
-  }
-
-  function cancelMine(id: string) {
-    setCanceled(prev => ({ ...prev, [id]: true }));
-    toast({ title: "已取消轉讓" });
+      toast({ title: "已免費領取", description: "取餐編號可在「我的餐點」查看。" });
+    } catch (err) {
+      toast({ title: "領取失敗", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setClaimingId(null);
+    }
   }
 
   return (
@@ -80,10 +149,9 @@ export default function TransferMarketPage() {
               id="marketplaceSearch"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="搜尋方案、店家或同學名稱"
+              placeholder="搜尋餐點名稱"
               className="flex-1 border-none outline-none bg-transparent text-sm py-2"
             />
-            <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white rounded-xl">搜尋</Button>
           </div>
         </div>
       </section>
@@ -109,65 +177,52 @@ export default function TransferMarketPage() {
           </button>
         </div>
 
-        {browseTab === "browse" && (
+        {loading && <p className="text-sm text-muted-foreground">載入中…</p>}
+
+        {!loading && browseTab === "browse" && (
           <>
             <div className="flex items-center justify-between flex-wrap gap-3.5">
-              <div className="flex gap-2 flex-wrap">
-                {CATEGORIES.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => setCategory(c.id)}
-                    className={`text-sm font-bold px-4 py-2 rounded-full border transition-colors ${
-                      category === c.id ? "bg-orange-500 border-orange-500 text-white" : "bg-white border-border text-muted-foreground"
-                    }`}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              <span className="text-sm text-muted-foreground font-semibold">目前 {listings.length} 筆轉讓中</span>
+              <span className="text-sm text-muted-foreground font-semibold">目前 {activeListings.length} 筆轉讓中</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {listings.map(item => {
-                const isClaimed = !!claimed[item.id];
-                return (
-                  <article key={item.id} className="rounded-2xl bg-white border border-border overflow-hidden flex flex-col">
-                    <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl">
-                      🍱
-                      <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-900 text-white">
-                        <Clock className="w-3 h-3" /> {item.expiresIn}後截止
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-[11px] font-bold text-orange-600 shrink-0">
-                          {item.sellerInitial}
+            {activeListings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">目前沒有人轉讓，稍後再回來看看。</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {activeListings.map(item => {
+                  const deadline = deadlineOf(item);
+                  return (
+                    <article key={item.id} className="rounded-2xl bg-white border border-border overflow-hidden flex flex-col">
+                      <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl">
+                        🍱
+                        {deadline && (
+                          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-900 text-white">
+                            <Clock className="w-3 h-3" /> {formatCountdown(deadline, now)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2.5 p-4 flex-1">
+                        <h3 className="text-[15px] font-bold leading-snug">{item.item_name}</h3>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
                         </div>
-                        <span className="text-xs font-medium text-muted-foreground">{item.seller} 轉讓</span>
-                      </div>
-                      <h3 className="text-[15px] font-bold leading-snug">{item.title}</h3>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {item.location}
-                      </div>
-                      <div className="flex items-center justify-between mt-auto pt-1.5">
-                        <div>
-                          <span className="text-xs text-gray-400 line-through mr-1.5">${item.original}</span>
-                          <span className="text-lg font-extrabold">${item.resale}</span>
+                        <div className="flex items-center justify-between mt-auto pt-1.5">
+                          <span className="text-lg font-extrabold">${item.locked_price}</span>
+                          <Button
+                            size="sm"
+                            disabled={claimingId === item.id}
+                            onClick={() => handleClaim(item.id)}
+                            className="bg-orange-500 hover:bg-orange-600 text-white"
+                          >
+                            {claimingId === item.id ? "處理中…" : "我要接手"}
+                          </Button>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => toggleClaim(item.id)}
-                          className={isClaimed ? "bg-green-700 hover:bg-green-800 text-white" : "bg-orange-500 hover:bg-orange-600 text-white"}
-                        >
-                          {isClaimed ? "已接手" : "我要接手"}
-                        </Button>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="flex items-center gap-2.5 pt-2 flex-wrap">
               <Clock className="w-5 h-5" />
@@ -175,10 +230,11 @@ export default function TransferMarketPage() {
               <span className="text-xs text-muted-foreground">取餐時段結束仍未被接手，系統自動開放給任何人免費領取，先到先得</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {mockMarketplaceReleased.map(item => {
-                const isReleased = !!released[item.id];
-                return (
+            {expiredListings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">目前沒有逾期的項目。</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {expiredListings.map(item => (
                   <article key={item.id} className="rounded-2xl bg-white border border-border overflow-hidden flex flex-col">
                     <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl">
                       🍱
@@ -187,81 +243,62 @@ export default function TransferMarketPage() {
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <h3 className="text-[15px] font-bold leading-snug">{item.title}</h3>
+                      <h3 className="text-[15px] font-bold leading-snug">{item.item_name}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {item.location}
+                        <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-1.5">
                         <div>
-                          <span className="text-xs text-gray-400 line-through mr-1.5">${item.original}</span>
+                          <span className="text-xs text-gray-400 line-through mr-1.5">${item.locked_price}</span>
                           <span className="text-lg font-extrabold">$0</span>
                         </div>
                         <Button
                           size="sm"
-                          onClick={() => toggleReleased(item.id)}
-                          className={isReleased ? "bg-green-700 hover:bg-green-800 text-white" : "bg-gray-900 hover:bg-gray-800 text-white"}
+                          disabled={claimingId === item.id}
+                          onClick={() => handleClaimFree(item.id)}
+                          className="bg-gray-900 hover:bg-gray-800 text-white"
                         >
-                          {isReleased ? "已領取" : "免費領取"}
+                          {claimingId === item.id ? "處理中…" : "免費領取"}
                         </Button>
                       </div>
                     </div>
                   </article>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 
-        {browseTab === "mine" && (
+        {!loading && browseTab === "mine" && (
           <>
-            <div className="flex items-center justify-between flex-wrap gap-3.5">
-              <span className="text-sm text-muted-foreground font-semibold">
-                你目前有 {mockMyMarketplaceListings.filter(i => !canceled[i.id]).length} 筆商品在轉讓市集
-              </span>
-              <Link href="/my-bookings" className="text-sm font-bold text-orange-600 flex items-center gap-1 hover:text-orange-700">
-                從我的餐點新增轉讓 <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+            <span className="text-sm text-muted-foreground font-semibold">你目前有 {myListings.length} 筆商品在轉讓市集</span>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {mockMyMarketplaceListings.map(item => {
-                const isCanceled = !!canceled[item.id];
-                const status = isCanceled ? "已取消" : item.outcome === "claimed" ? "已被接手" : "轉讓中";
-                const statusClass = isCanceled
-                  ? "bg-gray-200 text-gray-500"
-                  : item.outcome === "claimed"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-orange-500 text-white";
-                return (
+            {myListings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">你目前沒有轉讓中的項目。到「我的餐點」把還沒用到的份轉讓出去。</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {myListings.map(item => (
                   <article key={item.id} className="rounded-2xl bg-white border border-border overflow-hidden flex flex-col">
                     <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl">
                       🍱
-                      <span className={`absolute top-2.5 right-2.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${statusClass}`}>
-                        {status}
+                      <span className="absolute top-2.5 right-2.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
+                        轉讓中
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <h3 className="text-[15px] font-bold leading-snug">{item.title}</h3>
+                      <h3 className="text-[15px] font-bold leading-snug">{item.item_name}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {item.location}
+                        <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
                       </div>
-                      <div className="flex items-center justify-between mt-auto pt-1.5">
-                        <div>
-                          <span className="text-xs text-gray-400 line-through mr-1.5">${item.original}</span>
-                          <span className="text-lg font-extrabold">${item.resale}</span>
-                        </div>
-                        {!isCanceled && item.outcome === "listed" && (
-                          <Button size="sm" variant="outline" className="border-red-400 text-red-600 hover:bg-red-50" onClick={() => cancelMine(item.id)}>
-                            取消轉讓
-                          </Button>
-                        )}
-                        {isCanceled && <span className="text-xs font-bold text-gray-400">已取消</span>}
-                      </div>
+                      <span className="text-lg font-extrabold mt-auto pt-1.5">${item.locked_price}</span>
                     </div>
                   </article>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              「取消轉讓」尚未支援（Firestore 規則還沒開放 owner 把 for_resale 改回 locked），已被接手的項目目前也無法在此追蹤，因為資料模型沒有記錄原轉讓者。
+            </p>
           </>
         )}
       </div>

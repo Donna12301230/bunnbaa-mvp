@@ -14,6 +14,7 @@ import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
 import TransferMarketPage from "./pages/TransferMarketPage";
 import MyBookingsPage from "./pages/MyBookingsPage";
+import MyLocksPage from "./pages/MyLocksPage";
 import CartPage from "./pages/CartPage";
 import VendorListPage from "./pages/VendorListPage";
 import VendorPage from "./pages/VendorPage";
@@ -91,6 +92,9 @@ export default function App() {
           </Route>
           <Route path="/my-bookings">
             <MarketplacePage><MyBookingsPage /></MarketplacePage>
+          </Route>
+          <Route path="/my-locks">
+            <MarketplacePage><MyLocksPage /></MarketplacePage>
           </Route>
           <Route path="/cart">
             <MarketplacePage><CartPage /></MarketplacePage>
