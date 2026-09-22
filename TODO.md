@@ -6,15 +6,17 @@
 
 ## 🔴 最優先：3 個外部卡點（全部需人工處理，卡住下游一堆模組）
 
-1. **Blaze 方案升級**（需綁信用卡，[Firebase Console](https://console.firebase.google.com/)）
+負責人備註：三項卡住的下游模組（QR 核銷／撥款／Gemini Agent／金流串接(消費端)）目前全部列在下方「Donna 負責」的 🟡／🔴 清單裡，SU 名下沒有項目直接卡在這三點——所以這三項人工待辦歸 **Donna**。
+
+1. **Blaze 方案升級**（需綁信用卡，[Firebase Console](https://console.firebase.google.com/)）（Donna）
    卡住：QR 核銷正式站、撥款排程正式站、整合測試、Hosting 重新部署（轉賣／撥款／新版首頁等功能都還沒上線）
    - [ ] 手動完成信用卡綁定 → 啟用 Cloud Functions → 部署 `functions/` → 重新 `firebase deploy --only hosting`
 
-2. **Gemini API Key 手動申請**（[aistudio.google.com/apikey](https://aistudio.google.com/apikey)）
+2. **Gemini API Key 手動申請**（[aistudio.google.com/apikey](https://aistudio.google.com/apikey)）（Donna）
    卡住：兩個 AI Agent（商家校準／消費者折扣說明）、商家校準報告端到端驗證
    - [ ] 自動化申請會被 Google 判定可疑請求擋下，需人工手動點「Create API key」→ 選 GCP 專案 `bunnbaa-mvp-5474`（已 import 進 AI Studio）→ 建立 → 貼進 `functions/.env`（複製自 `functions/.env.example`）
 
-3. **LINE Pay／綠界特約商店審核**（業務面，非工程能代勞，審核可能數週）
+3. **LINE Pay／綠界特約商店審核**（業務面，非工程能代勞，審核可能數週）（Donna）
    卡住：金流串接(消費端)
    - [ ] 盡快送件，避免卡到最後一週才發現金流串不上
 
@@ -39,8 +41,8 @@
 
 ### Donna 負責（15 項）
 
-**🟡 部分完成 / 程式碼完成但未測未部署（8）**
-- 轉賣流程（交易核心）：`claimResoldLock`，兩個匿名帳號互接手已測過
+**🟡 部分完成 / 程式碼完成但未測未部署（9）**
+- 轉賣流程（交易核心）：`claimResoldLock`，兩個匿名帳號互接手已測過。2026-09-22 加上「取消轉讓」：`firestore.rules` 補規則讓 owner 把還沒被接手的 `for_resale`／`for_gift` 改回 `locked`，`TransferMarketPage.tsx`／`MyBookingsPage.tsx` 都接了真的取消按鈕——這條規則要人工部署才會在正式站生效
 - 轉賣金流(買家對買家)（金流與結算）：設計上不經過平台，只轉移 `buyer_uid`，已測
 - Firebase 專案建置（基礎建置）：專案／Firestore／Auth／Hosting／安全規則都已上線，卡在 Blaze 升級（見上方卡點 1）
 - 鎖定＋付款流程（交易核心）：「鎖定」本身已端到端驗證；「付款」要串真金流，見金流與結算
@@ -48,7 +50,7 @@
 - 撥款排程（金流與結算）：`settleVendorPayouts`（daily schedule + 手動觸發）emulator 已驗證重複點擊不會重複結算，卡在 Blaze/Functions 部署未上正式站
 - Firebase Hosting 部署（整合與交付）：已有初版正式站 https://bunnbaa-mvp-5474.web.app，但轉賣/撥款等新功能還沒重新部署（等 Functions 上線後一起做）
 - 取餐提醒推播(FCM)（交易核心，同 SU「通知系統」，合併計算）：2026-09-20 SU 完成程式碼——前端要求通知權限+存 FCM token 到私有的 `lock_tokens`（`web/src/lib/messaging.ts`）、Functions 端 `pickupReminders`（每 15 分排程）+ `triggerPickupRemindersNow`。卡兩點：VAPID key 還沒去 Console 拿（免費、跟 Blaze 無關，見下方）；Functions 部署卡 Blaze。
-- 我的鎖定/訂單記錄頁（交易核心）：2026-09-22 完成，新增 `MyLocksPage.tsx`（`/my-locks`，從「會員中心」連過去）——依 `buyer_uid` 查真實 `locks` 的簡易列表，不是週曆版面。emulator/正式站尚未實測（開發環境連不到外網 Firebase，見下方進度日誌）
+- 我的鎖定/訂單記錄頁（交易核心）：2026-09-22 完成，新增 `MyLocksPage.tsx`（`/my-locks`，從「會員中心」連過去）——依 `buyer_uid` 查真實 `locks` 的簡易列表，不是週曆版面。emulator/正式站尚未實測（開發環境連不到外網 Firebase）
 
 **🔴 卡住，等人工或外部審核（3）**
 - Gemini — 商家校準 Agent（AI Agent）：見上方卡點 2
@@ -56,7 +58,7 @@
 - 金流串接(消費端)（金流與結算）：見上方卡點 3
 
 **⬜ 未開始 / 本文件未提及（3）**
-- UI模型建置（基礎建置）：新增項目，本文件尚無內容，需另外確認範圍與進度。UI規格書 https://claude.ai/artifact/QWUhndBuB4GS7izdStzXa8
+- UI模型建置（基礎建置）：2026-09-22 讀完 UI規格書（https://claude.ai/artifact/QWUhndBuB4GS7izdStzXa8 ，v1.0，2026-09-18）盤點範圍——**這份文件已經嚴重過時**，只涵蓋最早的單一商家鎖定 demo（`/`、`/vendor`、`/vendor/redeem`），完全沒提到後來長出來的首頁／轉讓市集／我的餐點／管理後台／商家後台等等。文件列的「開放問題」四項，三項已透過這幾天的工作解決（商家後台身分驗證、A4 取餐提醒排程、A3 賣方轉讓列表），只剩 B5（商家新增/編輯品項）還沒接 Firestore——但盤點後發現這牽出「兩套平行資料模型」的架構問題（見下方 SU 負責區塊），B5 本身先暫緩
 - 整合測試（整合與交付）：未開始，待 Blaze 升級解除後才能做完整端到端測試
 - Demo 錄製 ＋ Proposal（整合與交付）：未開始，**10/18 前提交**
 
@@ -82,6 +84,8 @@
 - （無）
 
 **⬜ 未開始 / 本文件未提及（0）**
+
+**🏗️ 待決策：兩套平行的商家/品項資料模型**（2026-09-22 盤點 UI 規格書 B5「商家新增/編輯品項」時發現，範圍超出單次工作階段，先記錄）：「商品瀏覽」這條線（`VendorPage.tsx`／`MenuItemPage.tsx`／`VendorPortalMenu.tsx`／`CartPage.tsx`，SU 負責的「商品／瀏覽」「商家後台」模組，用 `VendorData`／`MenuItemData` 型別，從舊 `BunnBaa Parse_Ref` 雛型搬過來，含訂閱狀態／營業時段／桌位 QR 等「本次不做」清單裡揪團/現場點餐的殘留欄位）跟真正在跑的 `Lock`／`Vendor` 流程（`item_focus`／`reliability_tone`／`verified`，Donna 這幾天一直在接的 `cafe-renheya-demo`）是**兩套完全不相干、沒有互相引用的資料模型**。要接 Firestore 前得先決定：(a) `menu_items` 只接真實 `vendorId`（固定用 `cafe-renheya-demo`），維持跟 `VendorData`/訂閱系統分離；(b) 索性把整套「商品瀏覽」stack 併進真正的 `Vendor` 模型；(c) 這條線本來就屬於路線圖，這次不用管。決定前 `VendorPortalMenu.tsx` 的品項管理 UI 暫時維持 mock
 
 **🟡 ISO27001（系統與安全）**：2026-09-21 完成技術面落差分析＋修補，詳見 [ISO27001_落差分析.md](ISO27001_落差分析.md)。已補：Functions 授權（管理員／商家 owner）、`payouts`／`accuracy_reports` 限管理員與該商家 owner 可讀（`vendors/{id}.owner_uid` 綁定，商家儀表板改為需登入）、FCM token 私有化、`locks` 完整性規則、管理員稽核日誌、Hosting 安全標頭。`firestore.rules` 與前端已於 2026-09-21 部署上線（規則以未登入 REST 請求驗證過：敏感集合回 403）。**待辦**：下方煙霧測試；錄 demo 前照文件「商家帳號綁定」流程建商家帳號並設 `owner_uid`（否則商家儀表板看不到資料）；認證所需的 ISMS 管理制度文件尚未建立
 
@@ -130,7 +134,7 @@ QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`Loc
 
 ---
 
-## 環境搭建剩餘步驟
+## 環境搭建剩餘步驟（Donna——對應「Donna 負責」的「Firebase 專案建置」）
 
 - [x] Firebase 專案建立
 - [x] `firebase use --add` 連結專案，產生 `.firebaserc`
@@ -148,17 +152,17 @@ QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`Loc
 
 ## 骨架裡尚未實作的功能（見 `README.md`「尚未實作」清單）
 
-- [x] 轉賣流程實際 UI（`claimResoldLock`，emulator 端到端測過，含兩個匿名帳號互相接手）
-- [x] 履約穩定度徽章自動換算（`runCalibrationForVendor` 算完 accuracy_rate 自動更新 `reliability_tone`）——**還沒端到端測過**，需 Gemini Key 才能真的跑出報告
-- [ ] 取餐時段推播提醒（spec §3.7，FCM，跟 AI 無關的純 UX）
-- [x] 商家後台標記 no-show／備註介面（`/vendor/redeem`，`VendorRedeemPage.tsx`，emulator 已驗證）
+- [x] 轉賣流程實際 UI（`claimResoldLock`，emulator 端到端測過，含兩個匿名帳號互相接手）（Donna）
+- [x] 履約穩定度徽章自動換算（`runCalibrationForVendor` 算完 accuracy_rate 自動更新 `reliability_tone`）——**還沒端到端測過**，需 Gemini Key 才能真的跑出報告（Donna）
+- [x] 取餐時段推播提醒（spec §3.7，FCM，跟 AI 無關的純 UX）——2026-09-20 已完成程式碼，跟「Donna 負責」清單裡的「取餐提醒推播(FCM)」是同一件事，這裡的 `[ ]` 是沒同步更新的舊紀錄。程式碼由 **SU** 完成（`web/src/lib/messaging.ts` + `functions/src/index.js` 的 `pickupReminders`），部署卡 Blaze／VAPID key 歸 **Donna**
+- [x] 商家後台標記 no-show／備註介面（`/vendor/redeem`，`VendorRedeemPage.tsx`，emulator 已驗證）（Donna）
 
-## 之後的工作（照架構文件時程表順序）
+## 之後的工作（照架構文件時程表順序，Donna——內容跟「Donna 負責」清單重複，保留當時程時間軸參考）
 
 - [x] 從 `BunnBaa Parse_Ref` 複製可沿用的前端元件（QR 核銷、react-hook-form+zod 表單、Cloudinary 上傳元件已搬過來但還沒接到任何頁面）
 - [x] 商業邏輯用「參照不複製」原則檢視完成
 - [x] 金流串接（假資料版）：`settleVendorPayouts`（全額撥款商家，無平台抽成，daily schedule + 手動觸發，emulator 端到端測過含重複點擊防護）；轉賣金流不經過平台（買家對買家私下付款，平台只轉移 `buyer_uid`）
-- [ ] 整合測試 → 部署 Firebase Hosting → 錄 Demo（3 分鐘腳本見 v6 §8）→ 撰寫英文版 Proposal → **10/18 前提交**（Hosting 還沒重新部署最新的轉賣/撥款功能）
+- [ ] 整合測試 → 部署 Firebase Hosting → 錄 Demo（3 分鐘腳本見 v6 §8）→ 撰寫英文版 Proposal → **10/18 前提交**（Hosting 還沒重新部署最新的轉賣/撥款功能；對應「Donna 負責」⬜ 清單的「整合測試」「Demo 錄製＋Proposal」）
 
 ---
 
@@ -179,107 +183,11 @@ QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`Loc
 
 ---
 
-## 本次不做（列入路線圖，不要誤觸）
+## 2026-09-22 死碼清理（全系統稽核後處理）
 
-揪團（GroupOrder）、現場點餐（TableOrder）、申訴機制（BanAppeal）、多站點美食地圖——全部留在舊 repo，不影響本次原型範圍。
+- **`VendorDashboard.tsx` 修正一個潛在正式站 bug**：查 `accuracy_reports` 原本用 `where(vendor_id) + orderBy(generated_at) + limit(1)`，但 `firestore.indexes.json` 沒宣告這個複合索引，正式站第一次跑很可能會噴 `FAILED_PRECONDITION`。改成單一 equality 查詢（不加 orderBy），前端排序取最新一筆——不用新增索引、不用人工部署
+- 補上兩個搜尋框（`VendorListPage.tsx`／`TransferMarketPage.tsx`）沒接的不雅字詞過濾 `isClean()`（`lib/searchFilter.ts`，原本寫好但沒人接）
+- 刪除完全沒用到的：`components/ui/tooltip.tsx` ＋ `@radix-ui/react-tooltip` 依賴、`types.ts` 的 `EarlyBirdRule`（已被 `lib/pricing.ts` 取代）與 `GroupOrderData`（揪團功能路線圖殘留）
+- `mockData.ts` 六個型別（`MockBanAppeal`／`MockVendorDashboard`／`MockSessionSummary`／`MockAccuracyReport`／`MealPlanTransfer`／`LockMealOption`）拿掉多餘的 `export`（只有同檔案內部在用）；`functions/src/gemini.js` 拿掉沒人 import 的 `MODEL_NAME` export
+- `npx tsc --noEmit` 與 `node --check` 全過
 
----
-
-## 進度日誌（歷史記錄，僅供追溯；最新在上）
-
-**2026-09-22（第三次更新）：`MyBookingsPage.tsx`（我的餐點）整頁改接真實 Firestore**
-
-前次盤點發現這頁整個週曆都是寫死 mock，這次把它做完（用戶要求先接這個再做「留下回饋」，因為回饋本身沒有資料模型缺口，缺的是整頁的真實資料串接）：
-- 依 `buyer_uid` 查真實 `locks`（沿用 `MyLocksPage.tsx` 同一個單一 equality、不加 `orderBy` 的慣例），依 `pickup_date` 分組成清單——真實筆數不固定，改用「每天一區塊」的版面，不是原本假資料那種固定 7×3 週曆格
-- 「使用」：只顯示 QR／取餐編號（`qrcode.react` 直接畫，沒有沿用 `LockQRCode.tsx`，因為那個元件的樣式是 `legacy-ui` scoped class，這頁是 Tailwind，套了會沒有樣式）；真正核銷是商家端 `markLockOutcome`，消費者這邊移除了原本假的「完成核銷」自助按鈕
-- 「贈送」：改成真的 `for_gift` 機制（同 `ConsumerLockPage.tsx` 的 `handleGift`），移除原本假的「朋友暱稱」輸入欄——真實機制沒有指名，是生成連結後私下傳給朋友
-- 「交易」：改成真的 `for_resale` + `resale_deadline`（同 `handleResell`），移除原本假的「轉讓價格」輸入欄——轉賣價由雙方私下議定，平台不經手，上架後會出現在 `/marketplace`
-- 「留下回饋」：沿用既有 `Lock.consumer_feedback`，one-shot，同 `handleSubmitFeedback`
-- 「取消轉讓／取消贈送」：跟 `TransferMarketPage.tsx` 的「我的轉讓」一樣，firestore.rules 沒有對應規則，沒有做假的取消按鈕
-- 「計畫型」（訂閱制多日方案）完全沒有真實資料模型，這次不補假資料，只顯示單點型的真實紀錄——這代表原本 `MEAL_ROWS` 裡的「計畫型」假資料整段被拿掉了
-- `npx tsc --noEmit` 零錯誤；瀏覽器實測頁面渲染正常無 crash。嘗試在同一分頁先跑 `/lock` 的「鎖定這份」再切回 `/my-bookings`，驗證離線快取是否能反映——結果 `signInAnonymously` 因沙盒連不到外網直接卡住（`auth.currentUser` 一直是 `null`），`handleLock()` 的 guard 讓按鈕點了沒反應，證實這個環境完全沒辦法測到真正的 Firestore 讀寫（跟前兩次盤點的環境限制一致），需要真的有網路或 emulator 才能端到端驗證
-- 順手清掉這次 session 期間累積在 5173–5177 埠的多個殘留 `vite` dev server process（`TaskStop` 沒有真的砍掉底層 node 子行程）
-
-**2026-09-22（第四次更新）：依序做完剩下四項——計畫型、認證商家徽章、成長獎勵抽獎、取消轉讓**
-
-使用者要求「依序做」剩下清單裡的四項（原本評估規模都不小）：
-- **計畫型（訂閱制多日方案）**：拿掉「要另外設計 plan collection + 排程 Function」的預設，改成「加入計畫」當下直接一次寫入 N 筆真實 `locks`（同一個 `plan_id`／`plan_label` 串起來，`types.ts` 新增這兩個欄位；`firestore.rules` 的 `create` 規則本來就沒有欄位白名單限制，不用改規則）。`mockVendorMealPlans` 加上 `days` 欄位（5/7）取代原本用正規表達式解析顯示字串。`HomePage.tsx` 的「預約加入計畫」按鈕從純 toast 改成真的 `writeBatch` 寫入，取餐日從明天起算連續 N 天
-- **認證商家徽章**：`Vendor` 型別新增 `verified?: boolean`。因為 `firestore.rules` 的 `vendors` 寫入規則本來就是 `allow write: if isAdmin()`（沒有欄位限制），不用改規則。`AdminSettingsPage.tsx` 新增「認證商家」卡片（`VendorVerificationCard`），admin 可以勾選；`ConsumerLockPage.tsx` 的商家名稱旁顯示真的徽章（原本 `HomePage.tsx` 的「認證商家」是完全跟資料無關的裝飾徽章，這次沒有動它，因為那些卡片本身就是全 mock，沒有真實 vendor 物件可以掛）
-- **成長獎勵抽獎機制**：這項規模最大，因為「機率計算不能信任 client」是明確要求，抽獎本身必須在 Cloud Function 做。新增 `functions/src/index.js` 的 `drawGrowthReward`：先查 `payouts` 加總算出商家累積營收判斷是否解鎖（20萬門檻），用權重機率抽 6 個等級（80/60/50/30/10/0），用 `runTransaction` 更新 `growth_rewards/{vendorId}` 的 0 元券庫存（見底自動降級成 10%保底），寫入 `draws` 開獎紀錄。`firestore.rules` 新增這兩個 collection 的規則（公開可讀、只有 Function 能寫）。前端三處改真資料：`VendorPortalGrowth.tsx`（門檻進度／0元券庫存／開獎名單）、`GrowthRewardTicker.tsx`（訂閱 `draws` 裡 `price_percent===0` 的紀錄，不再是假資料，沒人抽中前這裡就是空的）、`HomePage.tsx` 新增消費者端「成長獎勵抽獎」卡片（`httpsCallable` 呼叫 `drawGrowthReward`）。**這個 Function 還沒有機會被實際呼叫測試過**，因為卡 Blaze 部署，跟其他 Functions 一樣的既有卡點
-- **取消轉讓**：`firestore.rules` 補一條規則，讓 owner 可以把還沒被接手的 `for_resale`／`for_gift` 改回 `locked`（原本完全沒有這條路徑）。`TransferMarketPage.tsx`「我的轉讓」跟 `MyBookingsPage.tsx` 都接上真的「取消轉讓／取消贈送」按鈕，拿掉之前寫的「尚未支援」提示文字
-- 這次改動有兩處 `firestore.rules` 變更（取消轉讓規則 + growth_rewards/draws 規則）跟一處 Cloud Function 新增，都還沒部署到正式站，待人工執行 `firebase deploy --only firestore:rules,functions`（Functions 仍卡 Blaze，規則本身不受影響可以先單獨部署）
-- `npx tsc --noEmit` 零錯誤，`node --check functions/src/index.js` 語法過。瀏覽器實測 `/home`、`/vendor-portal/growth`、`/marketplace`（我的轉讓分頁）、`/my-bookings` 都能正常渲染不 crash；點擊「預約加入計畫」因沙盒連不到外網 Firebase（跟本次 session 一路以來的環境限制一致）沒有實際寫入效果，但沒有拋出例外
-- 順手清掉又累積在 5173 埠的殘留 vite process
-
-**2026-09-22（第二次更新）：新增 `MyLocksPage.tsx`（我的鎖定紀錄）＋早鳥階梯定價邏輯 `pricing.ts`**
-
-延續上一次「先做不受三大卡點影響的項目」的方向：
-- 「我的鎖定/訂單記錄頁」原本本文件沒描述範圍，跟使用者確認後決定做一個獨立的真實資料簡易列表頁（不是週曆版面）：新增 `MyLocksPage.tsx`（`/my-locks`），依 `buyer_uid` 查真實 `locks`（單一 equality，不加 `orderBy`，避免要求新複合索引，排序交給前端），從「會員中心」（`ProfilePage.tsx`）新增「我的鎖定紀錄」卡片連過去。之後可以當作把 `MyBookingsPage.tsx` 從 mock 換成真資料的中間步驟
-- 早鳥階梯定價：新增 `web/src/lib/pricing.ts`（純函式 `applyEarlyBirdPrice`，對應 `HomePage.tsx` 側欄「早鳥預約折扣」顯示的三個階梯：今日/明日 95折、提前2–13天 8折、提前14–30天 7折），接進 `ConsumerLockPage.tsx` 的 `handleLock()` 取代原本寫死的 `discount_percent: 20` / `locked_price: 96`（跟側欄階梯不一致的舊值）。瀏覽器實測 `/lock` 正確顯示「今日／明日・95折 → NT$114」
-- `npx tsc --noEmit` 零錯誤；`/my-locks` 頁面渲染正常（沙盒連不到外網 Firebase，卡在 auth 匿名登入無法解析，停在「載入中」——跟前次 `TransferMarketPage.tsx` 遇到的環境限制相同，不是程式碼問題）
-
-**2026-09-22：`VendorPortalPrep.tsx`／`TransferMarketPage.tsx` 接上真實 Firestore（不受三大卡點影響的項目優先做）**
-
-盤點 TODO 後，先挑不受 Blaze／Gemini／LINE Pay 三大卡點影響、純 Firestore client 讀寫就能做完的項目：
-- `VendorPortalPrep.tsx`（今日備料）：改用 `onSnapshot` 監聽 `locks`，沿用 `VendorRedeemPage.tsx` 同一組 `vendor_id + created_at` 索引（不用新增複合索引），前端過濾今日 `pickup_date` 且排除 `fulfilled`／`resold_and_fulfilled`／`no_show`，依 `pickup_window` → `item_name` 即時分組計數。刪除已無用的 `mockPrepSlots`
-- `TransferMarketPage.tsx`（轉讓市集）：沿用 `ConsumerLockPage.tsx` 已驗證過的模式——「瀏覽轉讓」「已逾期開放$0元」改成即時查詢真實 `for_resale` 的 `locks`；「我要接手」呼叫 `claimResoldLock`（正式站要等 Blaze，emulator 可先測）；「免費領取」是純 client-side firestore.rules 寫入，不用排程、不受 Blaze 卡住；「我的轉讓」改查真實資料，但誠實標註「取消轉讓」目前 rules 不支援、已被接手的項目也追蹤不到（資料模型沒記錄原轉讓者），不做假按鈕。刪除已無用的 marketplace mock 資料
-- 盤點時發現 `MyBookingsPage.tsx`（我的餐點）整頁週曆完全是寫死 mock，沒有真實 `locks` 串接，「留下回饋」看似只差一個欄位（`Lock.consumer_feedback` 早就有規則支援），實際要接得先把整頁重新接上真實資料——比預期大得多，先跳過，改做上面兩項
-- `npx tsc --noEmit` 零錯誤；瀏覽器實測兩頁面渲染正常、loading/空清單狀態正確；比對既有已驗證的 `/lock` 頁面確認 `Firestore Listen...transport errored` 是這次測試所在的瀏覽器沙盒連不到外網 Firebase，不是程式碼問題
-
-**2026-09-21（第六次更新）：`/lock/vendor/redeem`（核對取餐）加上取餐總覽日曆格**
-
-第五次改成 Tailwind 後使用者反饋「太陽春」，希望跟消費端一樣有行事曆格式：
-- 新增「取餐總覽」區塊——即時監聽（`onSnapshot`）該商家最近 200 筆 lock，依取餐日期（欄）× 取餐時段（列）排成跟 `MyBookingsPage.tsx` 同樣邏輯的日曆格；每格是可點的小卡片（品項/狀態徽章/價格）
-- 點卡片＝`selectLock()`，直接帶入下面既有的核對結果卡（狀態、確認取餐、登記未取餐），跟手動輸入編號查詢共用同一套 `markOutcome` 邏輯，沒有另外寫一套
-- 查詢索引沿用既有的 `vendor_id + created_at` 複合索引（`firestore.indexes.json` 已有），日曆格用同一組查詢結果分組，沒有另外要求新索引
-- 瀏覽器實測：在 `/lock` 真的鎖定一筆，日曆格即時抓到並正確分組顯示；點卡片能正確帶入查詢結果；按「確認取餐」有觸發 `markLockOutcome` 呼叫（正式環境因 Functions 未上 Blaze 會失敗，這是既有已知卡點，不是這次改動造成的）。`npx tsc --noEmit` 零錯誤
-
-**2026-09-21（第五次更新）：`/lock/vendor/redeem` 換成 Tailwind/shadcn，跟全站一致**
-
-`/lock/vendor/redeem`（核對取餐）原本是 `legacy-ui` 純 CSS（跟 `/lock`、`/lock/vendor` 同一套舊風格），透過主導覽點進去後風格落差明顯：
-- `VendorRedeemPage.tsx` 全部換成 Card/Input/Button/Badge/Label/Separator，版面參照同類型的 `VendorPortalScan.tsx`；狀態徽章另外定義 `LOCK_STATUS_STYLE`（`lib/statusMap.ts` 是給 PreOrder 用的，欄位對不上 Lock 狀態機）
-- 加上 `<MarketplaceHeader active="bookings" />`，`App.tsx` 拿掉這條路由的 `legacy-ui` 包裝
-- 邏輯完全沒動——Firestore 查詢、`markLockOutcome` 呼叫、react-hook-form+zod 驗證原封不動，只換 JSX/className
-- 瀏覽器實測：畫面一致、查詢邏輯沒被改壞（正式 Firebase 查無結果時錯誤提示正確顯示）。`npx tsc --noEmit` 零錯誤
-
-**2026-09-21（第四次更新）：`/vendors` 導覽統一、「我的商品」改名「我的餐點」＋角色分流、刪除舊 `Navbar.tsx`**
-
-- 首頁「轉讓優惠」併進「同學轉讓保底專區」，移到 `HomePage.tsx` 最下面合成一個橘色卡片
-- `/vendors`、`/vendor/:id`、`/item/:id`（共用 `CustomerLayout.tsx`）原本掛另一套 `Navbar.tsx`（購物車／我的訂單／我的開團連結都指向不存在的路由，會 404），改成跟其他頁共用 `MarketplaceHeader`（新增 `"vendors"` active 狀態）
-- 「我的商品」改名「我的餐點」，並依角色分流（`MarketplaceHeader.tsx`）：一般使用者顯示「我的餐點」連到 `/my-bookings`；廠商（`isVendor`）這個分頁位置換成「核對取餐」連到 `/lock/vendor/redeem`——真的接 Firestore 核銷 `locks` 的商家端頁面，跟消費端 `MyBookingsPage.tsx`「使用」面板的核銷碼是同一套機制的兩端
-- 刪除已無引用的 `components/Navbar.tsx`
-- 驗證：mock auth 登入態存在模組記憶體變數，只改 URL hash 不會刷新，改用 `localStorage.setItem` + `location.reload()` 切換角色測試，確認 vendor／一般帳號各自看到正確分頁。`npx tsc --noEmit` 零錯誤
-
-**2026-09-21（第三次更新）：`Main.dc.html`「預購鎖定」補進 `HomePage.tsx`**
-
-發現 `Main.dc.html` 現在是合併版（`PlanSchedule.dc.html` 已併入），`HomePage.tsx` 早已做出計畫方案那一半，這次只缺「今日推薦鎖定方案」單點型卡片區＋側欄新增內容。沒有另開新頁面（`/home` 在全站 8 處被當成回首頁的通用錨點），直接加進既有 `HomePage.tsx`：
-- 側欄新增：取餐時段（單一日期+3段 radio）、保障說明／取餐提醒提示框、進階篩選（純裝飾）
-- 主區新增「今日推薦鎖定方案」3 卡片：認證商家＋履約穩定度雙徽章、Gemini 折扣說明框、消保法免責 checkbox（未勾則 disabled）、逾時警示、鎖定後變綠色狀態
-- 主區底部新增「同學轉讓保底專區」CTA 橫幅，連到 `/marketplace`
-- mock 資料：`mockData.ts` 新增 `mockLockMeals`（3 個品項）
-- 刻意沒跟 `/lock`（`ConsumerLockPage.tsx`）真實 Firestore 邏輯合併——那頁是 10/18 demo 要用的端到端示範，這次新增純版面+local state（`handleToggleLock` 只彈 toast）。之後要接可照 `ConsumerLockPage.tsx` 的 `handleLock()` 模式擴充成多品項版本
-- `npx tsc --noEmit` 零錯誤；`npm run dev` 實際跑過驗證版面與互動正確
-
-**2026-09-21（第二次更新）：草圖新增「商家後台」`VendorDashboard.dc.html`**
-
-草圖新增第 6 張 artboard，4 個分頁：訂單／備料／收益及未來備料趨勢／成長獎勵。比對後發現只有「備料」「成長獎勵」是全新機制，其餘跟既有廠商後台（`VendorPortalLayout.tsx` + `pages/vendor-portal/*`）重疊。已加入：
-- 新增 `pages/vendor-portal/VendorPortalPrep.tsx`（`/vendor-portal/prep`，今日備料，mock `mockPrepSlots`）
-- 新增 `pages/vendor-portal/VendorPortalGrowth.tsx`（`/vendor-portal/growth`，成長獎勵，mock `mockGrowthRewards`）——商家累積合作營收達門檻（20萬解鎖單抽／100萬解鎖十連抽），消費者可抽中折扣券（8/6/5/3/1折或整份0元）
-- `VendorPortalReports.tsx` 補上「校準洞察」卡片——這份 Gemini 校準報告其實已在 `/lock/vendor`（`VendorDashboard.tsx`）真的串了 Firestore + `askCalibrationScenario`，只是卡在 Gemini Key／Blaze 沒部署，之後直接接既有 Function 即可
-- 新增 `components/GrowthRewardTicker.tsx`，掛在 `HomePage.tsx` header 下方廣播中獎跑馬燈
-- 「訂單」分頁沒有另外做（跟既有「訂單管理」重疊，草圖是鎖定制視角，等主線需求明確再決定）
-- Main 草圖新增的「商家後台 →」header 快速連結**沒有照抄**——現有 app 用 `isVendor` 角色門檻擋在下拉選單裡，草圖那種永遠顯示的連結會讓一般會員也點得進去，故意不加
-- `npx tsc --noEmit` 零錯誤，`vendor_test` 帳號實測通過
-
-**2026-09-21（第一次進度）：`Marketplace.dc.html` / `MyBookings.dc.html` 版面完成**
-
-依建議順序把版面做完（「請先改版面」）：
-- 新增 `components/MarketplaceHeader.tsx`（從 `HomePage.tsx` 抽出的共用頂部列，三頁共用同一組導覽）
-- 新增 `pages/TransferMarketPage.tsx`、`pages/MyBookingsPage.tsx`，掛進 `App.tsx`；`ProfilePage.tsx`「我的訂單」改導去 `/my-bookings`
-- 兩頁都是版面＋前端 local state 骨架，互動都做得出來、有 toast 回饋，但沒寫回 Firestore；mock 資料在 `mockData.ts` 底部（`mockMarketplaceListings`／`mockMarketplaceReleased`／`mockMyMarketplaceListings`），每個 TODO(firebase) 註解都寫了要接哪個 Cloud Function
-- 視覺沿用現有 Tailwind/shadcn 風格，符合「其他 UI 依照原模型」指示
-- `npx tsc --noEmit` 零錯誤，`npm run dev` 瀏覽器實測一輪通過
-
-**2026-09-20：SU 完成取餐提醒推播(FCM) / 通知系統程式碼**
-
-前端要求通知權限+存 FCM token（`web/src/lib/messaging.ts`）、Functions 端 `pickupReminders`（每 15 分排程）+ `triggerPickupRemindersNow`。管理員後台重做整合進 `AdminLayout`。商品列表/詳情頁、商家清單/商家頁完成並測試通過（詳見上方模組總覽）。

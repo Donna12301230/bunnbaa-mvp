@@ -48,4 +48,4 @@ async function generateJSON({ systemInstruction, userPrompt, temperature = 0.4 }
   }
 }
 
-module.exports = { generateJSON, MODEL_NAME };
+module.exports = { generateJSON };

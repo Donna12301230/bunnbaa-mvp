@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Search, MapPin, Phone, Store } from "lucide-react";
 import { mockVendors } from "@/lib/mockData";
+import { isClean } from "@/lib/searchFilter";
 
 // 商家清單頁 — 消費者瀏覽所有上架商家。
 // TODO(firebase): queryFn 讀的是 mockData.ts 的假資料，之後接 Firestore
@@ -16,8 +17,10 @@ export default function VendorListPage() {
     staleTime: 15 * 60 * 1000,
   });
 
+  // 不雅字詞當作沒輸入搜尋字串處理，不特別跳錯誤訊息。
+  const effectiveSearch = isClean(search) ? search : "";
   const filtered = vendors.filter(
-    (v) => v.name.includes(search) || v.description.includes(search)
+    (v) => v.name.includes(effectiveSearch) || v.description.includes(effectiveSearch)
   );
 
   return (

@@ -77,7 +77,7 @@ export const mockMenuItems: MenuItemData[] = [
   { id: "item-6", name: "手工厚蛋三明治", description: "現煎厚蛋、生菜、火腿", price: 55, isAvailable: true, category: "早餐", allergens: ["蛋", "奶"], dietaryTags: ["葷食"], vendorId: "vendor-3", createdAt: new Date("2026-03-02") },
 ];
 
-export interface MockBanAppeal {
+interface MockBanAppeal {
   id: string;
   userId: string;
   username: string;
@@ -260,7 +260,7 @@ export function mockDeleteMenuItem(id: string) {
   if (idx >= 0) mockMenuItems.splice(idx, 1);
 }
 
-export interface MockVendorDashboard {
+interface MockVendorDashboard {
   vendorName: string;
   pendingOrders: number;
   totalOrders: number;
@@ -341,7 +341,7 @@ export function mockUpdatePreOrderStatus(orderId: string, status: PreOrderData["
   }
 }
 
-export interface MockSessionSummary {
+interface MockSessionSummary {
   sessionDate: Date;
   pickupTime: string;
   deadline: Date;
@@ -462,7 +462,7 @@ export function mockCompletePreOrder(orderId: string) {
   }
 }
 
-export interface MockAccuracyReport {
+interface MockAccuracyReport {
   accuracy_rate: number;
   error_range: string;
   explanation: string;
@@ -479,7 +479,7 @@ export const mockAccuracyReport: MockAccuracyReport = {
 };
 
 // ── 首頁「計畫方案」模板用的假資料（訂閱式計畫餐 + 轉讓市集） ──────────────
-export interface MealPlanTransfer {
+interface MealPlanTransfer {
   id: string;
   sellerName: string;
   planName: string;
@@ -548,7 +548,7 @@ export const mockVendorMealPlans: VendorMealPlanGroup[] = [
 // 鎖定」），沒有寫入 Firestore。真正端到端接 locks collection 的單一品項示範在
 // pages/ConsumerLockPage.tsx（掛在 /lock，demo 影片用），之後要把這裡串成真的，
 // 可以照那個檔案的 handleLock() 模式擴充成多品項版本。
-export interface LockMealOption {
+interface LockMealOption {
   id: string;
   title: string;
   time: string;

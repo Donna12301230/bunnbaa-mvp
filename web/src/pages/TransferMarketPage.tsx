@@ -7,6 +7,7 @@ import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db, functions } from "@/lib/firebase";
+import { isClean } from "@/lib/searchFilter";
 import type { Lock } from "@/types";
 
 // 對應 UI草圖 Marketplace.dc.html「轉讓市集」。接上真實 Firestore,沿用
@@ -77,7 +78,8 @@ export default function TransferMarketPage() {
     return ts?.toDate ? ts.toDate() : null;
   }
 
-  const searchLower = search.trim().toLowerCase();
+  // 不雅字詞當作沒輸入搜尋字串處理，不特別跳錯誤訊息。
+  const searchLower = isClean(search) ? search.trim().toLowerCase() : "";
   const forResale = useMemo(
     () =>
       locks.filter(

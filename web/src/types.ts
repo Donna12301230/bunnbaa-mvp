@@ -115,11 +115,6 @@ export interface MenuItemData {
   createdAt: Date;
 }
 
-export interface EarlyBirdRule {
-  daysInAdvance: number; // minimum days before pickup
-  discountRate: number;  // e.g. 0.9 = 90% = 10% off
-}
-
 export interface CartItem {
   menuItem: MenuItemData;
   quantity: number;
@@ -192,25 +187,6 @@ export interface TableOrderItemData {
   quantity: number;
   unitPrice: number;
   note: string;
-}
-
-export interface GroupOrderData {
-  id: string;
-  leaderId: string;
-  leaderName: string;
-  vendorId: string;
-  vendorName: string;
-  sessionId: string;
-  sessionDate: Date;
-  sessionPickupTime: string;
-  sessionDeadline: Date;
-  pickupLocation: string;
-  title: string;
-  joinCode: string;
-  status: "open" | "closed";
-  note: string;
-  memberCount: number;
-  createdAt: Date;
 }
 
 export interface OrderSessionData {

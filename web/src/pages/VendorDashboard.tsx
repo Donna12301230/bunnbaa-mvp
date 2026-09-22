@@ -23,17 +23,16 @@ export default function VendorDashboard() {
   const [settling, setSettling] = useState(false);
 
   useEffect(() => {
-    const q = query(
-      collection(db, "accuracy_reports"),
-      where("vendor_id", "==", VENDOR_ID),
-      orderBy("generated_at", "desc"),
-      limit(1)
-    );
+    // Single equality (no orderBy) so this doesn't need its own composite
+    // index — firestore.indexes.json only declares vendor_id+created_at for
+    // locks/payouts. At pilot scale (one report/day for one vendor) sorting
+    // client-side for the latest is cheap.
+    const q = query(collection(db, "accuracy_reports"), where("vendor_id", "==", VENDOR_ID), limit(50));
     const unsub = onSnapshot(q, (snap) => {
-      if (!snap.empty) {
-        const d = snap.docs[0];
-        setReport({ id: d.id, ...(d.data() as any) });
-      }
+      if (snap.empty) return;
+      const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as AccuracyReport & { generated_at?: { toMillis?: () => number } });
+      docs.sort((a, b) => (b.generated_at?.toMillis?.() ?? 0) - (a.generated_at?.toMillis?.() ?? 0));
+      setReport(docs[0]);
     });
     return () => unsub();
   }, []);
