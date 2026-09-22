@@ -181,13 +181,5 @@ QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`Loc
 
 之後接上真的 Firebase Auth／正式身分驗證時，這套「帳號字串猜角色」的 mock 邏輯要整個換掉，`role` 改成從 Firestore `users/{uid}` 文件讀。
 
----
 
-## 2026-09-22 死碼清理（全系統稽核後處理）
-
-- **`VendorDashboard.tsx` 修正一個潛在正式站 bug**：查 `accuracy_reports` 原本用 `where(vendor_id) + orderBy(generated_at) + limit(1)`，但 `firestore.indexes.json` 沒宣告這個複合索引，正式站第一次跑很可能會噴 `FAILED_PRECONDITION`。改成單一 equality 查詢（不加 orderBy），前端排序取最新一筆——不用新增索引、不用人工部署
-- 補上兩個搜尋框（`VendorListPage.tsx`／`TransferMarketPage.tsx`）沒接的不雅字詞過濾 `isClean()`（`lib/searchFilter.ts`，原本寫好但沒人接）
-- 刪除完全沒用到的：`components/ui/tooltip.tsx` ＋ `@radix-ui/react-tooltip` 依賴、`types.ts` 的 `EarlyBirdRule`（已被 `lib/pricing.ts` 取代）與 `GroupOrderData`（揪團功能路線圖殘留）
-- `mockData.ts` 六個型別（`MockBanAppeal`／`MockVendorDashboard`／`MockSessionSummary`／`MockAccuracyReport`／`MealPlanTransfer`／`LockMealOption`）拿掉多餘的 `export`（只有同檔案內部在用）；`functions/src/gemini.js` 拿掉沒人 import 的 `MODEL_NAME` export
-- `npx tsc --noEmit` 與 `node --check` 全過
 
