@@ -461,3 +461,88 @@ exports.triggerPickupRemindersNow = onCall({ region: "asia-east1" }, async (requ
   const sent = await sendPickupReminders();
   return { sent };
 });
+
+/* ------------------------------------------------------------------ *
+ * 5. Growth rewards — a vendor unlocks consumer draws once its
+ *    cumulative payouts cross a revenue threshold (spec ref:
+ *    VendorDashboard.dc.html「成長獎勵」). The draw itself must run here,
+ *    not on the client: a client could otherwise just claim it won the
+ *    0-yuan tier. TODO.md 2026-09-22 待辦：growth_rewards/draws collection
+ *    設計 + 抽獎邏輯，這裡是那個實作，還沒因 Blaze 部署到正式站測過。
+ * ------------------------------------------------------------------ */
+
+// price_percent = 中獎後要付的比例（80 = 8折，0 = 整份免費），weight 是抽中
+// 機率的相對權重，不是百分比本身。
+const GROWTH_REWARD_TIERS = [
+  { price_percent: 80, weight: 40 },
+  { price_percent: 60, weight: 25 },
+  { price_percent: 50, weight: 15 },
+  { price_percent: 30, weight: 10 },
+  { price_percent: 10, weight: 7 },
+  { price_percent: 0, weight: 3 },
+];
+
+const GROWTH_REWARD_MILESTONES = [
+  { id: "tier1", label: "20 萬門檻・單抽", threshold: 200000 },
+  { id: "tier2", label: "100 萬門檻・十連抽", threshold: 1000000 },
+];
+
+const DEFAULT_VOUCHER_TOTAL = 10;
+
+function pickWeightedTier() {
+  const totalWeight = GROWTH_REWARD_TIERS.reduce((sum, t) => sum + t.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const tier of GROWTH_REWARD_TIERS) {
+    if (roll < tier.weight) return tier.price_percent;
+    roll -= tier.weight;
+  }
+  return GROWTH_REWARD_TIERS[GROWTH_REWARD_TIERS.length - 1].price_percent;
+}
+
+// Reuses the payouts collection's existing vendor_id index rather than a
+// separate running-total field, so there's nothing to keep in sync by hand.
+async function vendorCumulativeRevenue(vendorId) {
+  const snap = await db.collection("payouts").where("vendor_id", "==", vendorId).get();
+  return snap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
+}
+
+exports.drawGrowthReward = onCall({ region: "asia-east1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Must be signed in (anonymous is fine) to draw");
+  }
+  const { vendor_id: vendorId, item_name: itemName } = request.data || {};
+  if (!vendorId) throw new HttpsError("invalid-argument", "vendor_id is required");
+
+  const cumulativeRevenue = await vendorCumulativeRevenue(vendorId);
+  if (cumulativeRevenue < GROWTH_REWARD_MILESTONES[0].threshold) {
+    throw new HttpsError("failed-precondition", "This vendor hasn't unlocked draws yet.");
+  }
+
+  const rewardRef = db.collection("growth_rewards").doc(vendorId);
+  const pricePercent = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(rewardRef);
+    const voucherRemaining = snap.exists ? snap.data().voucher_remaining : DEFAULT_VOUCHER_TOTAL;
+    const voucherTotal = snap.exists ? snap.data().voucher_total : DEFAULT_VOUCHER_TOTAL;
+
+    let tier = pickWeightedTier();
+    // 0 元券見底後自動降級為保底 1 折券，六級機制照樣運作，只是拿不到整份免費。
+    if (tier === 0 && voucherRemaining <= 0) tier = 10;
+
+    tx.set(
+      rewardRef,
+      { voucher_total: voucherTotal, voucher_remaining: tier === 0 ? voucherRemaining - 1 : voucherRemaining },
+      { merge: true }
+    );
+    return tier;
+  });
+
+  await db.collection("draws").add({
+    vendor_id: vendorId,
+    buyer_uid: request.auth.uid,
+    item_name: itemName || null,
+    price_percent: pricePercent,
+    created_at: FieldValue.serverTimestamp(),
+  });
+
+  return { price_percent: pricePercent };
+});

@@ -254,7 +254,7 @@ export default function ConsumerLockPage() {
         <div className="card">
           <div className="row">
             <div>
-              <h2>{vendor.name}</h2>
+              <h2>{vendor.name} {vendor.verified && <span className="badge">認證商家</span>}</h2>
               <div className="muted">{ITEM_NAME} · 12:00–13:00 取餐</div>
             </div>
             <span className="badge">

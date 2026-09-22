@@ -61,6 +61,14 @@ service cloud.firestore {
                         && request.resource.data.status == 'locked'
                         && request.resource.data.buyer_uid == request.auth.uid
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer_uid']))
+                    // Buyer cancels their own still-unclaimed for_resale/for_gift
+                    // listing back to locked (TODO.md 2026-09-22 待辦：取消轉讓
+                    // 沒有對應規則). Only reachable while buyer_uid is still theirs —
+                    // once someone else claims it, buyer_uid has already moved on.
+                    || (request.auth != null && resource.data.buyer_uid == request.auth.uid
+                        && resource.data.status in ['for_resale', 'for_gift']
+                        && request.resource.data.status == 'locked'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resale_deadline']))
                     // Anyone claims an expired resale listing for free — replaces a
                     // scheduled "release" Cloud Function with a lazy, rule-enforced
                     // expiry checked at claim time.
@@ -134,6 +142,21 @@ service cloud.firestore {
     // payouts: written only by settleVendorPayouts (Cloud Function)
     match /payouts/{payoutId} {
       allow read: if isAdmin() || isVendorOwner(resource.data.vendor_id);
+      allow write: if false;
+    }
+
+    // growth_rewards: 0 元券庫存等狀態，只有 drawGrowthReward（Cloud Function，
+    // admin SDK 略過規則）能寫。公開可讀——商家後台跟消費者端跑馬燈都要讀，內容
+    // 不像 payouts 那樣有金額，公開沒有隱私問題。
+    match /growth_rewards/{vendorId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // draws: 開獎紀錄，同樣只由 drawGrowthReward 寫。公開可讀，理由同上——內容只有
+    // buyer_uid／折數／品項，沒有個資或金額。
+    match /draws/{drawId} {
+      allow read: if true;
       allow write: if false;
     }
   }

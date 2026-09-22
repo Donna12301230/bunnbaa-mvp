@@ -1,15 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
 import {
-  Clock, CalendarDays, Rocket, Star, User, MapPin,
+  Clock, CalendarDays, Rocket, Star, User, MapPin, Trophy,
   ShieldCheck, Bell, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal,
 } from "lucide-react";
-import { mockMealPlanTransfers, mockVendorMealPlans, mockLockMeals } from "@/lib/mockData";
+import { mockMealPlanTransfers, mockVendorMealPlans, mockLockMeals, type MealPlanOption, type VendorMealPlanGroup } from "@/lib/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import GrowthRewardTicker from "@/components/GrowthRewardTicker";
+import { auth, db, functions } from "@/lib/firebase";
+
+const GROWTH_VENDOR_ID = "cafe-renheya-demo";
+const GROWTH_UNLOCK_THRESHOLD = 200000;
+const GROWTH_TIER_LABEL: Record<number, string> = { 80: "8折", 60: "6折", 50: "5折", 30: "3折", 10: "1折", 0: "整份 0 元" };
 
 // 首頁模板 — 對應 UI草圖的 Main.dc.html（現在是合併版：原本 PlanSchedule.dc.html
 // 的「合作店家與計畫」已經整段併進 Main，這裡也已經做過；這次新增的是 Main 上半部
@@ -38,6 +46,41 @@ export default function HomePage() {
   const [selectedSort, setSelectedSort] = useState<string>("relevance");
   const [waiverAck, setWaiverAck] = useState<Record<string, boolean>>({});
   const [locked, setLocked] = useState<Record<string, boolean>>({});
+  const [uid, setUid] = useState<string | null>(null);
+  const [joiningPlanId, setJoiningPlanId] = useState<string | null>(null);
+  const [joinedPlanIds, setJoinedPlanIds] = useState<Record<string, boolean>>({});
+  const [growthRevenue, setGrowthRevenue] = useState(0);
+  const [drawing, setDrawing] = useState(false);
+
+  useEffect(() => {
+    signInAnonymously(auth).catch(console.error);
+    const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(query(collection(db, "payouts"), where("vendor_id", "==", GROWTH_VENDOR_ID)), (snap) => {
+      setGrowthRevenue(snap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0));
+    });
+    return () => unsub();
+  }, []);
+
+  const growthUnlocked = growthRevenue >= GROWTH_UNLOCK_THRESHOLD;
+
+  async function handleDrawGrowthReward() {
+    setDrawing(true);
+    try {
+      const fn = httpsCallable(functions, "drawGrowthReward");
+      const result = await fn({ vendor_id: GROWTH_VENDOR_ID });
+      const pricePercent = (result.data as { price_percent: number }).price_percent;
+      const label = GROWTH_TIER_LABEL[pricePercent] ?? `${pricePercent}%`;
+      toast({ title: "抽獎結果", description: `恭喜抽中 ${label}！` });
+    } catch (err) {
+      toast({ title: "抽獎失敗", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setDrawing(false);
+    }
+  }
 
   const { data: transfers = [] } = useQuery({
     queryKey: ["mealPlanTransfers"],
@@ -59,6 +102,46 @@ export default function HomePage() {
       }
       return { ...prev, [id]: next };
     });
+  }
+
+  // 「計畫型」（訂閱制多日方案）沒有另外的 plan/subscription collection——加入
+  // 計畫當下直接一次寫入 N 筆真實 locks（同一個 plan_id 串起來），不用排程
+  // Cloud Function 每天生一筆，所以不受 Blaze 卡住。之後在「我的餐點」會依
+  // pickup_date 自動分組出現。
+  async function handleJoinPlan(group: VendorMealPlanGroup, plan: MealPlanOption) {
+    if (!uid) return;
+    const planKey = `${group.vendorId}-${plan.id}`;
+    setJoiningPlanId(planKey);
+    try {
+      const batch = writeBatch(db);
+      const planLabel = `${plan.label}：${plan.name}`;
+      for (let day = 1; day <= plan.days; day++) {
+        const pickupDate = new Date();
+        pickupDate.setDate(pickupDate.getDate() + day);
+        const ref = doc(collection(db, "locks"));
+        batch.set(ref, {
+          vendor_id: group.vendorId,
+          item_name: `${planLabel}・第${day}/${plan.days}天`,
+          pickup_window: "12:00-13:00",
+          pickup_date: pickupDate.toISOString().slice(0, 10),
+          discount_percent: 0,
+          resellable: true,
+          locked_price: plan.pricePerMeal,
+          status: "locked",
+          buyer_uid: uid,
+          created_at: serverTimestamp(),
+          plan_id: planKey,
+          plan_label: planLabel,
+        });
+      }
+      await batch.commit();
+      setJoinedPlanIds(prev => ({ ...prev, [planKey]: true }));
+      toast({ title: "已加入計畫", description: `${group.vendorName} · ${plan.name}・已生成 ${plan.days} 筆鎖定，可在「我的餐點」查看。` });
+    } catch (err) {
+      toast({ title: "加入計畫失敗", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setJoiningPlanId(null);
+    }
   }
 
   return (
@@ -158,6 +241,27 @@ export default function HomePage() {
                 <span className="font-bold text-orange-600">7折</span>
               </div>
             </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-border p-4 space-y-2.5">
+            <h3 className="text-sm font-semibold flex items-center gap-1.5">
+              <Trophy className="w-4 h-4 text-orange-500" /> 成長獎勵抽獎
+            </h3>
+            {growthUnlocked ? (
+              <>
+                <p className="text-xs text-muted-foreground">校園咖啡廳已解鎖抽獎，手氣好可以抽到整份 0 元！</p>
+                <Button
+                  size="sm"
+                  className="w-full bg-brand-navy hover:bg-brand-navy-hover text-white"
+                  disabled={drawing}
+                  onClick={handleDrawGrowthReward}
+                >
+                  {drawing ? "抽獎中…" : "抽一次"}
+                </Button>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">校園咖啡廳累積合作營收還沒達到解鎖門檻，尚無法抽獎。</p>
+            )}
           </div>
 
           <div className="bg-white rounded-xl border border-border p-4 space-y-3">
@@ -308,9 +412,14 @@ export default function HomePage() {
                       </span>
                       <Button
                         className="mt-auto w-full bg-brand-navy hover:bg-brand-navy-hover text-white text-sm"
-                        onClick={() => toast({ title: "已加入計畫", description: `${group.vendorName} · ${plan.name}` })}
+                        disabled={joiningPlanId === `${group.vendorId}-${plan.id}` || !!joinedPlanIds[`${group.vendorId}-${plan.id}`]}
+                        onClick={() => handleJoinPlan(group, plan)}
                       >
-                        預約加入計畫
+                        {joinedPlanIds[`${group.vendorId}-${plan.id}`]
+                          ? "已加入計畫"
+                          : joiningPlanId === `${group.vendorId}-${plan.id}`
+                          ? "處理中…"
+                          : "預約加入計畫"}
                       </Button>
                     </div>
                   ))}

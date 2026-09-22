@@ -108,20 +108,20 @@ UI 草圖：https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc （僅參考版面
 | `PlanSchedule.dc.html`（合作店家與計畫） | `HomePage.tsx` | ✅ 已一比一做出來 |
 | `Main.dc.html`「預購鎖定」 | 2026-09-21 補進 `HomePage.tsx` | 🟡 版面＋互動骨架完成，**尚未接後端**——真正端到端接 Firestore 的示範仍在 `/lock`（`ConsumerLockPage.tsx`），兩邊還沒合併 |
 | `Marketplace.dc.html`「轉讓市集」 | `TransferMarketPage.tsx`（`/marketplace`） | 🟡 2026-09-22 接上真實 Firestore：瀏覽轉讓／我要接手（`claimResoldLock`）／免費領取／我的轉讓皆已是真實查詢與寫入。**尚未接後端**：「取消轉讓」（firestore.rules 沒有對應規則讓 owner 把 `for_resale` 改回 `locked`）；已被接手的項目也無法在「我的轉讓」追蹤（資料模型沒記錄原轉讓者） |
-| `MyBookings.dc.html`「我的商品」 | `MyBookingsPage.tsx`（`/my-bookings`） | 🟡 版面＋互動骨架完成（21 格週曆），資料是寫死 mock，**尚未接後端**：核銷要串 `markLockOutcome`、「贈送」指名轉移沒有對應 Function、「留下回饋」無資料模型 |
+| `MyBookings.dc.html`「我的商品」 | `MyBookingsPage.tsx`（`/my-bookings`） | 🟡 2026-09-22 改接真實 Firestore：依 `buyer_uid` 查真實 `locks`，依 `pickup_date` 分組成清單（不是原本假資料的固定 21 格週曆，因為真實筆數不固定）；「使用」（顯示取餐碼）／「贈送」（`for_gift`）／「交易」（`for_resale`）／「留下回饋」都是真的讀寫。**尚未接後端**：核銷仍要靠商家端 `markLockOutcome`（消費者這邊只能顯示取餐碼，不能自己按完成）；「計畫型」（訂閱制多日方案）完全沒有真實資料模型，這次沒有補假資料 |
 | `Login.dc.html`（手機門號 OTP 兩段式） | `LoginPage.tsx`（`mockAuth.ts` 帳號字串猜角色） | 🟡 草圖確認要 OTP 流程，尚未做 |
 | `VendorDashboard.dc.html`（商家後台：訂單/備料/收益/成長獎勵） | 既有 `VendorPortalLayout.tsx` 系列 + 新增備料/成長獎勵頁 | 🟡 見下方「全新機制」 |
 
 ### 草圖裡後端還接不上的功能（待辦清單）
 
 - [x] 逾時自動開放 $0 元領取（Marketplace）——2026-09-22 完成：沿用既有 firestore.rules 的 lazy expiry 規則（不用排程 Function），`TransferMarketPage.tsx` 已接上真實 `locks` 查詢＋`claimResoldLock`／免費領取
-- [ ] 取消轉讓（Marketplace「我的轉讓」）——firestore.rules 沒有對應規則，2026-09-22 盤點時發現
-- [ ] 贈送給指定朋友（MyBookings「贈送」）——現有機制只支援不指名的市集轉讓
-- [ ] 留下回饋／評論（MyBookings 過去餐點）——不缺資料模型（沿用 `Lock.consumer_feedback`，規則已支援，範例見 `ConsumerLockPage.tsx`），但 2026-09-22 盤點發現 `MyBookingsPage.tsx` 整頁週曆都是寫死 mock、完全沒接真實 `locks`，要接這個得先把整頁重新接上真實資料（比預期大的工程，非單純加欄位）
-- [ ] 計畫型（訂閱制多日方案）——僅 `mockVendorMealPlans` 前端假資料，Firestore 無 plan／多日排程模型
-- [ ] 認證商家徽章——目前只有 `reliability_tone`（履約穩定度），沒有「認證商家」欄位
+- [x] 取消轉讓（Marketplace「我的轉讓」／MyBookings）——2026-09-22 完成：`firestore.rules` 補上規則讓 owner 把還沒被接手的 `for_resale`／`for_gift` 改回 `locked`，兩頁都接了真的「取消轉讓／取消贈送」按鈕。**待辦**：這條規則要人工執行 `firebase deploy --only firestore:rules` 才會在正式站生效
+- [x] 贈送給指定朋友（MyBookings「贈送」）——2026-09-22 完成：改成真實 `for_gift` 機制（同 `ConsumerLockPage.tsx` 的 `handleGift`），沒有「指名」欄位——生成連結後私下傳給朋友，跟 QR 取餐碼「給誰就是誰的」同一套信任模型
+- [x] 留下回饋／評論（MyBookings 過去餐點）——2026-09-22 完成：`MyBookingsPage.tsx` 整頁改接真實 `locks`（依 `buyer_uid` 查詢，`pickup_date` 分組成清單，不是原本假資料的固定週曆格），「留下回饋」沿用 `Lock.consumer_feedback`，跟「使用」「贈送」「交易」一起接上真實 Firestore。「計畫型」（訂閱制）沒有真實資料模型，這次沒補假資料，只顯示單點型真實紀錄
+- [x] 計畫型（訂閱制多日方案）——2026-09-22 完成，但用了跟原設想不同的簡化設計：沒有另外的 `plan`/`subscription` collection，「預約加入計畫」當下直接一次寫入 N 筆真實 `locks`（同一個 `plan_id` 串起來，見 `types.ts` 的 `Lock.plan_id`/`plan_label`），不用排程 Cloud Function 每天生一筆——原因是這樣就不受 Blaze 卡住。取餐日從明天起算連續 N 天，沒有對應「下週一/二/三」那組展示用文字實際換算日期
+- [x] 認證商家徽章——2026-09-22 完成，`Vendor.verified` 欄位（只有 admin 能寫，`firestore.rules` 的 `vendors` 寫入規則本來就沒限制欄位白名單，不用改規則），`AdminSettingsPage.tsx` 新增「認證商家」卡片可以勾選，`ConsumerLockPage.tsx` 顯示徽章
 - [x] 早鳥階梯定價 95/8/7 折——2026-09-22 完成，`web/src/lib/pricing.ts`（純函式，可測），已接進 `ConsumerLockPage.tsx` 的 `handleLock()`。`HomePage.tsx` 的 `mockLockMeals` 卡片是純前端 mock、還沒接真實下單流程，沒有一併套用
-- [ ] `growth_rewards`／`draws` collection 重新設計（商家累積營收門檻、開獎紀錄）；抽獎機率計算必須在 Cloud Function 做，不能信任 client
+- [x] `growth_rewards`／`draws` collection 重新設計——2026-09-22 完成資料模型 + 規則設計，抽獎邏輯（`drawGrowthReward`）寫在 `functions/src/index.js`，機率權重制、0 元券見底自動降級 1 折保底，符合「機率計算不能信任 client」的要求。`VendorPortalGrowth.tsx`／`GrowthRewardTicker.tsx`／`HomePage.tsx`（新增消費者端「成長獎勵抽獎」卡片）都接上真實資料。**待辦**：這個 Function 跟其他 Functions 一樣卡 Blaze 部署，還沒真的在任何環境被呼叫過測試；`firestore.rules` 新增的 `growth_rewards`／`draws` 規則也要人工部署
 - [x] 備料聚合改成依 `locks` collection 的 `pickup_date` + `pickup_window` 即時分組——2026-09-22 完成，`VendorPortalPrep.tsx` 改用 `onSnapshot`
 
 QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`LockQRCode.tsx` + `VendorRedeemPage.tsx`。
@@ -186,6 +186,30 @@ QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`Loc
 ---
 
 ## 進度日誌（歷史記錄，僅供追溯；最新在上）
+
+**2026-09-22（第三次更新）：`MyBookingsPage.tsx`（我的餐點）整頁改接真實 Firestore**
+
+前次盤點發現這頁整個週曆都是寫死 mock，這次把它做完（用戶要求先接這個再做「留下回饋」，因為回饋本身沒有資料模型缺口，缺的是整頁的真實資料串接）：
+- 依 `buyer_uid` 查真實 `locks`（沿用 `MyLocksPage.tsx` 同一個單一 equality、不加 `orderBy` 的慣例），依 `pickup_date` 分組成清單——真實筆數不固定，改用「每天一區塊」的版面，不是原本假資料那種固定 7×3 週曆格
+- 「使用」：只顯示 QR／取餐編號（`qrcode.react` 直接畫，沒有沿用 `LockQRCode.tsx`，因為那個元件的樣式是 `legacy-ui` scoped class，這頁是 Tailwind，套了會沒有樣式）；真正核銷是商家端 `markLockOutcome`，消費者這邊移除了原本假的「完成核銷」自助按鈕
+- 「贈送」：改成真的 `for_gift` 機制（同 `ConsumerLockPage.tsx` 的 `handleGift`），移除原本假的「朋友暱稱」輸入欄——真實機制沒有指名，是生成連結後私下傳給朋友
+- 「交易」：改成真的 `for_resale` + `resale_deadline`（同 `handleResell`），移除原本假的「轉讓價格」輸入欄——轉賣價由雙方私下議定，平台不經手，上架後會出現在 `/marketplace`
+- 「留下回饋」：沿用既有 `Lock.consumer_feedback`，one-shot，同 `handleSubmitFeedback`
+- 「取消轉讓／取消贈送」：跟 `TransferMarketPage.tsx` 的「我的轉讓」一樣，firestore.rules 沒有對應規則，沒有做假的取消按鈕
+- 「計畫型」（訂閱制多日方案）完全沒有真實資料模型，這次不補假資料，只顯示單點型的真實紀錄——這代表原本 `MEAL_ROWS` 裡的「計畫型」假資料整段被拿掉了
+- `npx tsc --noEmit` 零錯誤；瀏覽器實測頁面渲染正常無 crash。嘗試在同一分頁先跑 `/lock` 的「鎖定這份」再切回 `/my-bookings`，驗證離線快取是否能反映——結果 `signInAnonymously` 因沙盒連不到外網直接卡住（`auth.currentUser` 一直是 `null`），`handleLock()` 的 guard 讓按鈕點了沒反應，證實這個環境完全沒辦法測到真正的 Firestore 讀寫（跟前兩次盤點的環境限制一致），需要真的有網路或 emulator 才能端到端驗證
+- 順手清掉這次 session 期間累積在 5173–5177 埠的多個殘留 `vite` dev server process（`TaskStop` 沒有真的砍掉底層 node 子行程）
+
+**2026-09-22（第四次更新）：依序做完剩下四項——計畫型、認證商家徽章、成長獎勵抽獎、取消轉讓**
+
+使用者要求「依序做」剩下清單裡的四項（原本評估規模都不小）：
+- **計畫型（訂閱制多日方案）**：拿掉「要另外設計 plan collection + 排程 Function」的預設，改成「加入計畫」當下直接一次寫入 N 筆真實 `locks`（同一個 `plan_id`／`plan_label` 串起來，`types.ts` 新增這兩個欄位；`firestore.rules` 的 `create` 規則本來就沒有欄位白名單限制，不用改規則）。`mockVendorMealPlans` 加上 `days` 欄位（5/7）取代原本用正規表達式解析顯示字串。`HomePage.tsx` 的「預約加入計畫」按鈕從純 toast 改成真的 `writeBatch` 寫入，取餐日從明天起算連續 N 天
+- **認證商家徽章**：`Vendor` 型別新增 `verified?: boolean`。因為 `firestore.rules` 的 `vendors` 寫入規則本來就是 `allow write: if isAdmin()`（沒有欄位限制），不用改規則。`AdminSettingsPage.tsx` 新增「認證商家」卡片（`VendorVerificationCard`），admin 可以勾選；`ConsumerLockPage.tsx` 的商家名稱旁顯示真的徽章（原本 `HomePage.tsx` 的「認證商家」是完全跟資料無關的裝飾徽章，這次沒有動它，因為那些卡片本身就是全 mock，沒有真實 vendor 物件可以掛）
+- **成長獎勵抽獎機制**：這項規模最大，因為「機率計算不能信任 client」是明確要求，抽獎本身必須在 Cloud Function 做。新增 `functions/src/index.js` 的 `drawGrowthReward`：先查 `payouts` 加總算出商家累積營收判斷是否解鎖（20萬門檻），用權重機率抽 6 個等級（80/60/50/30/10/0），用 `runTransaction` 更新 `growth_rewards/{vendorId}` 的 0 元券庫存（見底自動降級成 10%保底），寫入 `draws` 開獎紀錄。`firestore.rules` 新增這兩個 collection 的規則（公開可讀、只有 Function 能寫）。前端三處改真資料：`VendorPortalGrowth.tsx`（門檻進度／0元券庫存／開獎名單）、`GrowthRewardTicker.tsx`（訂閱 `draws` 裡 `price_percent===0` 的紀錄，不再是假資料，沒人抽中前這裡就是空的）、`HomePage.tsx` 新增消費者端「成長獎勵抽獎」卡片（`httpsCallable` 呼叫 `drawGrowthReward`）。**這個 Function 還沒有機會被實際呼叫測試過**，因為卡 Blaze 部署，跟其他 Functions 一樣的既有卡點
+- **取消轉讓**：`firestore.rules` 補一條規則，讓 owner 可以把還沒被接手的 `for_resale`／`for_gift` 改回 `locked`（原本完全沒有這條路徑）。`TransferMarketPage.tsx`「我的轉讓」跟 `MyBookingsPage.tsx` 都接上真的「取消轉讓／取消贈送」按鈕，拿掉之前寫的「尚未支援」提示文字
+- 這次改動有兩處 `firestore.rules` 變更（取消轉讓規則 + growth_rewards/draws 規則）跟一處 Cloud Function 新增，都還沒部署到正式站，待人工執行 `firebase deploy --only firestore:rules,functions`（Functions 仍卡 Blaze，規則本身不受影響可以先單獨部署）
+- `npx tsc --noEmit` 零錯誤，`node --check functions/src/index.js` 語法過。瀏覽器實測 `/home`、`/vendor-portal/growth`、`/marketplace`（我的轉讓分頁）、`/my-bookings` 都能正常渲染不 crash；點擊「預約加入計畫」因沙盒連不到外網 Firebase（跟本次 session 一路以來的環境限制一致）沒有實際寫入效果，但沒有拋出例外
+- 順手清掉又累積在 5173 埠的殘留 vite process
 
 **2026-09-22（第二次更新）：新增 `MyLocksPage.tsx`（我的鎖定紀錄）＋早鳥階梯定價邏輯 `pricing.ts`**
 

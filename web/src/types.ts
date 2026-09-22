@@ -4,6 +4,7 @@ export interface Vendor {
   item_focus: string;
   reliability_tone: "new" | "variable" | "stable";
   status?: "active" | "disabled"; // missing = active, for backward compat with seeded data
+  verified?: boolean; // 平台審核後手動認證，跟 reliability_tone（系統自動算）是兩件事；只有 admin 能寫
 }
 
 export type LockStatus =
@@ -33,6 +34,12 @@ export interface Lock {
   buyer_uid: string;
   created_at: unknown; // Firestore Timestamp
   reminder_sent?: boolean; // device token lives in the private lock_tokens/{lockId} doc
+  // 計畫型（訂閱制多日方案）：加入計畫時一次生成 N 筆 locks，用同一個 plan_id
+  // 串起來，沒有另外的 plan/subscription collection（見 HomePage.tsx 的
+  // handleJoinPlan）。firestore.rules 的 create 規則沒有限制欄位白名單，
+  // 所以這兩個欄位不需要另外修改規則。
+  plan_id?: string;
+  plan_label?: string;
 }
 
 export interface Payout {

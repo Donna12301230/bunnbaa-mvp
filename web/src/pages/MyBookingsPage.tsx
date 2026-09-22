@@ -1,385 +1,188 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, QrCode, CheckCircle2, Gift, Repeat } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { collection, doc, limit, onSnapshot, query, Timestamp, updateDoc, where } from "firebase/firestore";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { QRCodeSVG } from "qrcode.react";
+import { format } from "date-fns";
+import { zhTW } from "date-fns/locale";
+import { QrCode, Gift, Repeat, Copy } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { auth, db } from "@/lib/firebase";
+import type { Lock } from "@/types";
 
-// 對應 UI草圖 MyBookings.dc.html「我的商品」(2026-09-21 改名「我的餐點」,只給
-// 一般使用者看;廠商端這個 nav 分頁換成接受端的核對取餐,見 MarketplaceHeader.tsx)
-// ——一週餐點行事曆(列＝早/午/晚,
-// 欄＝週一~日),每格可「使用(QR核銷)／贈送(指名朋友)／交易(上架轉讓)／
-// 留下回饋」。
+// 對應 UI草圖 MyBookings.dc.html「我的商品」（2026-09-21 改名「我的餐點」，只給
+// 一般使用者看；廠商端這個 nav 分頁換成接受端的核對取餐，見 MarketplaceHeader.tsx）。
 //
-// TODO(firebase): 這頁目前完全是版面骨架 + 前端 local state 示意,資料是寫死的
-// mock 陣列,還沒接 Firestore 的 locks collection。接後端時要處理:
-//   - 「使用」核銷:串 markLockOutcome(functions/src/index.js,client 不可直接
-//     改 lock 狀態)
-//   - 「贈送」指名轉移:2026-09-21 已有對應機制,不用 Cloud Function——
-//     firestore.rules 新增 for_gift 狀態:買家可把自己 locked 的 lock 轉成
-//     for_gift(不公開列在任何查詢),任何「非原買家」的登入用戶都能把它
-//     接回 locked＋buyer_uid 換自己。「指名」是社交層面的:把連結/lock_id
-//     私下傳給朋友,同 QR 取餐碼「給誰就是誰的」的信任模型。真實端到端範例
-//     在 ConsumerLockPage.tsx 的 handleGift() / handleAcceptGift()
-//   - 「交易」上架轉讓:對應現有 for_resale 狀態(消費者端「轉賣這份」按鈕的邏輯,
-//     可參照 MyBookings 尚未串接的頁面)
-//   - 「留下回饋」:不用新 collection,沿用既有 Lock.consumer_feedback 欄位
-//     (原本就餵給商家校準的 buildVendorHistory)。2026-09-21 firestore.rules
-//     新增規則:買家在自己的 lock 狀態是 fulfilled/resold_and_fulfilled/no_show
-//     時可以寫入一次 consumer_feedback(寫過就不能再改)。範例在
-//     ConsumerLockPage.tsx 的 handleSubmitFeedback()
-//
-// UIUX 檢視後補上:原本只有一份固定 min-w-[980px] 的 7 欄週曆 grid,手機只能整頁
-// 橫向捲動,格子內文字小到 9~10px、按鈕觸控熱區也太小。這裡把每格的內容抽成
-// CellBody 共用,桌機維持原本的週曆 grid(md 以上),手機改成「一天一區塊、每區塊
-// 三張餐卡」的直向清單(md 以下),文字與按鈕尺寸也一併放大到至少可讀/可點的程度。
+// 2026-09-22 接上真實 Firestore（前次盤點發現整頁完全是寫死 mock，比想像中大的
+// 工程，這次做完）：
+//   - 依 buyer_uid 查真實 locks（單一 equality，不加 orderBy，避免要求新複合
+//     索引，同 MyLocksPage/TransferMarketPage 的慣例），依 pickup_date /
+//     pickup_window 即時分組——真實資料筆數不固定，改成「每天一區塊」的清單，
+//     不是原本假資料那種固定 7×3 週曆格
+//   - 「使用」：只顯示 QR／取餐編號（真正核銷是商家端 markLockOutcome，消費者
+//     這邊不能自己按「完成核銷」，原本 mock 的 confirmUse 是假的）
+//   - 「贈送」：沒有「指名」欄位——真實機制是把 lock 轉成 for_gift 再把連結
+//     私下傳給朋友，同 ConsumerLockPage.tsx 的 handleGift()
+//   - 「交易」：轉成 for_resale + resale_deadline，同 handleResell()，上架後
+//     會出現在 /marketplace；沒有價格輸入欄位——轉賣價由雙方私下議定，平台
+//     不經手（同 TransferMarketPage.tsx 的設計）
+//   - 「留下回饋」：沿用既有 Lock.consumer_feedback 欄位，one-shot，同
+//     handleSubmitFeedback()
+//   - 「取消轉讓／取消贈送」：2026-09-22 補上 firestore.rules 規則後可以把
+//     for_resale/for_gift 改回 locked，同 TransferMarketPage「我的轉讓」
+//   - 「計畫型」（訂閱制多日方案）完全沒有真實資料模型（Firestore 沒有 plan
+//     collection），這次不補假資料，只顯示單點型的真實紀錄
 
-const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-1";
-
-type CellStatus = "used" | "no_show" | "pending";
-type TransferMode = "gift" | "sell" | null;
-
-interface BookingCell {
-  key: string;
-  type: "計畫型" | "單點型";
-  restaurant: string;
-  dish: string;
-  time: string;
-  status: CellStatus;
-  isPast: boolean;
-}
-
-const DAYS = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"];
-const TODAY_INDEX = 3; // 星期四
-
-const SINGLE_ORDER = [
-  { dish: "舒肥雞胸溫沙拉餐盒", time: "12:00–12:30 取餐" },
-  { dish: "塔香牛肉藜麥碗", time: "11:30–12:00 取餐" },
-  { dish: "地中海鮪魚酪梨碗", time: "12:30–13:00 取餐" },
-];
-
-const RAW_ROWS: { label: string; raw: [BookingCell["type"], string, string, string, boolean][] }[] = [
-  {
-    label: "早餐",
-    raw: [
-      ["單點型", "校園咖啡廳", SINGLE_ORDER[0].dish, "07:30–08:00 取餐", false],
-      ["單點型", "校園咖啡廳", SINGLE_ORDER[1].dish, "07:30–08:00 取餐", false],
-      ["單點型", "校園咖啡廳", SINGLE_ORDER[2].dish, "07:30–08:00 取餐", true],
-      ["單點型", "校園咖啡廳", SINGLE_ORDER[0].dish, "07:30–08:00 取餐", false],
-      ["單點型", "校園咖啡廳", SINGLE_ORDER[1].dish, "07:30–08:00 取餐", false],
-      ["單點型", "校園咖啡廳", SINGLE_ORDER[2].dish, "07:30–08:00 取餐", false],
-      ["單點型", "校園咖啡廳", SINGLE_ORDER[0].dish, "07:30–08:00 取餐", false],
-    ],
-  },
-  {
-    label: "午餐",
-    raw: [
-      ["計畫型", "一頭牛日式燒肉丼", "A方案:減脂健身餐・第1/5天", "每日午餐", false],
-      ["計畫型", "一頭牛日式燒肉丼", "A方案:減脂健身餐・第2/5天", "每日午餐", false],
-      ["計畫型", "一頭牛日式燒肉丼", "A方案:減脂健身餐・第3/5天", "每日午餐", false],
-      ["計畫型", "一頭牛日式燒肉丼", "A方案:減脂健身餐・第4/5天", "每日午餐", false],
-      ["計畫型", "一頭牛日式燒肉丼", "A方案:減脂健身餐・第5/5天", "每日午餐", false],
-      ["單點型", "校園咖啡廳", SINGLE_ORDER[1].dish, SINGLE_ORDER[1].time, false],
-      ["單點型", "校園咖啡廳", SINGLE_ORDER[2].dish, SINGLE_ORDER[2].time, false],
-    ],
-  },
-  {
-    label: "晚餐",
-    raw: [
-      ["計畫型", "元氣蔬食坊", "B方案:全穀養生餐・第1/7天", "每日晚餐", false],
-      ["計畫型", "元氣蔬食坊", "B方案:全穀養生餐・第2/7天", "每日晚餐", false],
-      ["計畫型", "元氣蔬食坊", "B方案:全穀養生餐・第3/7天", "每日晚餐", false],
-      ["計畫型", "元氣蔬食坊", "B方案:全穀養生餐・第4/7天", "每日晚餐", false],
-      ["計畫型", "元氣蔬食坊", "B方案:全穀養生餐・第5/7天", "每日晚餐", false],
-      ["計畫型", "元氣蔬食坊", "B方案:全穀養生餐・第6/7天", "每日晚餐", false],
-      ["計畫型", "元氣蔬食坊", "B方案:全穀養生餐・第7/7天", "每日晚餐", false],
-    ],
-  },
-];
-
-const MEAL_ROWS = RAW_ROWS.map((row, rowIndex) => ({
-  label: row.label,
-  cells: row.raw.map(([type, restaurant, dish, time, noShow], dayIndex): BookingCell => {
-    const isPast = dayIndex < TODAY_INDEX;
-    return {
-      key: `${rowIndex}-${dayIndex}`,
-      type, restaurant, dish, time,
-      status: noShow ? "no_show" : isPast ? "used" : "pending",
-      isPast,
-    };
-  }),
-}));
-
-const STATUS_STYLE: Record<CellStatus, { label: string; className: string }> = {
-  used: { label: "已取餐", className: "bg-green-50 text-green-700" },
-  no_show: { label: "No-show", className: "bg-red-50 text-red-600" },
-  pending: { label: "待取餐", className: "bg-amber-50 text-amber-700" },
+const STATUS_STYLE: Record<string, { label: string; className: string }> = {
+  locked: { label: "已鎖定", className: "bg-orange-100 text-orange-700" },
+  for_resale: { label: "轉賣中", className: "bg-amber-100 text-amber-800" },
+  for_gift: { label: "贈送中", className: "bg-blue-100 text-blue-700" },
+  fulfilled: { label: "已取餐", className: "bg-green-100 text-green-700" },
+  resold_and_fulfilled: { label: "已由轉賣對象取餐", className: "bg-green-100 text-green-700" },
+  no_show: { label: "已登記未取餐", className: "bg-red-100 text-red-700" },
 };
 
-const TYPE_COLOR: Record<BookingCell["type"], string> = {
-  計畫型: "text-green-700",
-  單點型: "text-orange-600",
-};
+const FEEDBACK_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled", "no_show"]);
 
-interface CellMeta {
-  statusInfo: { label: string; className: string };
-  canTransfer: boolean;
-  isUsed: boolean;
-  isUseOpen: boolean;
-  result?: { type: "gift" | "sell"; text: string };
-  showGiftForm: boolean;
-  showSellForm: boolean;
-  showTransferButtons: boolean;
-  redeemCode: string;
-  submittedText?: string;
-  isFeedbackOpen: boolean;
-  giftValue: string;
-  sellValue: string;
-  feedbackValue: string;
-  onOpenUse: () => void;
-  onConfirmUse: () => void;
-  onCancelUse: () => void;
-  onStartGift: () => void;
-  onStartSell: () => void;
-  onGiftChange: (v: string) => void;
-  onConfirmGift: () => void;
-  onSellChange: (v: string) => void;
-  onConfirmSell: () => void;
-  onCancelTransfer: () => void;
-  onCancelResult: () => void;
-  onOpenFeedback: () => void;
-  onFeedbackChange: (v: string) => void;
-  onSubmitFeedback: () => void;
+function formatDateLabel(dateStr: string): string {
+  try {
+    return format(new Date(`${dateStr}T00:00:00`), "M/d（EEE）", { locale: zhTW });
+  } catch {
+    return dateStr;
+  }
 }
 
-// 每格的內容與互動邏輯——桌機週曆 grid、手機每日清單共用同一份,只靠 `dense`
-// 切換字級/按鈕尺寸(手機版字級更大、按鈕熱區更高,方便點擊)。
-function CellBody({ cell, meta, dense }: { cell: BookingCell; meta: CellMeta; dense: boolean }) {
-  const labelSize = dense ? "text-[11px]" : "text-xs";
-  const titleSize = dense ? "text-xs" : "text-sm";
-  const timeSize = dense ? "text-[11px]" : "text-xs";
-  const btnPad = dense ? "py-1.5" : "py-2.5";
-  const btnText = dense ? "text-[11px]" : "text-xs";
+// Mirrors ConsumerLockPage.tsx's pickupWindowEnd — used as the resale_deadline
+// after which anyone may free-claim (see firestore.rules).
+function pickupWindowEnd(pickupDate: string, pickupWindow: string): Date | null {
+  const endTime = pickupWindow.split("-")[1]?.trim() ?? pickupWindow.split("–")[1]?.trim();
+  if (!endTime) return null;
+  return new Date(`${pickupDate}T${endTime}:00+08:00`);
+}
 
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className={cn("self-start font-bold px-1.5 py-0.5 rounded-full", labelSize, meta.statusInfo.className)}>
-        {meta.statusInfo.label}
-      </span>
-      <p className={cn("font-bold", labelSize, TYPE_COLOR[cell.type])}>{cell.type}</p>
-      <p className={cn("font-semibold leading-snug", titleSize)}>{cell.restaurant}</p>
-      <p className={cn("leading-snug text-muted-foreground", titleSize, dense && "line-clamp-2")}>{cell.dish}</p>
-      <p className={cn("text-muted-foreground", timeSize)}>{cell.time}</p>
-
-      {meta.showTransferButtons && (
-        <div className="mt-auto flex flex-col gap-1.5 pt-1">
-          <button
-            onClick={meta.onOpenUse}
-            className={cn("font-bold rounded-md bg-orange-500 text-white", btnPad, btnText, FOCUS_RING)}
-          >
-            使用
-          </button>
-          <div className="flex gap-1.5">
-            <button
-              onClick={meta.onStartGift}
-              className={cn("flex-1 font-semibold rounded-md border border-border", btnPad, btnText, FOCUS_RING)}
-            >
-              贈送
-            </button>
-            <button
-              onClick={meta.onStartSell}
-              className={cn("flex-1 font-semibold rounded-md border border-border", btnPad, btnText, FOCUS_RING)}
-            >
-              交易
-            </button>
-          </div>
-        </div>
-      )}
-
-      {meta.isUseOpen && (
-        <div className="mt-auto flex flex-col items-center gap-1.5 pt-1 text-center">
-          <QrCode className={dense ? "w-8 h-8" : "w-10 h-10"} />
-          <span className={cn("font-bold", labelSize)}>核銷碼 {meta.redeemCode}</span>
-          <span className={cn("text-muted-foreground", dense ? "text-[9px]" : "text-[11px]")}>請於取餐時向店員出示</span>
-          <div className="flex gap-1.5 w-full">
-            <button onClick={meta.onConfirmUse} className={cn("flex-1 font-bold rounded-md bg-green-700 text-white", btnPad, btnText, FOCUS_RING)}>完成核銷</button>
-            <button onClick={meta.onCancelUse} className={cn("flex-1 font-semibold rounded-md border border-border", btnPad, btnText, FOCUS_RING)}>返回</button>
-          </div>
-        </div>
-      )}
-
-      {meta.isUsed && (
-        <div className={cn("mt-auto flex items-center gap-1.5 pt-1 font-semibold text-green-700", btnText)}>
-          <CheckCircle2 className="w-3.5 h-3.5" /> 已完成核銷取餐
-        </div>
-      )}
-
-      {meta.showGiftForm && (
-        <div className="mt-auto flex flex-col gap-1.5 pt-1">
-          <label htmlFor={`gift-${cell.key}`} className="sr-only">朋友的暱稱</label>
-          <input
-            id={`gift-${cell.key}`}
-            value={meta.giftValue}
-            onChange={e => meta.onGiftChange(e.target.value)}
-            placeholder="朋友的暱稱/學號"
-            className={cn("border border-border rounded-md px-2 py-1.5", btnText)}
-          />
-          <div className="flex gap-1.5">
-            <button onClick={meta.onConfirmGift} className={cn("flex-1 font-bold rounded-md bg-green-700 text-white", btnPad, btnText, FOCUS_RING)}>確認贈送</button>
-            <button onClick={meta.onCancelTransfer} className={cn("flex-1 font-semibold rounded-md border border-border", btnPad, btnText, FOCUS_RING)}>取消</button>
-          </div>
-        </div>
-      )}
-
-      {meta.showSellForm && (
-        <div className="mt-auto flex flex-col gap-1.5 pt-1">
-          <label htmlFor={`sell-${cell.key}`} className="sr-only">轉讓價格</label>
-          <input
-            id={`sell-${cell.key}`}
-            inputMode="numeric"
-            value={meta.sellValue}
-            onChange={e => meta.onSellChange(e.target.value)}
-            placeholder="轉讓價格($)"
-            className={cn("border border-border rounded-md px-2 py-1.5", btnText)}
-          />
-          <div className="flex gap-1.5">
-            <button onClick={meta.onConfirmSell} className={cn("flex-1 font-bold rounded-md bg-orange-500 text-white", btnPad, btnText, FOCUS_RING)}>上架交易</button>
-            <button onClick={meta.onCancelTransfer} className={cn("flex-1 font-semibold rounded-md border border-border", btnPad, btnText, FOCUS_RING)}>取消</button>
-          </div>
-        </div>
-      )}
-
-      {meta.result && (
-        <div className="mt-auto flex flex-col gap-1.5 pt-1">
-          <p className={cn("font-semibold flex items-center gap-1", btnText)}>
-            {meta.result.type === "gift" ? <Gift className="w-3 h-3" /> : <Repeat className="w-3 h-3" />} {meta.result.text}
-          </p>
-          <button onClick={meta.onCancelResult} className={cn("font-semibold rounded-md border border-red-300 text-red-600", btnPad, btnText, FOCUS_RING)}>取消交易</button>
-        </div>
-      )}
-
-      {cell.isPast && meta.submittedText && (
-        <p className={cn("mt-auto text-muted-foreground pt-1 line-clamp-2", timeSize)}>已回饋:「{meta.submittedText}」</p>
-      )}
-      {cell.isPast && !meta.submittedText && !meta.isFeedbackOpen && (
-        <button
-          onClick={meta.onOpenFeedback}
-          className={cn("mt-auto font-semibold rounded-md border border-border", btnPad, btnText, FOCUS_RING)}
-        >
-          留下回饋
-        </button>
-      )}
-      {meta.isFeedbackOpen && (
-        <div className="mt-auto flex flex-col gap-1.5 pt-1">
-          <label htmlFor={`fb-${cell.key}`} className="sr-only">留下回饋</label>
-          <input
-            id={`fb-${cell.key}`}
-            value={meta.feedbackValue}
-            onChange={e => meta.onFeedbackChange(e.target.value)}
-            placeholder="這餐的心得…"
-            className={cn("border border-border rounded-md px-2 py-1.5", btnText)}
-          />
-          <button onClick={meta.onSubmitFeedback} className={cn("font-bold rounded-md bg-orange-500 text-white", btnPad, btnText, FOCUS_RING)}>送出回饋</button>
-        </div>
-      )}
-    </div>
-  );
+function formatCountdown(deadline: Date, now: number): string {
+  const diffMin = Math.round((deadline.getTime() - now) / 60000);
+  if (diffMin <= 0) return "已逾期";
+  if (diffMin < 60) return `${diffMin} 分後截止`;
+  return `${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`;
 }
 
 export default function MyBookingsPage() {
   const { toast } = useToast();
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [useOpen, setUseOpen] = useState<Record<string, boolean>>({});
-  const [usedCells, setUsedCells] = useState<Record<string, boolean>>({});
-  const [transferMode, setTransferMode] = useState<Record<string, TransferMode>>({});
-  const [giftDraft, setGiftDraft] = useState<Record<string, string>>({});
-  const [sellDraft, setSellDraft] = useState<Record<string, string>>({});
-  const [transferResult, setTransferResult] = useState<Record<string, { type: "gift" | "sell"; text: string }>>({});
+  const [uid, setUid] = useState<string | null>(null);
+  const [locks, setLocks] = useState<Lock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [qrOpen, setQrOpen] = useState<Record<string, boolean>>({});
   const [feedbackOpen, setFeedbackOpen] = useState<Record<string, boolean>>({});
   const [feedbackDraft, setFeedbackDraft] = useState<Record<string, string>>({});
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState<Record<string, string>>({
-    "0-0": "份量剛好,很滿足!",
-    "0-1": "口味偏鹹,可以調整",
-    "0-2": "睡過頭,沒吃到,殘念",
-    "2-0": "全穀餐很喜歡,會續訂",
-    "2-2": "晚餐很棒,續訂了",
-  });
 
-  function confirmUse(key: string) {
-    setUsedCells(prev => ({ ...prev, [key]: true }));
-    setUseOpen(prev => ({ ...prev, [key]: false }));
-    toast({ title: "核銷完成", description: "示意畫面:實際核銷需串接 markLockOutcome。" });
+  useEffect(() => {
+    signInAnonymously(auth).catch(console.error);
+    const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(collection(db, "locks"), where("buyer_uid", "==", uid), limit(200));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setLocks(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock));
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+    return () => unsub();
+  }, [uid]);
+
+  // 轉賣逾時倒數是前端算的，固定重算才會即時更新顯示。
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const dateGroups = useMemo(() => {
+    const byDate = new Map<string, Lock[]>();
+    for (const lock of locks) {
+      const bucket = byDate.get(lock.pickup_date) ?? [];
+      bucket.push(lock);
+      byDate.set(lock.pickup_date, bucket);
+    }
+    return Array.from(byDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, items]) => ({
+        date,
+        items: items.sort((a, b) => a.pickup_window.localeCompare(b.pickup_window)),
+      }));
+  }, [locks]);
+
+  async function handleGift(lock: Lock) {
+    setBusyId(lock.id);
+    try {
+      await updateDoc(doc(db, "locks", lock.id), { status: "for_gift" });
+      toast({ title: "已轉為贈送模式", description: "把下面出現的連結私下傳給朋友即可。" });
+    } catch (err) {
+      toast({ title: "贈送失敗", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  function confirmGift(key: string) {
-    const name = (giftDraft[key] || "").trim();
-    if (!name) return;
-    setTransferResult(prev => ({ ...prev, [key]: { type: "gift", text: `已贈送給 ${name}` } }));
-    setTransferMode(prev => ({ ...prev, [key]: null }));
-    toast({ title: "已贈送", description: "示意畫面:指名贈送尚未有對應後端功能。" });
+  async function handleResell(lock: Lock) {
+    setBusyId(lock.id);
+    try {
+      const deadline = pickupWindowEnd(lock.pickup_date, lock.pickup_window);
+      await updateDoc(doc(db, "locks", lock.id), {
+        status: "for_resale",
+        ...(deadline ? { resale_deadline: Timestamp.fromDate(deadline) } : {}),
+      });
+      toast({ title: "已上架轉讓市集" });
+    } catch (err) {
+      toast({ title: "上架失敗", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  function confirmSell(key: string) {
-    const price = (sellDraft[key] || "").trim();
-    if (!price) return;
-    setTransferResult(prev => ({ ...prev, [key]: { type: "sell", text: `已上架交易・$${price}` } }));
-    setTransferMode(prev => ({ ...prev, [key]: null }));
-    toast({ title: "已上架轉讓市集" });
+  async function handleCancelTransfer(lock: Lock) {
+    setBusyId(lock.id);
+    try {
+      await updateDoc(doc(db, "locks", lock.id), { status: "locked" });
+      toast({ title: lock.status === "for_gift" ? "已取消贈送" : "已取消轉讓" });
+    } catch (err) {
+      toast({ title: "取消失敗", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  function cancelTransferResult(key: string) {
-    setTransferResult(prev => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-  }
-
-  function submitFeedback(key: string) {
-    const text = (feedbackDraft[key] || "").trim();
+  async function handleSubmitFeedback(lock: Lock) {
+    const text = (feedbackDraft[lock.id] || "").trim();
     if (!text) return;
-    setFeedbackSubmitted(prev => ({ ...prev, [key]: text }));
-    setFeedbackOpen(prev => ({ ...prev, [key]: false }));
+    setBusyId(lock.id);
+    try {
+      await updateDoc(doc(db, "locks", lock.id), { consumer_feedback: text });
+      setFeedbackOpen((prev) => ({ ...prev, [lock.id]: false }));
+    } catch (err) {
+      toast({ title: "送出回饋失敗", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  const cellMetaByKey: Record<string, CellMeta> = {};
-  for (const row of MEAL_ROWS) {
-    for (const cell of row.cells) {
-      const statusInfo = STATUS_STYLE[cell.status];
-      const canTransfer = !cell.isPast;
-      const isUsed = canTransfer && !!usedCells[cell.key];
-      const isUseOpen = canTransfer && !!useOpen[cell.key] && !isUsed;
-      const result = transferResult[cell.key];
-      const mode = transferMode[cell.key];
-      const showGiftForm = canTransfer && mode === "gift" && !result && !isUsed && !isUseOpen;
-      const showSellForm = canTransfer && mode === "sell" && !result && !isUsed && !isUseOpen;
-      const showTransferButtons = canTransfer && !result && !isUsed && !showGiftForm && !showSellForm && !isUseOpen;
-      const submittedText = feedbackSubmitted[cell.key];
-      const isFeedbackOpen = !!feedbackOpen[cell.key] && !submittedText;
+  function giftLinkFor(lockId: string): string {
+    return `${window.location.origin}${window.location.pathname}?gift=${lockId}#/lock`;
+  }
 
-      cellMetaByKey[cell.key] = {
-        statusInfo, canTransfer, isUsed, isUseOpen, result,
-        showGiftForm, showSellForm, showTransferButtons,
-        redeemCode: `BB-${cell.key.replace("-", "")}`,
-        submittedText, isFeedbackOpen,
-        giftValue: giftDraft[cell.key] || "",
-        sellValue: sellDraft[cell.key] || "",
-        feedbackValue: feedbackDraft[cell.key] || "",
-        onOpenUse: () => setUseOpen(prev => ({ ...prev, [cell.key]: true })),
-        onConfirmUse: () => confirmUse(cell.key),
-        onCancelUse: () => setUseOpen(prev => ({ ...prev, [cell.key]: false })),
-        onStartGift: () => setTransferMode(prev => ({ ...prev, [cell.key]: "gift" })),
-        onStartSell: () => setTransferMode(prev => ({ ...prev, [cell.key]: "sell" })),
-        onGiftChange: v => setGiftDraft(prev => ({ ...prev, [cell.key]: v })),
-        onConfirmGift: () => confirmGift(cell.key),
-        onSellChange: v => setSellDraft(prev => ({ ...prev, [cell.key]: v })),
-        onConfirmSell: () => confirmSell(cell.key),
-        onCancelTransfer: () => setTransferMode(prev => ({ ...prev, [cell.key]: null })),
-        onCancelResult: () => cancelTransferResult(cell.key),
-        onOpenFeedback: () => setFeedbackOpen(prev => ({ ...prev, [cell.key]: true })),
-        onFeedbackChange: v => setFeedbackDraft(prev => ({ ...prev, [cell.key]: v })),
-        onSubmitFeedback: () => submitFeedback(cell.key),
-      };
+  async function copyLink(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "已複製連結" });
+    } catch {
+      toast({ title: "複製失敗，請手動選取連結", variant: "destructive" });
     }
   }
 
@@ -387,96 +190,147 @@ export default function MyBookingsPage() {
     <div className="min-h-screen bg-gray-50">
       <MarketplaceHeader active="bookings" />
 
-      {/* ── Hero ── */}
-      <section className="px-4 md:px-6 py-6 flex items-center justify-between flex-wrap gap-3 max-w-[1400px] mx-auto">
-        <div>
-          <h1 className="text-2xl font-bold mb-1">我的餐點</h1>
-          <p className="text-sm text-muted-foreground">
-            09/22(一)－ 09/28(日)這週的餐點行事曆・今天是 09/25(四)
-            {weekOffset !== 0 && `(週偏移 ${weekOffset > 0 ? "+" : ""}${weekOffset},示意用)`}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w - 1)}>
-            <ChevronLeft className="w-4 h-4 mr-1" /> 上週
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w + 1)}>
-            下週 <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
-        </div>
+      <section className="px-4 md:px-6 py-6 max-w-[1400px] mx-auto">
+        <h1 className="text-2xl font-bold mb-1">我的餐點</h1>
+        <p className="text-sm text-muted-foreground">依取餐日期排列你目前的鎖定紀錄。</p>
       </section>
 
-      {/* ── Body ── */}
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 pb-10 space-y-4">
-        {/* legend */}
-        <div className="flex items-center justify-between flex-wrap gap-3 text-xs">
-          <div className="flex gap-4">
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-700 inline-block" /> 計畫型(訂閱制,每日供餐)</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" /> 單點型(校園咖啡廳單次預購)</span>
-          </div>
-          <div className="flex gap-2">
-            {Object.values(STATUS_STYLE).map(s => (
-              <span key={s.label} className={`px-2 py-0.5 rounded-full font-semibold ${s.className}`}>{s.label}</span>
-            ))}
-          </div>
-        </div>
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 pb-10 space-y-6">
+        {loading ? (
+          <p className="text-sm text-muted-foreground">載入中…</p>
+        ) : dateGroups.length === 0 ? (
+          <p className="text-sm text-muted-foreground">目前沒有任何鎖定紀錄。到「預購鎖定」鎖一份餐點看看。</p>
+        ) : (
+          dateGroups.map((group) => (
+            <section key={group.date} className="space-y-2">
+              <h2 className="text-sm font-bold text-muted-foreground">{formatDateLabel(group.date)}</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {group.items.map((lock) => {
+                  const statusInfo = STATUS_STYLE[lock.status] ?? { label: lock.status, className: "bg-gray-100 text-gray-700" };
+                  const isBusy = busyId === lock.id;
+                  const deadline = lock.status === "for_resale" ? pickupWindowEnd(lock.pickup_date, lock.pickup_window) : null;
+                  const canFeedback = FEEDBACK_ELIGIBLE.has(lock.status);
+                  const hasFeedback = !!lock.consumer_feedback;
 
-        {/* 桌機:週曆 grid(md 以上) */}
-        <div className="hidden md:block bg-white border border-border rounded-2xl overflow-x-auto">
-          <div className="min-w-[980px] grid" style={{ gridTemplateColumns: "80px repeat(7, 1fr)" }}>
-            <div className="border-b border-border" />
-            {DAYS.map((d, i) => (
-              <div
-                key={d}
-                className={`border-b border-l border-border px-2 py-2 text-center text-xs font-semibold ${
-                  i === TODAY_INDEX ? "bg-orange-50 text-orange-600" : "text-muted-foreground"
-                }`}
-              >
-                {d}
-              </div>
-            ))}
-
-            {MEAL_ROWS.map(row => (
-              <div key={row.label} className="contents">
-                <div className="border-b border-border px-2 py-3 text-xs font-bold text-muted-foreground flex items-start">
-                  {row.label}
-                </div>
-                {row.cells.map(cell => (
-                  <div key={cell.key} className="border-b border-l border-border p-2 flex flex-col gap-1.5 min-h-[132px]">
-                    <CellBody cell={cell} meta={cellMetaByKey[cell.key]} dense />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 手機:每天一區塊、餐卡直向排列(md 以下) */}
-        <div className="md:hidden space-y-5">
-          {DAYS.map((day, dayIndex) => (
-            <section key={day} className="space-y-2">
-              <div className="flex items-center gap-2 px-0.5">
-                <h3 className={cn("text-sm font-bold", dayIndex === TODAY_INDEX ? "text-orange-600" : "text-foreground")}>
-                  {day}
-                </h3>
-                {dayIndex === TODAY_INDEX && (
-                  <span className="text-[10px] font-bold bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">今天</span>
-                )}
-              </div>
-              <div className="space-y-2">
-                {MEAL_ROWS.map(row => {
-                  const cell = row.cells[dayIndex];
                   return (
-                    <div key={cell.key} className="bg-white border border-border rounded-xl p-3">
-                      <p className="text-xs font-bold text-muted-foreground mb-2">{row.label}</p>
-                      <CellBody cell={cell} meta={cellMetaByKey[cell.key]} dense={false} />
-                    </div>
+                    <article key={lock.id} className="bg-white border border-border rounded-xl p-4 flex flex-col gap-2">
+                      <span className={`self-start text-xs font-bold px-2 py-0.5 rounded-full ${statusInfo.className}`}>
+                        {statusInfo.label}
+                      </span>
+                      <h3 className="font-semibold leading-snug">{lock.item_name}</h3>
+                      <p className="text-sm text-muted-foreground">{lock.pickup_window} 取餐・${lock.locked_price}</p>
+
+                      {lock.status === "locked" && (
+                        <div className="flex flex-col gap-2 pt-1">
+                          {qrOpen[lock.id] ? (
+                            <div className="flex flex-col items-center gap-1.5 text-center py-2">
+                              <QRCodeSVG value={JSON.stringify({ lockId: lock.id, vendorId: lock.vendor_id })} size={120} level="M" />
+                              <span className="text-sm font-bold">取餐編號 {lock.id.slice(-8).toUpperCase()}</span>
+                              <span className="text-xs text-muted-foreground">請於取餐時向店員出示</span>
+                              <button
+                                onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: false }))}
+                                className="text-xs font-semibold text-muted-foreground underline"
+                              >
+                                收起
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: true }))}
+                              className="flex items-center justify-center gap-1.5 text-xs font-bold rounded-md bg-orange-500 text-white py-2"
+                            >
+                              <QrCode className="w-3.5 h-3.5" /> 使用（顯示取餐碼）
+                            </button>
+                          )}
+                          <div className="flex gap-2">
+                            <button
+                              disabled={isBusy}
+                              onClick={() => handleGift(lock)}
+                              className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold rounded-md border border-border py-2"
+                            >
+                              <Gift className="w-3.5 h-3.5" /> 贈送
+                            </button>
+                            <button
+                              disabled={isBusy}
+                              onClick={() => handleResell(lock)}
+                              className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold rounded-md border border-border py-2"
+                            >
+                              <Repeat className="w-3.5 h-3.5" /> 交易
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {lock.status === "for_gift" && (
+                        <div className="flex flex-col gap-1.5 pt-1">
+                          <p className="text-xs text-muted-foreground">把這組連結私下傳給朋友，對方打開就能收下：</p>
+                          <div className="flex items-center gap-1.5">
+                            <input readOnly value={giftLinkFor(lock.id)} className="flex-1 text-xs border border-border rounded-md px-2 py-1.5 truncate" />
+                            <button onClick={() => copyLink(giftLinkFor(lock.id))} className="shrink-0 p-1.5 rounded-md border border-border">
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <button
+                            disabled={isBusy}
+                            onClick={() => handleCancelTransfer(lock)}
+                            className="text-xs font-semibold rounded-md border border-red-300 text-red-600 py-1.5"
+                          >
+                            取消贈送
+                          </button>
+                        </div>
+                      )}
+
+                      {lock.status === "for_resale" && (
+                        <div className="flex flex-col gap-1.5 pt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {deadline ? formatCountdown(deadline, now) : "等待有人接手"}・已上架到轉讓市集
+                          </p>
+                          <button
+                            disabled={isBusy}
+                            onClick={() => handleCancelTransfer(lock)}
+                            className="text-xs font-semibold rounded-md border border-red-300 text-red-600 py-1.5"
+                          >
+                            取消轉讓
+                          </button>
+                        </div>
+                      )}
+
+                      {canFeedback && (
+                        hasFeedback ? (
+                          <p className="text-xs text-muted-foreground pt-1">已回饋：「{lock.consumer_feedback}」</p>
+                        ) : feedbackOpen[lock.id] ? (
+                          <div className="flex flex-col gap-1.5 pt-1">
+                            <input
+                              value={feedbackDraft[lock.id] || ""}
+                              onChange={(e) => setFeedbackDraft((prev) => ({ ...prev, [lock.id]: e.target.value }))}
+                              placeholder="這餐的心得…（送出後無法修改）"
+                              maxLength={280}
+                              className="text-xs border border-border rounded-md px-2 py-1.5"
+                            />
+                            <button
+                              disabled={isBusy || !(feedbackDraft[lock.id] || "").trim()}
+                              onClick={() => handleSubmitFeedback(lock)}
+                              className="text-xs font-bold rounded-md bg-orange-500 text-white py-2"
+                            >
+                              送出回饋
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setFeedbackOpen((prev) => ({ ...prev, [lock.id]: true }))}
+                            className="text-xs font-semibold rounded-md border border-border py-2 pt-1"
+                          >
+                            留下回饋
+                          </button>
+                        )
+                      )}
+                    </article>
                   );
                 })}
               </div>
             </section>
-          ))}
-        </div>
+          ))
+        )}
       </div>
     </div>
   );

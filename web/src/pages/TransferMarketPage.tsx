@@ -16,11 +16,11 @@ import type { Lock } from "@/types";
 //     resale_deadline 已過，任何登入用戶可直接 updateDoc），不用排程
 //   - 沿用同一組 vendor_id + created_at 索引，篩選 for_resale 交給前端做，
 //     避免另外要求新的複合索引（跟 VendorRedeemPage/VendorPortalPrep 同慣例）
-// 「取消轉讓」目前 firestore.rules 沒有對應規則（owner 沒辦法把 for_resale 改回
-// locked），所以「我的轉讓」只顯示提示文字，不做假的取消按鈕。同理，已被接手的
-// 項目一旦 buyer_uid 換人就無法再用「我的」查回來（資料模型沒有記錄原轉讓者），
-// 這頁「我的轉讓」只會顯示目前還在轉讓中、尚未被接手的項目。
-// 轉賣價格由買家雙方私下議定、платform 不經手，所以這裡不顯示「轉讓價」，只顯示
+// 「取消轉讓」2026-09-22 補上 firestore.rules 規則（owner 可以把還沒被接手的
+// for_resale 改回 locked），「我的轉讓」現在是真的可以取消。已被接手的項目一旦
+// buyer_uid 換人就無法再用「我的」查回來（資料模型沒有記錄原轉讓者），這頁
+// 「我的轉讓」只會顯示目前還在轉讓中、尚未被接手的項目。
+// 轉賣價格由買家雙方私下議定、平台不經手，所以這裡不顯示「轉讓價」，只顯示
 // 原鎖定價（locked_price）。
 const VENDOR_ID = "cafe-renheya-demo";
 
@@ -126,6 +126,18 @@ export default function TransferMarketPage() {
       toast({ title: "已免費領取", description: "取餐編號可在「我的餐點」查看。" });
     } catch (err) {
       toast({ title: "領取失敗", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setClaimingId(null);
+    }
+  }
+
+  async function handleCancelListing(lockId: string) {
+    setClaimingId(lockId);
+    try {
+      await updateDoc(doc(db, "locks", lockId), { status: "locked" });
+      toast({ title: "已取消轉讓" });
+    } catch (err) {
+      toast({ title: "取消失敗", description: (err as Error).message, variant: "destructive" });
     } finally {
       setClaimingId(null);
     }
@@ -290,14 +302,25 @@ export default function TransferMarketPage() {
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
                       </div>
-                      <span className="text-lg font-extrabold mt-auto pt-1.5">${item.locked_price}</span>
+                      <div className="flex items-center justify-between mt-auto pt-1.5">
+                        <span className="text-lg font-extrabold">${item.locked_price}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-300 text-red-600 hover:bg-red-50"
+                          disabled={claimingId === item.id}
+                          onClick={() => handleCancelListing(item.id)}
+                        >
+                          {claimingId === item.id ? "處理中…" : "取消轉讓"}
+                        </Button>
+                      </div>
                     </div>
                   </article>
                 ))}
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              「取消轉讓」尚未支援（Firestore 規則還沒開放 owner 把 for_resale 改回 locked），已被接手的項目目前也無法在此追蹤，因為資料模型沒有記錄原轉讓者。
+              已被接手的項目目前無法在此追蹤紀錄，因為資料模型沒有記錄原轉讓者（buyer_uid 換人後就查不到了）。
             </p>
           </>
         )}

@@ -504,6 +504,7 @@ export interface MealPlanOption {
   pricePerMeal: number;
   rating: number;
   fastestBooking: string;
+  days: number; // 供餐天數，用來決定「預約加入計畫」要生成幾筆 locks
 }
 
 export interface VendorMealPlanGroup {
@@ -518,77 +519,29 @@ export const mockVendorMealPlans: VendorMealPlanGroup[] = [
     vendorId: "vendor-1",
     vendorName: "一頭牛日式燒肉",
     plans: [
-      { id: "p1", label: "A方案", name: "減脂健身餐 (5天)", description: "每日午餐、附贈無糖茶", pricePerMeal: 150, rating: 4.8, fastestBooking: "下週一" },
-      { id: "p2", label: "B方案", name: "增肌蛋白餐 (7天)", description: "每日午餐、附贈蛋白餐食蛋白飯", pricePerMeal: 150, rating: 4.7, fastestBooking: "下週一" },
+      { id: "p1", label: "A方案", name: "減脂健身餐 (5天)", description: "每日午餐、附贈無糖茶", pricePerMeal: 150, rating: 4.8, fastestBooking: "下週一", days: 5 },
+      { id: "p2", label: "B方案", name: "增肌蛋白餐 (7天)", description: "每日午餐、附贈蛋白餐食蛋白飯", pricePerMeal: 150, rating: 4.7, fastestBooking: "下週一", days: 7 },
     ],
   },
   {
     vendorId: "vendor-2",
     vendorName: "王媽媽便當",
     plans: [
-      { id: "p3", label: "A方案", name: "家常均衡餐 (5天)", description: "每日午餐、附贈溫豆漿", pricePerMeal: 140, rating: 4.6, fastestBooking: "下週二" },
-      { id: "p4", label: "B方案", name: "高蛋白便當餐 (7天)", description: "每日午餐、附贈黑豆漿", pricePerMeal: 160, rating: 4.5, fastestBooking: "下週二" },
+      { id: "p3", label: "A方案", name: "家常均衡餐 (5天)", description: "每日午餐、附贈溫豆漿", pricePerMeal: 140, rating: 4.6, fastestBooking: "下週二", days: 5 },
+      { id: "p4", label: "B方案", name: "高蛋白便當餐 (7天)", description: "每日午餐、附贈黑豆漿", pricePerMeal: 160, rating: 4.5, fastestBooking: "下週二", days: 7 },
     ],
   },
   {
     vendorId: "vendor-3",
     vendorName: "阿嘉炸雞排",
     plans: [
-      { id: "p5", label: "A方案", name: "酥脆雞排餐 (5天)", description: "每日午餐、附贈紅茶", pricePerMeal: 130, rating: 4.4, fastestBooking: "下週三" },
-      { id: "p6", label: "B方案", name: "雙拼炸物餐 (7天)", description: "每日午餐、附贈綠茶", pricePerMeal: 155, rating: 4.3, fastestBooking: "下週三" },
+      { id: "p5", label: "A方案", name: "酥脆雞排餐 (5天)", description: "每日午餐、附贈紅茶", pricePerMeal: 130, rating: 4.4, fastestBooking: "下週三", days: 5 },
+      { id: "p6", label: "B方案", name: "雙拼炸物餐 (7天)", description: "每日午餐、附贈綠茶", pricePerMeal: 155, rating: 4.3, fastestBooking: "下週三", days: 7 },
     ],
   },
 ];
 
 
-// ── 商家後台「成長獎勵」用的假資料（VendorDashboard.dc.html 草圖新增的分頁） ──
-// 全新機制：商家累積合作營收達門檻，解鎖消費者端抽獎（單抽／十連抽），獎項是
-// 折扣券（8/6/5/3/1折或整份 0 元），對應 Main 草圖新增的跑馬燈「剛抽中...0 元
-// 大獎」。目前完全沒有資料模型與後端邏輯，這裡先用假資料把畫面撐出來。
-// TODO(firebase): 需要新設計 growth_rewards（門檻/累積營收）與 draws（開獎紀錄）
-// collection，抽獎邏輯建議走 Cloud Function（client 不可信任機率計算）。
-export interface GrowthMilestone {
-  id: string;
-  label: string;
-  threshold: number;
-  achieved: boolean;
-}
-
-export interface DrawRecord {
-  id: string;
-  date: string;
-  consumer: string;
-  tierPercentOff: number; // 80/60/50/30/10；0 代表整份免費
-  tierLabel: string;
-  item: string;
-}
-
-export interface MockGrowthRewards {
-  cumulativeRevenue: number;
-  milestones: GrowthMilestone[];
-  voucherRemaining: number;
-  voucherTotal: number;
-  drawHistory: DrawRecord[];
-}
-
-const TIER_LABEL: Record<number, string> = { 80: "8折", 60: "6折", 50: "5折", 30: "3折", 10: "1折", 0: "0元整份" };
-
-export const mockGrowthRewards: MockGrowthRewards = {
-  cumulativeRevenue: 186400,
-  milestones: [
-    { id: "tier1", label: "20 萬門檻・單抽", threshold: 200000, achieved: true },
-    { id: "tier2", label: "100 萬門檻・十連抽", threshold: 1000000, achieved: false },
-  ],
-  voucherRemaining: 3,
-  voucherTotal: 10,
-  drawHistory: [
-    { id: "d1", date: "09/24", consumer: "林＊同學", tierPercentOff: 60, tierLabel: TIER_LABEL[60], item: "舒肥雞胸溫沙拉餐盒" },
-    { id: "d2", date: "09/22", consumer: "陳＊同學", tierPercentOff: 0, tierLabel: TIER_LABEL[0], item: "一頭牛日式燒肉丼 A方案（整份）" },
-    { id: "d3", date: "09/20", consumer: "黃＊同學", tierPercentOff: 80, tierLabel: TIER_LABEL[80], item: "舒肥雞胸溫沙拉餐盒" },
-    { id: "d4", date: "09/18", consumer: "周＊同學", tierPercentOff: 10, tierLabel: TIER_LABEL[10], item: "舒肥雞胸溫沙拉餐盒" },
-    { id: "d5", date: "09/16", consumer: "王＊同學", tierPercentOff: 50, tierLabel: TIER_LABEL[50], item: "舒肥雞胸溫沙拉餐盒" },
-  ],
-};
 
 // ── 首頁「今日推薦鎖定方案」用的假資料（UI草圖 Main.dc.html 新增的單點型卡片區） ──
 // TODO(firebase): 這組卡片目前純前端示意（勾選消保法同意欄位才能按「立即預付
