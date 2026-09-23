@@ -1,0 +1,166 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   BunnBaa 飯飽 Design Tokens
+   ──────────────────────────────────────────────────────────────────────────
+   作用範圍：.bb-theme（由 <ThemeRoot> 產生），而非 :root。
+   原因：index.css 已在 :root 定義 --bg / --surface / --border（legacy lock 頁
+   與 shadcn 頁在用，且有 prefers-color-scheme 深色覆寫）。放在 :root 會蓋掉
+   舊頁面的值。等舊頁全部遷移到本設計系統後，可把 .bb-theme 改回 :root。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.bb-theme {
+  /* ── 品牌色（規格原值） ─────────────────────────────────────────────── */
+  --brand-brown: #b87a5a;        /* 標題、Logo「Bunn」 */
+  --brand-brown-dark: #8f5a3f;   /* hover / 強調文字 */
+  --brand-orange: #f29e0c;       /* Logo「Baa」、icon、裝飾 */
+  --brand-orange-dark: #d98a00;
+  --brand-orange-soft: #fdebd3;  /* icon 底色、選取背景、標籤底 */
+  --brand-orange-tint: #fff4e3;  /* 大面積淡色區塊 */
+
+  /* ── 無障礙衍生色（對比 ≥ 4.5:1） ─────────────────────────────────────
+     白字 on #F29E0C 只有 2.17:1、on #D98A00 2.77:1，不足 4.5:1，
+     依規格「不足時加深按鈕色」，主要按鈕改用 strong 系列。 */
+  --brand-orange-strong: #b35a00;        /* 主要按鈕底：白字 4.80:1 */
+  --brand-orange-strong-hover: #944a00;  /* 主要按鈕 hover/active：6.48:1 */
+  --brand-orange-text: #a34f00;          /* 橘色文字/連結：on bg 5.41、on soft 4.90 */
+
+  /* ── 中性色 ─────────────────────────────────────────────────────────── */
+  --bg: #fff8ec;
+  --surface: #ffffff;
+  --surface-muted: #f7f5f0;
+  --border: #ece6dc;
+  --border-strong: #dcd3c6;      /* 輸入框 hover 外框（比 --border 深一階，仍屬細柔線） */
+  --border-control: #948778;     /* 核取框/單選框/開關外框：非文字元素 ≥3:1 */
+  --text: #2b2b2b;
+  --text-secondary: #5c5c5c;
+  /* 規格原值 #8A8A8A on #FFF8EC 僅 3.27:1，調為暖灰 #6F6B66（5.01:1） */
+  --text-muted: #6f6b66;
+  --text-on-brand: #ffffff;
+  --overlay: rgba(43, 32, 22, 0.42);
+  --tooltip-bg: #3a2f26;         /* 暖深棕，避免純黑；白字 13:1 */
+  --tooltip-text: #ffffff;
+  --skeleton-base: #f1ece3;
+  --skeleton-shine: rgba(255, 255, 255, 0.6);
+
+  /* ── 狀態色（規格原值：做圖示、邊框、點；文字請用 *-text） ─────────── */
+  --success: #5a9e6f;  --success-soft: #e6f2e9;  --success-text: #437552;
+  --warning: #e0a030;  --warning-soft: #fbf1dc;  --warning-text: #8f6315;
+  --danger:  #d0604a;  --danger-soft:  #f8e3de;  --danger-text:  #af432e;
+  --info:    #6b8fb3;  --info-soft:    #e6eef5;  --info-text:    #4a6d8f;
+  /* 危險按鈕底：白字 on #D0604A 僅 3.85:1 → #C24E36（4.73:1） */
+  --danger-strong: #c24e36;
+  --danger-strong-hover: #a84030;
+
+  /* ── Focus ring ────────────────────────────────────────────────────────
+     規格為 --brand-orange；但 #F29E0C on 奶油底僅 2.06:1，低於非文字元素
+     3:1 門檻，故使用 strong 色。 */
+  --focus-ring-color: var(--brand-orange-strong);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* ── 字體 ───────────────────────────────────────────────────────────── */
+  --font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+
+  --font-display-size: 32px; --font-display-weight: 700; --font-display-lh: 1.3;
+  --font-h1-size: 24px;      --font-h1-weight: 700;      --font-h1-lh: 1.35;
+  --font-h2-size: 20px;      --font-h2-weight: 600;      --font-h2-lh: 1.4;
+  --font-h3-size: 17px;      --font-h3-weight: 600;      --font-h3-lh: 1.4;
+  --font-body-size: 15px;    --font-body-weight: 400;    --font-body-lh: 1.6;
+  --font-body-sm-size: 13px; --font-body-sm-weight: 400; --font-body-sm-lh: 1.5;
+  --font-caption-size: 12px; --font-caption-weight: 400; --font-caption-lh: 1.5;
+
+  /* ── 間距（4px 基準） ─────────────────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── 圓角 ───────────────────────────────────────────────────────────── */
+  --radius-sm: 6px;    /* 標籤 */
+  --radius-md: 8px;    /* 按鈕、輸入框 */
+  --radius-lg: 12px;   /* 小卡片、icon 方塊 */
+  --radius-xl: 16px;   /* 大卡片、彈窗 */
+  --radius-full: 999px;
+
+  /* ── 陰影（暖棕色調，不用純黑） ─────────────────────────────────────── */
+  --shadow-sm: 0 2px 8px rgba(120, 80, 40, 0.05);
+  --shadow-md: 0 8px 24px rgba(120, 80, 40, 0.08);
+  --shadow-lg: 0 16px 40px rgba(120, 80, 40, 0.12);
+
+  /* ── 動態 ───────────────────────────────────────────────────────────── */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ── 尺寸 ───────────────────────────────────────────────────────────── */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-stroke: 1.75;
+  --hit-target: 44px;  /* 最小點擊區域 */
+
+  /* ── 斷點（CSS 變數無法用於 @media，僅供 JS 讀取與文件參考；
+        @media 請直接寫 375 / 768 / 1024 / 1280px） ───────────────────── */
+  --bp-sm: 375px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+
+  /* ── z-index ───────────────────────────────────────────────────────── */
+  --z-tooltip: 60;
+  --z-overlay: 50;
+  --z-toast: 70;
+
+  color-scheme: light;
+}
+
+/* ── 深色模式：品牌主色維持不變，只覆寫中性色、衍生色與文字用的 brown-dark ── */
+.bb-theme[data-theme='dark'] {
+  --bg: #1f1a15;
+  --surface: #2a231d;
+  --surface-muted: #342b24;
+  --border: #3d342b;
+  --border-strong: #52463a;
+  --border-control: #8a7d6e;
+  --text: #f3ece2;
+  --text-secondary: #d6ccbf;
+  --text-muted: #b8afa3;          /* on #2A231D 7.15:1 */
+  --overlay: rgba(0, 0, 0, 0.55);
+  --tooltip-bg: #f3ece2;
+  --tooltip-text: #2b2b2b;
+  --skeleton-base: #3a3029;
+  --skeleton-shine: rgba(255, 255, 255, 0.06);
+
+  --brand-orange-soft: #43321c;
+  --brand-orange-tint: #2f261c;
+  --brand-orange-text: #f29e0c;   /* on #1F1A15 7.95:1 */
+  /* 強調文字用的深棕在深底上只有 3.04:1，深色模式改為淺棕（7.63:1）；
+     --brand-brown 本身維持不變 */
+  --brand-brown-dark: #d9a07f;
+
+  --success-soft: #22322a;  --success-text: #8cc79c;
+  --warning-soft: #3a2f18;  --warning-text: #e8bd6a;
+  --danger-soft:  #3d231d;  --danger-text:  #ec9a88;
+  --info-soft:    #1f2b38;  --info-text:    #a5c0dc;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.4);
+
+  color-scheme: dark;
+}
+
+/* ── prefers-reduced-motion：縮短時長，由 global.css 關閉位移/縮放 ─────── */
+@media (prefers-reduced-motion: reduce) {
+  .bb-theme {
+    --duration-fast: 0.01ms;
+    --duration-base: 0.01ms;
+    --duration-slow: 0.01ms;
+  }
+}

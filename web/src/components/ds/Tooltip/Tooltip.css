@@ -1,0 +1,80 @@
+.bb-tooltip {
+  position: relative;
+  display: inline-flex;
+}
+
+.bb-tooltip__bubble {
+  --tooltip-gap: 8px;
+
+  position: absolute;
+  z-index: var(--z-tooltip);
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  font-size: var(--font-body-sm-size);
+  font-weight: 500;
+  line-height: var(--font-body-sm-lh);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+/* 關閉時不渲染：隱藏的泡泡若仍佔版面，靠近螢幕邊緣時會撐出水平捲軸 */
+.bb-tooltip__bubble[data-state='closed'] {
+  display: none;
+}
+.bb-tooltip__bubble[data-state='open'] {
+  animation: bb-fade-in var(--duration-fast) var(--ease-standard);
+}
+
+/* 小三角 */
+.bb-tooltip__bubble::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  transform: rotate(45deg);
+  border-radius: 1px;
+}
+
+.bb-tooltip__bubble--top {
+  bottom: calc(100% + var(--tooltip-gap));
+  left: 50%;
+  transform: translate(-50%, 0);
+}
+.bb-tooltip__bubble--top::after {
+  top: calc(100% - 4px);
+  left: calc(50% - 4px);
+}
+
+.bb-tooltip__bubble--bottom {
+  top: calc(100% + var(--tooltip-gap));
+  left: 50%;
+  transform: translate(-50%, 0);
+}
+.bb-tooltip__bubble--bottom::after {
+  bottom: calc(100% - 4px);
+  left: calc(50% - 4px);
+}
+
+.bb-tooltip__bubble--left {
+  right: calc(100% + var(--tooltip-gap));
+  top: 50%;
+  transform: translate(0, -50%);
+}
+.bb-tooltip__bubble--left::after {
+  left: calc(100% - 4px);
+  top: calc(50% - 4px);
+}
+
+.bb-tooltip__bubble--right {
+  left: calc(100% + var(--tooltip-gap));
+  top: 50%;
+  transform: translate(0, -50%);
+}
+.bb-tooltip__bubble--right::after {
+  right: calc(100% - 4px);
+  top: calc(50% - 4px);
+}

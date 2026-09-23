@@ -1,0 +1,146 @@
+/* ── Button ─────────────────────────────────────────────────────────────
+   .is-hover / .is-active / .is-focus 只供設計系統預覽頁強制呈現狀態使用。 */
+
+.bb-btn {
+  --btn-bg: transparent;
+  --btn-bg-hover: transparent;
+  --btn-fg: var(--text);
+  --btn-fg-hover: var(--btn-fg);
+  --btn-border: transparent;
+  --btn-border-hover: var(--btn-border);
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 44px;
+  padding: 0 var(--space-5);
+  border: 1px solid var(--btn-border);
+  border-radius: var(--radius-md);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-family: inherit;
+  font-size: var(--font-body-size);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.bb-btn:hover:not(:disabled),
+.bb-btn.is-hover {
+  background: var(--btn-bg-hover);
+  color: var(--btn-fg-hover);
+  border-color: var(--btn-border-hover);
+}
+
+.bb-btn:active:not(:disabled),
+.bb-btn.is-active {
+  background: var(--btn-bg-hover);
+  color: var(--btn-fg-hover);
+  border-color: var(--btn-border-hover);
+  transform: scale(0.98);
+}
+
+.bb-btn:focus-visible,
+.bb-btn.is-focus {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.bb-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.bb-btn.is-loading {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+.bb-btn__icon {
+  display: inline-flex;
+}
+
+/* ── variants ── */
+.bb-btn--primary {
+  --btn-bg: var(--brand-orange-strong);
+  --btn-bg-hover: var(--brand-orange-strong-hover);
+  --btn-fg: var(--text-on-brand);
+}
+
+.bb-btn--secondary {
+  --btn-bg: var(--brand-orange-soft);
+  --btn-bg-hover: color-mix(in srgb, var(--brand-orange-soft) 88%, var(--brand-orange));
+  --btn-fg: var(--brand-orange-text);
+  --btn-fg-hover: var(--brand-orange-strong-hover);
+}
+.bb-theme[data-theme='dark'] .bb-btn--secondary {
+  --btn-fg-hover: var(--brand-orange);
+}
+
+.bb-btn--outline {
+  --btn-bg: var(--surface);
+  --btn-bg-hover: var(--brand-orange-tint);
+  --btn-fg: var(--text);
+  --btn-fg-hover: var(--brand-orange-text);
+  --btn-border: var(--border-strong);
+  --btn-border-hover: var(--brand-orange);
+}
+
+.bb-btn--text {
+  --btn-bg-hover: var(--brand-orange-tint);
+  --btn-fg: var(--brand-orange-text);
+  padding-inline: var(--space-3);
+}
+
+.bb-btn--danger {
+  --btn-bg: var(--danger-strong);
+  --btn-bg-hover: var(--danger-strong-hover);
+  --btn-fg: var(--text-on-brand);
+}
+
+/* ── sizes ── */
+.bb-btn--sm {
+  height: 36px;
+  padding: 0 var(--space-4);
+  font-size: var(--font-body-sm-size);
+  gap: 6px;
+}
+/* 視覺 36px，但點擊區維持 44px */
+.bb-btn--sm::after {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+.bb-btn--sm.bb-btn--text {
+  padding-inline: var(--space-2);
+}
+
+.bb-btn--lg {
+  height: 52px;
+  padding: 0 var(--space-8);
+  font-size: 16px;
+  border-radius: var(--radius-lg);
+}
+
+.bb-btn--icon-only {
+  padding: 0;
+  aspect-ratio: 1;
+}
+.bb-btn--icon-only.bb-btn--sm::after {
+  inset: -4px;
+}
+
+.bb-btn--full {
+  display: flex;
+  width: 100%;
+}

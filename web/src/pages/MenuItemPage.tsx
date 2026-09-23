@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { doc, getDoc } from "firebase/firestore";
 import { ArrowLeft, Minus, Plus, ShoppingCart } from "lucide-react";
-import { mockMenuItems, mockVendors } from "@/lib/mockData";
+import { db } from "@/lib/firebase";
+import type { MenuItem, Vendor } from "@/types";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 
 // 商品詳情頁。
-// TODO(firebase): queryFn 讀的是 mockData.ts 的假資料，之後接 Firestore
-// 時把它換成 MenuItem doc get 即可。
 export default function MenuItemPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
@@ -19,12 +19,21 @@ export default function MenuItemPage() {
 
   const { data: item, isLoading } = useQuery({
     queryKey: ["menuItem", id],
-    queryFn: async () => mockMenuItems.find((m) => m.id === id) ?? null,
+    queryFn: async () => {
+      if (!id) return null;
+      const snap = await getDoc(doc(db, "menu_items", id));
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as MenuItem) : null;
+    },
+    enabled: !!id,
   });
 
   const { data: vendor } = useQuery({
-    queryKey: ["vendor", item?.vendorId],
-    queryFn: async () => mockVendors.find((v) => v.id === item?.vendorId) ?? null,
+    queryKey: ["vendor", item?.vendor_id],
+    queryFn: async () => {
+      if (!item?.vendor_id) return null;
+      const snap = await getDoc(doc(db, "vendors", item.vendor_id));
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as Vendor) : null;
+    },
     enabled: !!item,
   });
 
@@ -44,20 +53,20 @@ export default function MenuItemPage() {
   }
 
   function handleAddToCart() {
-    if (cartVendorId && cartVendorId !== item!.vendorId) {
+    if (cartVendorId && cartVendorId !== item!.vendor_id) {
       toast({
         title: "購物車裡有別家商家的品項",
         description: "加入這項會清空目前的購物車（一次只能跟一家商家預購）。",
       });
     }
-    for (let i = 0; i < qty; i++) addItem(item!, item!.vendorId, note);
+    for (let i = 0; i < qty; i++) addItem(item!, item!.vendor_id, note);
     toast({ title: "已加入購物車", description: `${item!.name} x${qty}` });
   }
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <Link
-        href={`/vendor/${item.vendorId}`}
+        href={`/vendor/${item.vendor_id}`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="w-4 h-4" /> {vendor?.name ?? "回商家頁"}
@@ -75,11 +84,11 @@ export default function MenuItemPage() {
 
           <div className="text-2xl font-bold text-orange-600">NT${item.price}</div>
 
-          {(item.dietaryTags?.length > 0 || item.allergens?.length > 0) && (
+          {(item.dietary_tags?.length > 0 || item.allergens?.length > 0) && (
             <div className="space-y-1.5">
-              {item.dietaryTags?.length > 0 && (
+              {item.dietary_tags?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {item.dietaryTags.map((tag) => (
+                  {item.dietary_tags.map((tag) => (
                     <span key={tag} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
                       {tag}
                     </span>

@@ -1,0 +1,40 @@
+.bb-iconbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--brand-orange-soft);
+  color: var(--brand-orange);
+}
+.bb-iconbox .lucide {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.bb-iconbox--sm {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+}
+.bb-iconbox--sm .lucide {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+.bb-iconbox--lg {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-xl);
+}
+.bb-iconbox--lg .lucide {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
+.bb-iconbox--neutral { background: var(--surface-muted); color: var(--text-secondary); }
+.bb-iconbox--success { background: var(--success-soft); color: var(--success); }
+.bb-iconbox--warning { background: var(--warning-soft); color: var(--warning); }
+.bb-iconbox--danger  { background: var(--danger-soft);  color: var(--danger); }
+.bb-iconbox--info    { background: var(--info-soft);    color: var(--info); }

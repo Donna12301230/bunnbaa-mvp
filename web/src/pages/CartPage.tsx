@@ -1,32 +1,40 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { doc, getDoc } from "firebase/firestore";
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
-import { mockVendors } from "@/lib/mockData";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
-import { auth, functions } from "@/lib/firebase";
+import { auth, db, functions } from "@/lib/firebase";
+import type { Vendor } from "@/types";
 
 // 購物車頁面。
 // UIUX 檢視後新增:原本 MenuItemPage「加入購物車」只會彈 toast,useCart 把品項存進
 // localStorage,但全站沒有任何頁面能查看/調整/送出購物車——是斷掉的核心動線。
 // 這頁補上查看、調整數量、刪除、送出預購的畫面。
-// 2026-09-23：「送出預購」改接真的 LINE Pay（createCartLinePayReservation，
-// functions/src/index.js），付款確認後才建立真實 locks 文件。這條線用的
-// mockVendors/MenuItemData 目錄跟真正在跑的 Vendor/Lock 模型是兩套平行資料
-// （見 TODO.md「兩套平行資料模型」），這個試營運階段只有一個真實商家
-// cafe-renheya-demo，所以不管購物車品項來自哪個 mock 商家，結帳出來的
-// locks 一律掛在這個真實商家底下（品項名稱/價格仍是真的）。
+// 「送出預購」接真的 LINE Pay（createCartLinePayReservation，
+// functions/src/index.js），付款確認後才建立真實 locks 文件。每個 cart
+// item 現在都帶著真實 vendor_id（來自真實 menu_items），Cloud Function
+// 依此各自歸戶到正確的商家，不再全部掛在單一寫死的商家底下。
 export default function CartPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { items, vendorId, total, removeItem, updateQuantity, clearCart } = useCart();
   const [checkingOut, setCheckingOut] = useState(false);
 
-  const vendor = vendorId ? mockVendors.find(v => v.id === vendorId) : null;
+  const { data: vendor } = useQuery({
+    queryKey: ["vendor", vendorId],
+    queryFn: async () => {
+      if (!vendorId) return null;
+      const snap = await getDoc(doc(db, "vendors", vendorId));
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as Vendor) : null;
+    },
+    enabled: !!vendorId,
+  });
 
   useEffect(() => {
     signInAnonymously(auth).catch(console.error);
@@ -49,6 +57,7 @@ export default function CartPage() {
       const fn = httpsCallable(functions, "createCartLinePayReservation");
       const result = await fn({
         items: items.map(({ menuItem, quantity }) => ({
+          vendor_id: menuItem.vendor_id,
           item_name: menuItem.name,
           unit_price: menuItem.price,
           quantity,

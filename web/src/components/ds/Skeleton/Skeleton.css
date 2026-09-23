@@ -1,0 +1,51 @@
+.bb-skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--skeleton-base);
+  border-radius: var(--radius-sm);
+}
+.bb-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--skeleton-shine), transparent);
+  transform: translateX(-100%);
+  animation: bb-shimmer 1.4s var(--ease-standard) infinite;
+}
+
+.bb-skeleton--text {
+  width: 100%;
+  height: 0.9em;
+  margin-block: 0.3em;
+  border-radius: var(--radius-sm);
+}
+.bb-skeleton--rect {
+  width: 100%;
+  height: 120px;
+  border-radius: var(--radius-lg);
+}
+.bb-skeleton--circle {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+}
+
+.bb-skeleton--r-sm { border-radius: var(--radius-sm); }
+.bb-skeleton--r-md { border-radius: var(--radius-md); }
+.bb-skeleton--r-lg { border-radius: var(--radius-lg); }
+.bb-skeleton--r-xl { border-radius: var(--radius-xl); }
+.bb-skeleton--r-full { border-radius: var(--radius-full); }
+
+.bb-skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* 減少動態：停掉掃光，改為靜態底色 */
+@media (prefers-reduced-motion: reduce) {
+  .bb-skeleton::after {
+    display: none;
+  }
+}

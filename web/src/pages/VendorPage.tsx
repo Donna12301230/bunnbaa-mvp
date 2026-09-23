@@ -1,22 +1,32 @@
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { ArrowLeft, MapPin, Phone, Store } from "lucide-react";
-import { mockVendors, mockMenuItems } from "@/lib/mockData";
+import { db } from "@/lib/firebase";
+import type { Vendor, MenuItem } from "@/types";
 
 // 商家頁 — 也兼商品(鎖定品項)列表頁：顯示這家商家所有可預購品項。
-// TODO(firebase): queryFn 讀的是 mockData.ts 的假資料，之後接 Firestore 時
-// 把它換成 Vendor doc get + MenuItem collection where(vendorId==, isAvailable==true) 即可。
 export default function VendorPage() {
   const { id } = useParams<{ id: string }>();
 
   const { data: vendor, isLoading: vendorLoading } = useQuery({
     queryKey: ["vendor", id],
-    queryFn: async () => mockVendors.find((v) => v.id === id) ?? null,
+    queryFn: async () => {
+      if (!id) return null;
+      const snap = await getDoc(doc(db, "vendors", id));
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as Vendor) : null;
+    },
+    enabled: !!id,
   });
 
   const { data: items = [], isLoading: itemsLoading } = useQuery({
     queryKey: ["vendorMenuItems", id],
-    queryFn: async () => mockMenuItems.filter((m) => m.vendorId === id && m.isAvailable),
+    queryFn: async () => {
+      const snap = await getDocs(
+        query(collection(db, "menu_items"), where("vendor_id", "==", id), where("is_available", "==", true))
+      );
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as MenuItem);
+    },
     enabled: !!id,
   });
 
@@ -49,14 +59,18 @@ export default function VendorPage() {
           </div>
           <div className="min-w-0">
             <h1 className="text-xl font-bold mb-1">{vendor.name}</h1>
-            <p className="text-sm text-muted-foreground mb-3">{vendor.description}</p>
+            {vendor.description && <p className="text-sm text-muted-foreground mb-3">{vendor.description}</p>}
             <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 shrink-0" /> {vendor.address}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 shrink-0" /> {vendor.phone}
-              </span>
+              {vendor.address && (
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 shrink-0" /> {vendor.address}
+                </span>
+              )}
+              {vendor.phone && (
+                <span className="flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 shrink-0" /> {vendor.phone}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -85,9 +99,9 @@ export default function VendorPage() {
                   </div>
                   <span className="text-sm font-bold text-orange-600 shrink-0">NT${item.price}</span>
                 </div>
-                {item.dietaryTags?.length > 0 && (
+                {item.dietary_tags?.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {item.dietaryTags.map((tag) => (
+                    {item.dietary_tags.map((tag) => (
                       <span key={tag} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
                         {tag}
                       </span>

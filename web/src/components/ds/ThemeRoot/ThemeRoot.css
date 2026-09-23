@@ -1,0 +1,6 @@
+/* Portal 容器只是 token 的載體，不應有底色或佔位 */
+.bb-theme.bb-portal {
+  background: none;
+  position: relative;
+  z-index: var(--z-overlay);
+}

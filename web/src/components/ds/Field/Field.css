@@ -1,0 +1,138 @@
+.bb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bb-field__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.bb-field__label {
+  font-size: var(--font-body-sm-size);
+  font-weight: 600;
+  line-height: var(--font-body-sm-lh);
+  color: var(--text);
+}
+
+.bb-field__required {
+  margin-left: 2px;
+  color: var(--danger-text);
+}
+
+.bb-field__aside {
+  font-size: var(--font-caption-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bb-field__message {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: var(--font-caption-size);
+  line-height: var(--font-caption-lh);
+  color: var(--text-muted);
+}
+.bb-field__message .lucide {
+  margin-top: 2px;
+}
+
+.bb-field__message--error {
+  color: var(--danger-text);
+  animation: bb-fade-in var(--duration-base) var(--ease-standard);
+}
+
+/* ── 控制項共用外框（Input / Select / Textarea） ─────────────────────────
+   .is-hover / .is-focus 只供預覽頁強制呈現狀態使用。 */
+.bb-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: var(--surface-muted);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.bb-control:hover,
+.bb-control.is-hover {
+  border-color: var(--border-strong);
+}
+
+.bb-control:focus-within,
+.bb-control.is-focus {
+  background: var(--surface);
+  border-color: var(--brand-orange);
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.bb-control.is-invalid {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+.bb-control.is-invalid:focus-within,
+.bb-control.is-invalid.is-focus {
+  background: var(--surface);
+  outline-color: var(--danger-strong);
+}
+
+.bb-control.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.bb-control.is-disabled:hover {
+  border-color: transparent;
+}
+
+.bb-control__native {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-body-size);
+  line-height: 1.4;
+}
+.bb-control__native:focus,
+.bb-control__native:focus-visible {
+  outline: none;
+}
+.bb-control__native::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+.bb-control__native:disabled {
+  cursor: not-allowed;
+}
+
+.bb-control__icon {
+  display: inline-flex;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.bb-control:focus-within .bb-control__icon--lead {
+  color: var(--brand-orange-text);
+}
+
+.bb-control--lg {
+  min-height: 52px;
+  padding: 0 var(--space-4);
+}
+.bb-control--lg .bb-control__native {
+  height: 50px;
+  font-size: 16px;
+}

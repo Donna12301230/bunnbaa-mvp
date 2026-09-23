@@ -235,6 +235,20 @@ exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
  * LINE_PAY_ENV=production and swap the credentials once it does.
  * ------------------------------------------------------------------ */
 
+// Cart/single-item checkout both take a client-supplied vendor_id — a
+// malicious client could otherwise attribute a lock (and the revenue it
+// eventually settles as) to an arbitrary vendor_id string that doesn't
+// correspond to a real vendor doc. Cache hits within one function
+// invocation so a multi-item cart doesn't re-read the same vendor N times.
+async function assertVendorExists(vendorId, cache) {
+  if (cache?.has(vendorId)) return;
+  const snap = await db.collection("vendors").doc(vendorId).get();
+  if (!snap.exists) {
+    throw new HttpsError("invalid-argument", `Unknown vendor_id: ${vendorId}`);
+  }
+  cache?.add(vendorId);
+}
+
 exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Must be signed in (anonymous is fine) to check out");
@@ -253,6 +267,7 @@ exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (reque
       "vendor_id, item_name, pickup_window, pickup_date and a positive locked_price are required"
     );
   }
+  await assertVendorExists(vendorId);
 
   const appBaseUrl = process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
   const intentRef = db.collection("payment_intents").doc();
@@ -306,18 +321,14 @@ exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (reque
 });
 
 /* ------------------------------------------------------------------ *
- * 1d. Cart checkout — LINE Pay, multi-item version of the above. The
- * "商品瀏覽" stack (VendorPage/MenuItemPage/CartPage.tsx, useCart, mock
- * VendorData/MenuItemData catalog) has its own vendor/menu data that was
- * never connected to the real Vendor/Lock Firestore model — this pilot
- * only has one real vendor (cafe-renheya-demo), so every cart checkout is
- * anchored to it regardless of which mock vendor's menu the items came
- * from (see TODO.md's "兩套平行資料模型" note; this is option (a) there).
- * Each cart line's quantity expands into that many individual Lock docs
- * (one pickup QR code per meal), same convention as HomePage's plan-join.
+ * 1d. Cart checkout — LINE Pay, multi-item version of the above.
+ * VendorPage/MenuItemPage/CartPage.tsx now read/write the real
+ * vendors/menu_items collections, so each cart line carries its own real
+ * vendor_id — no more hardcoded single-vendor attribution. Each cart
+ * line's quantity expands into that many individual Lock docs (one pickup
+ * QR code per meal), same convention as HomePage's plan-join.
  * ------------------------------------------------------------------ */
 
-const CART_VENDOR_ID = "cafe-renheya-demo";
 const MAX_CART_LINES = 50;
 const MAX_CART_UNITS = 100; // bounds the Firestore batch confirmLinePayPayment writes
 
@@ -336,27 +347,31 @@ exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (r
   const pickupDate = new Date().toISOString().slice(0, 10);
   const products = [];
   const lockDrafts = [];
+  const checkedVendors = new Set();
   let amount = 0;
   for (const item of items) {
+    const vendorId = item?.vendor_id;
     const itemName = item?.item_name;
     const unitPrice = item?.unit_price;
     const quantity = item?.quantity;
     if (
+      typeof vendorId !== "string" || !vendorId ||
       typeof itemName !== "string" || !itemName ||
       typeof unitPrice !== "number" || unitPrice <= 0 ||
       !Number.isInteger(quantity) || quantity <= 0
     ) {
       throw new HttpsError(
         "invalid-argument",
-        "Each item needs item_name, a positive unit_price and a positive integer quantity"
+        "Each item needs vendor_id, item_name, a positive unit_price and a positive integer quantity"
       );
     }
+    await assertVendorExists(vendorId, checkedVendors);
     const price = Math.round(unitPrice);
     products.push({ name: itemName, quantity, price });
     amount += price * quantity;
     for (let i = 0; i < quantity; i++) {
       lockDrafts.push({
-        vendor_id: CART_VENDOR_ID,
+        vendor_id: vendorId,
         item_name: itemName,
         pickup_window: "12:00-13:00",
         pickup_date: pickupDate,

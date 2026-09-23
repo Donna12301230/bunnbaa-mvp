@@ -167,5 +167,40 @@ service cloud.firestore {
     match /payment_intents/{orderId} {
       allow read, write: if false;
     }
+
+    // menu_items: real catalog backing VendorPage/MenuItemPage/CartPage
+    // (replaces the old mockMenuItems). Publicly readable for browsing;
+    // writes restricted to admin or that item's own vendor owner. The
+    // update rule pins vendor_id so an owner can't relabel their own item
+    // onto a different vendor's storefront.
+    match /menu_items/{itemId} {
+      allow read: if true;
+      allow create: if isAdmin() || (request.auth != null && isVendorOwner(request.resource.data.vendor_id));
+      allow update: if isAdmin() || (request.auth != null
+                      && isVendorOwner(resource.data.vendor_id)
+                      && request.resource.data.vendor_id == resource.data.vendor_id);
+      allow delete: if isAdmin() || (request.auth != null && isVendorOwner(resource.data.vendor_id));
+    }
+
+    // meal_plans: real multi-day subscription plan catalog backing
+    // HomePage.tsx's "合作店家與計畫" cards (replaces mockVendorMealPlans).
+    // Same read/write shape as menu_items — public catalog, vendor-owner or
+    // admin writes.
+    match /meal_plans/{planId} {
+      allow read: if true;
+      allow create: if isAdmin() || (request.auth != null && isVendorOwner(request.resource.data.vendor_id));
+      allow update: if isAdmin() || (request.auth != null
+                      && isVendorOwner(resource.data.vendor_id)
+                      && request.resource.data.vendor_id == resource.data.vendor_id);
+      allow delete: if isAdmin() || (request.auth != null && isVendorOwner(resource.data.vendor_id));
+    }
+
+    // ban_appeals: admin-only in both directions for now — there is no
+    // consumer submission flow yet (no stable non-anonymous user identity
+    // to attach a ban to; see TODO.md). This collection is seeded/managed
+    // by admins only; AdminAppealsPage just lists + approves/rejects.
+    match /ban_appeals/{appealId} {
+      allow read, write: if isAdmin();
+    }
   }
 }

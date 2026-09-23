@@ -1,26 +1,32 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { collection, getDocs } from "firebase/firestore";
 import { Search, MapPin, Phone, Store } from "lucide-react";
-import { mockVendors } from "@/lib/mockData";
+import { db } from "@/lib/firebase";
 import { isClean } from "@/lib/searchFilter";
+import type { Vendor } from "@/types";
 
-// 商家清單頁 — 消費者瀏覽所有上架商家。
-// TODO(firebase): queryFn 讀的是 mockData.ts 的假資料，之後接 Firestore
-// 時把它換成 Vendor collection 的 query 即可（只讀 isApproved && isActive）。
+// 商家清單頁 — 消費者瀏覽所有上架商家。真實 vendors collection 沒有
+// isApproved/isActive 這兩個欄位，用 status !== 'disabled' 頂替。
 export default function VendorListPage() {
   const [search, setSearch] = useState("");
 
   const { data: vendors = [], isLoading } = useQuery({
     queryKey: ["vendors"],
-    queryFn: async () => mockVendors.filter((v) => v.isApproved && v.isActive),
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, "vendors"));
+      return snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) }) as Vendor)
+        .filter((v) => v.status !== "disabled");
+    },
     staleTime: 15 * 60 * 1000,
   });
 
   // 不雅字詞當作沒輸入搜尋字串處理，不特別跳錯誤訊息。
   const effectiveSearch = isClean(search) ? search : "";
   const filtered = vendors.filter(
-    (v) => v.name.includes(effectiveSearch) || v.description.includes(effectiveSearch)
+    (v) => v.name.includes(effectiveSearch) || (v.description ?? "").includes(effectiveSearch)
   );
 
   return (
@@ -63,15 +69,21 @@ export default function VendorListPage() {
                 🍱
               </div>
               <h3 className="font-semibold mb-1 truncate">{vendor.name}</h3>
-              <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{vendor.description}</p>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="w-3 h-3 shrink-0" />
-                <span className="truncate">{vendor.address}</span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Phone className="w-3 h-3 shrink-0" />
-                <span>{vendor.phone}</span>
-              </div>
+              {vendor.description && (
+                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{vendor.description}</p>
+              )}
+              {vendor.address && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <MapPin className="w-3 h-3 shrink-0" />
+                  <span className="truncate">{vendor.address}</span>
+                </div>
+              )}
+              {vendor.phone && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Phone className="w-3 h-3 shrink-0" />
+                  <span>{vendor.phone}</span>
+                </div>
+              )}
             </Link>
           ))}
         </div>

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, Link, Router } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -38,6 +39,8 @@ import VendorPortalScan from "./pages/vendor-portal/VendorPortalScan";
 import VendorPortalSessions from "./pages/vendor-portal/VendorPortalSessions";
 import VendorPortalSessionSummary from "./pages/vendor-portal/VendorPortalSessionSummary";
 import VendorPortalSettings from "./pages/vendor-portal/VendorPortalSettings";
+
+const DesignSystemPreview = lazy(() => import("./pages/DesignSystemPreview"));
 
 function NotFound() {
   return (
@@ -164,6 +167,11 @@ export default function App() {
           </Route>
           <Route path="/vendor-portal/settings">
             <MarketplacePage><VendorPortalSettings /></MarketplacePage>
+          </Route>
+
+          {/* 設計系統預覽（tokens + 元件狀態一覽）；lazy 載入，不增加其他頁面的 bundle */}
+          <Route path="/design-system">
+            <Suspense fallback={null}><DesignSystemPreview /></Suspense>
           </Route>
 
           <Route>

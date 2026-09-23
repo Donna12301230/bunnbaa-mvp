@@ -1,0 +1,105 @@
+/* ── Tabs：膠囊式分段控制 ─────────────────────────────────────────────── */
+.bb-tabs {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface-muted);
+  border-radius: var(--radius-full);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.bb-tabs::-webkit-scrollbar {
+  display: none;
+}
+.bb-tabs--full {
+  display: flex;
+  width: 100%;
+}
+.bb-tabs.is-disabled {
+  opacity: 0.55;
+}
+
+/* 白色選中塊：以 transform 滑動 */
+.bb-tabs__indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm), 0 1px 2px rgba(120, 80, 40, 0.08);
+  transition:
+    transform var(--duration-slow) var(--ease-standard),
+    width var(--duration-slow) var(--ease-standard);
+  pointer-events: none;
+}
+.bb-theme[data-theme='dark'] .bb-tabs__indicator {
+  background: var(--border-strong);
+}
+
+.bb-tabs__tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-size: var(--font-body-size);
+  font-weight: 500;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--duration-base) var(--ease-standard);
+}
+.bb-tabs--full .bb-tabs__tab {
+  flex: 1;
+}
+/* 視覺 40px，點擊區補到 44px */
+.bb-tabs__tab::after {
+  content: '';
+  position: absolute;
+  inset: -2px 0;
+}
+
+.bb-tabs__tab:hover:not(:disabled):not([aria-selected='true']),
+.bb-tabs__tab.is-hover {
+  color: var(--text);
+}
+
+.bb-tabs__tab[aria-selected='true'] {
+  color: var(--text);
+  font-weight: 600;
+}
+.bb-tabs__tab[aria-selected='true'] .bb-tabs__icon {
+  color: var(--brand-orange-text);
+}
+
+.bb-tabs__tab:focus-visible,
+.bb-tabs__tab.is-focus {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 0;
+}
+
+.bb-tabs__tab:disabled {
+  cursor: not-allowed;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.bb-tabs__icon {
+  display: inline-flex;
+}
+
+.bb-tabs--lg .bb-tabs__tab {
+  min-height: 44px;
+  font-size: 16px;
+}
+.bb-tabs--lg .bb-tabs__tab::after {
+  inset: 0;
+}

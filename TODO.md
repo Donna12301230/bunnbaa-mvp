@@ -102,6 +102,17 @@
 
 **2026-09-23 購物車結帳採用選項 (a)，接上真實金流**：`CartPage.tsx`「送出預購」原本只是清空購物車＋toast 的示意畫面，完全沒寫入任何資料庫。這次改成真的呼叫 LINE Pay（新增 `createCartLinePayReservation` Cloud Function，`functions/src/index.js`），購物車每個品項×數量展開成對應筆數的真實 `locks` 草稿（一份餐點一組取餐碼，沿用 `HomePage.tsx`「預約加入計畫」已經用過的「一次寫入 N 筆」模式），付款確認後才真的建立 `locks`。`confirmLinePayPayment` 因此改成統一處理陣列（`lock_drafts`），單品項（`/lock`）跟購物車多品項共用同一套確認邏輯。**限制**：商品/商家目錄仍是 mock（`vendor-1`／`vendor-2`／`vendor-3`），不管購物車品項來自哪個假商家，結帳出來的 `locks` 一律掛在唯一的真實商家 `cafe-renheya-demo` 底下（品項名稱/價格是真的，商家歸屬是簡化）——這是選項 (a) 的已知取捨，不是 bug。已實測 Request API 成功導向 LINE Pay Sandbox 結帳頁
 
+**兩套平行資料模型最終決定：選項 (b)，「商品瀏覽」整套併進真正的 Vendor 模型**——`VendorListPage.tsx`／`VendorPage.tsx`／`MenuItemPage.tsx`／`CartPage.tsx`／`VendorPortalMenu.tsx` 五個頁面全部改讀寫真實 `vendors`＋新的 `menu_items` collection（新增 `firestore.rules` 規則，重用既有 `isVendorOwner()`），不再讀 mock 目錄；`createCartLinePayReservation`／`createLinePayReservation` 也拿掉寫死的 `CART_VENDOR_ID`，改吃每個 item 附帶的真實 `vendor_id`（並驗證該 vendor 真的存在）——購物車/單點鎖定終於會正確歸戶到下單的那家商家，不再全部掛在 `cafe-renheya-demo` 底下。同時：
+- **揪團預購場次／現場點餐維持 mock，暫不刪**：盤點後發現這功能從頭到尾是斷頭的——消費者端完全沒有「加入場次/下團購單」的入口，連 mock UI 都沒做過，商家後台永遠只會看到自己手動輸入的現場訂單。曾經一度整組刪掉（`VendorPortalSessions/Orders/Scan/Dashboard/Reports.tsx` + `VendorPortalSessionSummary.tsx`，連同路由/導覽列），後來決定先復原、保留商家後台完整 9 項導覽（總覽／訂餐時段／核對取餐／菜單管理／訂單管理／今日備料／統計報表／成長獎勵／店家設定）。**待決定，先記錄不做**：(a) 維持現狀，這幾頁只是示意用，資料仍是假的；(b) 只把商家後台那半邊（`order_sessions`/`pre_orders`/`table_orders` collection＋商家自建現場訂單/管理場次/核對取餐/報表統計）換成真的 Firestore，消費者端依然沒有入口，商家後台平常還是空的；(c) 連消費者端「加入場次/下團購單」的畫面也一起從零設計並開發（目前連 mock UI 都沒有），規模最大，才能讓整套功能真正被使用
+- **解封申訴只做管理員後台那半邊**：新增真實 `ban_appeals` collection（`firestore.rules` 限 `isAdmin()` 讀寫），`AdminAppealsPage.tsx` 改真實讀取/核准/拒絕，並補上 `RequireRealAdmin`（原本用假登入的 admin 角色判斷，寫入本來就會被規則擋下）。**消費者端「提交解封申訴」仍然完全沒有入口**（連 mock UI 都沒有，登入頁條款裡的「會員中心提交申訴」只是宣傳文字，沒有對應功能）——要做消費者自助申訴，得先有真實使用者帳號體系（手機門號 OTP 登入，見上方「會員／身分驗證」項目）落地，因為現在消費者端都是匿名 Firebase Auth，裝置一換 uid 就變，沒有穩定身分可以綁定封禁狀態。這次刻意只做管理員能看到的那一半
+- **HomePage.tsx 的「合作店家與計畫」「同學轉讓保底專區」「今日推薦鎖定方案」卡片全部換成真的**：新增 `meal_plans` collection（每個商家 A/B 兩方案，價格照該商家 `menu_items` 已有單品價打折算，不是憑空數字）；轉讓預覽改真的查 `locks`（`status=='for_resale'`），拿掉平台本來就不追蹤的虛構「原價/轉讓價」跟賣家姓名；「今日推薦鎖定方案」原本 `handleToggleLock` 連 Firestore 都沒碰、純前端示意，現在真的呼叫 `createLinePayReservation` 導向 LINE Pay，折扣依 `pickupDate` 用 `web/src/lib/pricing.ts` 的早鳥階梯現算，認證商家／履約穩定度徽章也改讀真實 `vendor.verified`／`reliability_tone`
+- `web/src/lib/mockData.ts` 大部分清空，只留「商家訂閱平台」這條仍未接後端的線在用的 `mockVendors`／`mockGetMyVendor`／`mockUpdateVendor`／`mockSaveVendorSettings`／`mockRequestCancelSubscription`／`mockReactivateSubscription`／`mockApproveVendor`（`VendorPortalSettings.tsx`／`VendorPortalLayout.tsx`／`admin/AdminVendorsPage.tsx` 還在用，這次沒動——真實後端沒有「商家訂閱平台」這個概念，屬於更大的、還沒排進來的範圍）
+
+**部署待辦**（改了 `firestore.rules` 新增 `menu_items`／`meal_plans`／`ban_appeals` 規則，也改了 `functions/src/index.js` 的 `createCartLinePayReservation`／`createLinePayReservation`）：
+- [ ] `firebase deploy --only firestore:rules`
+- [ ] `firebase deploy --only functions`
+- [ ] 部署後實測一次購物車結帳，Firestore Console 確認新產生的 `locks.vendor_id` 正確對應下單的商家（不是全部變成 `cafe-renheya-demo`）
+
 **🟡 ISO27001（系統與安全）**：2026-09-21 完成技術面落差分析＋修補，詳見 [ISO27001_落差分析.md](ISO27001_落差分析.md)。已補：Functions 授權（管理員／商家 owner）、`payouts`／`accuracy_reports` 限管理員與該商家 owner 可讀（`vendors/{id}.owner_uid` 綁定，商家儀表板改為需登入）、FCM token 私有化、`locks` 完整性規則、管理員稽核日誌、Hosting 安全標頭。`firestore.rules` 與前端已於 2026-09-21 部署上線（規則以未登入 REST 請求驗證過：敏感集合回 403）。**待辦**：下方煙霧測試；錄 demo 前照文件「商家帳號綁定」流程建商家帳號並設 `owner_uid`（否則商家儀表板看不到資料）；認證所需的 ISMS 管理制度文件尚未建立
 
 **ISO27001 上線後煙霧測試（2026-09-21 以 Chrome 擴充功能實測）**

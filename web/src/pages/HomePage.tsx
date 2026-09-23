@@ -1,29 +1,46 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
+import {
+  collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch,
+} from "firebase/firestore";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import {
   Clock, CalendarDays, Rocket, Star, User, MapPin, Trophy,
   ShieldCheck, Bell, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal,
 } from "lucide-react";
-import { mockMealPlanTransfers, mockVendorMealPlans, mockLockMeals, type MealPlanOption, type VendorMealPlanGroup } from "@/lib/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import GrowthRewardTicker from "@/components/GrowthRewardTicker";
 import { auth, db, functions } from "@/lib/firebase";
+import type { Vendor, MenuItem, MealPlan, Lock } from "@/types";
+import { applyEarlyBirdPrice } from "@/lib/pricing";
 
 const GROWTH_VENDOR_ID = "cafe-renheya-demo";
 const GROWTH_UNLOCK_THRESHOLD = 200000;
 const GROWTH_TIER_LABEL: Record<number, string> = { 80: "8折", 60: "6折", 50: "5折", 30: "3折", 10: "1折", 0: "整份 0 元" };
 
+// 「取餐時段」選單的顯示文字跟送出去的 pickup_window 分開存——後者要用 ASCII
+// 連字號（跟 discount_explanations 的 cacheKeyFor()/其他真實 locks 一致），
+// en dash 會被 cacheKeyFor() 的白名單正規化成底線，對不上快取的鍵。
+const TIME_SLOT_WINDOWS: Record<string, string> = {
+  slot1: "11:30-12:00",
+  slot2: "12:00-12:30",
+  slot3: "12:30-13:00",
+};
+
+function formatResaleCountdown(deadline: Date, now: number): string {
+  const diffMin = Math.round((deadline.getTime() - now) / 60000);
+  if (diffMin <= 0) return "已逾期";
+  if (diffMin < 60) return `${diffMin} 分後截止`;
+  return `${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`;
+}
+
 // 首頁模板 — 對應 UI草圖的 Main.dc.html（現在是合併版：原本 PlanSchedule.dc.html
-// 的「合作店家與計畫」已經整段併進 Main，這裡也已經做過；這次新增的是 Main 上半部
-// 的「今日推薦鎖定方案」單點型卡片區，見下面 mockLockMeals 段落）。
-// TODO(firebase): 下方 useQuery 讀的是 mockData.ts 的假資料，之後接
-// Firestore 時把 queryFn 換掉即可；地址／語言選單目前只是靜態外觀（見 MarketplaceHeader）。
+// 的「合作店家與計畫」已經整段併進 Main，這裡也已經做過）。地址／語言選單目前
+// 只是靜態外觀（見 MarketplaceHeader）。
 const SORT_OPTIONS = [
   { id: "relevance", label: "相關性" },
   { id: "fastest", label: "最快送達" },
@@ -45,7 +62,7 @@ export default function HomePage() {
   const [selectedSlot, setSelectedSlot] = useState<string>("slot2");
   const [selectedSort, setSelectedSort] = useState<string>("relevance");
   const [waiverAck, setWaiverAck] = useState<Record<string, boolean>>({});
-  const [locked, setLocked] = useState<Record<string, boolean>>({});
+  const [lockingMealId, setLockingMealId] = useState<string | null>(null);
   const [uid, setUid] = useState<string | null>(null);
   const [joiningPlanId, setJoiningPlanId] = useState<string | null>(null);
   const [joinedPlanIds, setJoinedPlanIds] = useState<Record<string, boolean>>({});
@@ -82,33 +99,103 @@ export default function HomePage() {
     }
   }
 
-  const { data: transfers = [] } = useQuery({
-    queryKey: ["mealPlanTransfers"],
-    queryFn: async () => mockMealPlanTransfers,
+  // 真實商家清單，「今日推薦鎖定方案」跟「合作店家與計畫」都要用（各自的
+  // 品項/方案是分開的子集合查詢，商家本身只查一次）。
+  const { data: vendors = [] } = useQuery({
+    queryKey: ["vendors"],
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, "vendors"));
+      return snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) }) as Vendor)
+        .filter((v) => v.status !== "disabled");
+    },
     staleTime: 15 * 60 * 1000,
   });
 
-  const { data: vendorPlans = [] } = useQuery({
-    queryKey: ["vendorMealPlans"],
-    queryFn: async () => mockVendorMealPlans,
-    staleTime: 15 * 60 * 1000,
+  // 今日推薦鎖定方案（單點型）——真實 menu_items，早鳥折扣依 pickupDate 現算
+  // （跟左側「早鳥預約折扣」說明欄位同一套 web/src/lib/pricing.ts 規則）。
+  const { data: lockMealCards = [] } = useQuery({
+    queryKey: ["lockMealCards", vendors.map((v) => v.id).join(",")],
+    queryFn: async () => {
+      if (vendors.length === 0) return [];
+      const snap = await getDocs(query(collection(db, "menu_items"), where("is_available", "==", true)));
+      const vendorsById = new Map(vendors.map((v) => [v.id, v]));
+      return snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as MenuItem)
+        .map((item) => ({ item, vendor: vendorsById.get(item.vendor_id) }))
+        .filter((x): x is { item: MenuItem; vendor: Vendor } => !!x.vendor);
+    },
+    enabled: vendors.length > 0,
+    staleTime: 5 * 60 * 1000,
   });
 
-  function handleToggleLock(id: string, title: string) {
-    setLocked(prev => {
-      const next = !prev[id];
-      if (next) {
-        toast({ title: "已鎖定", description: `${title}・示意畫面：實際下單需串接 locks collection（參照 /lock 的 ConsumerLockPage）。` });
+  // 合作店家與計畫——真實 vendors + 各自的 meal_plans。
+  const { data: vendorPlanGroups = [] } = useQuery({
+    queryKey: ["vendorMealPlans", vendors.map((v) => v.id).join(",")],
+    queryFn: async () => {
+      const groups: { vendorId: string; vendorName: string; plans: MealPlan[] }[] = [];
+      for (const v of vendors) {
+        const snap = await getDocs(query(collection(db, "meal_plans"), where("vendor_id", "==", v.id)));
+        const plans = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as MealPlan);
+        if (plans.length > 0) groups.push({ vendorId: v.id, vendorName: v.name, plans });
       }
-      return { ...prev, [id]: next };
-    });
+      return groups;
+    },
+    enabled: vendors.length > 0,
+    staleTime: 15 * 60 * 1000,
+  });
+
+  // 同學轉讓保底專區——真實 locks，跟 TransferMarketPage.tsx 同一套查詢慣例
+  // （vendor_id+created_at 索引，status 篩選交給前端做）。真實 Lock 沒有「原價/
+  // 轉讓價」兩個價格（平台不經手轉讓價），也沒有賣家姓名，卡片改顯示唯一的
+  // locked_price + resale_deadline 倒數。
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const { data: transfers = [] } = useQuery({
+    queryKey: ["homeTransferPreview"],
+    queryFn: async () => {
+      const snap = await getDocs(
+        query(collection(db, "locks"), where("vendor_id", "==", GROWTH_VENDOR_ID), orderBy("created_at", "desc"), limit(50))
+      );
+      return snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as Lock)
+        .filter((l) => l.status === "for_resale")
+        .slice(0, 6);
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
+  async function handleLockMeal(item: MenuItem) {
+    if (!uid) return;
+    setLockingMealId(item.id);
+    try {
+      const { discountPercent, lockedPrice } = applyEarlyBirdPrice(item.price, pickupDate);
+      const fn = httpsCallable(functions, "createLinePayReservation");
+      const result = await fn({
+        vendor_id: item.vendor_id,
+        item_name: item.name,
+        pickup_window: TIME_SLOT_WINDOWS[selectedSlot],
+        pickup_date: pickupDate,
+        discount_percent: discountPercent,
+        locked_price: lockedPrice,
+      });
+      const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
+      window.location.href = paymentUrl;
+    } catch (err) {
+      toast({ title: "前往付款失敗", description: (err as Error).message, variant: "destructive" });
+      setLockingMealId(null);
+    }
   }
 
   // 「計畫型」（訂閱制多日方案）沒有另外的 plan/subscription collection——加入
   // 計畫當下直接一次寫入 N 筆真實 locks（同一個 plan_id 串起來），不用排程
   // Cloud Function 每天生一筆，所以不受 Blaze 卡住。之後在「我的餐點」會依
   // pickup_date 自動分組出現。
-  async function handleJoinPlan(group: VendorMealPlanGroup, plan: MealPlanOption) {
+  async function handleJoinPlan(group: { vendorId: string; vendorName: string; plans: MealPlan[] }, plan: MealPlan) {
     if (!uid) return;
     const planKey = `${group.vendorId}-${plan.id}`;
     setJoiningPlanId(planKey);
@@ -126,7 +213,7 @@ export default function HomePage() {
           pickup_date: pickupDate.toISOString().slice(0, 10),
           discount_percent: 0,
           resellable: true,
-          locked_price: plan.pricePerMeal,
+          locked_price: plan.price_per_meal,
           status: "locked",
           buyer_uid: uid,
           created_at: serverTimestamp(),
@@ -297,79 +384,79 @@ export default function HomePage() {
                 <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-orange-500 text-white">單點型</span>
                 <h3 className="text-lg font-bold">今日推薦鎖定方案</h3>
               </div>
-              <span className="text-sm text-muted-foreground font-semibold">校園咖啡廳・09/25（五）</span>
+              <span className="text-sm text-muted-foreground font-semibold">{pickupDate}・{TIME_SLOT_WINDOWS[selectedSlot]}</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {mockLockMeals.map(meal => {
-                const isLocked = !!locked[meal.id];
-                const hasAcked = !!waiverAck[meal.id];
-                const ctaDisabled = !isLocked && !hasAcked;
+              {lockMealCards.map(({ item, vendor }) => {
+                const { discountPercent, lockedPrice } = applyEarlyBirdPrice(item.price, pickupDate);
+                const hasAcked = !!waiverAck[item.id];
+                const isSubmitting = lockingMealId === item.id;
+                const ctaDisabled = !hasAcked || isSubmitting;
                 return (
-                  <article key={meal.id} className="bg-white rounded-2xl border border-border overflow-hidden flex flex-col">
-                    <div className={`relative h-32 bg-gradient-to-br ${meal.photoFrom} ${meal.photoTo} flex items-center justify-center text-4xl`}>
+                  <article key={item.id} className="bg-white rounded-2xl border border-border overflow-hidden flex flex-col">
+                    <div className="relative h-32 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl">
                       🍱
-                      <span className="absolute top-2.5 left-2.5 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
-                        <BadgeCheck className="w-3 h-3" /> 認證商家
-                      </span>
-                      <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-white text-green-700">
-                        <CheckCircle2 className="w-3 h-3" /> 履約穩定度：穩定
-                      </span>
+                      {vendor.verified && (
+                        <span className="absolute top-2.5 left-2.5 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
+                          <BadgeCheck className="w-3 h-3" /> 認證商家
+                        </span>
+                      )}
+                      {vendor.reliability_tone === "stable" && (
+                        <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-white text-green-700">
+                          <CheckCircle2 className="w-3 h-3" /> 履約穩定度：穩定
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
                       <div>
-                        <h4 className="font-bold text-[15px] leading-snug">{meal.title}</h4>
-                        <p className="text-xs text-muted-foreground font-semibold mt-0.5">取餐時段：09/25（五）{meal.time}</p>
+                        <h4 className="font-bold text-[15px] leading-snug">{item.name}</h4>
+                        <p className="text-xs text-muted-foreground font-semibold mt-0.5">{vendor.name}・取餐時段：{pickupDate}（{TIME_SLOT_WINDOWS[selectedSlot]}）</p>
                       </div>
 
                       <div className="flex gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
                         <Star className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5 fill-amber-500" />
                         <p className="text-[11px] leading-relaxed text-amber-900">
-                          Gemini 折扣說明：全額預付、不可退款但可轉賣過戶；搭配店家近期穩定的履約表現，換到這組確定性 8 折。
+                          {discountPercent > 0
+                            ? `提前預付鎖定，換到 ${10 - discountPercent / 10}折早鳥價；全額預付、不可退款但可轉賣過戶。`
+                            : "當日鎖定；全額預付、不可退款但可轉賣過戶。"}
                         </p>
                       </div>
 
-                      {!isLocked && (
-                        <div className="flex flex-col gap-1.5">
-                          <label className="flex items-start gap-1.5 p-2 rounded-lg bg-gray-50 border border-border cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={hasAcked}
-                              onChange={() => setWaiverAck(prev => ({ ...prev, [meal.id]: !prev[meal.id] }))}
-                              className="mt-0.5 accent-orange-500 w-3.5 h-3.5 shrink-0"
-                            />
-                            <span className="text-[10.5px] leading-relaxed text-muted-foreground">
-                              我了解本商品為現做餐點，依消保法通訊交易解除權合理例外情事適用準則，<strong className="text-foreground">鎖定後不適用 7 天猶豫期</strong>，除商家未履約外恕不接受退款
-                            </span>
-                          </label>
-                          <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
-                            <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
-                            <span className="text-[10.5px] leading-relaxed text-orange-900">
-                              取餐時段結束仍未取餐，將<strong>自動開放到轉讓市集、$0 元供人領取</strong>，避免整份浪費
-                            </span>
-                          </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="flex items-start gap-1.5 p-2 rounded-lg bg-gray-50 border border-border cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={hasAcked}
+                            onChange={() => setWaiverAck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                            className="mt-0.5 accent-orange-500 w-3.5 h-3.5 shrink-0"
+                          />
+                          <span className="text-[10.5px] leading-relaxed text-muted-foreground">
+                            我了解本商品為現做餐點，依消保法通訊交易解除權合理例外情事適用準則，<strong className="text-foreground">鎖定後不適用 7 天猶豫期</strong>，除商家未履約外恕不接受退款
+                          </span>
+                        </label>
+                        <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
+                          <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
+                          <span className="text-[10.5px] leading-relaxed text-orange-900">
+                            取餐時段結束仍未取餐，將<strong>自動開放到轉讓市集、$0 元供人領取</strong>，避免整份浪費
+                          </span>
                         </div>
-                      )}
+                      </div>
 
                       <div className="flex items-center justify-between mt-auto pt-1">
                         <div>
-                          <span className="text-xs text-gray-400 line-through mr-1.5">原價 ${meal.original}</span>
-                          <span className="text-xl font-extrabold">${meal.price}</span>
+                          {discountPercent > 0 && <span className="text-xs text-gray-400 line-through mr-1.5">原價 ${item.price}</span>}
+                          <span className="text-xl font-extrabold">${lockedPrice}</span>
                         </div>
                         <Button
                           size="sm"
                           disabled={ctaDisabled}
-                          onClick={() => handleToggleLock(meal.id, meal.title)}
-                          className={isLocked ? "bg-green-700 hover:bg-green-800 text-white" : "bg-orange-500 hover:bg-orange-600 text-white disabled:bg-gray-200 disabled:text-gray-400"}
+                          onClick={() => handleLockMeal(item)}
+                          className="bg-orange-500 hover:bg-orange-600 text-white disabled:bg-gray-200 disabled:text-gray-400"
                         >
-                          {isLocked ? "已鎖定" : "立即預付鎖定"}
+                          {isSubmitting ? "前往付款中…" : "立即預付鎖定"}
                         </Button>
                       </div>
-                      {isLocked && (
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> 已鎖定，取餐前將推播提醒
-                        </div>
-                      )}
                     </div>
                   </article>
                 );
@@ -381,7 +468,7 @@ export default function HomePage() {
           <section>
             <h3 className="text-lg font-bold mb-3">合作店家與計畫</h3>
             <div className="space-y-4">
-              {vendorPlans.map(group => (
+              {vendorPlanGroups.map(group => (
                 <div key={group.vendorId} className="bg-white rounded-xl border border-border p-4 grid grid-cols-1 md:grid-cols-[220px_1fr_1fr] gap-4">
                   {/* 店家資訊 */}
                   <Link href={`/vendor/${group.vendorId}`} className="flex md:flex-col gap-3 hover:opacity-90">
@@ -406,9 +493,9 @@ export default function HomePage() {
                     <div key={plan.id} className="bg-gray-50 rounded-lg p-3 flex flex-col">
                       <p className="text-sm font-semibold mb-0.5">{plan.label}：{plan.name}</p>
                       <p className="text-xs text-muted-foreground mb-3">{plan.description}</p>
-                      <p className="text-sm font-bold text-orange-600 mb-2">NT$ {plan.pricePerMeal} / 餐起</p>
+                      <p className="text-sm font-bold text-orange-600 mb-2">NT$ {plan.price_per_meal} / 餐起</p>
                       <span className="inline-block w-fit text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full mb-3">
-                        最快履約：{plan.fastestBooking}
+                        最快履約：{plan.fastest_booking}
                       </span>
                       <Button
                         className="mt-auto w-full bg-brand-navy hover:bg-brand-navy-hover text-white text-sm"
@@ -455,17 +542,18 @@ export default function HomePage() {
                     <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
                       <User className="w-3.5 h-3.5 text-orange-500" />
                     </div>
-                    <span className="text-xs font-medium truncate">{t.sellerName} 轉讓</span>
+                    <span className="text-xs font-medium truncate">使用者 {t.buyer_uid.slice(-6)} 轉讓</span>
                   </div>
-                  <p className="text-sm font-semibold line-clamp-1 mb-2">{t.planName}</p>
+                  <p className="text-sm font-semibold line-clamp-1 mb-2">{t.item_name}</p>
                   <div className="flex items-baseline gap-1.5 mb-1">
-                    <span className="text-xs text-muted-foreground line-through">${t.originalPrice}</span>
-                    <span className="text-xs text-muted-foreground">→</span>
-                    <span className="text-sm font-bold text-orange-600">接盤價 ${t.resalePrice}</span>
+                    <span className="text-sm font-bold text-orange-600">轉讓價 ${t.locked_price}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-1.5 mt-1.5 border-t border-gray-100">
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {t.daysLeftLabel}</span>
-                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {t.location}</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {(t as any).resale_deadline?.toDate ? formatResaleCountdown((t as any).resale_deadline.toDate(), now) : "—"}
+                    </span>
+                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> 仁和雅咖啡</span>
                   </div>
                 </div>
               ))}

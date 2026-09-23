@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { mockGetMyVendor, mockSaveMenuItem, mockDeleteMenuItem, mockMenuItems } from "@/lib/mockData";
+import {
+  addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where,
+} from "firebase/firestore";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,64 +15,110 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, UtensilsCrossed } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/useAuth";
-import type { MenuItemData } from "@/types";
+import { auth, db } from "@/lib/firebase";
+import type { MenuItem, Vendor } from "@/types";
 import { ALLERGEN_LIST, DIETARY_TAGS } from "@/types";
 import { ImageUploadField } from "@/components/ImageUploadField";
 
 const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[] };
 
-// Ported from BunnBaa Parse_Ref's client/src/pages/vendor/menu.tsx.
-// TODO(firebase): reads/writes mockMenuItems via mockData.ts helpers instead
-// of Parse.Query("MenuItem")/Parse.Object("MenuItem") — swap for Firestore
-// once the backend is wired up.
+// Same "one hardcoded real vendor" convention as VendorPortalGrowth.tsx /
+// VendorPortalPrep.tsx — there's no owner_uid-based per-user vendor
+// resolution built yet (see TODO.md「商家帳號綁定」). Unlike those two
+// read-only pages, this one writes, so it also guards against the day
+// someone binds owner_uid without also building that resolution: if the
+// bound owner doesn't match whoever's signed in, writes are blocked with
+// an explicit message instead of silently succeeding against the wrong
+// vendor's real menu.
+const VENDOR_ID = "cafe-renheya-demo";
+
 export default function VendorPortalMenu() {
-  const { user } = useAuth();
   const { toast } = useToast();
+  const [authUser, setAuthUser] = useState<User | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, setAuthUser);
+    return () => unsub();
+  }, []);
+
   const { data: myVendor } = useQuery({
-    queryKey: ["myVendor", user?.id],
-    queryFn: async () => mockGetMyVendor(),
-    enabled: !!user,
+    queryKey: ["myVendor", VENDOR_ID],
+    queryFn: async () => {
+      const snap = await getDoc(doc(db, "vendors", VENDOR_ID));
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as Vendor) : null;
+    },
   });
 
   const { data: items = [], isLoading } = useQuery({
-    queryKey: ["vendorMenu", myVendor?.id],
+    queryKey: ["vendorMenu", VENDOR_ID],
     queryFn: async () => {
-      if (!myVendor) return [];
-      return mockMenuItems.filter(i => i.vendorId === myVendor.id).sort((a, b) => a.category.localeCompare(b.category));
+      const snap = await getDocs(query(collection(db, "menu_items"), where("vendor_id", "==", VENDOR_ID)));
+      return snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as MenuItem)
+        .sort((a, b) => a.category.localeCompare(b.category));
     },
-    enabled: !!myVendor,
   });
+
+  function assertCanWrite() {
+    if (myVendor?.owner_uid && myVendor.owner_uid !== authUser?.uid) {
+      throw new Error("此帳號未綁定至這個商家");
+    }
+  }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!myVendor) throw new Error("找不到店家資料");
-      return mockSaveMenuItem(
-        { id: editId, name: form.name, description: form.description, price: Number(form.price), category: form.category, isAvailable: form.isAvailable, image: form.image, allergens: form.allergens, dietaryTags: form.dietaryTags },
-        myVendor.id,
-      );
+      assertCanWrite();
+      const data = {
+        vendor_id: myVendor.id,
+        name: form.name,
+        description: form.description,
+        price: Number(form.price),
+        category: form.category,
+        is_available: form.isAvailable,
+        image: form.image || null, // Firestore SDK throws on `undefined` field values
+        allergens: form.allergens,
+        dietary_tags: form.dietaryTags,
+      };
+      if (editId) {
+        await updateDoc(doc(db, "menu_items", editId), data);
+      } else {
+        await addDoc(collection(db, "menu_items"), { ...data, created_at: new Date() });
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendorMenu", myVendor?.id] });
+      queryClient.invalidateQueries({ queryKey: ["vendorMenu", VENDOR_ID] });
       setDialogOpen(false);
       setEditId(null);
       setForm(EMPTY_FORM);
       toast({ title: editId ? "已更新" : "已新增", description: form.name });
     },
-    onError: (err: Error) => toast({ variant: "destructive", title: "儲存失敗", description: err.message }),
+    onError: (err: any) => {
+      const description = err?.code === "permission-denied"
+        ? "帳號尚未綁定商家權限，請聯絡管理員"
+        : err.message;
+      toast({ variant: "destructive", title: "儲存失敗", description });
+    },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => mockDeleteMenuItem(id),
+    mutationFn: async (id: string) => {
+      assertCanWrite();
+      await deleteDoc(doc(db, "menu_items", id));
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendorMenu", myVendor?.id] });
+      queryClient.invalidateQueries({ queryKey: ["vendorMenu", VENDOR_ID] });
       toast({ title: "已刪除" });
     },
-    onError: (err: Error) => toast({ variant: "destructive", title: "刪除失敗", description: err.message }),
+    onError: (err: any) => {
+      const description = err?.code === "permission-denied"
+        ? "帳號尚未綁定商家權限，請聯絡管理員"
+        : err.message;
+      toast({ variant: "destructive", title: "刪除失敗", description });
+    },
   });
 
   function openAdd() {
@@ -78,9 +127,9 @@ export default function VendorPortalMenu() {
     setDialogOpen(true);
   }
 
-  function openEdit(item: MenuItemData) {
+  function openEdit(item: MenuItem) {
     setEditId(item.id);
-    setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, isAvailable: item.isAvailable, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietaryTags ?? [] });
+    setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [] });
     setDialogOpen(true);
   }
 
@@ -129,8 +178,8 @@ export default function VendorPortalMenu() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium">{item.name}</span>
-                            {!item.isAvailable && <Badge variant="secondary" className="text-xs">已下架</Badge>}
-                            {item.dietaryTags?.map(t => (
+                            {!item.is_available && <Badge variant="secondary" className="text-xs">已下架</Badge>}
+                            {item.dietary_tags?.map(t => (
                               <Badge key={t} variant="outline" className="text-xs text-green-700 border-green-200">{t}</Badge>
                             ))}
                           </div>

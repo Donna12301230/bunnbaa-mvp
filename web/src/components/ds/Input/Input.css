@@ -1,0 +1,29 @@
+/* 眼睛切換鈕：視覺貼齊欄位右緣，點擊區 44×44 */
+.bb-input__reveal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 42px;
+  margin-right: calc(var(--space-3) * -1);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--text-muted);
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+.bb-input__reveal:hover:not(:disabled) {
+  color: var(--brand-orange-text);
+}
+.bb-input__reveal:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+.bb-input__reveal:disabled {
+  cursor: not-allowed;
+}
+
+.bb-input__right {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: var(--font-body-sm-size);
+}

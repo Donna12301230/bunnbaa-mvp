@@ -5,6 +5,38 @@ export interface Vendor {
   reliability_tone: "new" | "variable" | "stable";
   status?: "active" | "disabled"; // missing = active, for backward compat with seeded data
   verified?: boolean; // 平台審核後手動認證，跟 reliability_tone（系統自動算）是兩件事；只有 admin 能寫
+  // 瀏覽用的顯示欄位，選填——不是每個商家（例如舊測試商家）都會有值
+  description?: string;
+  address?: string;
+  phone?: string;
+  owner_uid?: string | null; // 平台審核後綁定的真實 Firebase Auth uid，只有 admin 能寫
+}
+
+export interface MenuItem {
+  id: string;
+  vendor_id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  is_available: boolean;
+  image: string | null;
+  allergens: string[];
+  dietary_tags: string[];
+  created_at: unknown; // Firestore Timestamp
+}
+
+export interface MealPlan {
+  id: string;
+  vendor_id: string;
+  label: string; // "A方案" / "B方案"
+  name: string;
+  description: string;
+  price_per_meal: number;
+  rating: number;
+  fastest_booking: string;
+  days: number; // 供餐天數，加入計畫時會生成這麼多筆 locks
+  created_at: unknown; // Firestore Timestamp
 }
 
 export type LockStatus =
@@ -101,6 +133,10 @@ export const ALLERGEN_LIST = [
 
 export const DIETARY_TAGS = ["葷食", "素食", "全素", "辣"] as const;
 
+// MenuItemData（mock，camelCase）跟上面真實的 MenuItem（snake_case）並存——
+// 「揪團預購場次/現場點餐」那組 vendor-portal 頁面回復使用 mock 資料，只有
+// VendorListPage/VendorPage/MenuItemPage/CartPage/VendorPortalMenu 這五個
+// 真的接了 Firestore 的頁面用 MenuItem。
 export interface MenuItemData {
   id: string;
   name: string;
@@ -116,7 +152,7 @@ export interface MenuItemData {
 }
 
 export interface CartItem {
-  menuItem: MenuItemData;
+  menuItem: MenuItem;
   quantity: number;
   note: string;
 }
@@ -201,3 +237,4 @@ export interface OrderSessionData {
   autoCreated?: boolean;    // 由 businessHours 自動建立
   createdAt: Date;
 }
+

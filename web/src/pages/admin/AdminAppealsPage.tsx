@@ -1,31 +1,47 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { mockBanAppeals, mockProcessBanAppeal } from "@/lib/mockData";
+import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import AdminLayout from "@/components/AdminLayout";
+import RequireRealAdmin from "@/components/RequireRealAdmin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 
-// Ported from BunnBaa Parse_Ref's client/src/pages/admin/vendors.tsx (解封申訴 tab).
-// TODO(firebase): reads mockBanAppeals instead of Parse.Query("BanAppeal") and
-// calls mockProcessBanAppeal instead of Parse.Cloud.run("processBanAppeal") —
-// swap for Firestore + Cloud Functions once the backend is wired up.
-export default function AdminAppealsPage() {
+interface BanAppeal {
+  id: string;
+  buyer_uid: string;
+  username: string;
+  display_name: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  admin_note: string | null;
+  created_at: { toDate?: () => Date };
+}
+
+// 只做管理員後台這半邊：讀取 + 核准/拒絕，對應真實 ban_appeals collection
+// （firestore.rules 限管理員讀寫）。沒有消費者自動提交申訴的畫面——真實後端
+// 目前沒有穩定的使用者帳號體系可以綁定封禁狀態，這半邊功能刻意只到這裡
+// （TODO.md 有記錄，見「解封申訴」待辦）。
+function AppealsList() {
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
 
   const { data: appeals = [], isLoading } = useQuery({
     queryKey: ["adminAppeals"],
-    queryFn: async () => [...mockBanAppeals].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
-    enabled: isAdmin,
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, "ban_appeals"));
+      return snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) }) as BanAppeal)
+        .sort((a, b) => (b.created_at?.toDate?.().getTime() ?? 0) - (a.created_at?.toDate?.().getTime() ?? 0));
+    },
   });
 
   const processAppealMutation = useMutation({
-    mutationFn: async ({ appealId, approved }: { appealId: string; approved: boolean }) => mockProcessBanAppeal(appealId, approved),
+    mutationFn: async ({ appealId, approved }: { appealId: string; approved: boolean }) =>
+      updateDoc(doc(db, "ban_appeals", appealId), { status: approved ? "approved" : "rejected" }),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["adminAppeals"] });
       toast({ title: vars.approved ? "已核准解封" : "已拒絕申訴" });
@@ -34,7 +50,7 @@ export default function AdminAppealsPage() {
   });
 
   return (
-    <AdminLayout>
+    <>
       <h2 className="text-lg font-bold mb-3">解封申訴管理</h2>
       {isLoading ? (
         <div className="space-y-3">
@@ -52,11 +68,11 @@ export default function AdminAppealsPage() {
               <CardHeader className="pb-1 flex flex-row items-start justify-between">
                 <div>
                   <CardTitle className="text-base text-sm">
-                    {appeal.displayName || appeal.username}
+                    {appeal.display_name || appeal.username}
                     <span className="text-xs text-muted-foreground font-normal ml-2">@{appeal.username}</span>
                   </CardTitle>
                   <div className="text-xs text-muted-foreground">
-                    申訴時間：{format(appeal.createdAt, "yyyy/MM/dd HH:mm")}
+                    申訴時間：{appeal.created_at?.toDate ? format(appeal.created_at.toDate(), "yyyy/MM/dd HH:mm") : "—"}
                   </div>
                 </div>
                 <Badge className={
@@ -72,8 +88,8 @@ export default function AdminAppealsPage() {
                   <span className="text-xs text-muted-foreground block mb-1">申訴原因：</span>
                   {appeal.reason}
                 </div>
-                {appeal.adminNote && (
-                  <div className="text-xs text-muted-foreground">管理員備註：{appeal.adminNote}</div>
+                {appeal.admin_note && (
+                  <div className="text-xs text-muted-foreground">管理員備註：{appeal.admin_note}</div>
                 )}
                 {appeal.status === "pending" && (
                   <div className="flex gap-2 pt-1">
@@ -101,6 +117,16 @@ export default function AdminAppealsPage() {
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+export default function AdminAppealsPage() {
+  return (
+    <AdminLayout>
+      <RequireRealAdmin>
+        <AppealsList />
+      </RequireRealAdmin>
     </AdminLayout>
   );
 }

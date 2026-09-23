@@ -4,7 +4,8 @@ import { Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings } from "
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { mockBanAppeals } from "@/lib/mockData";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
@@ -35,7 +36,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   const { data: pendingAppealsCount = 0 } = useQuery({
     queryKey: ["adminAppeals", "pendingCount"],
-    queryFn: async () => mockBanAppeals.filter(a => a.status === "pending").length,
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "ban_appeals"), where("status", "==", "pending")));
+      return snap.size;
+    },
     enabled: isAdmin,
   });
 

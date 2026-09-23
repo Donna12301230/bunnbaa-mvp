@@ -1,0 +1,27 @@
+.bb-select__native {
+  appearance: none;
+  -webkit-appearance: none;
+  /* 讓 chevron 疊在 select 上，整條都能點 */
+  padding-right: 28px;
+  margin-right: -28px;
+  cursor: pointer;
+}
+.bb-select__native:disabled {
+  cursor: not-allowed;
+}
+
+/* 停在 placeholder（value=""）時用輔助色 */
+.bb-select__native:has(option[value='']:checked) {
+  color: var(--text-muted);
+}
+.bb-select__native option {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.bb-select__chevron {
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+.bb-control:focus-within .bb-select__chevron {
+  color: var(--brand-orange-text);
+}

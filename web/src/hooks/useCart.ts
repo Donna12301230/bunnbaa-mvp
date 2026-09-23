@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
-import type { CartItem, MenuItemData } from "@/types";
+import type { CartItem, MenuItem } from "@/types";
 
-const CART_KEY = "bento_cart";
-const VENDOR_KEY = "bento_cart_vendor";
+// _v2: bumped from bento_cart/bento_cart_vendor so a cart added to before
+// the mock→real menu-item migration (old camelCase MenuItemData shape,
+// no vendor_id field) gets silently dropped instead of producing a
+// checkout payload with vendor_id undefined.
+const CART_KEY = "bento_cart_v2";
+const VENDOR_KEY = "bento_cart_vendor_v2";
 
 function loadCart(): CartItem[] {
   try {
@@ -30,7 +34,7 @@ export const cartStore = {
   get total() { return _items.reduce((s, i) => s + i.menuItem.price * i.quantity, 0); },
   get count() { return _items.reduce((s, i) => s + i.quantity, 0); },
 
-  addItem(menuItem: MenuItemData, vendorId: string, note = "") {
+  addItem(menuItem: MenuItem, vendorId: string, note = "") {
     if (_vendorId && _vendorId !== vendorId) { _items = []; }
     _vendorId = vendorId;
     const existing = _items.find(i => i.menuItem.id === menuItem.id && i.note === note);
@@ -63,7 +67,7 @@ export function useCart() {
     vendorId: cartStore.vendorId,
     total: cartStore.total,
     count: cartStore.count,
-    addItem: (item: MenuItemData, vendorId: string, note?: string) => cartStore.addItem(item, vendorId, note),
+    addItem: (item: MenuItem, vendorId: string, note?: string) => cartStore.addItem(item, vendorId, note),
     removeItem: (id: string, note?: string) => cartStore.removeItem(id, note),
     updateQuantity: (id: string, note: string, qty: number) => cartStore.updateQuantity(id, note, qty),
     clearCart: () => cartStore.clearCart(),
