@@ -67,6 +67,29 @@ function formatCountdown(deadline: Date, now: number): string {
   return `${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`;
 }
 
+// Local-date (not UTC) helpers for the calendar grid — pickup_date strings
+// are plain "YYYY-MM-DD" with no timezone, so toISOString() here would risk
+// an off-by-one day depending on the viewer's timezone.
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function startOfWeek(d: Date): Date {
+  const copy = new Date(d);
+  copy.setHours(0, 0, 0, 0);
+  copy.setDate(copy.getDate() - copy.getDay());
+  return copy;
+}
+function addDays(d: Date, n: number): Date {
+  const copy = new Date(d);
+  copy.setDate(copy.getDate() + n);
+  return copy;
+}
+
+const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
+
 export default function MyBookingsPage() {
   const { toast } = useToast();
   const [uid, setUid] = useState<string | null>(null);
@@ -77,6 +100,7 @@ export default function MyBookingsPage() {
   const [qrOpen, setQrOpen] = useState<Record<string, boolean>>({});
   const [feedbackOpen, setFeedbackOpen] = useState<Record<string, boolean>>({});
   const [feedbackDraft, setFeedbackDraft] = useState<Record<string, string>>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     signInAnonymously(auth).catch(console.error);
@@ -104,20 +128,43 @@ export default function MyBookingsPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const dateGroups = useMemo(() => {
+  const locksByDate = useMemo(() => {
     const byDate = new Map<string, Lock[]>();
     for (const lock of locks) {
       const bucket = byDate.get(lock.pickup_date) ?? [];
       bucket.push(lock);
       byDate.set(lock.pickup_date, bucket);
     }
-    return Array.from(byDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, items]) => ({
-        date,
-        items: items.sort((a, b) => a.pickup_window.localeCompare(b.pickup_window)),
-      }));
+    for (const bucket of byDate.values()) bucket.sort((a, b) => a.pickup_window.localeCompare(b.pickup_window));
+    return byDate;
   }, [locks]);
+
+  // Calendar grid, back by popular demand after 2026-09-22's switch to a flat
+  // date-grouped list (see file header comment) — but sized to the real data
+  // instead of the original mock's fixed 7×3, so it doesn't run out of room:
+  // defaults to the current 3-week window, and grows (in whole weeks) to fit
+  // any lock whose pickup_date falls outside that range.
+  const calendarWeeks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let start = startOfWeek(today);
+    let end = addDays(start, 20);
+
+    for (const dateStr of locksByDate.keys()) {
+      const d = new Date(`${dateStr}T00:00:00`);
+      if (d < start) start = startOfWeek(d);
+      if (d > end) end = d;
+    }
+    end = addDays(startOfWeek(end), 6);
+
+    const days: Date[] = [];
+    for (let cur = start; cur <= end; cur = addDays(cur, 1)) days.push(cur);
+    const weeks: Date[][] = [];
+    for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+    return weeks;
+  }, [locksByDate]);
+
+  const expandedLock = expandedId ? (locks.find((l) => l.id === expandedId) ?? null) : null;
 
   async function handleGift(lock: Lock) {
     setBusyId(lock.id);
@@ -186,39 +233,22 @@ export default function MyBookingsPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <MarketplaceHeader active="bookings" />
+  function renderLockCard(lock: Lock) {
+    const statusInfo = STATUS_STYLE[lock.status] ?? { label: lock.status, className: "bg-gray-100 text-gray-700" };
+    const isBusy = busyId === lock.id;
+    const deadline = lock.status === "for_resale" ? pickupWindowEnd(lock.pickup_date, lock.pickup_window) : null;
+    const canFeedback = FEEDBACK_ELIGIBLE.has(lock.status);
+    const hasFeedback = !!lock.consumer_feedback;
 
-      <section className="px-4 md:px-6 py-6 max-w-[1400px] mx-auto">
-        <h1 className="text-2xl font-bold mb-1">我的餐點</h1>
-        <p className="text-sm text-muted-foreground">依取餐日期排列你目前的鎖定紀錄。</p>
-      </section>
-
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 pb-10 space-y-6">
-        {loading ? (
-          <p className="text-sm text-muted-foreground">載入中…</p>
-        ) : dateGroups.length === 0 ? (
-          <p className="text-sm text-muted-foreground">目前沒有任何鎖定紀錄。到「預購鎖定」鎖一份餐點看看。</p>
-        ) : (
-          dateGroups.map((group) => (
-            <section key={group.date} className="space-y-2">
-              <h2 className="text-sm font-bold text-muted-foreground">{formatDateLabel(group.date)}</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {group.items.map((lock) => {
-                  const statusInfo = STATUS_STYLE[lock.status] ?? { label: lock.status, className: "bg-gray-100 text-gray-700" };
-                  const isBusy = busyId === lock.id;
-                  const deadline = lock.status === "for_resale" ? pickupWindowEnd(lock.pickup_date, lock.pickup_window) : null;
-                  const canFeedback = FEEDBACK_ELIGIBLE.has(lock.status);
-                  const hasFeedback = !!lock.consumer_feedback;
-
-                  return (
-                    <article key={lock.id} className="bg-white border border-border rounded-xl p-4 flex flex-col gap-2">
+    return (
+      <article className="bg-white border border-border rounded-xl p-4 flex flex-col gap-2 max-w-sm">
                       <span className={`self-start text-xs font-bold px-2 py-0.5 rounded-full ${statusInfo.className}`}>
                         {statusInfo.label}
                       </span>
                       <h3 className="font-semibold leading-snug">{lock.item_name}</h3>
-                      <p className="text-sm text-muted-foreground">{lock.pickup_window} 取餐・${lock.locked_price}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDateLabel(lock.pickup_date)}・{lock.pickup_window} 取餐・${lock.locked_price}
+                      </p>
 
                       {lock.status === "locked" && (
                         <div className="flex flex-col gap-2 pt-1">
@@ -324,12 +354,70 @@ export default function MyBookingsPage() {
                           </button>
                         )
                       )}
-                    </article>
-                  );
-                })}
+      </article>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <MarketplaceHeader active="bookings" />
+
+      <section className="px-4 md:px-6 py-6 max-w-[1400px] mx-auto">
+        <h1 className="text-2xl font-bold mb-1">我的餐點</h1>
+        <p className="text-sm text-muted-foreground">週曆上點一筆訂單看詳情、使用取餐碼或轉讓／贈送。</p>
+      </section>
+
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 pb-10 space-y-6">
+        {loading ? (
+          <p className="text-sm text-muted-foreground">載入中…</p>
+        ) : locks.length === 0 ? (
+          <p className="text-sm text-muted-foreground">目前沒有任何鎖定紀錄。到「預購鎖定」鎖一份餐點看看。</p>
+        ) : (
+          <>
+            <div className="space-y-1">
+              <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-muted-foreground">
+                {WEEKDAY_LABELS.map((label) => (
+                  <div key={label}>{label}</div>
+                ))}
               </div>
-            </section>
-          ))
+              {calendarWeeks.map((week, wi) => (
+                <div key={wi} className="grid grid-cols-7 gap-1.5">
+                  {week.map((day) => {
+                    const dateStr = toLocalDateStr(day);
+                    const dayLocks = locksByDate.get(dateStr) ?? [];
+                    const isToday = dateStr === toLocalDateStr(new Date());
+                    return (
+                      <div
+                        key={dateStr}
+                        className={`min-h-[92px] rounded-lg border p-1.5 flex flex-col gap-1 ${
+                          isToday ? "border-orange-400 bg-orange-50/50" : "border-border bg-white"
+                        }`}
+                      >
+                        <span className="text-[11px] font-semibold text-muted-foreground">{day.getDate()}</span>
+                        {dayLocks.map((lock) => {
+                          const statusInfo = STATUS_STYLE[lock.status] ?? { label: lock.status, className: "bg-gray-100 text-gray-700" };
+                          return (
+                            <button
+                              key={lock.id}
+                              onClick={() => setExpandedId((prev) => (prev === lock.id ? null : lock.id))}
+                              className={`text-left text-[11px] leading-tight rounded px-1.5 py-1 truncate ${statusInfo.className} ${
+                                expandedId === lock.id ? "ring-2 ring-orange-500" : ""
+                              }`}
+                              title={lock.item_name}
+                            >
+                              {lock.item_name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            {expandedLock && <div>{renderLockCard(expandedLock)}</div>}
+          </>
         )}
       </div>
     </div>

@@ -10,10 +10,10 @@
 
 1. **Blaze 方案升級**（需綁信用卡，[Firebase Console](https://console.firebase.google.com/)）（Donna）
    卡住：QR 核銷正式站、撥款排程正式站、整合測試、Hosting 重新部署（轉賣／撥款／新版首頁等功能都還沒上線）
-   - [x] 2026-09-23 手動完成信用卡綁定（過程中卡過一次「交易遭拒」，換卡/請銀行放行後成功）→ Blaze 已啟用
-   - [x] 2026-09-23 `firebase deploy --only firestore:rules` 已部署（含取消轉讓、growth_rewards/draws 等新規則）
-   - [x] 2026-09-23 `firebase deploy --only functions` 已部署全部 11 個 functions（`onLockCreated` 第一次卡 Eventarc 權限生效中，等待後重試成功）
-   - [x] 2026-09-23 `firebase deploy --only hosting` 已重新部署，轉賣/撥款/成長獎勵抽獎等新功能正式上線 https://bunnbaa-mvp-5474.web.app
+   - [V] 2026-09-23 手動完成信用卡綁定（過程中卡過一次「交易遭拒」，換卡/請銀行放行後成功）→ Blaze 已啟用
+   - [V] 2026-09-23 `firebase deploy --only firestore:rules` 已部署（含取消轉讓、growth_rewards/draws 等新規則）
+   - [V] 2026-09-23 `firebase deploy --only functions` 已部署全部 11 個 functions（`onLockCreated` 第一次卡 Eventarc 權限生效中，等待後重試成功）
+   - [V] 2026-09-23 `firebase deploy --only hosting` 已重新部署，轉賣/撥款/成長獎勵抽獎等新功能正式上線 https://bunnbaa-mvp-5474.web.app
    
    **卡點 1 已解除。** 待辦：整合測試（見下方⬜清單）確認 QR 核銷、撥款排程等在正式站真的能跑；VAPID key 還沒補（FCM 推播卡最後一步）
 
@@ -100,13 +100,15 @@
 
 **🏗️ 待決策：兩套平行的商家/品項資料模型**（2026-09-22 盤點 UI 規格書 B5「商家新增/編輯品項」時發現，範圍超出單次工作階段，先記錄）：「商品瀏覽」這條線（`VendorPage.tsx`／`MenuItemPage.tsx`／`VendorPortalMenu.tsx`／`CartPage.tsx`，SU 負責的「商品／瀏覽」「商家後台」模組，用 `VendorData`／`MenuItemData` 型別，從舊 `BunnBaa Parse_Ref` 雛型搬過來，含訂閱狀態／營業時段／桌位 QR 等「本次不做」清單裡揪團/現場點餐的殘留欄位）跟真正在跑的 `Lock`／`Vendor` 流程（`item_focus`／`reliability_tone`／`verified`，Donna 這幾天一直在接的 `cafe-renheya-demo`）是**兩套完全不相干、沒有互相引用的資料模型**。要接 Firestore 前得先決定：(a) `menu_items` 只接真實 `vendorId`（固定用 `cafe-renheya-demo`），維持跟 `VendorData`/訂閱系統分離；(b) 索性把整套「商品瀏覽」stack 併進真正的 `Vendor` 模型；(c) 這條線本來就屬於路線圖，這次不用管。決定前 `VendorPortalMenu.tsx` 的品項管理 UI 暫時維持 mock
 
+**2026-09-23 購物車結帳採用選項 (a)，接上真實金流**：`CartPage.tsx`「送出預購」原本只是清空購物車＋toast 的示意畫面，完全沒寫入任何資料庫。這次改成真的呼叫 LINE Pay（新增 `createCartLinePayReservation` Cloud Function，`functions/src/index.js`），購物車每個品項×數量展開成對應筆數的真實 `locks` 草稿（一份餐點一組取餐碼，沿用 `HomePage.tsx`「預約加入計畫」已經用過的「一次寫入 N 筆」模式），付款確認後才真的建立 `locks`。`confirmLinePayPayment` 因此改成統一處理陣列（`lock_drafts`），單品項（`/lock`）跟購物車多品項共用同一套確認邏輯。**限制**：商品/商家目錄仍是 mock（`vendor-1`／`vendor-2`／`vendor-3`），不管購物車品項來自哪個假商家，結帳出來的 `locks` 一律掛在唯一的真實商家 `cafe-renheya-demo` 底下（品項名稱/價格是真的，商家歸屬是簡化）——這是選項 (a) 的已知取捨，不是 bug。已實測 Request API 成功導向 LINE Pay Sandbox 結帳頁
+
 **🟡 ISO27001（系統與安全）**：2026-09-21 完成技術面落差分析＋修補，詳見 [ISO27001_落差分析.md](ISO27001_落差分析.md)。已補：Functions 授權（管理員／商家 owner）、`payouts`／`accuracy_reports` 限管理員與該商家 owner 可讀（`vendors/{id}.owner_uid` 綁定，商家儀表板改為需登入）、FCM token 私有化、`locks` 完整性規則、管理員稽核日誌、Hosting 安全標頭。`firestore.rules` 與前端已於 2026-09-21 部署上線（規則以未登入 REST 請求驗證過：敏感集合回 403）。**待辦**：下方煙霧測試；錄 demo 前照文件「商家帳號綁定」流程建商家帳號並設 `owner_uid`（否則商家儀表板看不到資料）；認證所需的 ISMS 管理制度文件尚未建立
 
 **ISO27001 上線後煙霧測試（2026-09-21 以 Chrome 擴充功能實測）**
-- [x] 開 https://bunnbaa-mvp-5474.web.app/#/lock，按「鎖定這份」，看到取餐 QR code 即成功（通過，測試單 `9MNIFR3H`）
-- [x] `/#/login` 用 `admin@test.com`（密碼任意）登入平台 → 開 `/#/admin/locks` → 用真實管理員帳號（`suw192336@gmail.com`）登入 → 對一筆訂單按「標記已完成取餐」再「退回鎖定中」還原（通過，兩次狀態切換皆成功、Console 無錯誤）
+- [V] 開 https://bunnbaa-mvp-5474.web.app/#/lock，按「鎖定這份」，看到取餐 QR code 即成功（通過，測試單 `9MNIFR3H`）
+- [V] `/#/login` 用 `admin@test.com`（密碼任意）登入平台 → 開 `/#/admin/locks` → 用真實管理員帳號（`suw192336@gmail.com`）登入 → 對一筆訂單按「標記已完成取餐」再「退回鎖定中」還原（通過，兩次狀態切換皆成功、Console 無錯誤）
 - [ ] Firestore Console 確認 `admin_audit_logs` 多了兩筆（含 admin_email 與狀態變化）——**尚未親眼確認**：程式為單一 `writeBatch`（狀態更新與稽核紀錄同成敗），兩次切換都成功，理論上兩筆都已寫入，但需在 Console 看過才算數
-- [x] 瀏覽器 F12 Console 檢查有無 `Content-Security-Policy-Report-Only` 違規（通過：重新載入後無 CSP 違規、無 error；唯一警告是 `VAPID_KEY not set`，屬預期，見上方 FCM 卡點）
+- [V] 瀏覽器 F12 Console 檢查有無 `Content-Security-Policy-Report-Only` 違規（通過：重新載入後無 CSP 違規、無 error；唯一警告是 `VAPID_KEY not set`，屬預期，見上方 FCM 卡點）
 - [ ] 長期觀察無 CSP 違規後，把 `firebase.json` 的 `Content-Security-Policy-Report-Only` 改為 `Content-Security-Policy`（目前只測過 `/lock` 與兩個 mock 管理頁，尚未涵蓋所有頁面）
 - [ ] Console 手動項目：帳號 2FA、Firebase API key 加 referrer 限制（`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`localhost:*`，存檔後立刻重測正式站）、Cloud Audit Logs 開資料讀寫、GitHub `master` branch protection（需先與雅婷討論改走 PR）
 
@@ -125,21 +127,21 @@ UI 草圖：https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc （僅參考版面
 | `PlanSchedule.dc.html`（合作店家與計畫） | `HomePage.tsx` | ✅ 已一比一做出來 |
 | `Main.dc.html`「預購鎖定」 | 2026-09-21 補進 `HomePage.tsx` | 🟡 版面＋互動骨架完成，**尚未接後端**——真正端到端接 Firestore 的示範仍在 `/lock`（`ConsumerLockPage.tsx`），兩邊還沒合併 |
 | `Marketplace.dc.html`「轉讓市集」 | `TransferMarketPage.tsx`（`/marketplace`） | 🟡 2026-09-22 接上真實 Firestore：瀏覽轉讓／我要接手（`claimResoldLock`）／免費領取／我的轉讓皆已是真實查詢與寫入。**尚未接後端**：「取消轉讓」（firestore.rules 沒有對應規則讓 owner 把 `for_resale` 改回 `locked`）；已被接手的項目也無法在「我的轉讓」追蹤（資料模型沒記錄原轉讓者） |
-| `MyBookings.dc.html`「我的商品」 | `MyBookingsPage.tsx`（`/my-bookings`） | 🟡 2026-09-22 改接真實 Firestore：依 `buyer_uid` 查真實 `locks`，依 `pickup_date` 分組成清單（不是原本假資料的固定 21 格週曆，因為真實筆數不固定）；「使用」（顯示取餐碼）／「贈送」（`for_gift`）／「交易」（`for_resale`）／「留下回饋」都是真的讀寫。**尚未接後端**：核銷仍要靠商家端 `markLockOutcome`（消費者這邊只能顯示取餐碼，不能自己按完成）；「計畫型」（訂閱制多日方案）完全沒有真實資料模型，這次沒有補假資料 |
+| `MyBookings.dc.html`「我的商品」 | `MyBookingsPage.tsx`（`/my-bookings`） | 🟡 2026-09-22 改接真實 Firestore：依 `buyer_uid` 查真實 `locks`；「使用」（顯示取餐碼）／「贈送」（`for_gift`）／「交易」（`for_resale`）／「留下回饋」都是真的讀寫。2026-09-23 把版面改回草圖原本的週曆格狀（一開始改接 Firestore 時因為真實筆數不固定，暫時退回成依 `pickup_date` 分組的直條清單——這次恢復週曆，但格數改成資料驅動：預設顯示當週往後 3 週，若有訂單落在範圍外會整週延伸，不會像原本假資料那樣固定 21 格裝不下；格子裡放精簡的訂單小卡，點下去在下方展開完整操作區塊（QR／贈送／交易／回饋）。**尚未接後端**：核銷仍要靠商家端 `markLockOutcome`（消費者這邊只能顯示取餐碼，不能自己按完成）；「計畫型」（訂閱制多日方案）完全沒有真實資料模型，這次沒有補假資料 |
 | `Login.dc.html`（手機門號 OTP 兩段式） | `LoginPage.tsx`（`mockAuth.ts` 帳號字串猜角色） | 🟡 草圖確認要 OTP 流程，尚未做 |
 | `VendorDashboard.dc.html`（商家後台：訂單/備料/收益/成長獎勵） | 既有 `VendorPortalLayout.tsx` 系列 + 新增備料/成長獎勵頁 | 🟡 見下方「全新機制」 |
 
 ### 草圖裡後端還接不上的功能（待辦清單）
 
-- [x] 逾時自動開放 $0 元領取（Marketplace）——2026-09-22 完成：沿用既有 firestore.rules 的 lazy expiry 規則（不用排程 Function），`TransferMarketPage.tsx` 已接上真實 `locks` 查詢＋`claimResoldLock`／免費領取
-- [x] 取消轉讓（Marketplace「我的轉讓」／MyBookings）——2026-09-22 完成：`firestore.rules` 補上規則讓 owner 把還沒被接手的 `for_resale`／`for_gift` 改回 `locked`，兩頁都接了真的「取消轉讓／取消贈送」按鈕。**待辦**：這條規則要人工執行 `firebase deploy --only firestore:rules` 才會在正式站生效
-- [x] 贈送給指定朋友（MyBookings「贈送」）——2026-09-22 完成：改成真實 `for_gift` 機制（同 `ConsumerLockPage.tsx` 的 `handleGift`），沒有「指名」欄位——生成連結後私下傳給朋友，跟 QR 取餐碼「給誰就是誰的」同一套信任模型
-- [x] 留下回饋／評論（MyBookings 過去餐點）——2026-09-22 完成：`MyBookingsPage.tsx` 整頁改接真實 `locks`（依 `buyer_uid` 查詢，`pickup_date` 分組成清單，不是原本假資料的固定週曆格），「留下回饋」沿用 `Lock.consumer_feedback`，跟「使用」「贈送」「交易」一起接上真實 Firestore。「計畫型」（訂閱制）沒有真實資料模型，這次沒補假資料，只顯示單點型真實紀錄
-- [x] 計畫型（訂閱制多日方案）——2026-09-22 完成，但用了跟原設想不同的簡化設計：沒有另外的 `plan`/`subscription` collection，「預約加入計畫」當下直接一次寫入 N 筆真實 `locks`（同一個 `plan_id` 串起來，見 `types.ts` 的 `Lock.plan_id`/`plan_label`），不用排程 Cloud Function 每天生一筆——原因是這樣就不受 Blaze 卡住。取餐日從明天起算連續 N 天，沒有對應「下週一/二/三」那組展示用文字實際換算日期
-- [x] 認證商家徽章——2026-09-22 完成，`Vendor.verified` 欄位（只有 admin 能寫，`firestore.rules` 的 `vendors` 寫入規則本來就沒限制欄位白名單，不用改規則），`AdminSettingsPage.tsx` 新增「認證商家」卡片可以勾選，`ConsumerLockPage.tsx` 顯示徽章
-- [x] 早鳥階梯定價 95/8/7 折——2026-09-22 完成，`web/src/lib/pricing.ts`（純函式，可測），已接進 `ConsumerLockPage.tsx` 的 `handleLock()`。`HomePage.tsx` 的 `mockLockMeals` 卡片是純前端 mock、還沒接真實下單流程，沒有一併套用
-- [x] `growth_rewards`／`draws` collection 重新設計——2026-09-22 完成資料模型 + 規則設計，抽獎邏輯（`drawGrowthReward`）寫在 `functions/src/index.js`，機率權重制、0 元券見底自動降級 1 折保底，符合「機率計算不能信任 client」的要求。`VendorPortalGrowth.tsx`／`GrowthRewardTicker.tsx`／`HomePage.tsx`（新增消費者端「成長獎勵抽獎」卡片）都接上真實資料。2026-09-23 `drawGrowthReward` Function 與 `growth_rewards`／`draws` 規則已部署上正式站。**待辦**：還沒真的在正式站被呼叫過測試
-- [x] 備料聚合改成依 `locks` collection 的 `pickup_date` + `pickup_window` 即時分組——2026-09-22 完成，`VendorPortalPrep.tsx` 改用 `onSnapshot`
+- [V] 逾時自動開放 $0 元領取（Marketplace）——2026-09-22 完成：沿用既有 firestore.rules 的 lazy expiry 規則（不用排程 Function），`TransferMarketPage.tsx` 已接上真實 `locks` 查詢＋`claimResoldLock`／免費領取
+- [V] 取消轉讓（Marketplace「我的轉讓」／MyBookings）——2026-09-22 完成：`firestore.rules` 補上規則讓 owner 把還沒被接手的 `for_resale`／`for_gift` 改回 `locked`，兩頁都接了真的「取消轉讓／取消贈送」按鈕。**待辦**：這條規則要人工執行 `firebase deploy --only firestore:rules` 才會在正式站生效
+- [V] 贈送給指定朋友（MyBookings「贈送」）——2026-09-22 完成：改成真實 `for_gift` 機制（同 `ConsumerLockPage.tsx` 的 `handleGift`），沒有「指名」欄位——生成連結後私下傳給朋友，跟 QR 取餐碼「給誰就是誰的」同一套信任模型
+- [V] 留下回饋／評論（MyBookings 過去餐點）——2026-09-22 完成：`MyBookingsPage.tsx` 整頁改接真實 `locks`（依 `buyer_uid` 查詢，`pickup_date` 分組成清單，不是原本假資料的固定週曆格），「留下回饋」沿用 `Lock.consumer_feedback`，跟「使用」「贈送」「交易」一起接上真實 Firestore。「計畫型」（訂閱制）沒有真實資料模型，這次沒補假資料，只顯示單點型真實紀錄
+- [V] 計畫型（訂閱制多日方案）——2026-09-22 完成，但用了跟原設想不同的簡化設計：沒有另外的 `plan`/`subscription` collection，「預約加入計畫」當下直接一次寫入 N 筆真實 `locks`（同一個 `plan_id` 串起來，見 `types.ts` 的 `Lock.plan_id`/`plan_label`），不用排程 Cloud Function 每天生一筆——原因是這樣就不受 Blaze 卡住。取餐日從明天起算連續 N 天，沒有對應「下週一/二/三」那組展示用文字實際換算日期
+- [V] 認證商家徽章——2026-09-22 完成，`Vendor.verified` 欄位（只有 admin 能寫，`firestore.rules` 的 `vendors` 寫入規則本來就沒限制欄位白名單，不用改規則），`AdminSettingsPage.tsx` 新增「認證商家」卡片可以勾選，`ConsumerLockPage.tsx` 顯示徽章
+- [V] 早鳥階梯定價 95/8/7 折——2026-09-22 完成，`web/src/lib/pricing.ts`（純函式，可測），已接進 `ConsumerLockPage.tsx` 的 `handleLock()`。`HomePage.tsx` 的 `mockLockMeals` 卡片是純前端 mock、還沒接真實下單流程，沒有一併套用
+- [V] `growth_rewards`／`draws` collection 重新設計——2026-09-22 完成資料模型 + 規則設計，抽獎邏輯（`drawGrowthReward`）寫在 `functions/src/index.js`，機率權重制、0 元券見底自動降級 1 折保底，符合「機率計算不能信任 client」的要求。`VendorPortalGrowth.tsx`／`GrowthRewardTicker.tsx`／`HomePage.tsx`（新增消費者端「成長獎勵抽獎」卡片）都接上真實資料。2026-09-23 `drawGrowthReward` Function 與 `growth_rewards`／`draws` 規則已部署上正式站。**待辦**：還沒真的在正式站被呼叫過測試
+- [V] 備料聚合改成依 `locks` collection 的 `pickup_date` + `pickup_window` 即時分組——2026-09-22 完成，`VendorPortalPrep.tsx` 改用 `onSnapshot`
 
 QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`LockQRCode.tsx` + `VendorRedeemPage.tsx`。
 
@@ -149,15 +151,15 @@ QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`Loc
 
 ## 環境搭建剩餘步驟（Donna——對應「Donna 負責」的「Firebase 專案建置」）
 
-- [x] Firebase 專案建立
-- [x] `firebase use --add` 連結專案，產生 `.firebaserc`
-- [x] 啟用 Firestore（asia-east1）、Authentication（匿名登入）
-- [x] 部署 `firestore.rules` 和 `firestore.indexes.json`
-- [x] 2026-09-23 升級到 Blaze 方案 → 啟用 Functions → 部署 10/11 個 Cloud Functions（`onLockCreated` 因 Eventarc 權限生效延遲，重試部署中）
-- [x] 啟用 Hosting：`web/` 已 build 並部署，https://bunnbaa-mvp-5474.web.app （正式環境 Firestore 是空的，還沒 seed demo 資料；等要錄 demo 前再灌資料）
+- [V] Firebase 專案建立
+- [V] `firebase use --add` 連結專案，產生 `.firebaserc`
+- [V] 啟用 Firestore（asia-east1）、Authentication（匿名登入）
+- [V] 部署 `firestore.rules` 和 `firestore.indexes.json`
+- [V] 2026-09-23 升級到 Blaze 方案 → 啟用 Functions → 部署 10/11 個 Cloud Functions（`onLockCreated` 因 Eventarc 權限生效延遲，重試部署中）
+- [V] 啟用 Hosting：`web/` 已 build 並部署，https://bunnbaa-mvp-5474.web.app （正式環境 Firestore 是空的，還沒 seed demo 資料；等要錄 demo 前再灌資料）
 - [ ] 申請 Gemini API Key（見上方卡點 2），填入 `functions/.env`
-- [x] 把 `web/src/lib/firebase.ts` 的 `firebaseConfig` 換成真實專案設定值
-- [x] 本機用 emulator 跑通：消費者端「鎖定這份」流程已驗證（匿名登入、Firestore 寫入、`onLockCreated` 觸發都正常，只差 Gemini Key 導致折扣說明卡在「產生說明中」）
+- [V] 把 `web/src/lib/firebase.ts` 的 `firebaseConfig` 換成真實專案設定值
+- [V] 本機用 emulator 跑通：消費者端「鎖定這份」流程已驗證（匿名登入、Firestore 寫入、`onLockCreated` 觸發都正常，只差 Gemini Key 導致折扣說明卡在「產生說明中」）
 
 已完成：`functions/` 和 `web/` 的 npm 依賴都裝好，四個 Cloud Functions 檔案語法確認正常，`web` 補了缺失的 `vite-env.d.ts`，`npx tsc --noEmit` 已過。
 
@@ -165,16 +167,16 @@ QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`Loc
 
 ## 骨架裡尚未實作的功能（見 `README.md`「尚未實作」清單）
 
-- [x] 轉賣流程實際 UI（`claimResoldLock`，emulator 端到端測過，含兩個匿名帳號互相接手）（Donna）
-- [x] 履約穩定度徽章自動換算（`runCalibrationForVendor` 算完 accuracy_rate 自動更新 `reliability_tone`）——**還沒端到端測過**，需 Gemini Key 才能真的跑出報告（Donna）
-- [x] 取餐時段推播提醒（spec §3.7，FCM，跟 AI 無關的純 UX）——2026-09-20 已完成程式碼，跟「Donna 負責」清單裡的「取餐提醒推播(FCM)」是同一件事，這裡的 `[ ]` 是沒同步更新的舊紀錄。程式碼由 **SU** 完成（`web/src/lib/messaging.ts` + `functions/src/index.js` 的 `pickupReminders`），部署卡 Blaze／VAPID key 歸 **Donna**
-- [x] 商家後台標記 no-show／備註介面（`/vendor/redeem`，`VendorRedeemPage.tsx`，emulator 已驗證）（Donna）
+- [V] 轉賣流程實際 UI（`claimResoldLock`，emulator 端到端測過，含兩個匿名帳號互相接手）（Donna）
+- [V] 履約穩定度徽章自動換算（`runCalibrationForVendor` 算完 accuracy_rate 自動更新 `reliability_tone`）——**還沒端到端測過**，需 Gemini Key 才能真的跑出報告（Donna）
+- [V] 取餐時段推播提醒（spec §3.7，FCM，跟 AI 無關的純 UX）——2026-09-20 已完成程式碼，跟「Donna 負責」清單裡的「取餐提醒推播(FCM)」是同一件事，這裡的 `[ ]` 是沒同步更新的舊紀錄。程式碼由 **SU** 完成（`web/src/lib/messaging.ts` + `functions/src/index.js` 的 `pickupReminders`），部署卡 Blaze／VAPID key 歸 **Donna**
+- [V] 商家後台標記 no-show／備註介面（`/vendor/redeem`，`VendorRedeemPage.tsx`，emulator 已驗證）（Donna）
 
 ## 之後的工作（照架構文件時程表順序，Donna——內容跟「Donna 負責」清單重複，保留當時程時間軸參考）
 
-- [x] 從 `BunnBaa Parse_Ref` 複製可沿用的前端元件（QR 核銷、react-hook-form+zod 表單、Cloudinary 上傳元件已搬過來但還沒接到任何頁面）
-- [x] 商業邏輯用「參照不複製」原則檢視完成
-- [x] 金流串接（假資料版）：`settleVendorPayouts`（全額撥款商家，無平台抽成，daily schedule + 手動觸發，emulator 端到端測過含重複點擊防護）；轉賣金流不經過平台（買家對買家私下付款，平台只轉移 `buyer_uid`）
+- [V] 從 `BunnBaa Parse_Ref` 複製可沿用的前端元件（QR 核銷、react-hook-form+zod 表單、Cloudinary 上傳元件已搬過來但還沒接到任何頁面）
+- [V] 商業邏輯用「參照不複製」原則檢視完成
+- [V] 金流串接（假資料版）：`settleVendorPayouts`（全額撥款商家，無平台抽成，daily schedule + 手動觸發，emulator 端到端測過含重複點擊防護）；轉賣金流不經過平台（買家對買家私下付款，平台只轉移 `buyer_uid`）
 - [ ] 整合測試 → 部署 Firebase Hosting → 錄 Demo（3 分鐘腳本見 v6 §8）→ 撰寫英文版 Proposal → **10/18 前提交**（Hosting 還沒重新部署最新的轉賣/撥款功能；對應「Donna 負責」⬜ 清單的「整合測試」「Demo 錄製＋Proposal」）
 
 ---

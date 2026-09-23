@@ -264,7 +264,7 @@ exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (reque
     info = await requestPayment({
       orderId,
       amount,
-      productName: itemName,
+      products: [{ name: itemName, quantity: 1, price: amount }],
       // orderId goes in the path, not a query string: LINE Pay appends
       // ?transactionId=... (or &... if our URL already has a "?") by plain
       // string concatenation, with no awareness of the "#" hash-router
@@ -286,15 +286,114 @@ exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (reque
     buyer_uid: request.auth.uid,
     transaction_id: String(info.transactionId),
     amount,
-    lock_draft: {
-      vendor_id: vendorId,
-      item_name: itemName,
-      pickup_window: pickupWindow,
-      pickup_date: pickupDate,
-      discount_percent: discountPercent ?? 0,
-      resellable: true,
-      locked_price: amount,
-    },
+    // Array of one — confirmLinePayPayment below always creates one Lock doc
+    // per entry, shared with the multi-item cart checkout (createCartLinePayReservation).
+    lock_drafts: [
+      {
+        vendor_id: vendorId,
+        item_name: itemName,
+        pickup_window: pickupWindow,
+        pickup_date: pickupDate,
+        discount_percent: discountPercent ?? 0,
+        resellable: true,
+        locked_price: amount,
+      },
+    ],
+    created_at: FieldValue.serverTimestamp(),
+  });
+
+  return { order_id: orderId, payment_url: info.paymentUrl.web };
+});
+
+/* ------------------------------------------------------------------ *
+ * 1d. Cart checkout — LINE Pay, multi-item version of the above. The
+ * "商品瀏覽" stack (VendorPage/MenuItemPage/CartPage.tsx, useCart, mock
+ * VendorData/MenuItemData catalog) has its own vendor/menu data that was
+ * never connected to the real Vendor/Lock Firestore model — this pilot
+ * only has one real vendor (cafe-renheya-demo), so every cart checkout is
+ * anchored to it regardless of which mock vendor's menu the items came
+ * from (see TODO.md's "兩套平行資料模型" note; this is option (a) there).
+ * Each cart line's quantity expands into that many individual Lock docs
+ * (one pickup QR code per meal), same convention as HomePage's plan-join.
+ * ------------------------------------------------------------------ */
+
+const CART_VENDOR_ID = "cafe-renheya-demo";
+const MAX_CART_LINES = 50;
+const MAX_CART_UNITS = 100; // bounds the Firestore batch confirmLinePayPayment writes
+
+exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Must be signed in (anonymous is fine) to check out");
+  }
+  const { items } = request.data || {};
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new HttpsError("invalid-argument", "items must be a non-empty array");
+  }
+  if (items.length > MAX_CART_LINES) {
+    throw new HttpsError("invalid-argument", `Too many cart lines (max ${MAX_CART_LINES})`);
+  }
+
+  const pickupDate = new Date().toISOString().slice(0, 10);
+  const products = [];
+  const lockDrafts = [];
+  let amount = 0;
+  for (const item of items) {
+    const itemName = item?.item_name;
+    const unitPrice = item?.unit_price;
+    const quantity = item?.quantity;
+    if (
+      typeof itemName !== "string" || !itemName ||
+      typeof unitPrice !== "number" || unitPrice <= 0 ||
+      !Number.isInteger(quantity) || quantity <= 0
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Each item needs item_name, a positive unit_price and a positive integer quantity"
+      );
+    }
+    const price = Math.round(unitPrice);
+    products.push({ name: itemName, quantity, price });
+    amount += price * quantity;
+    for (let i = 0; i < quantity; i++) {
+      lockDrafts.push({
+        vendor_id: CART_VENDOR_ID,
+        item_name: itemName,
+        pickup_window: "12:00-13:00",
+        pickup_date: pickupDate,
+        discount_percent: 0,
+        resellable: true,
+        locked_price: price,
+      });
+    }
+  }
+  if (lockDrafts.length > MAX_CART_UNITS) {
+    throw new HttpsError("invalid-argument", `Too many items total (max ${MAX_CART_UNITS})`);
+  }
+
+  const appBaseUrl = process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
+  const intentRef = db.collection("payment_intents").doc();
+  const orderId = intentRef.id;
+
+  let info;
+  try {
+    info = await requestPayment({
+      orderId,
+      amount,
+      products,
+      confirmUrl: `${appBaseUrl}/#/payment/confirm/${orderId}`,
+      cancelUrl: `${appBaseUrl}/#/payment/cancel/${orderId}`,
+    });
+  } catch (err) {
+    logger.error("LINE Pay cart request failed", err);
+    throw new HttpsError("internal", "LINE Pay 付款請求失敗，請稍後再試");
+  }
+
+  await intentRef.set({
+    status: "pending",
+    buyer_uid: request.auth.uid,
+    transaction_id: String(info.transactionId),
+    amount,
+    lock_drafts: lockDrafts,
     created_at: FieldValue.serverTimestamp(),
   });
 
@@ -320,7 +419,7 @@ exports.confirmLinePayPayment = onCall({ region: "asia-east1" }, async (request)
   // buyer double-taps back/refresh), so replay the stored result instead of
   // re-confirming with LINE Pay, which would reject a second confirm.
   if (intent.status === "confirmed") {
-    return { lock_id: intent.lock_id };
+    return { lock_ids: intent.lock_ids };
   }
   if (intent.status !== "pending") {
     throw new HttpsError("failed-precondition", `This payment is ${intent.status}, not pending`);
@@ -333,16 +432,22 @@ exports.confirmLinePayPayment = onCall({ region: "asia-east1" }, async (request)
     throw new HttpsError("internal", "LINE Pay 付款確認失敗，請稍後再試或聯絡客服");
   }
 
-  const lockRef = db.collection("locks").doc();
-  await lockRef.set({
-    ...intent.lock_draft,
-    status: "locked",
-    buyer_uid: request.auth.uid,
-    created_at: FieldValue.serverTimestamp(),
-  });
-  await intentRef.update({ status: "confirmed", lock_id: lockRef.id });
+  const batch = db.batch();
+  const lockIds = [];
+  for (const draft of intent.lock_drafts) {
+    const lockRef = db.collection("locks").doc();
+    batch.set(lockRef, {
+      ...draft,
+      status: "locked",
+      buyer_uid: request.auth.uid,
+      created_at: FieldValue.serverTimestamp(),
+    });
+    lockIds.push(lockRef.id);
+  }
+  batch.update(intentRef, { status: "confirmed", lock_ids: lockIds });
+  await batch.commit();
 
-  return { lock_id: lockRef.id };
+  return { lock_ids: lockIds };
 });
 
 /* ------------------------------------------------------------------ *

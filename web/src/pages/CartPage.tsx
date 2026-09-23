@@ -1,31 +1,66 @@
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { httpsCallable } from "firebase/functions";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { mockVendors } from "@/lib/mockData";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
+import { auth, functions } from "@/lib/firebase";
 
 // 購物車頁面。
 // UIUX 檢視後新增:原本 MenuItemPage「加入購物車」只會彈 toast,useCart 把品項存進
 // localStorage,但全站沒有任何頁面能查看/調整/送出購物車——是斷掉的核心動線。
 // 這頁補上查看、調整數量、刪除、送出預購的畫面。
-// TODO(firebase): 「送出預購」目前只是示意畫面(清空購物車 + toast),之後要接建立
-// PreOrder 的 Cloud Function(對應 mockData.ts 裡其他 mockCreate*/mockSave* 的接法)。
+// 2026-09-23：「送出預購」改接真的 LINE Pay（createCartLinePayReservation，
+// functions/src/index.js），付款確認後才建立真實 locks 文件。這條線用的
+// mockVendors/MenuItemData 目錄跟真正在跑的 Vendor/Lock 模型是兩套平行資料
+// （見 TODO.md「兩套平行資料模型」），這個試營運階段只有一個真實商家
+// cafe-renheya-demo，所以不管購物車品項來自哪個 mock 商家，結帳出來的
+// locks 一律掛在這個真實商家底下（品項名稱/價格仍是真的）。
 export default function CartPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { items, vendorId, total, removeItem, updateQuantity, clearCart } = useCart();
+  const [checkingOut, setCheckingOut] = useState(false);
 
   const vendor = vendorId ? mockVendors.find(v => v.id === vendorId) : null;
 
-  function handleCheckout() {
-    toast({
-      title: "已送出預購",
-      description: "示意畫面：實際送出需串接建立 PreOrder 的 Cloud Function。",
-    });
-    clearCart();
-    navigate("/my-bookings");
+  useEffect(() => {
+    signInAnonymously(auth).catch(console.error);
+  }, []);
+
+  async function handleCheckout() {
+    setCheckingOut(true);
+    try {
+      // Mount's signInAnonymously() call usually finishes well before the
+      // buyer reviews the cart and clicks checkout, but wait for it here too
+      // in case they landed straight on /cart before it resolved.
+      if (!auth.currentUser) {
+        await new Promise<void>((resolve, reject) => {
+          const unsub = onAuthStateChanged(auth, (u) => {
+            if (u) { unsub(); resolve(); }
+          }, reject);
+        });
+      }
+
+      const fn = httpsCallable(functions, "createCartLinePayReservation");
+      const result = await fn({
+        items: items.map(({ menuItem, quantity }) => ({
+          item_name: menuItem.name,
+          unit_price: menuItem.price,
+          quantity,
+        })),
+      });
+      const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
+      clearCart();
+      window.location.href = paymentUrl;
+    } catch (err) {
+      toast({ title: "前往付款失敗", description: (err as Error).message, variant: "destructive" });
+      setCheckingOut(false);
+    }
   }
 
   return (
@@ -111,8 +146,9 @@ export default function CartPage() {
               <Button
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white"
                 onClick={handleCheckout}
+                disabled={checkingOut}
               >
-                送出預購
+                {checkingOut ? "前往付款中…" : "送出預購並付款"}
               </Button>
             </div>
           </>

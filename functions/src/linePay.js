@@ -61,20 +61,18 @@ async function callLinePay(method, uri, body) {
   return json.info;
 }
 
-/** Reserves a payment; returns { transactionId, paymentUrl, paymentAccessToken }. */
-function requestPayment({ orderId, amount, productName, confirmUrl, cancelUrl }) {
+/**
+ * Reserves a payment; returns { transactionId, paymentUrl, paymentAccessToken }.
+ * `products` is LINE Pay's own shape: [{ name, quantity, price }, ...] — one
+ * entry per cart line (a single-item checkout just passes a 1-element array).
+ */
+function requestPayment({ orderId, amount, products, confirmUrl, cancelUrl }) {
   const uri = "/v3/payments/request";
   return callLinePay("POST", uri, {
     amount,
     currency: "TWD",
     orderId,
-    packages: [
-      {
-        id: "package-1",
-        amount,
-        products: [{ name: productName, quantity: 1, price: amount }],
-      },
-    ],
+    packages: [{ id: "package-1", amount, products }],
     redirectUrls: { confirmUrl, cancelUrl },
   });
 }

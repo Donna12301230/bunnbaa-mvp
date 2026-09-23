@@ -16,7 +16,7 @@ import { registerForPickupReminders } from "../lib/messaging";
  */
 export default function PaymentConfirmPage() {
   const [status, setStatus] = useState<"waiting-auth" | "confirming" | "done" | "error">("waiting-auth");
-  const [lockId, setLockId] = useState<string | null>(null);
+  const [lockIds, setLockIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   // Route is /payment/confirm/:orderId. LINE Pay's ?transactionId=... append
   // can still end up glued onto this param (see App.tsx's comment on this
@@ -36,16 +36,21 @@ export default function PaymentConfirmPage() {
       unsub();
       setStatus("confirming");
       try {
+        // Handles both a single-item checkout (ConsumerLockPage) and a
+        // multi-item cart checkout (CartPage) — confirmLinePayPayment always
+        // creates one Lock doc per cart line/quantity and returns all their ids.
         const fn = httpsCallable(functions, "confirmLinePayPayment");
         const result = await fn({ order_id: orderId });
-        const { lock_id: id } = result.data as { lock_id: string };
-        setLockId(id);
+        const { lock_ids: ids } = result.data as { lock_ids: string[] };
+        setLockIds(ids);
         setStatus("done");
 
         try {
           const fcmToken = await registerForPickupReminders();
           if (fcmToken) {
-            await setDoc(doc(db, "lock_tokens", id), { fcm_token: fcmToken, buyer_uid: user.uid });
+            await Promise.all(
+              ids.map((id) => setDoc(doc(db, "lock_tokens", id), { fcm_token: fcmToken, buyer_uid: user.uid }))
+            );
           }
         } catch (err) {
           console.warn("Could not save pickup-reminder token:", err);
@@ -66,12 +71,14 @@ export default function PaymentConfirmPage() {
           <p className="muted">確認付款中…</p>
         </div>
       )}
-      {status === "done" && lockId && (
+      {status === "done" && lockIds.length > 0 && (
         <div className="card">
           <h2>付款成功！</h2>
-          <LockQRCode lockId={lockId} vendorId="cafe-renheya-demo" />
+          {lockIds.map((id) => (
+            <LockQRCode key={id} lockId={id} vendorId="cafe-renheya-demo" />
+          ))}
           <p className="muted" style={{ marginTop: 12 }}>
-            <Link href="/lock">回鎖定頁面</Link>
+            <Link href="/my-locks">查看我的訂單</Link>
           </p>
         </div>
       )}
@@ -80,7 +87,7 @@ export default function PaymentConfirmPage() {
           <h2>付款確認失敗</h2>
           <p className="muted">{errorMessage}</p>
           <p className="muted">
-            <Link href="/lock">回鎖定頁面重新嘗試</Link>
+            <Link href="/my-locks">查看我的訂單</Link>
           </p>
         </div>
       )}
