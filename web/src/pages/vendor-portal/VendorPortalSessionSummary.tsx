@@ -246,7 +246,7 @@ export default function VendorPortalSessionSummary() {
                     <div className="flex items-center gap-2.5">
                       {isDone
                         ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                        : <Circle className="w-5 h-5 text-gray-300 shrink-0" />
+                        : <Circle className="w-5 h-5 text-gray-400 shrink-0" />
                       }
                       <div>
                         <div className={`font-medium text-sm ${isDone ? "line-through text-muted-foreground" : ""}`}>

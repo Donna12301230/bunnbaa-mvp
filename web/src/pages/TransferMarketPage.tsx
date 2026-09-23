@@ -150,11 +150,11 @@ export default function TransferMarketPage() {
       <MarketplaceHeader active="transfer" />
 
       {/* ── Hero ── */}
-      <section className="bg-gradient-to-br from-amber-400 to-orange-400 px-4 md:px-6 py-10">
+      <section className="bg-gradient-to-br from-orange-500 to-orange-600 px-4 md:px-6 py-10">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-6 flex-wrap">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-1.5">轉讓市集</h1>
-            <p className="text-sm text-amber-50">同學安全轉讓已鎖定的方案，全額入袋；逾時沒人接手，系統會自動開放 $0 元供人領取。</p>
+            <p className="text-sm text-white">同學安全轉讓已鎖定的方案，全額入袋；逾時沒人接手，系統會自動開放 $0 元供人領取。</p>
           </div>
           <div className="flex items-center gap-2 bg-white rounded-2xl p-1.5 pl-4 min-w-[300px]">
             <Search className="w-4 h-4 text-gray-400 shrink-0" />
@@ -263,7 +263,7 @@ export default function TransferMarketPage() {
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-1.5">
                         <div>
-                          <span className="text-xs text-gray-400 line-through mr-1.5">${item.locked_price}</span>
+                          <span className="text-xs text-gray-500 line-through mr-1.5">${item.locked_price}</span>
                           <span className="text-lg font-extrabold">$0</span>
                         </div>
                         <Button

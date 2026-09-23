@@ -13,7 +13,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const COLORS = ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"];
+// 設計系統品牌色階（由深到淺），對應 tailwind orange-500 / 400 / 300 / 200 / 100
+const COLORS = ["#B35A00", "#F29E0C", "#F7C27A", "#FBDDB5", "#FDEBD3"];
 
 function ItemRankList({ items }: { items: { name: string; qty: number; revenue: number }[] }) {
   if (items.length === 0) return <p className="text-sm text-muted-foreground text-center py-6">無資料</p>;
@@ -129,11 +130,11 @@ export default function VendorPortalReports() {
     return (
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ECE6DC" />
           <XAxis dataKey="date" tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip formatter={(v: number) => [`NT$ ${v}`, "收入"]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-          <Bar dataKey="revenue" radius={[4, 4, 0, 0]} fill="#f97316" />
+          <Bar dataKey="revenue" radius={[4, 4, 0, 0]} fill="#B35A00" />
         </BarChart>
       </ResponsiveContainer>
     );

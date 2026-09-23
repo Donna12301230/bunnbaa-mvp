@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import GrowthRewardTicker from "@/components/GrowthRewardTicker";
 import { auth, db, functions } from "@/lib/firebase";
@@ -63,6 +64,7 @@ export default function HomePage() {
   const [selectedSort, setSelectedSort] = useState<string>("relevance");
   const [waiverAck, setWaiverAck] = useState<Record<string, boolean>>({});
   const [lockingMealId, setLockingMealId] = useState<string | null>(null);
+  const [lockDialogItem, setLockDialogItem] = useState<{ item: MenuItem; vendor: Vendor } | null>(null);
   const [uid, setUid] = useState<string | null>(null);
   const [joiningPlanId, setJoiningPlanId] = useState<string | null>(null);
   const [joinedPlanIds, setJoinedPlanIds] = useState<Record<string, boolean>>({});
@@ -389,10 +391,7 @@ export default function HomePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {lockMealCards.map(({ item, vendor }) => {
-                const { discountPercent, lockedPrice } = applyEarlyBirdPrice(item.price, pickupDate);
-                const hasAcked = !!waiverAck[item.id];
-                const isSubmitting = lockingMealId === item.id;
-                const ctaDisabled = !hasAcked || isSubmitting;
+                const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
                 return (
                   <article key={item.id} className="bg-white rounded-2xl border border-border overflow-hidden flex flex-col">
                     <div className="relative h-32 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl">
@@ -414,6 +413,42 @@ export default function HomePage() {
                         <p className="text-xs text-muted-foreground font-semibold mt-0.5">{vendor.name}・取餐時段：{pickupDate}（{TIME_SLOT_WINDOWS[selectedSlot]}）</p>
                       </div>
 
+                      <div className="flex items-center justify-between mt-auto pt-1">
+                        <div>
+                          {discountPercent > 0 && <span className="text-xs text-gray-500 line-through mr-1.5">原價 ${item.price}</span>}
+                          <span className="text-xl font-extrabold">${lockedPrice}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => setLockDialogItem({ item, vendor })}
+                          className="bg-orange-500 hover:bg-orange-600 text-white"
+                        >
+                          立即預付鎖定
+                        </Button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* 立即預付鎖定確認彈窗——折扣說明/消保法聲明/轉讓市集提醒改成點按鈕當下才顯示，不塞在每張卡片上 */}
+          <Dialog open={!!lockDialogItem} onOpenChange={(open) => { if (!open) setLockDialogItem(null); }}>
+            <DialogContent>
+              {lockDialogItem && (() => {
+                const { item, vendor } = lockDialogItem;
+                const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
+                const hasAcked = !!waiverAck[item.id];
+                const isSubmitting = lockingMealId === item.id;
+                return (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>{item.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 py-1">
+                      <p className="text-sm text-muted-foreground">{vendor.name}・取餐時段：{pickupDate}（{TIME_SLOT_WINDOWS[selectedSlot]}）・${lockedPrice}</p>
+
                       <div className="flex gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
                         <Star className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5 fill-amber-500" />
                         <p className="text-[11px] leading-relaxed text-amber-900">
@@ -423,46 +458,41 @@ export default function HomePage() {
                         </p>
                       </div>
 
-                      <div className="flex flex-col gap-1.5">
-                        <label className="flex items-start gap-1.5 p-2 rounded-lg bg-gray-50 border border-border cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={hasAcked}
-                            onChange={() => setWaiverAck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                            className="mt-0.5 accent-orange-500 w-3.5 h-3.5 shrink-0"
-                          />
-                          <span className="text-[10.5px] leading-relaxed text-muted-foreground">
-                            我了解本商品為現做餐點，依消保法通訊交易解除權合理例外情事適用準則，<strong className="text-foreground">鎖定後不適用 7 天猶豫期</strong>，除商家未履約外恕不接受退款
-                          </span>
-                        </label>
-                        <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
-                          <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
-                          <span className="text-[10.5px] leading-relaxed text-orange-900">
-                            取餐時段結束仍未取餐，將<strong>自動開放到轉讓市集、$0 元供人領取</strong>，避免整份浪費
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between mt-auto pt-1">
-                        <div>
-                          {discountPercent > 0 && <span className="text-xs text-gray-400 line-through mr-1.5">原價 ${item.price}</span>}
-                          <span className="text-xl font-extrabold">${lockedPrice}</span>
-                        </div>
-                        <Button
-                          size="sm"
-                          disabled={ctaDisabled}
-                          onClick={() => handleLockMeal(item)}
-                          className="bg-orange-500 hover:bg-orange-600 text-white disabled:bg-gray-200 disabled:text-gray-400"
-                        >
-                          {isSubmitting ? "前往付款中…" : "立即預付鎖定"}
-                        </Button>
+                      <label className="flex items-start gap-1.5 p-2 rounded-lg bg-gray-50 border border-border cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={hasAcked}
+                          onChange={() => setWaiverAck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                          className="mt-0.5 accent-orange-500 w-3.5 h-3.5 shrink-0"
+                        />
+                        <span className="text-[10.5px] leading-relaxed text-muted-foreground">
+                          我了解本商品為現做餐點，依消保法通訊交易解除權合理例外情事適用準則，<strong className="text-foreground">鎖定後不適用 7 天猶豫期</strong>，除商家未履約外恕不接受退款
+                        </span>
+                      </label>
+                      <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
+                        <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
+                        <span className="text-[10.5px] leading-relaxed text-orange-900">
+                          取餐時段結束仍未取餐，將<strong>自動開放到轉讓市集、$0 元供人領取</strong>，避免整份浪費
+                        </span>
                       </div>
                     </div>
-                  </article>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setLockDialogItem(null)} disabled={isSubmitting}>
+                        取消
+                      </Button>
+                      <Button
+                        disabled={!hasAcked || isSubmitting}
+                        onClick={() => handleLockMeal(item)}
+                        className="bg-orange-500 hover:bg-orange-600 text-white disabled:bg-gray-200 disabled:text-gray-400"
+                      >
+                        {isSubmitting ? "前往付款中…" : "確認鎖定並付款"}
+                      </Button>
+                    </DialogFooter>
+                  </>
                 );
-              })}
-            </div>
-          </section>
+              })()}
+            </DialogContent>
+          </Dialog>
 
           {/* 合作店家與計畫 */}
           <section>
@@ -516,13 +546,13 @@ export default function HomePage() {
           </section>
 
           {/* 同學轉讓保底專區（含轉讓優惠橫捲清單，併成同一區塊放最下面） */}
-          <section className="rounded-2xl p-6 bg-gradient-to-br from-amber-400 to-orange-400 space-y-5">
+          <section className="rounded-2xl p-6 bg-gradient-to-br from-orange-500 to-orange-600 space-y-5">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div className="flex items-center gap-3.5">
                 <Repeat className="w-7 h-7 text-white shrink-0" />
                 <div>
                   <h3 className="font-bold text-white text-[15.5px] mb-0.5">同學轉讓保底專區</h3>
-                  <p className="text-sm text-amber-50 max-w-xl">
+                  <p className="text-sm text-white max-w-xl">
                     臨時去不了？可安全轉讓給同學，全額入袋；逾時沒人接手，系統會自動開放到轉讓市集、$0 元供人領取，不浪費一份鎖定。
                   </p>
                 </div>

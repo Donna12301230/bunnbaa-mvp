@@ -2,89 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── shadcn/ui design tokens (ported from BunnBaa Parse_Ref) ──────────────
-   Drives the new marketplace UI (login/home/admin/vendor-portal pages).
+/* ── shadcn/ui design tokens ──────────────────────────────────────────────
+   已對齊 BunnBaa 設計系統（src/styles/tokens.css，預覽：#/design-system）。
+   色值與 tokens.css 同源，改色時兩邊一起改。
+   Drives the marketplace UI (login/home/admin/vendor-portal pages).
    Kept separate from the --ink/--brand/... tokens below, which the existing
    lock-prototype pages (ConsumerLockPage/VendorDashboard/VendorRedeemPage)
    use — the two systems don't share variable names, so they coexist safely. */
 :root {
-  --background: hsl(36, 40%, 97%);
-  --foreground: hsl(22, 30%, 12%);
-  --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(22, 30%, 12%);
-  --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(22, 30%, 12%);
-  --primary: hsl(22, 62%, 35%);
-  --primary-foreground: hsl(36, 60%, 97%);
-  --secondary: hsl(36, 35%, 88%);
-  --secondary-foreground: hsl(22, 40%, 18%);
-  --muted: hsl(36, 25%, 93%);
-  --muted-foreground: hsl(22, 15%, 46%);
-  --accent: hsl(36, 88%, 50%);
-  --accent-foreground: hsl(0, 0%, 100%);
-  --destructive: hsl(0, 84.2%, 60.2%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(36, 20%, 87%);
-  --input: hsl(36, 20%, 87%);
-  --ring: hsl(22, 62%, 35%);
-  --chart-1: hsl(22, 62%, 35%);
-  --chart-2: hsl(36, 88%, 50%);
-  --chart-3: hsl(36, 45%, 65%);
-  --chart-4: hsl(22, 30%, 55%);
-  --chart-5: hsl(36, 70%, 70%);
-  --sidebar: hsl(36, 30%, 95%);
-  --sidebar-foreground: hsl(22, 30%, 12%);
-  --sidebar-primary: hsl(22, 62%, 35%);
-  --sidebar-primary-foreground: hsl(36, 60%, 97%);
-  --sidebar-accent: hsl(36, 35%, 88%);
-  --sidebar-accent-foreground: hsl(22, 62%, 35%);
-  --sidebar-border: hsl(36, 20%, 87%);
-  --sidebar-ring: hsl(22, 62%, 35%);
-  --brand-navy: #0f2a4a;
-  --brand-navy-hover: #16375c;
-  --surface-dark: #2b2620;
-  --font-sans: -apple-system, "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+  --background: #fff8ec;          /* --bg */
+  --foreground: #2b2b2b;          /* --text */
+  --card: #ffffff;                /* --surface */
+  --card-foreground: #2b2b2b;
+  --popover: #ffffff;
+  --popover-foreground: #2b2b2b;
+  --primary: #b35a00;             /* --brand-orange-strong：白字 4.80:1 */
+  --primary-foreground: #ffffff;
+  --primary-hover: #944a00;       /* hover 加深（設計系統：hover 微微變深） */
+  --secondary: #fdebd3;           /* --brand-orange-soft */
+  --secondary-foreground: #a34f00;/* --brand-orange-text：4.90:1 */
+  --muted: #f7f5f0;               /* --surface-muted */
+  --muted-foreground: #6f6b66;    /* --text-muted：4.85:1 on muted */
+  --accent: #fff4e3;              /* --brand-orange-tint：hover / 選取底 */
+  --accent-foreground: #a34f00;
+  --destructive: #c24e36;         /* --danger-strong：白字 4.73:1 */
+  --destructive-foreground: #ffffff;
+  --destructive-hover: #a84030;
+  --border: #ece6dc;
+  --input: #dcd3c6;               /* --border-strong */
+  --ring: #b35a00;                /* focus ring */
+  --chart-1: #b35a00;
+  --chart-2: #f29e0c;
+  --chart-3: #b87a5a;
+  --chart-4: #5a9e6f;
+  --chart-5: #6b8fb3;
+  --sidebar: #fffbf4;
+  --sidebar-foreground: #2b2b2b;
+  --sidebar-primary: #b35a00;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fdebd3;
+  --sidebar-accent-foreground: #a34f00;
+  --sidebar-border: #ece6dc;
+  --sidebar-ring: #b35a00;
+  /* 原為海軍藍；設計系統避免冷色調，改用品牌深棕（白字 5.67:1）。變數名稱保留以免改頁面 */
+  --brand-navy: #8f5a3f;
+  --brand-navy-hover: #744630;
+  --surface-dark: #3a2f26;
+  --font-sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
-  --radius: 0.5rem;
+  --radius: 12px;
 }
 
 .dark {
-  --background: hsl(22, 20%, 8%);
-  --foreground: hsl(36, 40%, 92%);
-  --card: hsl(22, 18%, 11%);
-  --card-foreground: hsl(36, 40%, 92%);
-  --popover: hsl(22, 18%, 11%);
-  --popover-foreground: hsl(36, 40%, 92%);
-  --primary: hsl(22, 62%, 50%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(36, 25%, 18%);
-  --secondary-foreground: hsl(36, 40%, 92%);
-  --muted: hsl(22, 15%, 14%);
-  --muted-foreground: hsl(36, 15%, 55%);
-  --accent: hsl(36, 88%, 52%);
-  --accent-foreground: hsl(0, 0%, 100%);
-  --destructive: hsl(0, 84.2%, 60.2%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(22, 15%, 18%);
-  --input: hsl(22, 18%, 16%);
-  --ring: hsl(22, 62%, 50%);
-  --chart-1: hsl(22, 62%, 50%);
-  --chart-2: hsl(36, 88%, 52%);
-  --chart-3: hsl(36, 45%, 45%);
-  --chart-4: hsl(22, 30%, 50%);
-  --chart-5: hsl(36, 70%, 55%);
-  --sidebar: hsl(22, 18%, 11%);
-  --sidebar-foreground: hsl(36, 40%, 92%);
-  --sidebar-primary: hsl(22, 62%, 50%);
-  --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent: hsl(36, 25%, 18%);
-  --sidebar-accent-foreground: hsl(22, 62%, 50%);
-  --sidebar-border: hsl(22, 15%, 22%);
-  --sidebar-ring: hsl(22, 62%, 50%);
-  --brand-navy: #16375c;
-  --brand-navy-hover: #1d4573;
-  --surface-dark: #2b2620;
+  --background: #1f1a15;
+  --foreground: #f3ece2;
+  --card: #2a231d;
+  --card-foreground: #f3ece2;
+  --popover: #2a231d;
+  --popover-foreground: #f3ece2;
+  --primary: #b35a00;
+  --primary-foreground: #ffffff;
+  --primary-hover: #944a00;
+  --secondary: #43321c;
+  --secondary-foreground: #f29e0c;
+  --muted: #342b24;
+  --muted-foreground: #b8afa3;
+  --accent: #2f261c;
+  --accent-foreground: #f29e0c;
+  --destructive: #c24e36;
+  --destructive-foreground: #ffffff;
+  --destructive-hover: #a84030;
+  --border: #3d342b;
+  --input: #52463a;
+  --ring: #f29e0c;
+  --chart-1: #f29e0c;
+  --chart-2: #d9a07f;
+  --chart-3: #b87a5a;
+  --chart-4: #8cc79c;
+  --chart-5: #a5c0dc;
+  --sidebar: #2a231d;
+  --sidebar-foreground: #f3ece2;
+  --sidebar-primary: #b35a00;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #43321c;
+  --sidebar-accent-foreground: #f29e0c;
+  --sidebar-border: #3d342b;
+  --sidebar-ring: #f29e0c;
+  --brand-navy: #8f5a3f;
+  --brand-navy-hover: #744630;
+  --surface-dark: #15110d;
 }
 
 @layer base {
@@ -93,44 +100,47 @@
   }
 }
 
-/* ── existing lock-prototype design tokens (ConsumerLockPage / VendorDashboard /
-   VendorRedeemPage) — unchanged ──────────────────────────────────────────── */
+/* ── lock-prototype tokens（ConsumerLockPage / VendorDashboard / VendorRedeemPage /
+   Payment 結果頁）— 變數名稱不變，色值改為 BunnBaa 設計系統（原為灰玫瑰色系）。
+   文字色皆 ≥ 4.5:1；狀態色對應設計系統 success / warning / danger / info。 ── */
 :root {
-  --ink: #1a1a1a;
-  --sub: #555;
-  --faint: #888;
-  --brand: #8b5e5e;
-  --brand-strong: #6e4749;
-  --brand-light: #f4ecec;
-  --line: #e3e3e3;
-  --bg: #fff;
+  --ink: #2b2b2b;                 /* --text */
+  --sub: #5c5c5c;                 /* --text-secondary */
+  --faint: #6f6b66;               /* --text-muted */
+  --brand: #a34f00;               /* --brand-orange-text：白字 5.71:1、on brand-light 4.90:1 */
+  --brand-strong: #7a3d00;
+  --brand-light: #fdebd3;         /* --brand-orange-soft */
+  --on-brand: #fff;               /* 品牌底上的文字 */
+  --line: #ece6dc;                /* --border */
+  --bg: #fff8ec;                  /* 奶油底 */
   --surface: #fff;
 
   /* status colors — one pair per lock.status value (spec §04 設計代幣) */
-  --status-locked: #8b5e5e;      --status-locked-bg: #f4ecec;
-  --status-resale: #a9762b;      --status-resale-bg: #f8efe0;
-  --status-fulfilled: #4f7a5c;   --status-fulfilled-bg: #eaf2ec;
-  --status-resold: #3d7a7e;      --status-resold-bg: #e7f3f3;
-  --status-noshow: #a1483a;      --status-noshow-bg: #f8e9e6;
+  --status-locked: #a34f00;      --status-locked-bg: #fdebd3;
+  --status-resale: #8f6315;      --status-resale-bg: #fbf1dc;
+  --status-fulfilled: #437552;   --status-fulfilled-bg: #e6f2e9;
+  --status-resold: #4a6d8f;      --status-resold-bg: #e6eef5;
+  --status-noshow: #af432e;      --status-noshow-bg: #f8e3de;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ink: #f4ece9;
-    --sub: #c9bcb8;
-    --faint: #988c88;
-    --brand: #d59c9c;
-    --brand-strong: #e8bcbc;
-    --brand-light: #382625;
-    --line: #382d2b;
-    --bg: #171211;
-    --surface: #231c1b;
+    --ink: #f3ece2;
+    --sub: #d6ccbf;
+    --faint: #b8afa3;
+    --brand: #f29e0c;
+    --brand-strong: #f7c27a;
+    --brand-light: #43321c;
+    --on-brand: #1f1a15;          /* 深色模式品牌底較亮，改用深字（7.95:1） */
+    --line: #3d342b;
+    --bg: #1f1a15;
+    --surface: #2a231d;
 
-    --status-locked: #d59c9c;      --status-locked-bg: #382625;
-    --status-resale: #d9a75c;      --status-resale-bg: #3a2e17;
-    --status-fulfilled: #7bab8a;   --status-fulfilled-bg: #1f2f24;
-    --status-resold: #6fb8bb;      --status-resold-bg: #17302f;
-    --status-noshow: #d9776a;      --status-noshow-bg: #3a1e1a;
+    --status-locked: #f29e0c;      --status-locked-bg: #43321c;
+    --status-resale: #e8bd6a;      --status-resale-bg: #3a2f18;
+    --status-fulfilled: #8cc79c;   --status-fulfilled-bg: #22322a;
+    --status-resold: #a5c0dc;      --status-resold-bg: #1f2b38;
+    --status-noshow: #ec9a88;      --status-noshow-bg: #3d231d;
   }
 }
 
@@ -173,11 +183,20 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .legacy-ui .disclaimer { color: var(--faint); font-size: 11px; font-style: italic; margin-top: 8px; }
 
 .legacy-ui button {
-  background: var(--brand); color: #fff; border: none; border-radius: 8px;
-  padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  background: var(--brand); color: var(--on-brand); border: none; border-radius: 8px;
+  min-height: 44px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: background-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+.legacy-ui button:hover:not(:disabled) { background: var(--brand-strong); }
+.legacy-ui button:active:not(:disabled) { transform: scale(0.98); }
+.legacy-ui button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .legacy-ui button:disabled { opacity: 0.5; cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .legacy-ui button { transition: none; }
+  .legacy-ui button:active:not(:disabled) { transform: none; }
+}
 .legacy-ui button.secondary { background: var(--surface); color: var(--brand); border: 1px solid var(--brand); }
+.legacy-ui button.secondary:hover:not(:disabled) { background: var(--brand-light); }
 
 .legacy-ui input[type="text"], .legacy-ui textarea {
   width: 100%; padding: 8px 10px; border: 1px solid var(--line);
@@ -198,4 +217,4 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 
 .legacy-ui .image-preview { position: relative; width: 100%; height: 128px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); margin-bottom: 8px; }
 .legacy-ui .image-preview img { width: 100%; height: 100%; object-fit: cover; }
-.legacy-ui .image-preview button { position: absolute; top: 4px; right: 4px; padding: 2px 8px; font-size: 12px; }
+.legacy-ui .image-preview button { position: absolute; top: 4px; right: 4px; padding: 2px 8px; font-size: 12px; min-height: 0; }

@@ -1,71 +1,203 @@
 import type { Config } from "tailwindcss";
 
+// 顏色存成完整色值的 CSS 變數（#hex），Tailwind 無法直接加透明度；
+// 以 color-mix 包一層，bg-primary/10、hover:bg-primary/90 這類修飾才會產生
+const withAlpha = (cssVar: string) =>
+  `color-mix(in srgb, var(${cssVar}) calc(<alpha-value> * 100%), transparent)`;
+
 export default {
   darkMode: ["class"],
   content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      // 圓角對齊設計系統：sm 6（標籤）/ md 8（按鈕、輸入框）/ lg 12（小卡片）/ xl 16（大卡片、彈窗）
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        sm: "6px",
+        md: "8px",
+        lg: "12px",
+        xl: "16px",
+        "2xl": "20px",
+      },
+      // 暖棕色調陰影，不用純黑（對應 --shadow-sm / md / lg）
+      boxShadow: {
+        sm: "0 2px 8px rgba(120, 80, 40, 0.05)",
+        DEFAULT: "0 2px 8px rgba(120, 80, 40, 0.06)",
+        md: "0 8px 24px rgba(120, 80, 40, 0.08)",
+        lg: "0 16px 40px rgba(120, 80, 40, 0.12)",
+        xl: "0 20px 48px rgba(120, 80, 40, 0.14)",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.2, 0.8, 0.2, 1)",
       },
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        /* ── 設計系統色階：頁面大量寫死 orange-* / amber-* / gray-* / red-* / green-*，
+           這裡整組換成品牌色系，不改頁面檔即可整站換裝。
+           500 以上的色階皆確保白字對比 ≥ 4.5:1（見 #/design-system 對比檢查）。 */
+        orange: {
+          50: "#FFF4E3",   // --brand-orange-tint
+          100: "#FDEBD3",  // --brand-orange-soft
+          200: "#FBDDB5",
+          300: "#F7C27A",
+          400: "#F29E0C",  // --brand-orange（Logo、icon、裝飾、focus 外框）
+          500: "#B35A00",  // --brand-orange-strong：主要按鈕底，白字 4.80:1
+          600: "#944A00",  // --brand-orange-strong-hover
+          700: "#7A3D00",
+          800: "#5E3000",
+          900: "#472400",
+          950: "#301800",
+        },
+        amber: {
+          50: "#FBF1DC",   // --warning-soft
+          100: "#F8E6C4",
+          200: "#F1D39C",
+          300: "#E8BD6A",
+          400: "#E0A030",  // --warning
+          // 頁面把 amber-500 / 600 當主要按鈕底（登入頁、廠商後台），統一為品牌主行動色
+          500: "#B35A00",  // = orange-500，白字 4.80:1
+          600: "#944A00",  // = orange-600
+          700: "#7A4D0F",
+          800: "#653F0E",
+          900: "#4F310C",
+          950: "#352008",
+        },
+        gray: {
+          // 頁面以 bg-gray-50 當整頁底色 → 奶油底；gray-100 為淡灰區塊（骨架、標籤底）
+          50: "#FFF8EC",   // --bg
+          100: "#F7F5F0",  // --surface-muted
+          200: "#ECE6DC",  // --border
+          300: "#DCD3C6",  // --border-strong
+          400: "#948778",  // --border-control
+          500: "#6F6B66",  // --text-muted
+          600: "#5C5C5C",  // --text-secondary
+          700: "#45403B",
+          800: "#2B2B2B",  // --text
+          900: "#1F1A15",
+          950: "#15110D",
+        },
+        red: {
+          50: "#FCF1EE",
+          100: "#F8E3DE",  // --danger-soft
+          200: "#F0C4BA",
+          300: "#E59A89",
+          400: "#D0604A",  // --danger
+          500: "#C24E36",  // --danger-strong，白字 4.73:1
+          600: "#AF432E",  // --danger-text
+          700: "#943726",
+          800: "#772C1F",
+          900: "#5C2218",
+          950: "#3D160F",
+        },
+        green: {
+          50: "#F1F8F3",
+          100: "#E6F2E9",  // --success-soft
+          200: "#C8E3CF",
+          300: "#9DCBAA",
+          400: "#5A9E6F",  // --success
+          500: "#467D57",  // 白字 4.85:1
+          600: "#437552",  // --success-text
+          700: "#37613F",
+          800: "#2C4E35",
+          900: "#223D2A",
+          950: "#16281B",
+        },
+        /* 冷色系（藍 / 紫 / 黃）也收斂進設計系統：
+           blue → 資訊色（低飽和藍灰）、yellow → 警示色、purple → 品牌棕 */
+        blue: {
+          50: "#F1F5F9",
+          100: "#E6EEF5",  // --info-soft
+          200: "#CCDBE8",
+          300: "#A5C0DC",
+          400: "#6B8FB3",  // --info
+          500: "#4A6D8F",  // --info-text，白字 5.42:1
+          600: "#3E5E7D",  // 白字 6.77:1
+          700: "#3E5E7D",
+          800: "#2F4860",
+          900: "#223447",
+          950: "#16222F",
+        },
+        yellow: {
+          50: "#FBF1DC",   // --warning-soft
+          100: "#F8E6C4",
+          200: "#F1D39C",
+          300: "#E8BD6A",
+          400: "#E0A030",
+          500: "#E0A030",  // --warning（進度條等裝飾）
+          600: "#8F6315",  // --warning-text
+          700: "#7A4D0F",
+          800: "#7A4D0F",  // on yellow-100 5.91:1
+          900: "#4F310C",
+          950: "#352008",
+        },
+        purple: {
+          50: "#F8EFEA",
+          100: "#F1E0D6",
+          200: "#E3C2AF",
+          300: "#D09F84",
+          400: "#B87A5A",  // --brand-brown
+          500: "#8F5A3F",  // --brand-brown-dark
+          600: "#8F5A3F",
+          700: "#744630",  // on purple-50 6.96:1
+          800: "#5C3726",
+          900: "#44281C",
+          950: "#2D1A12",
+        },
+        background: withAlpha("--background"),
+        foreground: withAlpha("--foreground"),
         card: {
-          DEFAULT: "var(--card)",
-          foreground: "var(--card-foreground)",
+          DEFAULT: withAlpha("--card"),
+          foreground: withAlpha("--card-foreground"),
         },
         popover: {
-          DEFAULT: "var(--popover)",
-          foreground: "var(--popover-foreground)",
+          DEFAULT: withAlpha("--popover"),
+          foreground: withAlpha("--popover-foreground"),
         },
         primary: {
-          DEFAULT: "var(--primary)",
-          foreground: "var(--primary-foreground)",
+          DEFAULT: withAlpha("--primary"),
+          foreground: withAlpha("--primary-foreground"),
+          hover: withAlpha("--primary-hover"),
         },
         secondary: {
-          DEFAULT: "var(--secondary)",
-          foreground: "var(--secondary-foreground)",
+          DEFAULT: withAlpha("--secondary"),
+          foreground: withAlpha("--secondary-foreground"),
         },
         muted: {
-          DEFAULT: "var(--muted)",
-          foreground: "var(--muted-foreground)",
+          DEFAULT: withAlpha("--muted"),
+          foreground: withAlpha("--muted-foreground"),
         },
         accent: {
-          DEFAULT: "var(--accent)",
-          foreground: "var(--accent-foreground)",
+          DEFAULT: withAlpha("--accent"),
+          foreground: withAlpha("--accent-foreground"),
         },
         destructive: {
-          DEFAULT: "var(--destructive)",
-          foreground: "var(--destructive-foreground)",
+          DEFAULT: withAlpha("--destructive"),
+          foreground: withAlpha("--destructive-foreground"),
+          hover: withAlpha("--destructive-hover"),
         },
-        border: "var(--border)",
-        input: "var(--input)",
-        ring: "var(--ring)",
+        border: withAlpha("--border"),
+        input: withAlpha("--input"),
+        ring: withAlpha("--ring"),
         chart: {
-          "1": "var(--chart-1)",
-          "2": "var(--chart-2)",
-          "3": "var(--chart-3)",
-          "4": "var(--chart-4)",
-          "5": "var(--chart-5)",
+          "1": withAlpha("--chart-1"),
+          "2": withAlpha("--chart-2"),
+          "3": withAlpha("--chart-3"),
+          "4": withAlpha("--chart-4"),
+          "5": withAlpha("--chart-5"),
         },
         sidebar: {
-          DEFAULT: "var(--sidebar)",
-          foreground: "var(--sidebar-foreground)",
-          primary: "var(--sidebar-primary)",
-          "primary-foreground": "var(--sidebar-primary-foreground)",
-          accent: "var(--sidebar-accent)",
-          "accent-foreground": "var(--sidebar-accent-foreground)",
-          border: "var(--sidebar-border)",
-          ring: "var(--sidebar-ring)",
+          DEFAULT: withAlpha("--sidebar"),
+          foreground: withAlpha("--sidebar-foreground"),
+          primary: withAlpha("--sidebar-primary"),
+          "primary-foreground": withAlpha("--sidebar-primary-foreground"),
+          accent: withAlpha("--sidebar-accent"),
+          "accent-foreground": withAlpha("--sidebar-accent-foreground"),
+          border: withAlpha("--sidebar-border"),
+          ring: withAlpha("--sidebar-ring"),
         },
         "brand-navy": {
-          DEFAULT: "var(--brand-navy)",
-          hover: "var(--brand-navy-hover)",
+          DEFAULT: withAlpha("--brand-navy"),
+          hover: withAlpha("--brand-navy-hover"),
         },
-        "surface-dark": "var(--surface-dark)",
+        "surface-dark": withAlpha("--surface-dark"),
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
@@ -75,10 +207,10 @@ export default {
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
+          to: { height: withAlpha("--radix-accordion-content-height") },
         },
         "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
+          from: { height: withAlpha("--radix-accordion-content-height") },
           to: { height: "0" },
         },
         marquee: {

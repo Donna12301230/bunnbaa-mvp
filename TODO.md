@@ -131,6 +131,8 @@ UI 草圖：https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc （僅參考版面
 
 導覽骨架：草圖三頁（Main/Marketplace/MyBookings）共用同一組 3 項主導覽「預購鎖定／轉讓市集／我的商品」。`PlanSchedule.dc.html` 已被合併進 `Main.dc.html`，不當獨立頁面處理。
 
+設計系統：http://localhost:5199/#/design-system
+
 ### 逐頁狀態
 
 | 草圖頁 | 現有對應 | 狀態 |
