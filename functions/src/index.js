@@ -10,6 +10,7 @@ const db = admin.firestore();
 
 const { generateVendorCalibrationReport } = require("./vendorCalibration");
 const { generateDiscountExplanation } = require("./consumerExplanation");
+const { requestPayment, confirmPayment } = require("./linePay");
 
 // ISO 27001 A.5.15/A.8.3: privileged and cost-bearing callables fail closed in
 // deployed environments. Callers must be a platform admin, or (for anything
@@ -221,6 +222,127 @@ exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
   // The previous owner's device token must not keep receiving this lock's reminders.
   await db.collection("lock_tokens").doc(lockId).delete();
   return { lock_id: lockId };
+});
+
+/* ------------------------------------------------------------------ *
+ * 1c. Consumer checkout — LINE Pay (spec ref: 金流串接(消費端), TODO.md
+ * 卡點 3). Reserve → redirect to LINE Pay → confirm: the `locks` doc is
+ * only created once confirmLinePayPayment succeeds, so a buyer who never
+ * finishes paying never ends up with a "locked" doc. Point functions/.env's
+ * LINE_PAY_CHANNEL_ID/LINE_PAY_CHANNEL_SECRET at a Sandbox channel from
+ * https://pay.line.me/tw/developers (self-serve, no merchant review) to
+ * test this end to end before the real 特約商店審核 clears; set
+ * LINE_PAY_ENV=production and swap the credentials once it does.
+ * ------------------------------------------------------------------ */
+
+exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Must be signed in (anonymous is fine) to check out");
+  }
+  const {
+    vendor_id: vendorId,
+    item_name: itemName,
+    pickup_window: pickupWindow,
+    pickup_date: pickupDate,
+    discount_percent: discountPercent,
+    locked_price: lockedPrice,
+  } = request.data || {};
+  if (!vendorId || !itemName || !pickupWindow || !pickupDate || typeof lockedPrice !== "number" || lockedPrice <= 0) {
+    throw new HttpsError(
+      "invalid-argument",
+      "vendor_id, item_name, pickup_window, pickup_date and a positive locked_price are required"
+    );
+  }
+
+  const appBaseUrl = process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
+  const intentRef = db.collection("payment_intents").doc();
+  const orderId = intentRef.id;
+  const amount = Math.round(lockedPrice);
+
+  let info;
+  try {
+    info = await requestPayment({
+      orderId,
+      amount,
+      productName: itemName,
+      // orderId goes in the path, not a query string: LINE Pay appends
+      // ?transactionId=... (or &... if our URL already has a "?") by plain
+      // string concatenation, with no awareness of the "#" hash-router
+      // boundary. A query string here would land the appended param inside
+      // the hash fragment and break wouter's route match (see App.tsx's
+      // /payment/confirm/:orderId — the trailing junk gets absorbed into
+      // the :orderId capture instead, harmlessly, since it's stripped in
+      // PaymentConfirmPage).
+      confirmUrl: `${appBaseUrl}/#/payment/confirm/${orderId}`,
+      cancelUrl: `${appBaseUrl}/#/payment/cancel/${orderId}`,
+    });
+  } catch (err) {
+    logger.error("LINE Pay request failed", err);
+    throw new HttpsError("internal", "LINE Pay 付款請求失敗，請稍後再試");
+  }
+
+  await intentRef.set({
+    status: "pending",
+    buyer_uid: request.auth.uid,
+    transaction_id: String(info.transactionId),
+    amount,
+    lock_draft: {
+      vendor_id: vendorId,
+      item_name: itemName,
+      pickup_window: pickupWindow,
+      pickup_date: pickupDate,
+      discount_percent: discountPercent ?? 0,
+      resellable: true,
+      locked_price: amount,
+    },
+    created_at: FieldValue.serverTimestamp(),
+  });
+
+  return { order_id: orderId, payment_url: info.paymentUrl.web };
+});
+
+exports.confirmLinePayPayment = onCall({ region: "asia-east1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Must be signed in to confirm a payment");
+  }
+  const { order_id: orderId } = request.data || {};
+  if (!orderId) throw new HttpsError("invalid-argument", "order_id is required");
+
+  const intentRef = db.collection("payment_intents").doc(orderId);
+  const intentSnap = await intentRef.get();
+  if (!intentSnap.exists) throw new HttpsError("not-found", `No payment_intent found for order ${orderId}`);
+  const intent = intentSnap.data();
+
+  if (intent.buyer_uid !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "This payment doesn't belong to you");
+  }
+  // Idempotent: the confirm redirect can legitimately fire twice (e.g. the
+  // buyer double-taps back/refresh), so replay the stored result instead of
+  // re-confirming with LINE Pay, which would reject a second confirm.
+  if (intent.status === "confirmed") {
+    return { lock_id: intent.lock_id };
+  }
+  if (intent.status !== "pending") {
+    throw new HttpsError("failed-precondition", `This payment is ${intent.status}, not pending`);
+  }
+
+  try {
+    await confirmPayment({ transactionId: intent.transaction_id, amount: intent.amount });
+  } catch (err) {
+    logger.error("LINE Pay confirm failed", err);
+    throw new HttpsError("internal", "LINE Pay 付款確認失敗，請稍後再試或聯絡客服");
+  }
+
+  const lockRef = db.collection("locks").doc();
+  await lockRef.set({
+    ...intent.lock_draft,
+    status: "locked",
+    buyer_uid: request.auth.uid,
+    created_at: FieldValue.serverTimestamp(),
+  });
+  await intentRef.update({ status: "confirmed", lock_id: lockRef.id });
+
+  return { lock_id: lockRef.id };
 });
 
 /* ------------------------------------------------------------------ *

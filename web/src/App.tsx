@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/useAuth";
 import ConsumerLockPage from "./pages/ConsumerLockPage";
 import VendorDashboard from "./pages/VendorDashboard";
 import VendorRedeemPage from "./pages/VendorRedeemPage";
+import PaymentConfirmPage from "./pages/PaymentConfirmPage";
+import PaymentCancelPage from "./pages/PaymentCancelPage";
 
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
@@ -75,6 +77,16 @@ export default function App() {
           </Route>
           <Route path="/lock/vendor/redeem">
             <RequireVendorSignIn><VendorRedeemPage /></RequireVendorSignIn>
+          </Route>
+          {/* :orderId, not a query string — LINE Pay appends ?transactionId=...
+              by string concatenation with no regard for the "#" boundary, which
+              would otherwise land inside the hash fragment and break the match.
+              See functions/src/index.js's createLinePayReservation. */}
+          <Route path="/payment/confirm/:orderId">
+            <div className="legacy-ui"><PaymentConfirmPage /></div>
+          </Route>
+          <Route path="/payment/cancel/:orderId">
+            <div className="legacy-ui"><PaymentCancelPage /></div>
           </Route>
 
           {/* 搬移自 BunnBaa Parse_Ref 的行銷平台 UI（登入/首頁/後台） */}

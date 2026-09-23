@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import {
-  addDoc,
   collection,
   doc,
   onSnapshot,
   orderBy,
   query,
-  serverTimestamp,
-  setDoc,
   Timestamp,
   updateDoc,
   where,
@@ -17,7 +14,6 @@ import { db, auth, functions } from "../lib/firebase";
 import { signInAnonymously } from "firebase/auth";
 import type { Lock, Vendor } from "../types";
 import LockQRCode from "../components/LockQRCode";
-import { registerForPickupReminders } from "../lib/messaging";
 import { applyEarlyBirdPrice } from "../lib/pricing";
 
 const VENDOR_ID = "cafe-renheya-demo";
@@ -149,37 +145,30 @@ export default function ConsumerLockPage() {
     }
   }
 
+  // Real money now: this reserves a LINE Pay payment and sends the buyer to
+  // LINE Pay's checkout page. The `locks` doc itself is only created after
+  // PaymentConfirmPage confirms the payment server-side (createLinePayReservation
+  // / confirmLinePayPayment in functions/src/index.js) — never here, so a
+  // buyer who abandons checkout doesn't end up with a "locked" doc.
   async function handleLock() {
     if (!auth.currentUser) return;
     setLocking(true);
     try {
       const pickupDate = new Date().toISOString().slice(0, 10);
       const { discountPercent, lockedPrice } = applyEarlyBirdPrice(ORIGINAL_PRICE, pickupDate);
-      const ref = await addDoc(collection(db, "locks"), {
+      const fn = httpsCallable(functions, "createLinePayReservation");
+      const result = await fn({
         vendor_id: VENDOR_ID,
         item_name: ITEM_NAME,
         pickup_window: "12:00-13:00",
         pickup_date: pickupDate,
         discount_percent: discountPercent,
-        resellable: true,
         locked_price: lockedPrice,
-        status: "locked",
-        buyer_uid: auth.currentUser.uid,
-        created_at: serverTimestamp(),
       });
-      setMyLock({ id: ref.id } as Lock);
-
-      // locks are publicly readable, so the device token goes in a separate
-      // owner/admin-only doc. Best-effort: never let it break the lock flow.
-      try {
-        const fcmToken = await registerForPickupReminders();
-        if (fcmToken) {
-          await setDoc(doc(db, "lock_tokens", ref.id), { fcm_token: fcmToken, buyer_uid: auth.currentUser.uid });
-        }
-      } catch (err) {
-        console.warn("Could not save pickup-reminder token:", err);
-      }
-    } finally {
+      const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
+      window.location.href = paymentUrl;
+    } catch (err) {
+      alert("前往付款失敗：" + (err as Error).message);
       setLocking(false);
     }
   }

@@ -159,5 +159,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    // payment_intents: LINE Pay reserve/confirm bookkeeping (amount, LINE Pay
+    // transaction_id, draft lock fields). Only createLinePayReservation /
+    // confirmLinePayPayment (admin SDK, bypasses rules) ever touch this —
+    // the client only ever sees the order_id/payment_url they return.
+    match /payment_intents/{orderId} {
+      allow read, write: if false;
+    }
   }
 }

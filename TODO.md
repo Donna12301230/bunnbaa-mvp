@@ -10,15 +10,28 @@
 
 1. **Blaze 方案升級**（需綁信用卡，[Firebase Console](https://console.firebase.google.com/)）（Donna）
    卡住：QR 核銷正式站、撥款排程正式站、整合測試、Hosting 重新部署（轉賣／撥款／新版首頁等功能都還沒上線）
-   - [ ] 手動完成信用卡綁定 → 啟用 Cloud Functions → 部署 `functions/` → 重新 `firebase deploy --only hosting`
+   - [x] 2026-09-23 手動完成信用卡綁定（過程中卡過一次「交易遭拒」，換卡/請銀行放行後成功）→ Blaze 已啟用
+   - [x] 2026-09-23 `firebase deploy --only firestore:rules` 已部署（含取消轉讓、growth_rewards/draws 等新規則）
+   - [x] 2026-09-23 `firebase deploy --only functions` 已部署全部 11 個 functions（`onLockCreated` 第一次卡 Eventarc 權限生效中，等待後重試成功）
+   - [x] 2026-09-23 `firebase deploy --only hosting` 已重新部署，轉賣/撥款/成長獎勵抽獎等新功能正式上線 https://bunnbaa-mvp-5474.web.app
+   
+   **卡點 1 已解除。** 待辦：整合測試（見下方⬜清單）確認 QR 核銷、撥款排程等在正式站真的能跑；VAPID key 還沒補（FCM 推播卡最後一步）
 
 2. **Gemini API Key 手動申請**（[aistudio.google.com/apikey](https://aistudio.google.com/apikey)）（Donna）
    卡住：兩個 AI Agent（商家校準／消費者折扣說明）、商家校準報告端到端驗證
    - [ ] 自動化申請會被 Google 判定可疑請求擋下，需人工手動點「Create API key」→ 選 GCP 專案 `bunnbaa-mvp-5474`（已 import 進 AI Studio）→ 建立 → 貼進 `functions/.env`（複製自 `functions/.env.example`）
 
 3. **LINE Pay／綠界特約商店審核**（業務面，非工程能代勞，審核可能數週）（Donna）
-   卡住：金流串接(消費端)
+   卡住：金流串接(消費端)正式上線（Sandbox 測試不受此卡住，見下方）
    - [ ] 盡快送件，避免卡到最後一週才發現金流串不上
+
+   **2026-09-23 消費端金流改用 LINE Pay Sandbox 先行開發**：Sandbox channel 是開發者自助申請（免商業審核），已申請並填入 `functions/.env`（`LINE_PAY_CHANNEL_ID`/`LINE_PAY_CHANNEL_SECRET`/`LINE_PAY_ENV=sandbox`）。新增 `functions/src/linePay.js`（v3 簽章+Request/Confirm API）、`createLinePayReservation`／`confirmLinePayPayment` 兩個 Cloud Functions、`payment_intents` collection（`firestore.rules` 已鎖只有 Functions 能寫）、前端 `PaymentConfirmPage.tsx`／`PaymentCancelPage.tsx`（`/payment/confirm`、`/payment/cancel`）。`ConsumerLockPage.tsx`「鎖定這份」改成走 Request→導向 LINE Pay→Confirm 才建立 `locks` 文件，不再是原本的直接寫入。已實測 Request API 成功導向 LINE Pay Sandbox 登入頁；**待辦**：完整跑一次登入+確認付款，驗證 `confirmLinePayPayment` 有正確建立 `locks` 文件。正式審核過後只要把 `.env` 換成正式 Channel ID/Secret＋`LINE_PAY_ENV=production` 即可切換，程式碼不用改
+
+   **2026-09-23 端到端測試中修掉兩個 bug**：
+   1. hash 路由 404——LINE Pay 導回時用純字串串接把 `?transactionId=...` 加到我們給的 `confirmUrl` 後面，不理會 `#`（hash 路由分隔符），原本把 `orderId` 放在 `?query` 導致參數混進 hash 路徑讓 wouter 對不上路由。改成 `orderId` 放路徑（`/payment/confirm/:orderId`），用動態參數＋防禦性截斷吸收 LINE Pay 加的尾巴（`App.tsx`／`PaymentConfirmPage.tsx`）
+   2. Confirm API 回「1159 交易不存在」——LINE Pay 的 `transactionId` 是 19 位數，超過 JS `Number` 安全整數範圍（16 位數），`res.json()` 解析時精度被四捨五入，存進 Firestore 的值跟 LINE Pay 實際的對不上。改用官方文件提到的技巧：解析回應前先把 `transactionId` 數字字面值加上引號再 `JSON.parse`，讓它以字串型態保留完整精度（`functions/src/linePay.js`）
+   
+   兩個修復都已部署，**2026-09-23 已完整跑通一次端到端測試**：真實個人 LINE 帳號登入 → 確認付款 → Firestore 驗證 `payment_intents`（`status: "confirmed"`，`transaction_id` 完整 19 位數無精度遺失）跟對應的 `locks` 文件（`status: "locked"`）都正確寫入。消費端金流 Sandbox 串接全部完成
 
 ---
 
@@ -41,21 +54,21 @@
 
 ### Donna 負責（15 項）
 
-**🟡 部分完成 / 程式碼完成但未測未部署（9）**
-- 轉賣流程（交易核心）：`claimResoldLock`，兩個匿名帳號互接手已測過。2026-09-22 加上「取消轉讓」：`firestore.rules` 補規則讓 owner 把還沒被接手的 `for_resale`／`for_gift` 改回 `locked`，`TransferMarketPage.tsx`／`MyBookingsPage.tsx` 都接了真的取消按鈕——這條規則要人工部署才會在正式站生效
+**🟡 部分完成 / 程式碼完成但未測未部署（10）**
+- 轉賣流程（交易核心）：`claimResoldLock`，兩個匿名帳號互接手已測過。2026-09-22 加上「取消轉讓」：`firestore.rules` 補規則讓 owner 把還沒被接手的 `for_resale`／`for_gift` 改回 `locked`，`TransferMarketPage.tsx`／`MyBookingsPage.tsx` 都接了真的取消按鈕——2026-09-23 規則已隨 Blaze 升級一起部署上正式站
 - 轉賣金流(買家對買家)（金流與結算）：設計上不經過平台，只轉移 `buyer_uid`，已測
 - Firebase 專案建置（基礎建置）：專案／Firestore／Auth／Hosting／安全規則都已上線，卡在 Blaze 升級（見上方卡點 1）
-- 鎖定＋付款流程（交易核心）：「鎖定」本身已端到端驗證；「付款」要串真金流，見金流與結算
-- QR Code 核銷（交易核心）：emulator 已驗證，因 Functions 未上 Blaze 尚未上正式站（正式環境呼叫 `markLockOutcome` 會失敗）
-- 撥款排程（金流與結算）：`settleVendorPayouts`（daily schedule + 手動觸發）emulator 已驗證重複點擊不會重複結算，卡在 Blaze/Functions 部署未上正式站
-- Firebase Hosting 部署（整合與交付）：已有初版正式站 https://bunnbaa-mvp-5474.web.app，但轉賣/撥款等新功能還沒重新部署（等 Functions 上線後一起做）
-- 取餐提醒推播(FCM)（交易核心，同 SU「通知系統」，合併計算）：2026-09-20 SU 完成程式碼——前端要求通知權限+存 FCM token 到私有的 `lock_tokens`（`web/src/lib/messaging.ts`）、Functions 端 `pickupReminders`（每 15 分排程）+ `triggerPickupRemindersNow`。卡兩點：VAPID key 還沒去 Console 拿（免費、跟 Blaze 無關，見下方）；Functions 部署卡 Blaze。
+- 鎖定＋付款流程（交易核心）：2026-09-23 「付款」改接 LINE Pay Sandbox（見下方「金流串接(消費端)」），端到端測試通過（真實 LINE 帳號登入→確認付款→Firestore 正確寫入）
+- QR Code 核銷（交易核心）：emulator 已驗證，2026-09-23 `markLockOutcome` 已隨 Functions 部署上正式站，待實際跑一次驗證
+- 撥款排程（金流與結算）：`settleVendorPayouts`（daily schedule + 手動觸發）emulator 已驗證重複點擊不會重複結算，2026-09-23 已隨 Functions 部署上正式站，待實際跑一次驗證
+- Firebase Hosting 部署（整合與交付）：已有初版正式站 https://bunnbaa-mvp-5474.web.app，但轉賣/撥款等新功能還沒重新部署——2026-09-23 Functions 已上線，重新部署 Hosting 排定接下來做
+- 取餐提醒推播(FCM)（交易核心，同 SU「通知系統」，合併計算）：2026-09-20 SU 完成程式碼——前端要求通知權限+存 FCM token 到私有的 `lock_tokens`（`web/src/lib/messaging.ts`）、Functions 端 `pickupReminders`（每 15 分排程）+ `triggerPickupRemindersNow`。2026-09-23 Functions 已部署上正式站，仍卡：VAPID key 還沒去 Console 拿（免費、跟 Blaze 無關，見下方）。
 - 我的鎖定/訂單記錄頁（交易核心）：2026-09-22 完成，新增 `MyLocksPage.tsx`（`/my-locks`，從「會員中心」連過去）——依 `buyer_uid` 查真實 `locks` 的簡易列表，不是週曆版面。emulator/正式站尚未實測（開發環境連不到外網 Firebase）
+- 金流串接(消費端)（金流與結算）：2026-09-23 LINE Pay Sandbox 串接完成並部署，端到端測試通過；正式上線仍卡特約商店審核（見上方卡點 3）
 
-**🔴 卡住，等人工或外部審核（3）**
+**🔴 卡住，等人工或外部審核（2）**
 - Gemini — 商家校準 Agent（AI Agent）：見上方卡點 2
 - Gemini — 消費者折扣說明 Agent（AI Agent）：同上，目前消費者端會卡在「產生說明中」
-- 金流串接(消費端)（金流與結算）：見上方卡點 3
 
 **⬜ 未開始 / 本文件未提及（3）**
 - UI模型建置（基礎建置）：2026-09-22 讀完 UI規格書（https://claude.ai/artifact/QWUhndBuB4GS7izdStzXa8 ，v1.0，2026-09-18）盤點範圍——**這份文件已經嚴重過時**，只涵蓋最早的單一商家鎖定 demo（`/`、`/vendor`、`/vendor/redeem`），完全沒提到後來長出來的首頁／轉讓市集／我的餐點／管理後台／商家後台等等。文件列的「開放問題」四項，三項已透過這幾天的工作解決（商家後台身分驗證、A4 取餐提醒排程、A3 賣方轉讓列表），只剩 B5（商家新增/編輯品項）還沒接 Firestore——但盤點後發現這牽出「兩套平行資料模型」的架構問題（見下方 SU 負責區塊），B5 本身先暫緩
@@ -125,7 +138,7 @@ UI 草圖：https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc （僅參考版面
 - [x] 計畫型（訂閱制多日方案）——2026-09-22 完成，但用了跟原設想不同的簡化設計：沒有另外的 `plan`/`subscription` collection，「預約加入計畫」當下直接一次寫入 N 筆真實 `locks`（同一個 `plan_id` 串起來，見 `types.ts` 的 `Lock.plan_id`/`plan_label`），不用排程 Cloud Function 每天生一筆——原因是這樣就不受 Blaze 卡住。取餐日從明天起算連續 N 天，沒有對應「下週一/二/三」那組展示用文字實際換算日期
 - [x] 認證商家徽章——2026-09-22 完成，`Vendor.verified` 欄位（只有 admin 能寫，`firestore.rules` 的 `vendors` 寫入規則本來就沒限制欄位白名單，不用改規則），`AdminSettingsPage.tsx` 新增「認證商家」卡片可以勾選，`ConsumerLockPage.tsx` 顯示徽章
 - [x] 早鳥階梯定價 95/8/7 折——2026-09-22 完成，`web/src/lib/pricing.ts`（純函式，可測），已接進 `ConsumerLockPage.tsx` 的 `handleLock()`。`HomePage.tsx` 的 `mockLockMeals` 卡片是純前端 mock、還沒接真實下單流程，沒有一併套用
-- [x] `growth_rewards`／`draws` collection 重新設計——2026-09-22 完成資料模型 + 規則設計，抽獎邏輯（`drawGrowthReward`）寫在 `functions/src/index.js`，機率權重制、0 元券見底自動降級 1 折保底，符合「機率計算不能信任 client」的要求。`VendorPortalGrowth.tsx`／`GrowthRewardTicker.tsx`／`HomePage.tsx`（新增消費者端「成長獎勵抽獎」卡片）都接上真實資料。**待辦**：這個 Function 跟其他 Functions 一樣卡 Blaze 部署，還沒真的在任何環境被呼叫過測試；`firestore.rules` 新增的 `growth_rewards`／`draws` 規則也要人工部署
+- [x] `growth_rewards`／`draws` collection 重新設計——2026-09-22 完成資料模型 + 規則設計，抽獎邏輯（`drawGrowthReward`）寫在 `functions/src/index.js`，機率權重制、0 元券見底自動降級 1 折保底，符合「機率計算不能信任 client」的要求。`VendorPortalGrowth.tsx`／`GrowthRewardTicker.tsx`／`HomePage.tsx`（新增消費者端「成長獎勵抽獎」卡片）都接上真實資料。2026-09-23 `drawGrowthReward` Function 與 `growth_rewards`／`draws` 規則已部署上正式站。**待辦**：還沒真的在正式站被呼叫過測試
 - [x] 備料聚合改成依 `locks` collection 的 `pickup_date` + `pickup_window` 即時分組——2026-09-22 完成，`VendorPortalPrep.tsx` 改用 `onSnapshot`
 
 QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`LockQRCode.tsx` + `VendorRedeemPage.tsx`。
@@ -140,7 +153,7 @@ QR 核銷碼（MyBookings「使用」面板）已有對應實作可沿用：`Loc
 - [x] `firebase use --add` 連結專案，產生 `.firebaserc`
 - [x] 啟用 Firestore（asia-east1）、Authentication（匿名登入）
 - [x] 部署 `firestore.rules` 和 `firestore.indexes.json`
-- [ ] 升級到 Blaze 方案 → 啟用 Functions（見上方卡點 1）
+- [x] 2026-09-23 升級到 Blaze 方案 → 啟用 Functions → 部署 10/11 個 Cloud Functions（`onLockCreated` 因 Eventarc 權限生效延遲，重試部署中）
 - [x] 啟用 Hosting：`web/` 已 build 並部署，https://bunnbaa-mvp-5474.web.app （正式環境 Firestore 是空的，還沒 seed demo 資料；等要錄 demo 前再灌資料）
 - [ ] 申請 Gemini API Key（見上方卡點 2），填入 `functions/.env`
 - [x] 把 `web/src/lib/firebase.ts` 的 `firebaseConfig` 換成真實專案設定值
