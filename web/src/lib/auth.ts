@@ -1,10 +1,13 @@
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  RecaptchaVerifier,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPhoneNumber,
   signOut,
   updateProfile,
+  type ConfirmationResult,
   type User,
 } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from "firebase/firestore";
@@ -39,6 +42,8 @@ async function resolveProfile(u: User): Promise<UserProfile> {
   let role: UserProfile["role"] = "customer";
   let vendorId: string | undefined;
 
+  // 手機門號登入沒有 email，admin 一定是 email 白名單，所以這裡不會誤判；
+  // vendor 一樣靠 owner_uid 查，跟 email/phone 登入方式無關。
   if (email && ADMIN_EMAILS.includes(email)) {
     role = "admin";
   } else {
@@ -63,12 +68,14 @@ async function resolveProfile(u: User): Promise<UserProfile> {
     console.error("讀取個人資料失敗", err);
   }
 
+  const phone = extra.phone || u.phoneNumber || undefined;
+
   return {
     id: u.uid,
-    username: email.split("@")[0] || u.uid,
+    username: email ? email.split("@")[0] : phone || u.uid,
     email,
-    displayName: u.displayName || extra.display_name || email.split("@")[0] || undefined,
-    phone: extra.phone || undefined,
+    displayName: u.displayName || extra.display_name || (email ? email.split("@")[0] : phone) || undefined,
+    phone,
     department: extra.department || undefined,
     role,
     vendorId,
@@ -110,6 +117,11 @@ function friendlyAuthError(err: unknown): Error {
     "auth/weak-password": "密碼至少需要 6 個字元",
     "auth/too-many-requests": "嘗試次數過多，請稍後再試",
     "auth/network-request-failed": "網路連線失敗，請稍後再試",
+    "auth/invalid-phone-number": "手機號碼格式不正確",
+    "auth/missing-phone-number": "請輸入手機號碼",
+    "auth/invalid-verification-code": "驗證碼錯誤，請重新輸入",
+    "auth/code-expired": "驗證碼已過期，請重新取得",
+    "auth/quota-exceeded": "簡訊發送已達上限，請稍後再試",
   };
   return new Error(messages[code] ?? (err as Error)?.message ?? "發生未知錯誤");
 }
@@ -180,4 +192,57 @@ export async function requestPasswordReset(email: string): Promise<void> {
 
 export async function logout(): Promise<void> {
   await signOut(auth);
+}
+
+/* ------------------------------------------------------------------ *
+ * 手機門號 OTP 登入（草圖 Login.dc.html 的兩段式流程）：先送簡訊驗證碼，
+ * 再輸入驗證碼完成登入。號碼跟密碼登入是同一個 Firebase Auth 專案，但
+ * provider 不同——沒有 email 時的角色判斷已經在上面的 resolveProfile 處理。
+ * ------------------------------------------------------------------ */
+
+let _recaptchaVerifier: RecaptchaVerifier | null = null;
+
+/** invisible reCAPTCHA 綁在指定的 DOM 節點上，同一個 verifier 可以重複用來送不同號碼。 */
+function getRecaptchaVerifier(containerId: string): RecaptchaVerifier {
+  if (!_recaptchaVerifier) {
+    _recaptchaVerifier = new RecaptchaVerifier(auth, containerId, { size: "invisible" });
+  }
+  return _recaptchaVerifier;
+}
+
+/** "0912-345-678" / "0912345678" -> "+886912345678"；已經是 +886 開頭就原樣送出。 */
+export function toE164TaiwanPhone(input: string): string {
+  const digits = input.trim().replace(/[\s-]/g, "");
+  if (digits.startsWith("+")) return digits;
+  if (digits.startsWith("886")) return `+${digits}`;
+  if (digits.startsWith("09") && digits.length === 10) return `+886${digits.slice(1)}`;
+  throw new Error("請輸入正確的手機號碼（例如 0912345678）");
+}
+
+export async function sendOtp(phoneInput: string, recaptchaContainerId: string): Promise<ConfirmationResult> {
+  const phone = toE164TaiwanPhone(phoneInput);
+  try {
+    return await signInWithPhoneNumber(auth, phone, getRecaptchaVerifier(recaptchaContainerId));
+  } catch (err) {
+    // 送出失敗（例如格式被 Firebase 拒絕）就重建 verifier，避免同一個 widget 卡死不能重試
+    _recaptchaVerifier?.clear();
+    _recaptchaVerifier = null;
+    throw friendlyAuthError(err);
+  }
+}
+
+export async function confirmOtp(confirmation: ConfirmationResult, code: string): Promise<void> {
+  if (!code.trim()) throw new Error("請輸入驗證碼");
+  try {
+    const { user } = await confirmation.confirm(code.trim());
+    // 手機登入沒有註冊表單可以先寫 users/{uid}，第一次登入時順手建一筆（沒有就建，已存在就跳過）。
+    const ref = doc(db, "users", user.uid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, { display_name: "", phone: user.phoneNumber ?? "", school: "", department: "", created_at: serverTimestamp() });
+    }
+    await refresh(user);
+  } catch (err) {
+    throw friendlyAuthError(err);
+  }
 }

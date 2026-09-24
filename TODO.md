@@ -45,7 +45,10 @@
 ### 5. ISO27001 剩餘項目（詳見 [ISO27001_落差分析.md](ISO27001_落差分析.md)）
 
 - [ ] 長期觀察沒有 CSP 違規後，把 `firebase.json` 的 `Content-Security-Policy-Report-Only` 改成 `Content-Security-Policy`（目前只測過 `/lock` 跟兩個管理頁）
-- [ ] Console 手動項目：帳號 2FA；Firebase API key 加 referrer 限制（`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`localhost:*`，存檔後立刻重測正式站）；Cloud Audit Logs 開資料讀寫；GitHub `master` branch protection（要先跟雅婷討論改走 PR）
+- [x] SU 自己的 Google／GitHub 帳號 2FA——2026-09-25 完成（理由見 ISO27001 文件「情境重新評估」：這是參賽用原型不是正式上線，但比賽規則要求公開 repo＋公開網址，評審期間客觀上是曝露的，值得做）
+- [x] Firebase API key 加 referrer 限制——2026-09-25 完成並驗證：已加三筆（`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`localhost:*`）。用 `curl` 帶假 Referer 直接打 Firebase Auth 初始化 API 測過：正確網域回 200，不相干網域（`evil.example.com`）與完全不帶 Referer 都回 403 `API_KEY_HTTP_REFERRER_BLOCKED`，正式站本身仍正常載入（HTTP 200）
+- [-] ~~Cloud Audit Logs 開資料讀寫~~——2026-09-25 決定暫緩：只有事後鑑識用途（查誰讀寫過什麼），不會擋下任何事，對三週衝刺的參賽專案報酬率低，等要往正式商轉再開
+- [ ] **待跟雅婷討論，不預設要做**：`ckchildlikekid@gmail.com` 開 2FA；GitHub `master` branch protection（會改變目前直接推 master 自動部署的流程，衝刺截止日前可能得不償失，見 ISO27001 文件）
 - [x] 建立認證所需的 ISMS 管理制度文件——2026-09-25 完成 v1：[ISMS_管理制度文件.md](ISMS_管理制度文件.md)（資安政策、角色職責、風險評鑑與登錄表、適用性聲明 SoA、事件應變程序、備份與 BCP 現況、供應商清單、人員安全、文件審查）。這是符合兩人團隊試營運規模的精簡版，不是拿去給認證機構稽核用的完整版；風險登錄表列了 9 項風險，其中 R1/R4/R5/R7 對應到還沒做的待辦（2FA、branch protection、Firestore 備份、Secret Manager）
 
 ### 6. 尚未實作的功能
