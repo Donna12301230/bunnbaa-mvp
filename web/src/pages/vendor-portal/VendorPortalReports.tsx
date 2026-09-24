@@ -12,6 +12,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { EmptyState } from "@/components/ds";
 
 // 設計系統圖表色（index.css --chart-*），由深到淺；走 CSS 變數才會跟著深色模式切換
 const COLORS = [
@@ -24,7 +26,7 @@ const COLORS = [
 const AXIS_TICK = { fontSize: 12, fill: "var(--muted-foreground)" };
 
 function ItemRankList({ items }: { items: { name: string; qty: number; revenue: number }[] }) {
-  if (items.length === 0) return <p className="text-sm text-muted-foreground text-center py-6">無資料</p>;
+  if (items.length === 0) return <EmptyState size="compact" icon={<ShoppingBag size={32} />} title="這段期間沒有銷售紀錄" />;
   const maxQty = items[0].qty;
   return (
     <div className="space-y-2">
@@ -133,7 +135,7 @@ export default function VendorPortalReports() {
   }
 
   function RevenueChart({ data }: { data: { date: string; revenue: number }[] }) {
-    if (data.length === 0) return <p className="text-sm text-muted-foreground text-center py-6">無資料</p>;
+    if (data.length === 0) return <EmptyState size="compact" icon={<TrendingUp size={32} />} title="這段期間沒有營收紀錄" />;
     return (
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
@@ -207,14 +209,9 @@ export default function VendorPortalReports() {
         {/* 預約訂單報表 */}
         <TabsContent value="pre">
           {loadingPre ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />)}
-            </div>
+            <SkeletonBlocks count={3} height={128} className="space-y-3" />
           ) : !preStats ? (
-            <div className="text-center py-20 text-muted-foreground">
-              <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>尚無預約訂單資料</p>
-            </div>
+            <EmptyState icon={<TrendingUp size={32} />} title="尚無預約訂單資料" />
           ) : (
             <div className="space-y-5">
               <StatCards stats={preStats} />
@@ -241,14 +238,9 @@ export default function VendorPortalReports() {
         {/* 現場訂單報表 */}
         <TabsContent value="table">
           {loadingTable ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />)}
-            </div>
+            <SkeletonBlocks count={3} height={128} className="space-y-3" />
           ) : !tableStats ? (
-            <div className="text-center py-20 text-muted-foreground">
-              <TableProperties className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>尚無現場訂單資料</p>
-            </div>
+            <EmptyState icon={<TableProperties size={32} />} title="尚無現場訂單資料" />
           ) : (
             <div className="space-y-5">
               <StatCards stats={tableStats} colorClass="text-blue-600" />

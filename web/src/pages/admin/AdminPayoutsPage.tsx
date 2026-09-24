@@ -7,6 +7,7 @@ import RequireRealAdmin from "@/components/RequireRealAdmin";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Wallet } from "lucide-react";
+import { EmptyState } from "@/components/ds";
 
 /**
  * Read-only — payouts are only ever written by settleVendorPayouts
@@ -45,10 +46,7 @@ function PayoutsContent() {
       </Card>
 
       {payouts.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <Wallet className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>尚無撥款紀錄</p>
-        </div>
+        <EmptyState icon={<Wallet size={32} />} title="尚無撥款紀錄" description="商家完成取餐核銷後，撥款會出現在這裡。" />
       ) : (
         <div className="space-y-3">
           {payouts.map((p) => (

@@ -4,6 +4,7 @@ import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, Ticket, Sparkles } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { EmptyState } from "@/components/ds";
 
 // 對應 UI草圖 VendorDashboard.dc.html「成長獎勵」分頁——全新機制，之前的雛型
 // 完全沒有：商家累積合作營收達門檻後，解鎖消費者端抽獎（單抽／十連抽），獎項是
@@ -153,7 +154,7 @@ export default function VendorPortalGrowth() {
         </CardHeader>
         <CardContent className="p-0">
           {drawHistory.length === 0 ? (
-            <p className="text-sm text-muted-foreground px-6 py-4">尚無開獎紀錄。</p>
+            <EmptyState size="compact" icon={<Trophy size={32} />} title="尚無開獎紀錄" />
           ) : (
             <>
               <div className="grid grid-cols-3 gap-2 px-6 py-2 text-xs font-semibold text-muted-foreground border-b border-border">

@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
-import { Search, Clock, MapPin, UtensilsCrossed } from "lucide-react";
+import { Search, Clock, MapPin, UtensilsCrossed, Repeat } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db, functions } from "@/lib/firebase";
 import { isClean } from "@/lib/searchFilter";
 import type { Lock } from "@/types";
+import { EmptyState, Tag } from "@/components/ds";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { Link } from "wouter";
 
 // 對應 UI草圖 Marketplace.dc.html「轉讓市集」。接上真實 Firestore,沿用
 // ConsumerLockPage.tsx 已驗證過的模式:
@@ -173,25 +176,15 @@ export default function TransferMarketPage() {
       {/* ── Body ── */}
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         <div className="flex gap-2">
-          <button
-            onClick={() => setBrowseTab("browse")}
-            className={`text-sm font-bold px-[18px] py-2.5 rounded-full transition-colors ${
-              browseTab === "browse" ? "bg-orange-500 text-white" : "bg-white text-muted-foreground border border-border"
-            }`}
-          >
+          <Tag selected={browseTab === "browse"} onClick={() => setBrowseTab("browse")}>
             瀏覽轉讓
-          </button>
-          <button
-            onClick={() => setBrowseTab("mine")}
-            className={`text-sm font-bold px-[18px] py-2.5 rounded-full transition-colors ${
-              browseTab === "mine" ? "bg-orange-500 text-white" : "bg-white text-muted-foreground border border-border"
-            }`}
-          >
+          </Tag>
+          <Tag selected={browseTab === "mine"} onClick={() => setBrowseTab("mine")}>
             我的轉讓
-          </button>
+          </Tag>
         </div>
 
-        {loading && <p className="text-sm text-muted-foreground">載入中…</p>}
+        {loading && <SkeletonBlocks count={3} height={240} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" />}
 
         {!loading && browseTab === "browse" && (
           <>
@@ -200,7 +193,7 @@ export default function TransferMarketPage() {
             </div>
 
             {activeListings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">目前沒有人轉讓，稍後再回來看看。</p>
+              <EmptyState icon={<Repeat size={32} />} title="目前沒有人轉讓" description="稍後再回來看看，有新的轉讓會即時出現。" />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {activeListings.map(item => {
@@ -226,7 +219,6 @@ export default function TransferMarketPage() {
                             size="sm"
                             disabled={claimingId === item.id}
                             onClick={() => handleClaim(item.id)}
-                            className="bg-orange-500 hover:bg-orange-600 text-white"
                           >
                             {claimingId === item.id ? "處理中…" : "我要接手"}
                           </Button>
@@ -245,7 +237,7 @@ export default function TransferMarketPage() {
             </div>
 
             {expiredListings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">目前沒有逾期的項目。</p>
+              <EmptyState size="compact" icon={<Clock size={32} />} title="目前沒有逾期的項目" />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {expiredListings.map(item => (
@@ -288,7 +280,12 @@ export default function TransferMarketPage() {
             <span className="text-sm text-muted-foreground font-semibold">你目前有 {myListings.length} 筆商品在轉讓市集</span>
 
             {myListings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">你目前沒有轉讓中的項目。到「我的餐點」把還沒用到的份轉讓出去。</p>
+              <EmptyState
+                icon={<Repeat size={32} />}
+                title="你目前沒有轉讓中的項目"
+                description="臨時不能去？到「我的餐點」把還沒用到的份轉讓出去。"
+                action={<Button asChild variant="outline"><Link href="/my-bookings">前往我的餐點</Link></Button>}
+              />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {myListings.map(item => (

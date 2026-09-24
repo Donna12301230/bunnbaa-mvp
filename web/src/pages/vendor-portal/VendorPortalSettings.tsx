@@ -21,6 +21,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import { format, parseISO } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import type { BusinessHour } from "@/types";
+import { Tooltip } from "@/components/ds";
 
 const ORDER_DEADLINE_OFFSET = 30;
 const DAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
@@ -83,7 +84,7 @@ function SubscriptionReactivateButton({ vendorId }: { vendorId: string }) {
     onError: (err: Error) => toast({ variant: "destructive", title: "操作失敗", description: err.message }),
   });
   return (
-    <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white text-xs"
+    <Button size="sm" className="text-xs"
       disabled={mut.isPending} onClick={() => mut.mutate()}>
       {mut.isPending ? "處理中..." : "重新訂閱（NT$1,999/月）"}
     </Button>
@@ -262,14 +263,11 @@ export default function VendorPortalSettings() {
                 <Clock className="w-4 h-4 text-orange-500" /> 營業時段
               </CardTitle>
               {openDaysCount > 1 && (
-                <button
-                  type="button"
-                  onClick={syncAllOpenTimes}
-                  className="flex items-center gap-1 text-xs text-orange-500 hover:text-orange-600"
-                  title="將第一個開放日的時間套用至所有開放日"
-                >
-                  <Copy className="w-3 h-3" /> 同步所有開放日
-                </button>
+                <Tooltip content="將第一個開放日的時間套用至所有開放日">
+                  <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs text-orange-600" onClick={syncAllOpenTimes}>
+                    <Copy /> 同步所有開放日
+                  </Button>
+                </Tooltip>
               )}
             </div>
           </CardHeader>
@@ -280,7 +278,9 @@ export default function VendorPortalSettings() {
                 <button
                   type="button"
                   onClick={() => setBH(h.weekday, { open: !h.open })}
-                  className={`w-9 h-9 rounded-full text-sm font-medium border transition-colors flex-shrink-0 ${
+                  aria-pressed={h.open}
+                  aria-label={`星期${DAY_NAMES[h.weekday]}${h.open ? "營業" : "公休"}`}
+                  className={`w-9 h-9 rounded-full text-sm font-medium border transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                     h.open
                       ? "bg-orange-500 text-white border-orange-500"
                       : "bg-white text-muted-foreground border-border hover:border-orange-300"
@@ -292,16 +292,16 @@ export default function VendorPortalSettings() {
                 {h.open ? (
                   <div className="flex-1 flex flex-col gap-0.5">
                     <div className="flex items-center gap-1.5">
-                      <input
+                      <Input
                         type="time" value={h.openTime}
                         onChange={e => setBH(h.weekday, { openTime: e.target.value })}
-                        className="border rounded px-2 py-1 text-sm w-[6.2rem] focus:outline-none focus:ring-1 focus:ring-orange-400"
+                        className="h-10 w-[6.8rem] px-2"
                       />
                       <span className="text-muted-foreground text-xs">─</span>
-                      <input
+                      <Input
                         type="time" value={h.closeTime}
                         onChange={e => setBH(h.weekday, { closeTime: e.target.value })}
-                        className="border rounded px-2 py-1 text-sm w-[6.2rem] focus:outline-none focus:ring-1 focus:ring-orange-400"
+                        className="h-10 w-[6.8rem] px-2"
                       />
                     </div>
                     <p className="text-xs text-muted-foreground pl-0.5">
@@ -328,10 +328,10 @@ export default function VendorPortalSettings() {
               國定假日、臨時休息等特定日期，優先於每週營業時段。
             </p>
             <div className="flex gap-2">
-              <input
+              <Input
                 type="date" value={newHoliday}
                 onChange={e => setNewHoliday(e.target.value)}
-                className="border rounded px-2 py-1.5 text-sm flex-1 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                className="h-10 flex-1"
               />
               <Button
                 type="button" size="sm" variant="outline"
@@ -352,13 +352,16 @@ export default function VendorPortalSettings() {
                   <div key={d} className="flex items-center gap-1 bg-orange-50 border border-orange-100 rounded-full px-2.5 py-1 text-sm">
                     <CalendarDays className="w-3 h-3 text-orange-400 flex-shrink-0" />
                     <span className="text-orange-800">{fmtHoliday(d)}</span>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="ml-0.5 h-6 w-6 rounded-full text-orange-700 hover:bg-red-50 hover:text-red-600 [&_svg]:size-3.5"
+                      aria-label={`移除公休日 ${fmtHoliday(d)}`}
                       onClick={() => setHolidays(prev => prev.filter(h => h !== d))}
-                      className="text-orange-300 hover:text-red-500 transition-colors ml-0.5"
                     >
-                      <X className="w-3 h-3" />
-                    </button>
+                      <X />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -370,7 +373,7 @@ export default function VendorPortalSettings() {
 
         {/* ── 儲存按鈕 ── */}
         <Button
-          className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+          className="w-full"
           onClick={() => saveMutation.mutate()}
           disabled={saveMutation.isPending || !name.trim()}
         >
@@ -454,7 +457,7 @@ export default function VendorPortalSettings() {
                 onKeyDown={e => { if (e.key === "Enter" && newTable.trim()) addTableMutation.mutate(newTable.trim()); }}
               />
               <Button
-                className="bg-orange-500 hover:bg-orange-600 text-white flex-shrink-0"
+                className="flex-shrink-0"
                 onClick={() => { if (newTable.trim()) addTableMutation.mutate(newTable.trim()); }}
                 disabled={addTableMutation.isPending || !newTable.trim()}
               >

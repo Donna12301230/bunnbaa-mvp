@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
 
 // 抽自 HomePage 的共用頂部列——依 UI草圖(Main/Marketplace/MyBookings 三頁共用同一組
 // 導覽)統一給三頁用:預購餐點(計畫方案首頁)／轉讓市集／我的餐點。也給
@@ -74,13 +75,15 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-border">
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 h-16 flex items-center gap-3 md:gap-6">
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => setMobileNavOpen(true)}
-          className="md:hidden shrink-0 w-9 h-9 -ml-1.5 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-gray-50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+          className="md:hidden shrink-0 w-10 h-10 -ml-1.5 text-muted-foreground [&_svg]:size-5"
           aria-label="開啟導覽選單"
         >
-          <Menu className="w-5 h-5" />
-        </button>
+          <Menu />
+        </Button>
 
         <img
           src="/飯飽wordR.png"
@@ -95,7 +98,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
               key={tab}
               onClick={() => navigate(href)}
               className={cn(
-                "flex items-center gap-1.5 h-16 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2",
+                "flex items-center gap-1.5 h-16 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 active === tab ? "border-orange-500 text-orange-600" : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
@@ -105,47 +108,52 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
         </nav>
 
         <div className="flex-1 relative max-w-md hidden sm:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+          {/* 設計系統 Input：淡灰底無框，hover 出現細框，focus 轉白底 + 品牌橘 ring */}
+          <Input
+            type="search"
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
             placeholder="搜尋餐廳、料理或菜餚"
-            className="w-full pl-9 pr-3 h-10 rounded-full border border-border bg-gray-50 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+            aria-label="搜尋餐廳、料理或菜餚"
+            className="h-10 pl-9"
           />
         </div>
 
         <div className="flex items-center gap-2 md:gap-4 shrink-0 ml-auto text-sm">
-          <button className="hidden lg:flex items-center gap-1 text-muted-foreground hover:text-foreground">
+          <button type="button" className="hidden lg:flex items-center gap-1 text-muted-foreground hover:text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <MapPin className="w-4 h-4" />
             <span>新地址 選擇地址</span>
           </button>
-          <button className="hidden sm:flex items-center gap-1 text-muted-foreground hover:text-foreground">
+          <button type="button" className="hidden sm:flex items-center gap-1 text-muted-foreground hover:text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <Globe className="w-4 h-4" />
             <span>ZH</span>
             <ChevronDown className="w-3 h-3" />
           </button>
 
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => navigate("/cart")}
-            className="relative w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-gray-50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+            className="relative w-10 h-10 text-muted-foreground [&_svg]:size-5"
             aria-label={`購物車${cartCount > 0 ? `，${cartCount} 項商品` : ""}`}
           >
-            <ShoppingCart className="w-5 h-5" />
+            <ShoppingCart />
             {cartCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-micro font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}
-          </button>
+          </Button>
 
           {!user ? (
-            <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => navigate("/login")}>
+            <Button size="sm"  onClick={() => navigate("/login")}>
               登入 / 註冊
             </Button>
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1 text-foreground">
+                <button type="button" className="flex items-center gap-1 text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <User className="w-4 h-4" />
                   <span className="max-w-[80px] truncate hidden sm:inline">{user.displayName || user.username}</span>
                   <ChevronDown className="w-3 h-3" />
@@ -190,7 +198,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                 <button
                   onClick={() => go(href)}
                   className={cn(
-                    "w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400",
+                    "w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     active === tab ? "bg-orange-50 text-orange-600" : "text-foreground hover:bg-gray-50"
                   )}
                 >
@@ -201,7 +209,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
             <SheetClose asChild>
               <button
                 onClick={() => go("/cart")}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-foreground hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-foreground hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <ShoppingCart className="w-4 h-4" /> 購物車
                 {cartCount > 0 && (
@@ -214,7 +222,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           </nav>
           {!user && (
             <div className="p-3 border-t border-border">
-              <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white" onClick={() => go("/login")}>
+              <Button className="w-full" onClick={() => go("/login")}>
                 登入 / 註冊
               </Button>
             </div>

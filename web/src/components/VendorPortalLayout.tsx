@@ -94,7 +94,7 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
               重新訂閱方案：<b>首月免費，之後每月 NT$1,999</b>
             </div>
             <Button
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+              className="w-full"
               disabled={reactivateMutation.isPending}
               onClick={() => reactivateMutation.mutate()}
             >

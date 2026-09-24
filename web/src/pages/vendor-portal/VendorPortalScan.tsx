@@ -117,7 +117,7 @@ export default function VendorPortalScan() {
               maxLength={10}
             />
             <Button
-              className="bg-orange-500 hover:bg-orange-600 text-white shrink-0"
+              className="shrink-0"
               onClick={handleSearch}
               disabled={!code.trim() || isSearching || !myVendor}
             >

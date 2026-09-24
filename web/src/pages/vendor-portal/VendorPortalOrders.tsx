@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { PreOrderData, TableOrderData } from "@/types";
 
 import { STATUS_MAP } from "@/lib/statusMap";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/orders.tsx.
 // TODO(firebase): reads/writes mockData.ts's mockPreOrders/mockTableOrders
@@ -243,7 +244,7 @@ export default function VendorPortalOrders() {
               </div>
             </div>
             {needsDeposit && (
-              <Button size="sm" className="h-7 text-xs w-full bg-amber-500 hover:bg-amber-600 text-white"
+              <Button size="sm" className="h-7 text-xs w-full"
                 disabled={confirmDepositMutation.isPending}
                 onClick={() => confirmDepositMutation.mutate(order.id)}>
                 確認訂金已收到
@@ -341,7 +342,7 @@ export default function VendorPortalOrders() {
           <div className="flex justify-between items-center mb-3">
             <p className="text-xs text-muted-foreground">每 3 分鐘自動更新</p>
             <div className="flex gap-2">
-              <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setSheetOpen(true)}>
+              <Button size="sm"  onClick={() => setSheetOpen(true)}>
                 <Plus className="w-3.5 h-3.5 mr-1" /> 新增訂單
               </Button>
               <Button size="sm" variant="outline" onClick={() => refetchTable()} disabled={loadingTable}>
@@ -351,9 +352,7 @@ export default function VendorPortalOrders() {
           </div>
 
           {loadingTable ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse" />)}
-            </div>
+            <SkeletonBlocks count={3} height={112} className="space-y-3" />
           ) : (
             <Tabs defaultValue="t-pending">
               <TabsList className="mb-3">
@@ -386,9 +385,7 @@ export default function VendorPortalOrders() {
         {/* 預約訂購 Tab */}
         <TabsContent value="preorder">
           {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse" />)}
-            </div>
+            <SkeletonBlocks count={3} height={112} className="space-y-3" />
           ) : (
             <Tabs defaultValue="pending">
               <TabsList className="mb-4">
@@ -527,7 +524,7 @@ export default function VendorPortalOrders() {
           <SheetFooter className="pt-2 gap-2">
             <Button variant="outline" onClick={() => setSheetOpen(false)}>取消</Button>
             <Button
-              className="bg-orange-500 hover:bg-orange-600 text-white"
+              
               disabled={createTableOrderMutation.isPending}
               onClick={() => createTableOrderMutation.mutate()}
             >

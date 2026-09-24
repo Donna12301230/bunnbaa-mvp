@@ -8,6 +8,7 @@ import { CheckCircle, XCircle, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/admin/vendors.tsx (廠商管理 tab).
 // TODO(firebase): reads mockVendors instead of Parse.Query("Vendor") and calls
@@ -36,9 +37,7 @@ export default function AdminVendorsPage() {
     <AdminLayout>
       <h2 className="text-lg font-bold mb-3">所有廠商申請 ({vendors.length})</h2>
       {isLoading ? (
-        <div className="space-y-3">
-          {[1,2,3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
-        </div>
+        <SkeletonBlocks count={3} height={96} className="space-y-3" />
       ) : vendors.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <Store className="w-12 h-12 mx-auto mb-3 opacity-30" />

@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
+import { Tooltip } from "@/components/ds";
 
 const DEADLINE_OFFSET = 30; // 訂餐截止 = 打烊前 30 分鐘
 
@@ -150,9 +151,9 @@ export default function VendorPortalSessions() {
           <p>尚未設定營業時段</p>
           <p className="mt-1">
             請先至
-            <button className="text-orange-500 underline ml-1" onClick={() => navigate("/vendor-portal/settings")}>
+            <Button variant="link" className="ml-1 h-auto p-0 align-baseline" onClick={() => navigate("/vendor-portal/settings")}>
               店家設定
-            </button>
+            </Button>
             設定營業時間
           </p>
         </div>
@@ -195,12 +196,14 @@ export default function VendorPortalSessions() {
                     /* 公休日 */
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-gray-500">公休日</span>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-600"
                         onClick={() => removeHoliday.mutate(dateStr)}
-                        className="text-xs text-red-400 hover:text-red-600 flex items-center gap-0.5"
                       >
-                        <X className="w-3 h-3" /> 移除
-                      </button>
+                        <X /> 移除
+                      </Button>
                     </div>
                   ) : !isBizDay ? (
                     /* 非營業日 */
@@ -237,13 +240,16 @@ export default function VendorPortalSessions() {
                 {/* 操作 */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {isBizDay && !isToday && !isPast && (
-                    <button
-                      onClick={() => addHoliday.mutate(dateStr)}
-                      className="text-xs text-muted-foreground hover:text-orange-500 px-1"
-                      title="標為公休日"
-                    >
-                      公休
-                    </button>
+                    <Tooltip content="標為公休日">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-muted-foreground hover:text-orange-600"
+                        onClick={() => addHoliday.mutate(dateStr)}
+                      >
+                        公休
+                      </Button>
+                    </Tooltip>
                   )}
                   {session && (
                     <>

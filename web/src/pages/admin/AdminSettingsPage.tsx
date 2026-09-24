@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { EmptyState } from "@/components/ds";
+import { Store } from "lucide-react";
 
 // 認證商家徽章：vendors collection 原本只有 reliability_tone（履約穩定度，系統
 // 自動算），沒有「認證商家」欄位——這是平台審核後手動認證的標記，所以放在管理員
@@ -42,7 +44,7 @@ function VendorVerificationCard() {
       <h3 className="font-semibold mb-2">認證商家</h3>
       <p className="text-sm text-muted-foreground mb-3">平台審核後手動認證，跟系統自動算的「履約穩定度」是兩件事。</p>
       {vendors.length === 0 ? (
-        <p className="text-sm text-muted-foreground">目前沒有商家資料。</p>
+        <EmptyState size="compact" icon={<Store size={32} />} title="目前沒有商家資料" />
       ) : (
         <div className="space-y-2">
           {vendors.map((vendor) => (

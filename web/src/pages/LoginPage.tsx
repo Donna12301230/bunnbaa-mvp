@@ -172,22 +172,23 @@ export default function LoginPage() {
                     <div>
                       <Label>密碼</Label>
                       <div className="relative mt-1">
-                        <Input autoComplete="current-password" type={showPassword ? "text" : "password"} placeholder="請輸入密碼" value={password} onChange={e => setPassword(e.target.value)} required className="pr-10" />
-                        <button type="button" tabIndex={-1} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword(v => !v)}>
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        <Input autoComplete="current-password" type={showPassword ? "text" : "password"} placeholder="請輸入密碼" value={password} onChange={e => setPassword(e.target.value)} required className="pr-11" />
+                        <button type="button" aria-label={showPassword ? "隱藏密碼" : "顯示密碼"} aria-pressed={showPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowPassword(v => !v)}>
+                          {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                         </button>
                       </div>
                     </div>
                     <div className="text-right -mt-1">
-                      <button
+                      <Button
                         type="button"
-                        className="text-xs text-orange-600 hover:underline"
+                        variant="link"
+                        className="h-auto px-0 text-caption"
                         onClick={() => { setResetEmail(""); setResetDialogOpen(true); }}
                       >
                         忘記密碼？
-                      </button>
+                      </Button>
                     </div>
-                    <Button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-white" disabled={isPendingLogin}>
+                    <Button type="submit" className="w-full" disabled={isPendingLogin}>
                       {isPendingLogin ? "登入中..." : "登入"}
                     </Button>
                     <p className="text-center text-caption text-muted-foreground">
@@ -246,7 +247,7 @@ export default function LoginPage() {
                       </div>
 
                       <Button
-                        className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+                        className="w-full"
                         disabled={!memberAgreed}
                         onClick={() => setMemberStep("form")}
                       >
@@ -255,13 +256,14 @@ export default function LoginPage() {
                     </div>
                   ) : (
                     <form onSubmit={(e) => { e.preventDefault(); registerMutation.mutate(); }} className="space-y-3">
-                      <button
+                      <Button
                         type="button"
-                        className="text-xs text-orange-600 hover:underline"
+                        variant="link"
+                        className="h-auto px-0 text-caption"
                         onClick={() => setMemberStep("notice")}
                       >
                         ← 返回會員須知
-                      </button>
+                      </Button>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label>帳號 *</Label>
@@ -280,18 +282,18 @@ export default function LoginPage() {
                         <div>
                           <Label>密碼 *</Label>
                           <div className="relative mt-1">
-                            <Input autoComplete="new-password" type={showRegPassword ? "text" : "password"} placeholder="至少 6 位" value={regPassword} onChange={e => setRegPassword(e.target.value)} required className="pr-10" />
-                            <button type="button" tabIndex={-1} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowRegPassword(v => !v)}>
-                              {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            <Input autoComplete="new-password" type={showRegPassword ? "text" : "password"} placeholder="至少 6 位" value={regPassword} onChange={e => setRegPassword(e.target.value)} required className="pr-11" />
+                            <button type="button" aria-label={showRegPassword ? "隱藏密碼" : "顯示密碼"} aria-pressed={showRegPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowRegPassword(v => !v)}>
+                              {showRegPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
                           </div>
                         </div>
                         <div>
                           <Label>確認密碼 *</Label>
                           <div className="relative mt-1">
-                            <Input autoComplete="new-password" type={showRegConfirm ? "text" : "password"} placeholder="再輸入一次" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required className="pr-10" />
-                            <button type="button" tabIndex={-1} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowRegConfirm(v => !v)}>
-                              {showRegConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            <Input autoComplete="new-password" type={showRegConfirm ? "text" : "password"} placeholder="再輸入一次" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required className="pr-11" />
+                            <button type="button" aria-label={showRegConfirm ? "隱藏密碼" : "顯示密碼"} aria-pressed={showRegConfirm} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowRegConfirm(v => !v)}>
+                              {showRegConfirm ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
                           </div>
                         </div>
@@ -335,7 +337,7 @@ export default function LoginPage() {
                           )}
                         </div>
                       </div>
-                      <Button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-white" disabled={isPendingReg}>
+                      <Button type="submit" className="w-full" disabled={isPendingReg}>
                         {isPendingReg ? "註冊中..." : "立即註冊"}
                       </Button>
                     </form>
@@ -395,7 +397,7 @@ export default function LoginPage() {
                       </div>
 
                       <Button
-                        className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+                        className="w-full"
                         disabled={!vendorAgreed}
                         onClick={() => setVendorStep("form")}
                       >
@@ -404,13 +406,14 @@ export default function LoginPage() {
                     </div>
                   ) : (
                     <form onSubmit={(e) => { e.preventDefault(); vendorRegisterMutation.mutate(); }} className="space-y-3">
-                      <button
+                      <Button
                         type="button"
-                        className="text-xs text-amber-600 hover:underline"
+                        variant="link"
+                        className="h-auto px-0 text-caption"
                         onClick={() => setVendorStep("notice")}
                       >
                         ← 返回申請須知
-                      </button>
+                      </Button>
                       <div className="border rounded-lg p-3 space-y-3 bg-amber-50/50">
                         <p className="text-xs font-semibold text-amber-700">店家資訊</p>
                         <div>
@@ -436,23 +439,23 @@ export default function LoginPage() {
                         <div>
                           <Label>密碼 *</Label>
                           <div className="relative mt-1">
-                            <Input autoComplete="new-password" type={showVendorPassword ? "text" : "password"} placeholder="至少 6 位" value={vendorPassword} onChange={e => setVendorPassword(e.target.value)} required className="pr-10" />
-                            <button type="button" tabIndex={-1} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowVendorPassword(v => !v)}>
-                              {showVendorPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            <Input autoComplete="new-password" type={showVendorPassword ? "text" : "password"} placeholder="至少 6 位" value={vendorPassword} onChange={e => setVendorPassword(e.target.value)} required className="pr-11" />
+                            <button type="button" aria-label={showVendorPassword ? "隱藏密碼" : "顯示密碼"} aria-pressed={showVendorPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowVendorPassword(v => !v)}>
+                              {showVendorPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
                           </div>
                         </div>
                         <div>
                           <Label>確認密碼 *</Label>
                           <div className="relative mt-1">
-                            <Input autoComplete="new-password" type={showVendorConfirm ? "text" : "password"} placeholder="再輸入一次" value={vendorConfirmPassword} onChange={e => setVendorConfirmPassword(e.target.value)} required className="pr-10" />
-                            <button type="button" tabIndex={-1} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowVendorConfirm(v => !v)}>
-                              {showVendorConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            <Input autoComplete="new-password" type={showVendorConfirm ? "text" : "password"} placeholder="再輸入一次" value={vendorConfirmPassword} onChange={e => setVendorConfirmPassword(e.target.value)} required className="pr-11" />
+                            <button type="button" aria-label={showVendorConfirm ? "隱藏密碼" : "顯示密碼"} aria-pressed={showVendorConfirm} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowVendorConfirm(v => !v)}>
+                              {showVendorConfirm ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
                           </div>
                         </div>
                       </div>
-                      <Button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-white" disabled={isPendingVendor}>
+                      <Button type="submit" className="w-full" disabled={isPendingVendor}>
                         {isPendingVendor ? "申請中..." : "申請成為廠商"}
                       </Button>
                     </form>
@@ -489,7 +492,7 @@ export default function LoginPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setResetDialogOpen(false)}>取消</Button>
             <Button
-              className="bg-amber-500 hover:bg-amber-600 text-white"
+              
               disabled={!resetEmail.trim() || resetPasswordMutation.isPending}
               onClick={() => resetPasswordMutation.mutate(resetEmail.trim())}
             >

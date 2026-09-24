@@ -47,14 +47,17 @@ export function ImageUploadField({ label, value, onChange }: Props) {
       <Label>{label}</Label>
       {value && (
         <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-gray-50">
-          <img src={value} alt="preview" className="w-full h-full object-cover" />
-          <button
+          <img src={value} alt="品項圖片預覽" className="w-full h-full object-cover" />
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full bg-surface-dark/70 text-white hover:bg-surface-dark/90 hover:text-white [&_svg]:size-3.5"
+            aria-label="移除圖片"
             onClick={() => onChange("")}
-            className="absolute top-1 right-1 bg-gray-900/70 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-black/80"
           >
-            <X className="w-3 h-3" />
-          </button>
+            <X />
+          </Button>
         </div>
       )}
       <div className="flex gap-2">

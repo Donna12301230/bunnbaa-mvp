@@ -8,6 +8,9 @@ import type { MenuItem, Vendor } from "@/types";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { EmptyState } from "@/components/ds";
+import { Input } from "@/components/ui/input";
 
 // 商品詳情頁。
 export default function MenuItemPage() {
@@ -38,17 +41,17 @@ export default function MenuItemPage() {
   });
 
   if (isLoading) {
-    return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
+    return <SkeletonBlocks height={256} />;
   }
 
   if (!item) {
     return (
-      <div className="text-center py-16 text-muted-foreground">
-        <p>找不到這個品項</p>
-        <Link href="/vendors" className="text-sm text-orange-600 hover:underline mt-2 inline-block">
-          回商家清單
-        </Link>
-      </div>
+      <EmptyState
+        icon={<UtensilsCrossed size={32} />}
+        title="找不到這個品項"
+        description="可能已下架，或連結有誤。"
+        action={<Button variant="outline" asChild><Link href="/vendors">回商家清單</Link></Button>}
+      />
     );
   }
 
@@ -102,34 +105,28 @@ export default function MenuItemPage() {
           )}
 
           <div className="field">
-            <label className="text-sm font-medium block mb-1">備註（選填）</label>
-            <input
+            <label htmlFor="item-note" className="text-sm font-medium block mb-1">備註（選填）</label>
+            <Input
+              id="item-note"
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="例如：不要香菜"
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
             />
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-border">
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-                className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-gray-50"
-              >
-                <Minus className="w-3.5 h-3.5" />
-              </button>
-              <span className="w-6 text-center font-medium">{qty}</span>
-              <button
-                onClick={() => setQty((q) => q + 1)}
-                className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-gray-50"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
+              <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label="減少數量" onClick={() => setQty((q) => Math.max(1, q - 1))}>
+                <Minus />
+              </Button>
+              <span className="w-6 text-center font-medium bb-num" aria-live="polite">{qty}</span>
+              <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label="增加數量" onClick={() => setQty((q) => q + 1)}>
+                <Plus />
+              </Button>
             </div>
-            <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={handleAddToCart}>
-              <ShoppingCart className="w-4 h-4 mr-1.5" /> 加入購物車 · NT${item.price * qty}
+            <Button onClick={handleAddToCart}>
+              <ShoppingCart /> 加入購物車 · NT${item.price * qty}
             </Button>
           </div>
         </div>

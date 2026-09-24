@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { collection, limit, onSnapshot, query, where } from "firebase/firestore";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { format } from "date-fns";
@@ -7,6 +7,9 @@ import { zhTW } from "date-fns/locale";
 import { ArrowLeft, ClipboardList } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import type { Lock } from "@/types";
+import { EmptyState } from "@/components/ds";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { Button } from "@/components/ui/button";
 
 // 「我的鎖定/訂單記錄頁」——TODO.md 本來沒描述範圍，跟使用者確認後決定做一個
 // 獨立的真實資料簡易列表頁：直接查詢目前登入者自己的 locks（buyer_uid），
@@ -72,20 +75,22 @@ export default function MyLocksPage() {
           <h1 className="text-lg font-bold flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-orange-500" /> 我的訂單記錄
           </h1>
-          <button
-            onClick={() => navigate("/profile")}
-            className="flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" /> 回會員中心
-          </button>
+          <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={() => navigate("/profile")}>
+            <ArrowLeft /> 回會員中心
+          </Button>
         </div>
       </header>
 
       <main className="max-w-[1400px] mx-auto px-4 md:px-6 py-8">
         {loading ? (
-          <p className="text-sm text-muted-foreground">載入中…</p>
+          <SkeletonBlocks count={3} height={160} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" />
         ) : sorted.length === 0 ? (
-          <p className="text-sm text-muted-foreground">目前沒有任何鎖定紀錄。到「預購鎖定」鎖一份餐點看看。</p>
+          <EmptyState
+            icon={<ClipboardList size={32} />}
+            title="還沒有預約紀錄"
+            description="到「預購餐點」鎖一份餐點，隔天就不用排隊。"
+            action={<Button asChild><Link href="/home">去預約餐點</Link></Button>}
+          />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {sorted.map((lock) => {

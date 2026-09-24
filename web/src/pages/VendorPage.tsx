@@ -1,9 +1,12 @@
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { ArrowLeft, MapPin, Phone, Store } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Store, UtensilsCrossed } from "lucide-react";
 import { db } from "@/lib/firebase";
 import type { Vendor, MenuItem } from "@/types";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { EmptyState } from "@/components/ds";
+import { Button } from "@/components/ui/button";
 
 // 商家頁 — 也兼商品(鎖定品項)列表頁：顯示這家商家所有可預購品項。
 export default function VendorPage() {
@@ -31,18 +34,17 @@ export default function VendorPage() {
   });
 
   if (vendorLoading) {
-    return <div className="h-48 bg-gray-100 rounded-xl animate-pulse" />;
+    return <SkeletonBlocks height={192} />;
   }
 
   if (!vendor) {
     return (
-      <div className="text-center py-16 text-muted-foreground">
-        <Store className="w-12 h-12 mx-auto mb-3 opacity-30" />
-        <p>找不到這個商家</p>
-        <Link href="/vendors" className="text-sm text-orange-600 hover:underline mt-2 inline-block">
-          回商家清單
-        </Link>
-      </div>
+      <EmptyState
+        icon={<Store size={32} />}
+        title="找不到這個商家"
+        description="可能已停止營業，或連結有誤。"
+        action={<Button variant="outline" asChild><Link href="/vendors">回商家清單</Link></Button>}
+      />
     );
   }
 
@@ -79,11 +81,9 @@ export default function VendorPage() {
       <div>
         <h2 className="text-lg font-bold mb-3">品項</h2>
         {itemsLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[1, 2].map((i) => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
-          </div>
+          <SkeletonBlocks count={2} height={96} className="grid grid-cols-1 sm:grid-cols-2 gap-3" />
         ) : items.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">這家商家目前沒有上架品項</p>
+          <EmptyState size="compact" icon={<UtensilsCrossed size={32} />} title="這家商家目前沒有上架品項" />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {items.map((item) => (

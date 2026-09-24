@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChefHat } from "lucide-react";
 import { db } from "@/lib/firebase";
 import type { Lock } from "@/types";
+import { EmptyState } from "@/components/ds";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 // 對應 UI草圖 VendorDashboard.dc.html「備料」分頁——之前的雛型沒有這個視角：
 // 依取餐時段聚合「今天要備多少份」，方便商家一次看完整天備料量，不用一筆筆訂單
@@ -86,9 +88,9 @@ export default function VendorPortalPrep() {
       </Card>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">載入中…</p>
+        <SkeletonBlocks count={3} height={160} className="grid grid-cols-1 md:grid-cols-3 gap-4" />
       ) : prepSlots.length === 0 ? (
-        <p className="text-sm text-muted-foreground">今日尚無待備料的鎖定訂單。</p>
+        <EmptyState icon={<ChefHat size={32} />} title="今日尚無待備料的訂單" description="有顧客鎖定餐點後，會依取餐時段出現在這裡。" />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {prepSlots.map(slot => (

@@ -20,6 +20,8 @@ import { auth, db } from "@/lib/firebase";
 import type { MenuItem, Vendor } from "@/types";
 import { ALLERGEN_LIST, DIETARY_TAGS } from "@/types";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { EmptyState, Switch, Tag } from "@/components/ds";
 
 const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[] };
 
@@ -146,20 +148,15 @@ export default function VendorPortalMenu() {
     <VendorPortalLayout>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">菜單管理</h2>
-        <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={openAdd}>
+        <Button  onClick={openAdd}>
           <Plus className="w-4 h-4 mr-1" /> 新增品項
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">
-          {[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}
-        </div>
+        <SkeletonBlocks count={3} height={64} className="space-y-2" />
       ) : items.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <UtensilsCrossed className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>尚無菜單品項，點擊上方按鈕新增</p>
-        </div>
+        <EmptyState icon={<UtensilsCrossed size={32} />} title="尚無菜單品項" description="點擊上方「新增品項」，上架第一道餐點。" />
       ) : (() => {
         const categories = Array.from(new Set(items.map(i => i.category)));
         return (
@@ -241,29 +238,21 @@ export default function VendorPortalMenu() {
                 <Input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="例：便當、湯品" />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isAvailable"
-                checked={form.isAvailable}
-                onChange={e => setForm(f => ({ ...f, isAvailable: e.target.checked }))}
-                className="w-4 h-4"
-              />
-              <Label htmlFor="isAvailable">上架販售</Label>
-            </div>
+            {/* 上架與否是即時生效的開關設定 → 設計系統用 Switch */}
+            <Switch
+              checked={form.isAvailable}
+              onCheckedChange={(checked) => setForm(f => ({ ...f, isAvailable: checked }))}
+              label="上架販售"
+              description="關閉後顧客暫時看不到這個品項"
+            />
             {/* 飲食標記 */}
             <div>
               <Label className="block mb-1.5">飲食標記</Label>
               <div className="flex flex-wrap gap-2">
                 {DIETARY_TAGS.map(tag => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleTag("dietaryTags", tag)}
-                    className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${form.dietaryTags.includes(tag) ? "bg-green-500 text-white border-green-500" : "bg-white text-gray-600 border-gray-200 hover:border-green-400"}`}
-                  >
+                  <Tag key={tag} selected={form.dietaryTags.includes(tag)} onClick={() => toggleTag("dietaryTags", tag)}>
                     {tag}
-                  </button>
+                  </Tag>
                 ))}
               </div>
             </div>
@@ -272,14 +261,9 @@ export default function VendorPortalMenu() {
               <Label className="block mb-1.5">過敏原標示 <span className="text-xs text-red-500 font-normal">（食安法規定）</span></Label>
               <div className="flex flex-wrap gap-2">
                 {ALLERGEN_LIST.map(tag => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleTag("allergens", tag)}
-                    className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${form.allergens.includes(tag) ? "bg-red-500 text-white border-red-500" : "bg-white text-gray-600 border-gray-200 hover:border-red-400"}`}
-                  >
+                  <Tag key={tag} selected={form.allergens.includes(tag)} onClick={() => toggleTag("allergens", tag)}>
                     {tag}
-                  </button>
+                  </Tag>
                 ))}
               </div>
               <p className="text-xs text-muted-foreground mt-1">點選含有的過敏原成分，將顯示於消費者菜單頁面。</p>
@@ -289,7 +273,7 @@ export default function VendorPortalMenu() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
             <Button
-              className="bg-orange-500 hover:bg-orange-600 text-white"
+              
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending || !form.name || !form.price}
             >

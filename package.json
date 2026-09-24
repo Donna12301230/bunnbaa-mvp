@@ -1,0 +1,10 @@
+{
+  "name": "bunnbaa",
+  "private": true,
+  "scripts": {
+    "deploy:rules": "firebase deploy --only firestore:rules",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:hosting": "npm --prefix web run deploy",
+    "deploy": "npm run deploy:rules && npm run deploy:functions && npm run deploy:hosting"
+  }
+}

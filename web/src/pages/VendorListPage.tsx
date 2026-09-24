@@ -6,6 +6,9 @@ import { Search, MapPin, Phone, Store } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { isClean } from "@/lib/searchFilter";
 import type { Vendor } from "@/types";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { EmptyState } from "@/components/ds";
+import { Input } from "@/components/ui/input";
 
 // 商家清單頁 — 消費者瀏覽所有上架商家。真實 vendors collection 沒有
 // isApproved/isActive 這兩個欄位，用 status !== 'disabled' 頂替。
@@ -38,25 +41,22 @@ export default function VendorListPage() {
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
+        <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="搜尋商家名稱或介紹"
-          className="w-full pl-9 pr-3 h-10 rounded-full border border-border bg-white text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+          className="h-10 pl-9"
         />
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-40 bg-gray-100 rounded-xl animate-pulse" />
-          ))}
-        </div>
+        <SkeletonBlocks count={3} height={160} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" />
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <Store className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>找不到符合的商家</p>
-        </div>
+        <EmptyState
+          icon={<Store size={32} />}
+          title={search ? "找不到符合的商家" : "目前還沒有合作商家"}
+          description={search ? "換個關鍵字試試看。" : "新商家上架後會出現在這裡。"}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((vendor) => (

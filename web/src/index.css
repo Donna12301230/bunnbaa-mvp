@@ -6,9 +6,7 @@
    已對齊 BunnBaa 設計系統（src/styles/tokens.css，預覽：#/design-system）。
    色值與 tokens.css 同源，改色時兩邊一起改。
    Drives the marketplace UI (login/home/admin/vendor-portal pages).
-   Kept separate from the --ink/--brand/... tokens below, which the existing
-   lock-prototype pages (ConsumerLockPage/VendorDashboard/VendorRedeemPage)
-   use — the two systems don't share variable names, so they coexist safely. */
+   和下方舊原型頁的 --ink / --brand / --legacy-* 分開，變數名稱不重疊。 */
 :root {
   --background: #fff8ec;          /* --bg */
   --foreground: #2b2b2b;          /* --text */
@@ -100,8 +98,9 @@
   }
 }
 
-/* ── lock-prototype tokens（ConsumerLockPage / VendorDashboard / VendorRedeemPage /
-   Payment 結果頁）— 變數名稱不變，色值改為 BunnBaa 設計系統（原為灰玫瑰色系）。
+/* ── lock-prototype tokens（ConsumerLockPage / VendorDashboard / Payment 結果頁）
+   色值為 BunnBaa 設計系統（原為灰玫瑰色系）。底色類變數加 legacy- 前綴，
+   避免和設計系統 tokens.css 的 --bg / --surface 撞名（全站都在 .bb-theme 之內）。
    文字色皆 ≥ 4.5:1；狀態色對應設計系統 success / warning / danger / info。 ── */
 :root {
   --ink: #2b2b2b;                 /* --text */
@@ -112,12 +111,12 @@
   --brand-light: #fdebd3;         /* --brand-orange-soft */
   --on-brand: #fff;               /* 品牌底上的文字 */
   --line: #ece6dc;                /* --border */
-  --bg: #fff8ec;                  /* 奶油底 */
-  --surface: #fff;
-  --surface-muted: #f7f5f0;       /* 輸入框底（淡灰無框） */
+  --legacy-bg: #fff8ec;                  /* 奶油底 */
+  --legacy-surface: #fff;
+  --legacy-surface-muted: #f7f5f0;       /* 輸入框底（淡灰無框） */
   --line-strong: #dcd3c6;         /* --border-strong：輸入框 hover 外框 */
   --focus: #f29e0c;               /* --brand-orange：focus 外框 */
-  --shadow-sm: 0 2px 8px rgba(120, 80, 40, 0.05);
+  --legacy-shadow-sm: 0 2px 8px rgba(120, 80, 40, 0.05);
 
   /* status colors — one pair per lock.status value (spec §04 設計代幣) */
   --status-locked: #a34f00;      --status-locked-bg: #fdebd3;
@@ -137,11 +136,11 @@
     --brand-light: #43321c;
     --on-brand: #1f1a15;          /* 深色模式品牌底較亮，改用深字（7.95:1） */
     --line: #3d342b;
-    --bg: #1f1a15;
-    --surface: #2a231d;
-    --surface-muted: #342b24;
+    --legacy-bg: #1f1a15;
+    --legacy-surface: #2a231d;
+    --legacy-surface-muted: #342b24;
     --line-strong: #52463a;
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+    --legacy-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
 
     --status-locked: #f29e0c;      --status-locked-bg: #43321c;
     --status-resale: #e8bd6a;      --status-resale-bg: #3a2f18;
@@ -151,7 +150,10 @@
   }
 }
 
-body { margin: 0; background: var(--bg); color: var(--ink); }
+body { margin: 0; background: var(--legacy-bg); color: var(--ink); }
+
+/* 全站包在 <ThemeRoot>（淺色）之內；舊原型頁仍跟隨系統深色模式，自己鋪底色與字色 */
+.legacy-ui { min-height: 100vh; background: var(--legacy-bg); color: var(--ink); }
 
 .legacy-ui .page { max-width: 720px; margin: 0 auto; padding: 24px 20px 64px; }
 
@@ -167,7 +169,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 
 .legacy-ui .card {
   border: 1px solid var(--line); border-radius: 12px; padding: 16px;
-  margin-bottom: 16px; background: var(--surface); box-shadow: var(--shadow-sm);
+  margin-bottom: 16px; background: var(--legacy-surface); box-shadow: var(--legacy-shadow-sm);
 }
 .legacy-ui .card.tinted { background: var(--brand-light); border-color: transparent; box-shadow: none; }
 
@@ -208,13 +210,13 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
   .legacy-ui button { transition: none; }
   .legacy-ui button:active:not(:disabled) { transform: none; }
 }
-.legacy-ui button.secondary { background: var(--surface); color: var(--brand); border: 1px solid var(--brand); }
+.legacy-ui button.secondary { background: var(--legacy-surface); color: var(--brand); border: 1px solid var(--brand); }
 .legacy-ui button.secondary:hover:not(:disabled) { background: var(--brand-light); }
 
 /* 設計系統 Input：淡灰底無框，hover 出現細框，focus 轉白底 + 品牌橘 ring */
 .legacy-ui input[type="text"], .legacy-ui textarea {
   width: 100%; min-height: 44px; padding: 10px 12px; box-sizing: border-box;
-  background: var(--surface-muted); color: var(--ink);
+  background: var(--legacy-surface-muted); color: var(--ink);
   border: 1px solid transparent; border-radius: 8px;
   font-size: 15px; font-family: inherit;
   transition: background-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -222,7 +224,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .legacy-ui input[type="text"]::placeholder, .legacy-ui textarea::placeholder { color: var(--faint); }
 .legacy-ui input[type="text"]:hover, .legacy-ui textarea:hover { border-color: var(--line-strong); }
 .legacy-ui input[type="text"]:focus, .legacy-ui textarea:focus {
-  background: var(--surface); border-color: var(--focus);
+  background: var(--legacy-surface); border-color: var(--focus);
   outline: 2px solid var(--focus); outline-offset: 2px;
 }
 .legacy-ui textarea { margin-bottom: 8px; resize: vertical; }
@@ -231,7 +233,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .legacy-ui .stat { font-size: 24px; font-weight: 700; color: var(--brand); }
 
 .legacy-ui .qr-block { display: flex; align-items: center; gap: 16px; }
-.legacy-ui .qr-box { padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.legacy-ui .qr-box { padding: 8px; background: var(--legacy-surface); border: 1px solid var(--line); border-radius: 8px; }
 .legacy-ui .lock-code { font-size: 20px; font-weight: 700; letter-spacing: 0.08em; font-family: var(--font-mono); }
 
 .legacy-ui .field { margin-bottom: 12px; }

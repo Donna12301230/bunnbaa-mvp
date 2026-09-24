@@ -1,12 +1,14 @@
 /* ══════════════════════════════════════════════════════════════════════════
    BunnBaa 飯飽 Design Tokens
    ──────────────────────────────────────────────────────────────────────────
-   作用範圍：.bb-theme（由 <ThemeRoot> 產生），而非 :root。
-   原因：index.css 已在 :root 定義 --bg / --surface / --border（legacy lock 頁
-   與 shadcn 頁在用，且有 prefers-color-scheme 深色覆寫）。放在 :root 會蓋掉
-   舊頁面的值。等舊頁全部遷移到本設計系統後，可把 .bb-theme 改回 :root。
+   作用範圍：:root 與 .bb-theme（由 <ThemeRoot> 產生）。
+   放在 :root，Radix 等渲染到 document.body 的彈層（Dialog、Select 選單）
+   也吃得到 tokens。舊原型頁的底色變數已改名為 --legacy-*，不再撞名；
+   與 shadcn 共用的 --border 兩邊色值相同。
+   深色模式仍以 .bb-theme[data-theme='dark'] 覆寫（只影響該子樹）。
    ══════════════════════════════════════════════════════════════════════════ */
 
+:root,
 .bb-theme {
   /* ── 品牌色（規格原值） ─────────────────────────────────────────────── */
   --brand-brown: #b87a5a;        /* 標題、Logo「Bunn」 */
@@ -158,6 +160,7 @@
 
 /* ── prefers-reduced-motion：縮短時長，由 global.css 關閉位移/縮放 ─────── */
 @media (prefers-reduced-motion: reduce) {
+  :root,
   .bb-theme {
     --duration-fast: 0.01ms;
     --duration-base: 0.01ms;

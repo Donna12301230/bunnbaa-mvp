@@ -17,6 +17,8 @@ import GrowthRewardTicker from "@/components/GrowthRewardTicker";
 import { auth, db, functions } from "@/lib/firebase";
 import type { Vendor, MenuItem, MealPlan, Lock } from "@/types";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 const GROWTH_VENDOR_ID = "cafe-renheya-demo";
 const GROWTH_UNLOCK_THRESHOLD = 200000;
@@ -248,20 +250,20 @@ export default function HomePage() {
             </h3>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">開始日期</label>
-              <input
+              <Input
                 type="date"
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
-                className="w-full border border-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                className="h-10"
               />
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">結束日期</label>
-              <input
+              <Input
                 type="date"
                 value={endDate}
                 onChange={e => setEndDate(e.target.value)}
-                className="w-full border border-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                className="h-10"
               />
             </div>
             <p className="text-xs text-center text-muted-foreground pt-1 border-t border-border">最快下週一供餐</p>
@@ -272,11 +274,11 @@ export default function HomePage() {
             <label className="text-xs text-muted-foreground block -mt-1">單點型鎖定用，選一個日期跟時段</label>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">取餐日期</label>
-              <input
+              <Input
                 type="date"
                 value={pickupDate}
                 onChange={e => setPickupDate(e.target.value)}
-                className="w-full border border-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                className="h-10"
               />
             </div>
             <div className="space-y-2">
@@ -420,7 +422,6 @@ export default function HomePage() {
                         <Button
                           size="sm"
                           onClick={() => setLockDialogItem({ item, vendor })}
-                          className="bg-orange-500 hover:bg-orange-600 text-white"
                         >
                           立即預付鎖定
                         </Button>
@@ -458,11 +459,10 @@ export default function HomePage() {
                       </div>
 
                       <label className="flex items-start gap-1.5 p-2 rounded-lg bg-gray-50 border border-border cursor-pointer">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={hasAcked}
-                          onChange={() => setWaiverAck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                          className="mt-0.5 accent-orange-500 w-3.5 h-3.5 shrink-0"
+                          onCheckedChange={() => setWaiverAck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                          className="mt-0.5 shrink-0"
                         />
                         <span className="text-caption leading-relaxed text-muted-foreground">
                           我了解本商品為現做餐點，依消保法通訊交易解除權合理例外情事適用準則，<strong className="text-foreground">鎖定後不適用 7 天猶豫期</strong>，除商家未履約外恕不接受退款
@@ -482,7 +482,6 @@ export default function HomePage() {
                       <Button
                         disabled={!hasAcked || isSubmitting}
                         onClick={() => handleLockMeal(item)}
-                        className="bg-orange-500 hover:bg-orange-600 text-white disabled:bg-gray-200 disabled:text-gray-400"
                       >
                         {isSubmitting ? "前往付款中…" : "確認鎖定並付款"}
                       </Button>

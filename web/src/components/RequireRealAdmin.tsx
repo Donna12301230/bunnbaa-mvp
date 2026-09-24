@@ -2,6 +2,8 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAdminUser } from "@/lib/adminAuth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 // The platform login (useAuth/mockAuthStore) is a mock, so it can't authorize
 // real Firestore/Functions access. These gates ask for a real Firebase Auth
@@ -28,36 +30,32 @@ function RealSignInForm({ title, description }: { title: string; description: st
   }
 
   return (
-    <div className="max-w-sm mx-auto bg-white rounded-xl border border-border p-5">
-      <h2 className="font-semibold mb-1">{title}</h2>
+    <div className="max-w-sm mx-auto bg-card rounded-xl border border-border shadow-sm p-5">
+      <h2 className="text-h3 mb-1">{title}</h2>
       <p className="text-sm text-muted-foreground mb-4">{description}</p>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input
+        <Input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
+          aria-label="Email"
           autoComplete="username"
           required
-          className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
         />
-        <input
+        <Input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="密碼"
           autoComplete="current-password"
           required
-          className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+          aria-label="密碼"
         />
-        {error && <p className="text-xs text-red-500">{error}</p>}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg py-2 disabled:opacity-50"
-        >
+        {error && <p role="alert" className="text-caption text-red-600">{error}</p>}
+        <Button type="submit" className="w-full" disabled={submitting}>
           {submitting ? "登入中…" : "登入"}
-        </button>
+        </Button>
       </form>
     </div>
   );

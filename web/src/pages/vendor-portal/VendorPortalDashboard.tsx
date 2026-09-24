@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/dashboard.tsx.
 // TODO(firebase): mockGetVendorDashboard() stands in for
@@ -33,9 +34,7 @@ export default function VendorPortalDashboard() {
 
       {/* 統計卡片 */}
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {[1,2,3,4].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
-        </div>
+        <SkeletonBlocks count={4} height={96} className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" />
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card>

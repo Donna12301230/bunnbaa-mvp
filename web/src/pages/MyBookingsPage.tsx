@@ -4,7 +4,7 @@ import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import { QrCode, Gift, Repeat, Copy } from "lucide-react";
+import { QrCode, Gift, Repeat, Copy, ClipboardList } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase";
 import type { Lock } from "@/types";
+import { EmptyState } from "@/components/ds";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { Link } from "wouter";
 
 // 對應 UI草圖 MyBookings.dc.html「我的商品」（2026-09-21 改名「我的餐點」，只給
 // 一般使用者看；廠商端這個 nav 分頁換成接受端的核對取餐，見 MarketplaceHeader.tsx）。
@@ -343,9 +346,14 @@ export default function MyBookingsPage() {
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 pb-10 space-y-6">
         {loading ? (
-          <p className="text-sm text-muted-foreground">載入中…</p>
+          <SkeletonBlocks count={3} height={160} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" />
         ) : locks.length === 0 ? (
-          <p className="text-sm text-muted-foreground">目前沒有任何鎖定紀錄。到「預購鎖定」鎖一份餐點看看。</p>
+          <EmptyState
+            icon={<ClipboardList size={32} />}
+            title="還沒有預約紀錄"
+            description="到「預購餐點」鎖一份餐點，隔天就不用排隊。"
+            action={<Button asChild><Link href="/home">去預約餐點</Link></Button>}
+          />
         ) : (
           <>
             <div className="space-y-1">
@@ -374,8 +382,9 @@ export default function MyBookingsPage() {
                             <button
                               key={lock.id}
                               onClick={() => setExpandedId((prev) => (prev === lock.id ? null : lock.id))}
-                              className={`text-left text-micro leading-tight rounded px-1.5 py-1 truncate ${statusInfo.className} ${
-                                expandedId === lock.id ? "ring-2 ring-orange-500" : ""
+                              aria-expanded={expandedId === lock.id}
+                              className={`text-left text-micro leading-tight rounded-sm px-1.5 py-1 truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${statusInfo.className} ${
+                                expandedId === lock.id ? "ring-2 ring-primary" : ""
                               }`}
                               title={lock.item_name}
                             >

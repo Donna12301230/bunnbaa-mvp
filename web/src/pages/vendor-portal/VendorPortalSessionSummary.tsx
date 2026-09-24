@@ -7,15 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import {
-  ArrowLeft, CalendarDays, Clock, MapPin, Users,
-  ShoppingBag, Banknote, CheckCircle2, Circle,
-} from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock, MapPin, Users, ShoppingBag, Banknote, CheckCircle2, Circle, CalendarX, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { STATUS_MAP } from "@/lib/statusMap";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { EmptyState } from "@/components/ds";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/session-summary.tsx.
 // TODO(firebase): mockGetSessionSummary/mockUpdatePreOrderStatus stand in for
@@ -56,9 +55,7 @@ export default function VendorPortalSessionSummary() {
   if (isLoading) {
     return (
       <VendorPortalLayout>
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
-        </div>
+        <SkeletonBlocks count={3} height={96} className="space-y-3" />
       </VendorPortalLayout>
     );
   }
@@ -66,12 +63,12 @@ export default function VendorPortalSessionSummary() {
   if (error || !data) {
     return (
       <VendorPortalLayout>
-        <div className="text-center py-16 text-muted-foreground">
-          <p>找不到此時段資料。</p>
-          <Button variant="outline" className="mt-4" onClick={() => navigate("/vendor-portal/sessions")}>
-            返回時段管理
-          </Button>
-        </div>
+        <EmptyState
+          icon={<CalendarX size={32} />}
+          title="找不到此時段資料"
+          description="時段可能已被刪除，或連結有誤。"
+          action={<Button variant="outline" onClick={() => navigate("/vendor-portal/sessions")}>返回時段管理</Button>}
+        />
       </VendorPortalLayout>
     );
   }
@@ -145,7 +142,7 @@ export default function VendorPortalSessionSummary() {
         {/* 菜色彙總 Tab */}
         <TabsContent value="items">
           {data.itemAggregates.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">尚無訂單</p>
+            <EmptyState size="compact" icon={<ClipboardList size={32} />} title="這個時段尚無訂單" />
           ) : (
             <Card>
               <CardHeader className="pb-2">
@@ -176,7 +173,7 @@ export default function VendorPortalSessionSummary() {
         {/* 顧客清單 Tab */}
         <TabsContent value="customers">
           {data.customerOrders.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">尚無訂單</p>
+            <EmptyState size="compact" icon={<ClipboardList size={32} />} title="這個時段尚無訂單" />
           ) : (
             <div className="space-y-3">
               {data.customerOrders.map(order => {

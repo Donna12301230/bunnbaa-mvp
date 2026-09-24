@@ -10,6 +10,7 @@ import { CheckCircle, XCircle, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 interface BanAppeal {
   id: string;
@@ -53,9 +54,7 @@ function AppealsList() {
     <>
       <h2 className="text-lg font-bold mb-3">解封申訴管理</h2>
       {isLoading ? (
-        <div className="space-y-3">
-          {[1,2].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
-        </div>
+        <SkeletonBlocks count={2} height={96} className="space-y-3" />
       ) : appeals.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <ShieldAlert className="w-12 h-12 mx-auto mb-3 opacity-30" />

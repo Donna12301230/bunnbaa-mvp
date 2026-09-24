@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 const VENDOR_ID = "cafe-renheya-demo";
 
@@ -195,7 +196,7 @@ export default function VendorRedeemPage() {
           </h2>
 
           {loadingCalendar ? (
-            <div className="bg-white border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">載入中…</div>
+            <SkeletonBlocks height={240} />
           ) : recentLocks.length === 0 ? (
             <div className="bg-white border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">
               尚無取餐紀錄——消費端在 <span className="font-mono">/lock</span> 鎖定後會出現在這裡。
@@ -229,7 +230,8 @@ export default function VendorRedeemPage() {
                                 <button
                                   key={lock.id}
                                   onClick={() => selectLock(lock)}
-                                  className={`text-left rounded-lg border px-2 py-1.5 text-micro transition-colors ${
+                                  aria-pressed={isSelected}
+                                  className={`text-left rounded-lg border px-2 py-1.5 text-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                                     isSelected ? "border-orange-400 bg-orange-50" : "border-border bg-gray-50 hover:bg-gray-100"
                                   }`}
                                 >
@@ -273,7 +275,7 @@ export default function VendorRedeemPage() {
                   className="font-mono tracking-widest"
                 />
                 <Button
-                  className="bg-orange-500 hover:bg-orange-600 text-white shrink-0"
+                  className="shrink-0"
                   onClick={handleSearch}
                   disabled={!code.trim() || searching}
                 >
@@ -354,7 +356,7 @@ export default function VendorRedeemPage() {
                           {errors.note && <p className="text-xs text-red-600 mt-1">{errors.note.message}</p>}
                         </div>
                         <div className="flex gap-2">
-                          <Button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white" disabled={submitting}>
+                          <Button type="submit" className="flex-1" disabled={submitting}>
                             {submitting ? "送出中…" : "送出登記"}
                           </Button>
                           <Button type="button" variant="outline" className="flex-1" onClick={() => setShowNoShowForm(false)}>

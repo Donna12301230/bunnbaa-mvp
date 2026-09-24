@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { auth, db, functions } from "@/lib/firebase";
 import type { Vendor } from "@/types";
+import { EmptyState } from "@/components/ds";
 
 // 購物車頁面。
 // UIUX 檢視後新增:原本 MenuItemPage「加入購物車」只會彈 toast,useCart 把品項存進
@@ -82,15 +83,13 @@ export default function CartPage() {
         <h1 className="text-2xl font-bold">購物車</h1>
 
         {items.length === 0 ? (
-          <div className="bg-white rounded-xl border border-border py-16 px-6 text-center space-y-3">
-            <ShoppingCart className="w-10 h-10 mx-auto text-gray-300" />
-            <p className="text-muted-foreground">購物車是空的</p>
-            <Button
-              className="bg-orange-500 hover:bg-orange-600 text-white"
-              onClick={() => navigate("/vendors")}
-            >
-              去逛逛商家
-            </Button>
+          <div className="bg-white rounded-xl border border-border shadow-sm">
+            <EmptyState
+              icon={<ShoppingCart size={32} />}
+              title="購物車還是空的"
+              description="逛逛附近的商家，提前預約享早鳥價。"
+              action={<Button onClick={() => navigate("/vendors")}>去逛逛商家</Button>}
+            />
           </div>
         ) : (
           <>
@@ -165,7 +164,7 @@ export default function CartPage() {
                 <span className="text-orange-600">NT${total}</span>
               </div>
               <Button
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                className="w-full"
                 onClick={handleCheckout}
                 disabled={checkingOut}
               >
