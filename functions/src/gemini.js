@@ -9,7 +9,7 @@
  */
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const MODEL_NAME = "gemini-2.0-flash";
+const MODEL_NAME = "gemini-3.6-flash";
 
 function getClient() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -19,6 +19,24 @@ function getClient() {
     );
   }
   return new GoogleGenerativeAI(apiKey);
+}
+
+const MAX_ATTEMPTS = 3;
+
+/**
+ * Retries transient overload errors (503 high demand / 429 rate limit)
+ * with a short backoff; anything else is thrown immediately.
+ */
+async function generateWithRetry(model, userPrompt) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await model.generateContent(userPrompt);
+    } catch (err) {
+      const transient = err.status === 503 || err.status === 429;
+      if (!transient || attempt >= MAX_ATTEMPTS) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+    }
+  }
 }
 
 /**
@@ -36,7 +54,7 @@ async function generateJSON({ systemInstruction, userPrompt, temperature = 0.4 }
     },
   });
 
-  const result = await model.generateContent(userPrompt);
+  const result = await generateWithRetry(model, userPrompt);
   const text = result.response.text();
 
   try {
