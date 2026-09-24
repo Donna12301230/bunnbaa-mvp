@@ -9,15 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
-import { mockLogin, mockRegister, mockVendorApply, mockRequestPasswordReset } from "@/lib/mockAuth";
+import { login, register, applyAsVendor, requestPasswordReset } from "@/lib/auth";
 import TAIWAN_UNIV_DEPTS from "@/constants/taiwanUnivDepts.json";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ShoppingBag, Clock, Tag, Store, Eye, EyeOff } from "lucide-react";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/landing.tsx.
-// TODO(firebase): every mutationFn below calls the mock helpers in
-// @/lib/mockAuth instead of Parse.User.logIn/signUp/requestPasswordReset —
-// swap those for real Firebase Auth calls once the backend is wired up.
+// 登入／註冊／忘記密碼接真正的 Firebase Auth（@/lib/auth），登入用 Email。
+// 「帳號」欄位只當作沒填顯示名稱時的備用名稱。
 export default function LoginPage() {
   // 共用登入欄位
   const [username, setUsername] = useState("");
@@ -53,7 +52,6 @@ export default function LoginPage() {
   const [resetEmail, setResetEmail] = useState("");
 
   // 廠商申請欄位
-  const [vendorUsername, setVendorUsername] = useState("");
   const [vendorEmail, setVendorEmail] = useState("");
   const [vendorPassword, setVendorPassword] = useState("");
   const [vendorConfirmPassword, setVendorConfirmPassword] = useState("");
@@ -64,7 +62,7 @@ export default function LoginPage() {
   const [, navigate] = useLocation();
 
   const loginMutation = useMutation({
-    mutationFn: () => mockLogin(username, password),
+    mutationFn: () => login(username, password),
     onSuccess: () => navigate("/"),
     onError: (err: Error) => toast({ variant: "destructive", title: "登入失敗", description: err.message }),
   });
@@ -72,9 +70,14 @@ export default function LoginPage() {
   const registerMutation = useMutation({
     mutationFn: async () => {
       if (regPassword !== confirmPassword) throw new Error("兩次輸入的密碼不一致");
-      // TODO(firebase): school/department/phone aren't persisted by the mock yet —
-      // once wired to Firestore, save them onto the user's profile document.
-      return mockRegister({ username: regUsername, email: regEmail, displayName: displayName || regUsername });
+      return register({
+        email: regEmail,
+        password: regPassword,
+        displayName: displayName || regUsername,
+        phone,
+        school,
+        department,
+      });
     },
     onSuccess: () => {
       toast({ title: "註冊成功", description: "歡迎加入 飯飽BunnBaa！" });
@@ -87,9 +90,9 @@ export default function LoginPage() {
     mutationFn: async () => {
       if (vendorPassword !== vendorConfirmPassword) throw new Error("兩次輸入的密碼不一致");
       if (!storeName.trim()) throw new Error("請填寫店家名稱");
-      // 帳號先以 customer 角色建立，待管理員審核通過 Vendor 申請後
-      // 才會升級為 vendor（見 admin/vendors 頁的核准流程）
-      return mockVendorApply({ username: vendorUsername, email: vendorEmail, storeName });
+      // 帳號先以 customer 角色建立並送出 vendor_applications/{uid}，管理員在
+      // /admin/vendors 核准時把 vendors/{id}.owner_uid 綁到這個帳號後才會變成 vendor。
+      return applyAsVendor({ email: vendorEmail, password: vendorPassword, storeName, phone: vendorPhone });
     },
     onSuccess: () => {
       toast({ title: "廠商申請已送出", description: "管理員審核通過後即可使用廠商後台。" });
@@ -99,7 +102,7 @@ export default function LoginPage() {
   });
 
   const resetPasswordMutation = useMutation({
-    mutationFn: (email: string) => mockRequestPasswordReset(email),
+    mutationFn: (email: string) => requestPasswordReset(email),
     onSuccess: () => {
       setResetDialogOpen(false);
       setResetEmail("");
@@ -166,8 +169,8 @@ export default function LoginPage() {
                 <TabsContent value="login">
                   <form onSubmit={(e) => { e.preventDefault(); loginMutation.mutate(); }} className="space-y-3 max-w-xs mx-auto">
                     <div>
-                      <Label>帳號</Label>
-                      <Input autoComplete="username" placeholder="請輸入帳號" value={username} onChange={e => setUsername(e.target.value)} required />
+                      <Label>Email</Label>
+                      <Input autoComplete="username" type="email" placeholder="請輸入 Email" value={username} onChange={e => setUsername(e.target.value)} required />
                     </div>
                     <div>
                       <Label>密碼</Label>
@@ -191,9 +194,11 @@ export default function LoginPage() {
                     <Button type="submit" className="w-full" disabled={isPendingLogin}>
                       {isPendingLogin ? "登入中..." : "登入"}
                     </Button>
-                    <p className="text-center text-caption text-muted-foreground">
-                      Demo：帳號含 "admin" 登入為平台管理員、含 "vendor" 登入為廠商，其餘為一般會員
-                    </p>
+                    {import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true" && (
+                      <p className="text-center text-caption text-muted-foreground">
+                        本機 emulator：測試帳號見 TODO.md「測試帳號」
+                      </p>
+                    )}
                   </form>
                 </TabsContent>
 
@@ -425,15 +430,9 @@ export default function LoginPage() {
                           <Input autoComplete="tel" placeholder="05x-xxx-xxxx" value={vendorPhone} onChange={e => setVendorPhone(e.target.value)} />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label>帳號 *</Label>
-                          <Input autoComplete="username" placeholder="登入用帳號" value={vendorUsername} onChange={e => setVendorUsername(e.target.value)} required />
-                        </div>
-                        <div>
-                          <Label>Email *</Label>
-                          <Input autoComplete="email" type="email" placeholder="電子信箱" value={vendorEmail} onChange={e => setVendorEmail(e.target.value)} required />
-                        </div>
+                      <div>
+                        <Label>Email *（登入用）</Label>
+                        <Input autoComplete="username" type="email" placeholder="電子信箱" value={vendorEmail} onChange={e => setVendorEmail(e.target.value)} required />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>

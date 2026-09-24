@@ -9,7 +9,7 @@ import { zhTW } from "date-fns/locale";
 import { Search, CheckCircle2, AlertCircle, XCircle, CalendarDays } from "lucide-react";
 import { db, functions } from "../lib/firebase";
 import type { Lock } from "../types";
-import MarketplaceHeader from "@/components/MarketplaceHeader";
+import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +17,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
-const VENDOR_ID = "cafe-renheya-demo";
+// 沒綁定商家的帳號（例如 emulator 下的 admin）退回 demo 商家
+const DEMO_VENDOR_ID = "cafe-renheya-demo";
 
 const noShowSchema = z.object({
   note: z.string().min(2, "請簡短描述狀況（至少 2 個字），這會餵給校準報告的落差模式分析"),
@@ -60,6 +62,8 @@ function formatDateLabel(dateStr: string): string {
  * markOutcome 邏輯，沒有另外寫一套）。
  */
 export default function VendorRedeemPage() {
+  const { user } = useAuth();
+  const VENDOR_ID = user?.vendorId ?? DEMO_VENDOR_ID;
   const [code, setCode] = useState("");
   const [foundLock, setFoundLock] = useState<Lock | null>(null);
   const [searchError, setSearchError] = useState("");
@@ -95,7 +99,7 @@ export default function VendorRedeemPage() {
       () => setLoadingCalendar(false)
     );
     return () => unsub();
-  }, []);
+  }, [VENDOR_ID]);
 
   const pickupDates = Array.from(new Set(recentLocks.map((l) => l.pickup_date))).sort();
   const pickupSlots = Array.from(new Set(recentLocks.map((l) => l.pickup_window))).sort();
@@ -181,10 +185,8 @@ export default function VendorRedeemPage() {
   const statusInfo = foundLock ? LOCK_STATUS_STYLE[foundLock.status] : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <MarketplaceHeader active="bookings" />
-
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
+    <VendorPortalLayout>
+      <div className="max-w-[1400px] space-y-6">
         <h1 className="text-xl font-bold flex items-center gap-2">
           <Search className="w-5 h-5 text-orange-500" /> 核對取餐
         </h1>
@@ -372,6 +374,6 @@ export default function VendorRedeemPage() {
           )}
         </div>
       </div>
-    </div>
+    </VendorPortalLayout>
   );
 }

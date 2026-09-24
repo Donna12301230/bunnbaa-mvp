@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, auth, functions } from "../lib/firebase";
-import { signInAnonymously } from "firebase/auth";
+import { ensureFirebaseSession } from "../lib/auth";
 import type { Lock, Vendor } from "../types";
 import LockQRCode from "../components/LockQRCode";
 import { applyEarlyBirdPrice } from "../lib/pricing";
@@ -55,7 +55,7 @@ export default function ConsumerLockPage() {
   const todayPricing = applyEarlyBirdPrice(ORIGINAL_PRICE, new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
-    signInAnonymously(auth).catch(console.error);
+    ensureFirebaseSession().catch(console.error);
     const unsub = onSnapshot(doc(db, "vendors", VENDOR_ID), (snap) => {
       if (snap.exists()) setVendor({ id: snap.id, ...(snap.data() as any) });
     });

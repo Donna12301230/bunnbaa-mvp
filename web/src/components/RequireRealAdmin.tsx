@@ -5,10 +5,11 @@ import { useAdminUser } from "@/lib/adminAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-// The platform login (useAuth/mockAuthStore) is a mock, so it can't authorize
-// real Firestore/Functions access. These gates ask for a real Firebase Auth
-// sign-in instead; what the signed-in account may actually read or write is
-// enforced by firestore.rules and the Functions, never by the gate itself.
+// These gates ask for a real Firebase Auth sign-in on pages not wrapped in the
+// platform layouts. The platform login (useAuth / lib/auth.ts) now uses the
+// same Firebase Auth session, so signing in on either one satisfies both.
+// What the signed-in account may actually read or write is enforced by
+// firestore.rules and the Functions, never by the gate itself.
 
 function RealSignInForm({ title, description }: { title: string; description: string }) {
   const [email, setEmail] = useState("");

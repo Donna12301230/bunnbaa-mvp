@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
   collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch,
 } from "firebase/firestore";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import { ensureFirebaseSession } from "@/lib/auth";
 import { httpsCallable } from "firebase/functions";
 import {
   Clock, CalendarDays, Rocket, Star, User, MapPin, Trophy,
@@ -73,7 +74,7 @@ export default function HomePage() {
   const [drawing, setDrawing] = useState(false);
 
   useEffect(() => {
-    signInAnonymously(auth).catch(console.error);
+    ensureFirebaseSession().catch(console.error);
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
     return () => unsub();
   }, []);

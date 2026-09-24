@@ -43,7 +43,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     enabled: isAdmin,
   });
 
-  if (!isLoading && !isAdmin) {
+  if (isLoading || !isAdmin) {
     return null;
   }
 

@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
 import { Minus, Plus, ShoppingCart, Trash2, UtensilsCrossed } from "lucide-react";
 import { httpsCallable } from "firebase/functions";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import { ensureFirebaseSession } from "@/lib/auth";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -40,13 +41,13 @@ export default function CartPage() {
   });
 
   useEffect(() => {
-    signInAnonymously(auth).catch(console.error);
+    ensureFirebaseSession().catch(console.error);
   }, []);
 
   async function handleCheckout() {
     setCheckingOut(true);
     try {
-      // Mount's signInAnonymously() call usually finishes well before the
+      // Mount's ensureFirebaseSession() call usually finishes well before the
       // buyer reviews the cart and clicks checkout, but wait for it here too
       // in case they landed straight on /cart before it resolved.
       if (!auth.currentUser) {

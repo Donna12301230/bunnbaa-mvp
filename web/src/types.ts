@@ -197,6 +197,7 @@ export interface UserProfile {
   studentId?: string;
   department?: string;
   role: "customer" | "vendor" | "admin";
+  vendorId?: string; // role 為 vendor 時，owner_uid 綁定到這個帳號的 vendors/{id}
   orderBanned?: boolean;
   noPickupCount?: number;
 }

@@ -59,7 +59,8 @@ function MarketplacePage({ children }: { children: React.ReactNode }) {
 
 // 根路徑跟來源專案一致：未登入顯示登入頁、已登入顯示首頁
 function RootGate() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return null;
   return isAuthenticated ? <HomePage /> : <LoginPage />;
 }
 
@@ -84,7 +85,7 @@ export default function App() {
             <div className="legacy-ui"><RequireVendorSignIn><VendorDashboard /></RequireVendorSignIn></div>
           </Route>
           <Route path="/lock/vendor/redeem">
-            <RequireVendorSignIn><VendorRedeemPage /></RequireVendorSignIn>
+            <MarketplacePage><VendorRedeemPage /></MarketplacePage>
           </Route>
           {/* :orderId, not a query string — LINE Pay appends ?transactionId=...
               by string concatenation with no regard for the "#" boundary, which

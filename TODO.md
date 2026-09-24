@@ -19,7 +19,7 @@
 ### 2. 部署（2026-09-23 晚上的變更還沒上正式站）
 
 `firestore.rules` 新增 `menu_items`／`meal_plans`／`ban_appeals` 規則，`functions/src/index.js` 改了 `createCartLinePayReservation`／`createLinePayReservation`（改吃每個品項的真實 `vendor_id`）：
-- [ ] `firebase deploy --only firestore:rules`
+- [ ] `firebase deploy --only firestore:rules`（2026-09-24 又新增 `users`／`vendor_applications` 規則，平台登入改真實 Firebase Auth 後註冊、廠商申請都要靠這兩條）
 - [ ] `firebase deploy --only functions`
 - [ ] `cd web && npm run build` 後 `firebase deploy --only hosting`（設計系統／新 design tokens 也還沒上線）
 - [ ] 部署後實測一次購物車結帳，到 Firestore Console 確認新的 `locks.vendor_id` 對應下單的商家，不是全部掛在 `cafe-renheya-demo`
@@ -37,7 +37,7 @@
 ### 4. Demo 準備（整合與交付）
 
 - [x] 正式站灌 demo 資料（`scripts/seed.js`）——2026-09-24 確認雲端已有資料（seed.js 回報 locks already exist），不需再灌
-- [ ] 照 ISO27001 文件的「商家帳號綁定」流程建商家帳號並設定 `vendors/{id}.owner_uid`，否則商家儀表板看不到資料
+- [ ] **正式站商家帳號綁定**（2026-09-24 起平台登入是真實 Firebase Auth，沒綁 `owner_uid` 的帳號進不了廠商後台）：規則部署後，商家到 `/login`「廠商申請」送出 → 管理員登入 `/admin/vendors` 核准並選「綁定到既有商家：仁和雅咖啡」等（會寫 `admin_audit_logs`）。正式站目前**沒有任何**商家帳號，種子資料的 `owner_uid` 全是 `null`
 - [ ] 整合測試（端到端跑過消費者、商家、管理員三條線）
 - [ ] 錄 Demo（3 分鐘腳本見 v6 §8）
 - [ ] 撰寫英文版 Proposal
@@ -50,7 +50,8 @@
 
 ### 6. 尚未實作的功能
 
-- [ ] **手機門號 OTP 登入**（`LoginPage.tsx`，草圖 `Login.dc.html` 已確認兩段式流程）——目前是 `mockAuth.ts` 用帳號字串猜角色，消費者端則是匿名 Firebase Auth。接上後 `role` 改從 Firestore `users/{uid}` 讀
+- [ ] **手機門號 OTP 登入**（`LoginPage.tsx`，草圖 `Login.dc.html` 已確認兩段式流程）——2026-09-24 已先改成 Email＋密碼的真實 Firebase Auth（`web/src/lib/auth.ts`），OTP 之後可以直接加在同一個模組。角色：管理員＝email 白名單、廠商＝`vendors/{id}.owner_uid`、其餘＝會員；`users/{uid}` 只存個人資料不存角色
+- [ ] 已經有帳號的人在匿名狀態鎖定後才「登入」，匿名時的鎖定會留在舊的匿名 uid（`locks.buyer_uid` 只有 admin／Functions 能改）。「註冊」沒這問題（`linkWithCredential` 沿用同一個 uid）。要補的話得寫一支 Function 搬 `buyer_uid`
 - [ ] **消費者端提交解封申訴**——完全沒有入口（登入頁條款的「會員中心提交申訴」只是文字）。要先有 OTP 登入：匿名 uid 換裝置就變，沒有穩定身分能綁定封禁狀態
 - [ ] 「我的轉讓」無法追蹤已被接手的項目（資料模型沒有記錄原轉讓者）
 
@@ -60,7 +61,7 @@
   - (a) 維持現狀，當示意頁
   - (b) 只把商家後台那半邊（`order_sessions`／`pre_orders`／`table_orders`）接真 Firestore，消費者端仍沒入口
   - (c) 連消費者端畫面一起從零設計開發，規模最大
-- **商家訂閱平台**：`mockData.ts` 只剩這條線在用（`VendorPortalSettings.tsx`／`VendorPortalLayout.tsx`／`admin/AdminVendorsPage.tsx`），真實後端沒有「商家訂閱」這個概念，還沒排進範圍
+- **商家訂閱平台**：`mockData.ts` 只剩這條線在用（`VendorPortalSettings.tsx`／`VendorPortalLayout.tsx`），真實後端沒有「商家訂閱」這個概念，還沒排進範圍
 
 ---
 
@@ -107,12 +108,12 @@
 |---|---|---|
 | 商家清單／商家頁 | ✅ | `VendorListPage.tsx`／`VendorPage.tsx`，已改讀真實 `vendors` |
 | 商品列表／詳情頁 | ✅ | `VendorPage.tsx`／`MenuItemPage.tsx`，已改讀真實 `menu_items` |
-| 管理員後台 | ✅ | 訂單總覽／撥款總覽／系統設定／解封申訴都接真 Firestore，外加 `RequireRealAdmin` 驗證真實帳號；廠商管理仍是 mock |
+| 管理員後台 | ✅ | 訂單總覽／撥款總覽／系統設定／解封申訴／廠商管理（申請審核＋`owner_uid` 綁定）都接真 Firestore |
 | 權限控管／Firestore 安全規則 | ✅ | `firestore.rules`，新規則待部署（待辦 §2） |
 | 商家後台儀表板 | 🟡 | 含撥款區塊＋手動觸發按鈕；需要綁定 `owner_uid` |
 | 商家校準報告呈現（含 what-if 追問） | 🟡 | Gemini Key 已到位，待部署後在正式站驗證 |
 | 通知系統（FCM） | 🟡 | 同 Donna「取餐提醒推播」 |
-| 會員／身分驗證（手機門號 OTP） | ⬜ | 目前是匿名登入＋mock 登入，見待辦 §6 |
+| 會員／身分驗證（手機門號 OTP） | 🟡 | 2026-09-24 改為 Email＋密碼的真實 Firebase Auth；OTP 未做，見待辦 §6 |
 | ISO27001 | 🟡 | 技術面已修補並部署，剩餘項目見待辦 §5 |
 
 ---
@@ -127,17 +128,30 @@ UI 草圖：https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc （只參考版面
 | `Main.dc.html`「預購鎖定」 | `HomePage.tsx` | ✅ 「今日推薦鎖定方案」呼叫 `createLinePayReservation`，套用早鳥折扣 |
 | `Marketplace.dc.html`「轉讓市集」 | `TransferMarketPage.tsx`（`/marketplace`） | ✅ 瀏覽／接手／免費領取／我的轉讓／取消轉讓都接真 Firestore |
 | `MyBookings.dc.html`「我的商品」 | `MyBookingsPage.tsx`（`/my-bookings`） | ✅ 資料驅動的週曆；使用（QR）／贈送／交易／回饋都接真 Firestore |
-| `Login.dc.html`（手機門號 OTP） | `LoginPage.tsx` | ⬜ 見待辦 §6 |
+| `Login.dc.html`（手機門號 OTP） | `LoginPage.tsx` | 🟡 Email＋密碼已接真實 Firebase Auth，OTP 見待辦 §6 |
 | `VendorDashboard.dc.html`（商家後台） | `VendorPortalLayout.tsx` 系列 | 🟡 備料、成長獎勵、菜單接真資料；揪團場次類頁面仍是 mock（待辦 §7） |
 
 ---
 
 ## 測試帳號
 
-`/login` 目前是 `mockAuth.ts` 的假登入：不驗證密碼，只依帳號字串判斷角色（含 `admin` → 管理員、含 `vendor` → 廠商、其餘 → 一般會員）。登入後一律先進 `/home`，右上角下拉選單依角色顯示後台入口。
+2026-09-24 起 `/login` 是真實 Firebase Auth（Email＋密碼），不再用帳號字串猜角色。登入後一律先進 `/home`，右上角下拉選單依角色顯示後台入口。
 
-| 角色 | 帳號 | 密碼 | 後台入口 |
+**本機 emulator**（`scripts/seed.js` 在 emulator 裡自動建立，正式站不會有；`web/.env.local` 要設 `VITE_USE_EMULATORS=true`）：
+
+| 角色 | 帳號（Email） | 密碼 | 說明 |
 |---|---|---|---|
+| 一般會員 | customer@bunnbaa.test | demo1234 | 會員中心 `/profile` |
+| 廠商 | vendor@bunnbaa.test | demo1234 | 綁定 `cafe-renheya-demo`（仁和雅咖啡），廠商後台 `/vendor-portal/dashboard`、核對取餐 `/lock/vendor/redeem` |
+| 管理員 | suw192336@gmail.com | demo1234 | 管理後台 `/admin/vendors`（emulator 內的同名帳號，跟正式站密碼無關） |
+| 廠商申請中 | applicant@bunnbaa.test | demo1234 | 已送出「早安三明治」申請，登入管理員到 `/admin/vendors` 核准後才會變成廠商 |
+
+已經有 `.emulator-data` 存檔的話不會自動重灌，兩種做法擇一：`npm run dev:emulator:reset`（清掉重灌），或 emulator 開著時另開終端機執行
+`$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"; $env:FIREBASE_AUTH_EMULATOR_HOST="127.0.0.1:9099"; $env:GCLOUD_PROJECT="bunnbaa-mvp-5474"; node scripts/seed.js --catalog-only`（只補帳號跟目錄資料，不重複灌歷史紀錄）。
+
+**正式站**：只有管理員 `suw192336@gmail.com`（密碼由帳號持有人保管，不寫在 repo）。會員自行在 `/login`「會員註冊」建立；廠商帳號流程見待辦 §4「正式站商家帳號綁定」。
+
+---|---|---|---|
 | 一般會員 | customer@test.com | 任意 | 會員中心 `/profile` |
 | 廠商 | vendor@test.com | 任意 | 廠商後台 `/vendor-portal/dashboard` |
 | 管理員 | admin@test.com | 任意 | 管理後台 `/admin/vendors` |

@@ -202,5 +202,29 @@ service cloud.firestore {
     match /ban_appeals/{appealId} {
       allow read, write: if isAdmin();
     }
+
+    // users/{uid}: platform profile written at registration (web/src/lib/auth.ts).
+    // Deliberately holds no role — admin comes from the email allowlist and
+    // vendor from vendors/{id}.owner_uid, so nothing here can grant access.
+    match /users/{uid} {
+      allow read: if (request.auth != null && request.auth.uid == uid) || isAdmin();
+      allow create, update: if request.auth != null && request.auth.uid == uid
+                            && request.resource.data.keys().hasOnly(
+                                 ['display_name', 'phone', 'school', 'department', 'created_at']);
+      allow delete: if false;
+    }
+
+    // vendor_applications/{uid}: the applicant files one for themselves (status
+    // must start "pending"); only an admin decides it. Approval itself binds
+    // vendors/{id}.owner_uid, which admins can already write.
+    match /vendor_applications/{uid} {
+      allow read: if (request.auth != null && request.auth.uid == uid) || isAdmin();
+      allow create: if request.auth != null && request.auth.uid == uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.keys().hasOnly(
+                         ['store_name', 'phone', 'email', 'status', 'created_at']);
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
   }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, query, Timestamp, updateDoc, where } from "firebase/firestore";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import { ensureFirebaseSession } from "@/lib/auth";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
@@ -109,7 +110,7 @@ export default function MyBookingsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    signInAnonymously(auth).catch(console.error);
+    ensureFirebaseSession().catch(console.error);
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
     return () => unsub();
   }, []);

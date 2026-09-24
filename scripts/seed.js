@@ -712,6 +712,54 @@ async function guardNotAlreadySeeded() {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * Emulator-only demo accounts — the platform login (web/src/lib/auth.ts)
+ * is real Firebase Auth now, and the vendor role comes from
+ * vendors/{id}.owner_uid, so local dev needs real accounts to log in with.
+ * Never runs against production (no FIREBASE_AUTH_EMULATOR_HOST there).
+ * Idempotent: reuses an existing account, re-binds owner_uid every run
+ * (seedVendors() resets it to null).
+ * ------------------------------------------------------------------ */
+
+const DEMO_PASSWORD = "demo1234";
+const DEMO_ACCOUNTS = [
+  { email: "vendor@bunnbaa.test", displayName: "仁和雅咖啡（demo）", ownsVendor: "cafe-renheya-demo" },
+  { email: "customer@bunnbaa.test", displayName: "demo 消費者" },
+  // web/src/lib/adminAuth.ts ADMIN_EMAILS — only created inside the emulator
+  { email: "suw192336@gmail.com", displayName: "平台管理員（emulator）" },
+  // A pending vendor_applications/{uid} so /admin/vendors has something to approve
+  { email: "applicant@bunnbaa.test", displayName: "早安三明治（申請中）", appliesAs: "早安三明治" },
+];
+
+async function seedDemoAccounts() {
+  if (!process.env.FIREBASE_AUTH_EMULATOR_HOST) return;
+  for (const acct of DEMO_ACCOUNTS) {
+    let user;
+    try {
+      user = await admin.auth().getUserByEmail(acct.email);
+    } catch (err) {
+      if (err.code !== "auth/user-not-found") throw err;
+      user = await admin.auth().createUser({ email: acct.email, password: DEMO_PASSWORD, displayName: acct.displayName });
+    }
+    if (acct.ownsVendor) {
+      await db.collection("vendors").doc(acct.ownsVendor).set({ owner_uid: user.uid }, { merge: true });
+    }
+    if (acct.appliesAs) {
+      const appRef = db.collection("vendor_applications").doc(user.uid);
+      if (!(await appRef.get()).exists) {
+        await appRef.set({
+          store_name: acct.appliesAs,
+          phone: "05-2710000",
+          email: acct.email,
+          status: "pending",
+          created_at: FieldValue.serverTimestamp(),
+        });
+      }
+    }
+  }
+  console.log(`Emulator demo accounts ready (password ${DEMO_PASSWORD}): ${DEMO_ACCOUNTS.map((a) => a.email).join(", ")}`);
+}
+
 /* ------------------------------------------------------------------ */
 
 async function main() {
@@ -722,6 +770,7 @@ async function main() {
     await seedMealPlans(writer);
     await seedBanAppeals(writer);
     await writer.flush();
+    await seedDemoAccounts();
     console.log("\nCatalog-only seed complete.");
     process.exit(0);
     return;
@@ -764,6 +813,7 @@ async function main() {
   await seedGrowthRewards(VENDORS[0], writer);
 
   await writer.flush();
+  await seedDemoAccounts();
 
   console.log(`\nSeed complete: ${totalLocks} historical locks, ${totalPayouts} payouts, 4 vendors, ${writer.totalCommitted + 26} total writes (approx).`);
   console.log("discount_explanation fields on each lock are filled in asynchronously by the deployed onLockCreated trigger — give it a minute.");

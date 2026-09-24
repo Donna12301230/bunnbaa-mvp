@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { collection, limit, onSnapshot, query, where } from "firebase/firestore";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import { ensureFirebaseSession } from "@/lib/auth";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { ArrowLeft, ClipboardList } from "lucide-react";
@@ -47,7 +48,7 @@ export default function MyLocksPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    signInAnonymously(auth).catch(console.error);
+    ensureFirebaseSession().catch(console.error);
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
     return () => unsub();
   }, []);

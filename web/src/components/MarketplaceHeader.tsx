@@ -6,7 +6,7 @@ import {
   CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { mockLogout } from "@/lib/mockAuth";
+import { logout } from "@/lib/auth";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -52,7 +52,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const logoutMutation = useMutation({
-    mutationFn: () => mockLogout(),
+    mutationFn: () => logout(),
     onError: (err: Error) => {
       toast({ variant: "destructive", title: "登出失敗", description: err.message });
     },

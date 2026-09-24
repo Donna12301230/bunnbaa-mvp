@@ -1,19 +1,14 @@
-import { useEffect, useState } from "react";
-import { mockAuthStore } from "@/lib/mockAuth";
-import type { UserProfile } from "@/types";
+import { useSyncExternalStore } from "react";
+import { authStore } from "@/lib/auth";
 
-// TODO(firebase): ported from Parse_Ref's useAuth.ts, which synced against
-// Parse.User.currentAsync(). This reads the mock session in mockAuth.ts so the
-// ported login/home/admin/vendor-portal UI is still navigable; swap the
-// underlying store for real Firebase Auth state once the backend is wired up.
+// 平台登入狀態：讀 lib/auth.ts 裡由 Firebase Auth（onAuthStateChanged）維護的
+// 共用 store。匿名身分（消費端鎖定流程用）不算登入，user 會是 null。
 export function useAuth() {
-  const [user, setUser] = useState<UserProfile | null>(mockAuthStore.user);
-
-  useEffect(() => mockAuthStore.subscribe(() => setUser(mockAuthStore.user)), []);
+  const { user, loading } = useSyncExternalStore(authStore.subscribe, authStore.getSnapshot);
 
   return {
     user,
-    isLoading: false,
+    isLoading: loading,
     isAuthenticated: !!user,
     isVendor: user?.role === "vendor",
     isAdmin: user?.role === "admin",

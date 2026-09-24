@@ -5,7 +5,7 @@ import {
   ClipboardList, Users, Store, History,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { mockLogout } from "@/lib/mockAuth";
+import { logout } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 
@@ -21,7 +21,7 @@ export default function ProfilePage() {
   const { toast } = useToast();
 
   const logoutMutation = useMutation({
-    mutationFn: () => mockLogout(),
+    mutationFn: () => logout(),
     onSuccess: () => navigate("/"),
     onError: (err: Error) => toast({ variant: "destructive", title: "登出失敗", description: err.message }),
   });

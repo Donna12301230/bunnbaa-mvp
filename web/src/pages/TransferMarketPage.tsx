@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import { ensureFirebaseSession } from "@/lib/auth";
 import { Search, Clock, MapPin, UtensilsCrossed, Repeat } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ export default function TransferMarketPage() {
   const [claimingId, setClaimingId] = useState<string | null>(null);
 
   useEffect(() => {
-    signInAnonymously(auth).catch(console.error);
+    ensureFirebaseSession().catch(console.error);
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
     return () => unsub();
   }, []);

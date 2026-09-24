@@ -12,7 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 const navItems = [
   { href: "/vendor-portal/dashboard", label: "總覽", icon: LayoutDashboard },
   { href: "/vendor-portal/sessions", label: "訂餐時段", icon: CalendarDays },
-  { href: "/vendor-portal/scan", label: "核對取餐", icon: Search },
+  // 核對取餐指向真的接 Firestore 的 /lock/vendor/redeem（跟 MarketplaceHeader 同一個入口）
+  { href: "/lock/vendor/redeem", label: "核對取餐", icon: Search },
   { href: "/vendor-portal/menu", label: "菜單管理", icon: UtensilsCrossed },
   { href: "/vendor-portal/orders", label: "訂單管理", icon: ClipboardList },
   { href: "/vendor-portal/prep", label: "今日備料", icon: ChefHat },
@@ -41,10 +42,6 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
     }
   }, [isLoading, isVendor]);
 
-  if (!isLoading && !isVendor) {
-    return null;
-  }
-
   const { data: subInfo } = useQuery({
     queryKey: ["myVendorSub", user?.id],
     queryFn: async () => {
@@ -66,6 +63,11 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
     },
     onError: (err: Error) => toast({ variant: "destructive", title: "操作失敗", description: err.message }),
   });
+
+  // 放在所有 hooks 之後，登入狀態從載入中變成確定時 hook 數量才不會變
+  if (isLoading || !isVendor) {
+    return null;
+  }
 
   const now = new Date();
   const isSubscriptionBlocked = subInfo && (
