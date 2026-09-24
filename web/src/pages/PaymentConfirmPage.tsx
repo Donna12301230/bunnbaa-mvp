@@ -10,9 +10,9 @@ import { registerForPickupReminders } from "../lib/messaging";
 /**
  * LINE Pay redirects here after the buyer approves payment (confirmUrl set
  * in createLinePayReservation). We must wait for Firebase Auth to restore
- * the same anonymous session before calling confirmLinePayPayment — this is
- * a full page reload coming back from LINE Pay's domain, so auth.currentUser
- * is briefly null until onAuthStateChanged fires.
+ * the buyer's logged-in session before calling confirmLinePayPayment — this
+ * is a full page reload coming back from LINE Pay's domain, so
+ * auth.currentUser is briefly null until onAuthStateChanged fires.
  */
 export default function PaymentConfirmPage() {
   const [status, setStatus] = useState<"waiting-auth" | "confirming" | "done" | "error">("waiting-auth");
@@ -32,8 +32,15 @@ export default function PaymentConfirmPage() {
     }
 
     const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) return; // still restoring the anonymous session
+      // onAuthStateChanged's first call already reflects the restored session,
+      // so null here means the buyer really isn't logged in (e.g. logged out
+      // in another tab mid-payment) — confirmLinePayPayment would reject them.
       unsub();
+      if (!user || user.isAnonymous) {
+        setStatus("error");
+        setErrorMessage("登入狀態已失效，請重新登入後到「我的餐點」確認，或聯絡客服");
+        return;
+      }
       setStatus("confirming");
       try {
         // Handles both a single-item checkout (ConsumerLockPage) and a

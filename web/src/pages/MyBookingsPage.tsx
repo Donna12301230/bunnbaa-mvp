@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, query, Timestamp, updateDoc, where } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
-import { ensureFirebaseSession } from "@/lib/auth";
+import { useAuth } from "@/hooks/useAuth";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
@@ -11,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import type { Lock } from "@/types";
 import { EmptyState } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
@@ -99,7 +98,8 @@ const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 
 export default function MyBookingsPage() {
   const { toast } = useToast();
-  const [uid, setUid] = useState<string | null>(null);
+  const { user, isLoading: authLoading } = useAuth();
+  const uid = user?.id ?? null;
   const [locks, setLocks] = useState<Lock[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
@@ -108,12 +108,6 @@ export default function MyBookingsPage() {
   const [feedbackOpen, setFeedbackOpen] = useState<Record<string, boolean>>({});
   const [feedbackDraft, setFeedbackDraft] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    ensureFirebaseSession().catch(console.error);
-    const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
-    return () => unsub();
-  }, []);
 
   useEffect(() => {
     if (!uid) return;
@@ -346,7 +340,14 @@ export default function MyBookingsPage() {
       </section>
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 pb-10 space-y-6">
-        {loading ? (
+        {!authLoading && !uid ? (
+          <EmptyState
+            icon={<ClipboardList size={32} />}
+            title="請先登入"
+            description="登入後就能看到你預購的餐點。"
+            action={<Button asChild><Link href="/login">前往登入</Link></Button>}
+          />
+        ) : loading ? (
           <SkeletonBlocks count={3} height={160} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" />
         ) : locks.length === 0 ? (
           <EmptyState

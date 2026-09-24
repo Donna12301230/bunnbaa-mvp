@@ -1,17 +1,16 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
 import { Minus, Plus, ShoppingCart, Trash2, UtensilsCrossed } from "lucide-react";
 import { httpsCallable } from "firebase/functions";
-import { onAuthStateChanged } from "firebase/auth";
-import { ensureFirebaseSession } from "@/lib/auth";
+import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
-import { auth, db, functions } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
 import type { Vendor } from "@/types";
 import { EmptyState } from "@/components/ds";
 
@@ -29,6 +28,7 @@ export default function CartPage() {
   const confirm = useConfirm();
   const { items, vendorId, total, removeItem, updateQuantity, clearCart } = useCart();
   const [checkingOut, setCheckingOut] = useState(false);
+  const requireLogin = useRequireLogin();
 
   const { data: vendor } = useQuery({
     queryKey: ["vendor", vendorId],
@@ -40,23 +40,11 @@ export default function CartPage() {
     enabled: !!vendorId,
   });
 
-  useEffect(() => {
-    ensureFirebaseSession().catch(console.error);
-  }, []);
-
   async function handleCheckout() {
+    // 購物車可以先放著不登入，結帳才要求登入（購物車存在本機，登入回來還在）
+    if (!requireLogin()) return;
     setCheckingOut(true);
     try {
-      // Mount's ensureFirebaseSession() call usually finishes well before the
-      // buyer reviews the cart and clicks checkout, but wait for it here too
-      // in case they landed straight on /cart before it resolved.
-      if (!auth.currentUser) {
-        await new Promise<void>((resolve, reject) => {
-          const unsub = onAuthStateChanged(auth, (u) => {
-            if (u) { unsub(); resolve(); }
-          }, reject);
-        });
-      }
 
       const fn = httpsCallable(functions, "createCartLinePayReservation");
       const result = await fn({

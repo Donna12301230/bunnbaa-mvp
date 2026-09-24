@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, XCircle, Store, Link2Off } from "lucide-react";
+import { CheckCircle, XCircle, Store, Link2Off, CalendarPlus } from "lucide-react";
+import { adminRenewSubscription, getSubscriptionState, initialTrialFields } from "@/lib/subscription";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
@@ -31,6 +32,7 @@ const NEW_VENDOR = "__new__";
 //   - 核准 = 把 vendors/{id}.owner_uid 設成申請人 uid（新建商家，或綁到既有商家，
 //     例如種子資料的 cafe-renheya-demo），這就是 ISO27001 文件的「商家帳號綁定」
 //   - 每個決定都跟 admin_audit_logs 同一個 batch 寫入（ISO 27001 A.8.15）
+//   - 商家訂閱沒有金流：管理員確認收到月費後按「續約 30 天」（lib/subscription.ts）
 // 商家停用／認證徽章在 AdminSettingsPage。
 export default function AdminVendorsPage() {
   const { toast } = useToast();
@@ -89,11 +91,17 @@ export default function AdminVendorsPage() {
             verified: false,
             phone: app.phone,
             owner_uid: app.id,
+            ...initialTrialFields(),
             created_at: serverTimestamp(),
           });
         } else {
           vendorId = target;
-          batch.update(doc(db, "vendors", target), { owner_uid: app.id });
+          const existing = vendors.find((v) => v.id === target);
+          // 既有商家還沒有訂閱欄位的話，一起開始首月免費試用
+          batch.update(doc(db, "vendors", target), {
+            owner_uid: app.id,
+            ...(existing?.subscription_status ? {} : initialTrialFields()),
+          });
         }
       }
       batch.update(doc(db, "vendor_applications", app.id), {
@@ -132,6 +140,24 @@ export default function AdminVendorsPage() {
     },
     onError: (err: Error) => toast({ variant: "destructive", title: "操作失敗", description: err.message }),
   });
+
+  const renewMutation = useMutation({
+    mutationFn: (vendor: Vendor) => adminRenewSubscription(vendor),
+    onSuccess: (newEnd, vendor) => {
+      invalidate();
+      toast({ title: `已為「${vendor.name}」續約`, description: `新的到期日：${newEnd.toLocaleDateString("zh-TW")}` });
+    },
+    onError: (err: Error) => toast({ variant: "destructive", title: "操作失敗", description: err.message }),
+  });
+
+  async function handleRenew(vendor: Vendor) {
+    const ok = await confirm({
+      title: `確認已收到「${vendor.name}」的月費？`,
+      description: "會把訂閱延長 30 天（從目前到期日或今天起算，取較晚者），並恢復正常使用。",
+      confirmLabel: "續約 30 天",
+    });
+    if (ok) renewMutation.mutate(vendor);
+  }
 
   async function handleUnbind(vendor: Vendor) {
     const ok = await confirm({
@@ -219,8 +245,18 @@ export default function AdminVendorsPage() {
                   <div className="text-xs text-muted-foreground truncate">
                     {vendor.id}{vendor.status === "disabled" ? " · 已停用" : ""}
                   </div>
+                  <SubscriptionLine vendor={vendor} />
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    disabled={renewMutation.isPending}
+                    onClick={() => handleRenew(vendor)}
+                  >
+                    <CalendarPlus className="w-3.5 h-3.5 mr-1" /> 續約 30 天
+                  </Button>
                   {vendor.owner_uid ? (
                     <>
                       <Badge className="bg-green-100 text-green-800 border-0">已綁定帳號</Badge>
@@ -244,5 +280,23 @@ export default function AdminVendorsPage() {
         </div>
       )}
     </AdminLayout>
+  );
+}
+
+const SUB_LABEL: Record<string, string> = {
+  trial: "試用中",
+  active: "訂閱中",
+  cancelled: "已申請取消",
+  expired: "已到期（後台已暫停）",
+};
+
+function SubscriptionLine({ vendor }: { vendor: Vendor }) {
+  const sub = getSubscriptionState(vendor);
+  if (sub.unset) return <div className="text-xs text-muted-foreground">訂閱：尚未設定</div>;
+  return (
+    <div className={`text-xs ${sub.blocked ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+      訂閱：{SUB_LABEL[sub.status]}
+      {sub.endDate ? `，到期 ${sub.endDate.toLocaleDateString("zh-TW")}` : ""}
+    </div>
   );
 }

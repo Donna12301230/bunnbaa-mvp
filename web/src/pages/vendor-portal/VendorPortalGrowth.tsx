@@ -40,7 +40,6 @@ const TIER_STYLE: Record<number, { bg: string; color: string; label: string }> =
 
 interface DrawRecord {
   id: string;
-  buyer_uid: string;
   price_percent: number;
   item_name?: string | null;
   created_at?: { toDate?: () => Date };

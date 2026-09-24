@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { collection, limit, onSnapshot, query, where } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
-import { ensureFirebaseSession } from "@/lib/auth";
+import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { ArrowLeft, ClipboardList } from "lucide-react";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import type { Lock } from "@/types";
 import { EmptyState } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
@@ -43,15 +42,10 @@ function createdAtMillis(lock: Lock): number {
 
 export default function MyLocksPage() {
   const [, navigate] = useLocation();
-  const [uid, setUid] = useState<string | null>(null);
+  const { user, isLoading: authLoading } = useAuth();
+  const uid = user?.id ?? null;
   const [locks, setLocks] = useState<Lock[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    ensureFirebaseSession().catch(console.error);
-    const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
-    return () => unsub();
-  }, []);
 
   useEffect(() => {
     if (!uid) return;
@@ -83,7 +77,14 @@ export default function MyLocksPage() {
       </header>
 
       <main className="max-w-[1400px] mx-auto px-4 md:px-6 py-8">
-        {loading ? (
+        {!authLoading && !uid ? (
+          <EmptyState
+            icon={<ClipboardList size={32} />}
+            title="請先登入"
+            description="登入後就能看到你的訂單記錄。"
+            action={<Button asChild><Link href="/login">前往登入</Link></Button>}
+          />
+        ) : loading ? (
           <SkeletonBlocks count={3} height={160} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" />
         ) : sorted.length === 0 ? (
           <EmptyState

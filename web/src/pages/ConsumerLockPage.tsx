@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, auth, functions } from "../lib/firebase";
-import { ensureFirebaseSession } from "../lib/auth";
+import { useRequireLogin } from "../hooks/useRequireLogin";
 import type { Lock, Vendor } from "../types";
 import LockQRCode from "../components/LockQRCode";
 import { applyEarlyBirdPrice } from "../lib/pricing";
@@ -47,6 +47,7 @@ export default function ConsumerLockPage() {
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [gifting, setGifting] = useState(false);
   const [giftLink, setGiftLink] = useState<string | null>(null);
+  const requireLogin = useRequireLogin();
   const [incomingGiftId, setIncomingGiftId] = useState<string | null>(null);
   const [claimingGift, setClaimingGift] = useState(false);
   const [feedbackDraft, setFeedbackDraft] = useState("");
@@ -55,7 +56,6 @@ export default function ConsumerLockPage() {
   const todayPricing = applyEarlyBirdPrice(ORIGINAL_PRICE, new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
-    ensureFirebaseSession().catch(console.error);
     const unsub = onSnapshot(doc(db, "vendors", VENDOR_ID), (snap) => {
       if (snap.exists()) setVendor({ id: snap.id, ...(snap.data() as any) });
     });
@@ -87,7 +87,12 @@ export default function ConsumerLockPage() {
   // happens client-side rather than adding another composite index for what
   // is, at pilot scale, a handful of documents.
   useEffect(() => {
-    const q = query(collection(db, "locks"), where("vendor_id", "==", VENDOR_ID), orderBy("created_at", "desc"));
+    const q = query(
+      collection(db, "locks"),
+      where("vendor_id", "==", VENDOR_ID),
+      where("status", "==", "for_resale"),
+      orderBy("created_at", "desc")
+    );
     const unsub = onSnapshot(q, (snap) => {
       const listings = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock)
@@ -98,6 +103,7 @@ export default function ConsumerLockPage() {
   }, []);
 
   async function handleClaim(lockId: string) {
+    if (!requireLogin()) return;
     setClaimingId(lockId);
     try {
       const fn = httpsCallable(functions, "claimResoldLock");
@@ -114,7 +120,7 @@ export default function ConsumerLockPage() {
   // firestore.rules only allows it once resale_deadline has passed, which
   // replaces a scheduled "release" job with a check made at claim time.
   async function handleClaimFree(lockId: string) {
-    if (!auth.currentUser) return;
+    if (!requireLogin() || !auth.currentUser) return;
     setClaimingId(lockId);
     try {
       await updateDoc(doc(db, "locks", lockId), {
@@ -131,7 +137,7 @@ export default function ConsumerLockPage() {
   }
 
   async function handleAcceptGift() {
-    if (!auth.currentUser || !incomingGiftId) return;
+    if (!incomingGiftId || !requireLogin() || !auth.currentUser) return;
     setClaimingGift(true);
     try {
       await updateDoc(doc(db, "locks", incomingGiftId), {
@@ -153,7 +159,7 @@ export default function ConsumerLockPage() {
   // / confirmLinePayPayment in functions/src/index.js) — never here, so a
   // buyer who abandons checkout doesn't end up with a "locked" doc.
   async function handleLock() {
-    if (!auth.currentUser) return;
+    if (!requireLogin() || !auth.currentUser) return;
     setLocking(true);
     try {
       const pickupDate = new Date().toISOString().slice(0, 10);

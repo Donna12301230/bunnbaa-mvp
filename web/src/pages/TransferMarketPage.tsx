@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
-import { ensureFirebaseSession } from "@/lib/auth";
+import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { Search, Clock, MapPin, UtensilsCrossed, Repeat } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
@@ -41,21 +41,24 @@ export default function TransferMarketPage() {
   const [browseTab, setBrowseTab] = useState<"browse" | "mine">("browse");
   const [search, setSearch] = useState("");
   const [uid, setUid] = useState<string | null>(null);
+  const requireLogin = useRequireLogin();
   const [locks, setLocks] = useState<Lock[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [claimingId, setClaimingId] = useState<string | null>(null);
 
   useEffect(() => {
-    ensureFirebaseSession().catch(console.error);
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
     return () => unsub();
   }, []);
 
   useEffect(() => {
+    // 只查轉賣中的：locks 只有 for_resale／for_gift 是公開可讀（firestore.rules），
+    // 查詢條件要讓規則能證明每一筆都符合，不然整個查詢會被拒絕
     const q = query(
       collection(db, "locks"),
       where("vendor_id", "==", VENDOR_ID),
+      where("status", "==", "for_resale"),
       orderBy("created_at", "desc"),
       limit(200)
     );
@@ -108,6 +111,7 @@ export default function TransferMarketPage() {
   );
 
   async function handleClaim(lockId: string) {
+    if (!requireLogin()) return;
     setClaimingId(lockId);
     try {
       const fn = httpsCallable(functions, "claimResoldLock");
@@ -121,7 +125,7 @@ export default function TransferMarketPage() {
   }
 
   async function handleClaimFree(lockId: string) {
-    if (!uid) return;
+    if (!requireLogin() || !uid) return;
     setClaimingId(lockId);
     try {
       await updateDoc(doc(db, "locks", lockId), {

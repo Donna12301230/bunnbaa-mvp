@@ -1,10 +1,7 @@
 import {
-  EmailAuthProvider,
   createUserWithEmailAndPassword,
-  linkWithCredential,
   onAuthStateChanged,
   sendPasswordResetEmail,
-  signInAnonymously,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -19,8 +16,9 @@ import type { UserProfile } from "@/types";
 // 角色判斷：
 //   - admin：email 在 ADMIN_EMAILS 白名單（跟 firestore.rules / Functions 同一份）
 //   - vendor：有某個 vendors/{id}.owner_uid 等於這個 uid（跟 assertAdminOrVendorOwner 同一套）
-//   - 其他非匿名帳號都是 customer
-// 匿名帳號（消費端鎖定流程用的）不算「已登入」，useAuth() 看到的 user 是 null。
+//   - 其他帳號都是 customer
+// 2026-09-24 起不再使用匿名登入：鎖定／下單／轉讓都要先登入（firestore.rules
+// isSignedInUser()、Functions assertSignedInUser() 也會擋匿名身分）。
 // 前端的角色只影響 UI；真正的權限邊界仍是 firestore.rules 與 Functions。
 
 interface AuthState {
@@ -81,6 +79,8 @@ let _resolveSeq = 0;
 async function refresh(u: User | null) {
   const seq = ++_resolveSeq;
   if (!u || u.isAnonymous) {
+    // 之前留在瀏覽器裡的匿名身分直接登出，不再沿用
+    if (u?.isAnonymous) signOut(auth).catch(console.error);
     setState({ user: null, loading: false });
     return;
   }
@@ -99,16 +99,6 @@ export const authStore = {
   },
 };
 
-/**
- * 消費端頁面（鎖定、購物車、我的餐點…）需要一個 Firebase 身分才能寫入 locks。
- * 原本每頁都直接 signInAnonymously()，但那會把已登入的 email 帳號換掉，
- * 所以改成：等 Auth 初始化完，沒有任何身分時才建立匿名身分。
- */
-export async function ensureFirebaseSession(): Promise<void> {
-  await auth.authStateReady();
-  if (!auth.currentUser) await signInAnonymously(auth);
-}
-
 function friendlyAuthError(err: unknown): Error {
   const code = (err as { code?: string })?.code ?? "";
   const messages: Record<string, string> = {
@@ -117,7 +107,6 @@ function friendlyAuthError(err: unknown): Error {
     "auth/wrong-password": "Email 或密碼錯誤",
     "auth/user-not-found": "Email 或密碼錯誤",
     "auth/email-already-in-use": "這個 Email 已經註冊過了",
-    "auth/credential-already-in-use": "這個 Email 已經註冊過了",
     "auth/weak-password": "密碼至少需要 6 個字元",
     "auth/too-many-requests": "嘗試次數過多，請稍後再試",
     "auth/network-request-failed": "網路連線失敗，請稍後再試",
@@ -134,23 +123,6 @@ export async function login(email: string, password: string): Promise<void> {
   }
 }
 
-/**
- * 建立 email 帳號。目前是匿名身分的話，用 linkWithCredential 把匿名帳號「升級」
- * 成 email 帳號——uid 不變，匿名時鎖定的餐點（locks.buyer_uid）就會跟著過來。
- * （已經有 email 帳號的人改用「登入」時做不到這件事：locks.buyer_uid 只有
- * admin／Functions 能改，匿名時的紀錄會留在舊的匿名 uid 底下。）
- */
-async function createAccount(email: string, password: string): Promise<User> {
-  await auth.authStateReady();
-  const current = auth.currentUser;
-  if (current?.isAnonymous) {
-    const cred = await linkWithCredential(current, EmailAuthProvider.credential(email, password));
-    return cred.user;
-  }
-  const cred = await createUserWithEmailAndPassword(auth, email, password);
-  return cred.user;
-}
-
 export async function register(input: {
   email: string;
   password: string;
@@ -160,7 +132,7 @@ export async function register(input: {
   department?: string;
 }): Promise<void> {
   try {
-    const user = await createAccount(input.email.trim(), input.password);
+    const { user } = await createUserWithEmailAndPassword(auth, input.email.trim(), input.password);
     if (input.displayName) await updateProfile(user, { displayName: input.displayName });
     await setDoc(doc(db, "users", user.uid), {
       display_name: input.displayName ?? "",
@@ -169,7 +141,7 @@ export async function register(input: {
       department: input.department ?? "",
       created_at: serverTimestamp(),
     });
-    // 升級匿名帳號不會觸發 onAuthStateChanged，而且個人資料是剛剛才寫入的，手動再解析一次
+    // onAuthStateChanged 在寫入顯示名稱／個人資料之前就觸發了，手動再解析一次
     await refresh(user);
   } catch (err) {
     throw friendlyAuthError(err);

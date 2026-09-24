@@ -19,8 +19,8 @@
 ### 2. 部署（2026-09-23 晚上的變更還沒上正式站）
 
 `firestore.rules` 新增 `menu_items`／`meal_plans`／`ban_appeals` 規則，`functions/src/index.js` 改了 `createCartLinePayReservation`／`createLinePayReservation`（改吃每個品項的真實 `vendor_id`）：
-- [ ] `firebase deploy --only firestore:rules`（2026-09-24 又新增 `users`／`vendor_applications` 規則，平台登入改真實 Firebase Auth 後註冊、廠商申請都要靠這兩條）
-- [ ] `firebase deploy --only functions`
+- [ ] `firebase deploy --only firestore:rules,firestore:indexes`（2026-09-24 再次更新：`locks` 改成只有轉賣中／贈送中公開讀，新增 `vendor_id+status+created_at` 複合索引——**索引要先建好**，不然轉讓市集查詢會失敗；2026-09-24 又新增 `users`／`vendor_applications` 規則，平台登入改真實 Firebase Auth 後註冊、廠商申請都要靠這兩條）
+- [ ] `firebase deploy --only functions`（2026-09-24 起消費端 callable 會擋匿名身分，前端已不再匿名登入，**規則、Functions、hosting 要一起部署**，不然舊版前端的匿名使用者會全部被擋）
 - [ ] `cd web && npm run build` 後 `firebase deploy --only hosting`（設計系統／新 design tokens 也還沒上線）
 - [ ] 部署後實測一次購物車結帳，到 Firestore Console 確認新的 `locks.vendor_id` 對應下單的商家，不是全部掛在 `cafe-renheya-demo`
 
@@ -28,7 +28,7 @@
 
 - [ ] QR Code 核銷：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證）
 - [ ] 撥款排程：`settleVendorPayouts`＋手動觸發（emulator 已驗證重複點擊不會重複結算）
-- [ ] 成長獎勵抽獎：`drawGrowthReward`
+- [ ] 成長獎勵抽獎：`drawGrowthReward`（2026-09-24 修：消費者首頁原本讀 `payouts` 判斷是否解鎖，但 `payouts` 只限管理員／店主讀，消費者永遠看不到抽獎。改成讀公開的 `growth_rewards.unlocked_milestones`，由撥款結算的 `syncGrowthUnlock` 寫入、只有門檻 id 不含金額。**部署 Functions 後要跑一次** `triggerSettlementNow`（或等當天 20:00 排程）把正式站的解鎖狀態補上，不然首頁還是顯示未解鎖）
 - [ ] 我的鎖定頁：`MyLocksPage.tsx`（`/my-locks`）
 - [ ] 取餐提醒推播：`pickupReminders`／`triggerPickupRemindersNow`
 - [ ] 商家校準報告＋what-if 追問：`dailyCalibration`／`askCalibrationScenario`，以及 `reliability_tone` 自動換算
@@ -51,8 +51,9 @@
 ### 6. 尚未實作的功能
 
 - [ ] **手機門號 OTP 登入**（`LoginPage.tsx`，草圖 `Login.dc.html` 已確認兩段式流程）——2026-09-24 已先改成 Email＋密碼的真實 Firebase Auth（`web/src/lib/auth.ts`），OTP 之後可以直接加在同一個模組。角色：管理員＝email 白名單、廠商＝`vendors/{id}.owner_uid`、其餘＝會員；`users/{uid}` 只存個人資料不存角色
-- [ ] 已經有帳號的人在匿名狀態鎖定後才「登入」，匿名時的鎖定會留在舊的匿名 uid（`locks.buyer_uid` 只有 admin／Functions 能改）。「註冊」沒這問題（`linkWithCredential` 沿用同一個 uid）。要補的話得寫一支 Function 搬 `buyer_uid`
-- [ ] **消費者端提交解封申訴**——完全沒有入口（登入頁條款的「會員中心提交申訴」只是文字）。要先有 OTP 登入：匿名 uid 換裝置就變，沒有穩定身分能綁定封禁狀態
+- [x] 2026-09-24 決定**不再使用匿名登入**：瀏覽不用登入，但鎖定／下單／購物車結帳／轉讓接手／抽獎都要先登入（前端 `useRequireLogin`、`firestore.rules` `isSignedInUser()`、Functions `assertSignedInUser()` 三層都擋）。舊的匿名帳號跟它們名下的鎖定紀錄**不搬移、不保留**
+- [ ] 部署規則＋Functions 後，到 Firebase Console → Authentication → Sign-in method 把「匿名」停用
+- [ ] **消費者端提交解封申訴**——完全沒有入口（登入頁條款的「會員中心提交申訴」只是文字）。現在消費者已有穩定帳號，可以開始做了
 - [ ] 「我的轉讓」無法追蹤已被接手的項目（資料模型沒有記錄原轉讓者）
 
 ### 7. 待決策
@@ -61,7 +62,7 @@
   - (a) 維持現狀，當示意頁
   - (b) 只把商家後台那半邊（`order_sessions`／`pre_orders`／`table_orders`）接真 Firestore，消費者端仍沒入口
   - (c) 連消費者端畫面一起從零設計開發，規模最大
-- **商家訂閱平台**：`mockData.ts` 只剩這條線在用（`VendorPortalSettings.tsx`／`VendorPortalLayout.tsx`），真實後端沒有「商家訂閱」這個概念，還沒排進範圍
+- ~~**商家訂閱平台**~~ 2026-09-24 已接真 Firestore（`web/src/lib/subscription.ts`）：狀態存在 `vendors/{id}.subscription_*`，到期（`subscription_end_date` 已過）整個廠商後台擋住；商家只能自助「申請取消」「到期前撤回」（`firestore.rules` 限定這兩種轉換）；**沒有訂閱金流**，續約由管理員確認收款後在 `/admin/vendors` 按「續約 30 天」（寫 `admin_audit_logs`）。新核准的商家自動首月免費試用。正式站既有商家沒有訂閱欄位＝「尚未設定」，不擋也不能自助操作，要管理員按一次續約才開始計期。之後要自動扣款再接 LINE Pay 定期付款
 
 ---
 
@@ -145,6 +146,10 @@ UI 草圖：https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc （只參考版面
 | 廠商 | vendor@bunnbaa.test | demo1234 | 綁定 `cafe-renheya-demo`（仁和雅咖啡），廠商後台 `/vendor-portal/dashboard`、核對取餐 `/lock/vendor/redeem` |
 | 管理員 | suw192336@gmail.com | demo1234 | 管理後台 `/admin/vendors`（emulator 內的同名帳號，跟正式站密碼無關） |
 | 廠商申請中 | applicant@bunnbaa.test | demo1234 | 已送出「早安三明治」申請，登入管理員到 `/admin/vendors` 核准後才會變成廠商 |
+
+瀏覽不用登入，但鎖定／下單／結帳／轉讓接手／抽獎都要先登入（沒有匿名身分了）。
+
+種子資料的商家訂閱：仁和雅咖啡＝訂閱中（20 天後續約）、王媽媽便當＝試用中（5 天後到期）、阿嘉炸雞＝已申請取消（3 天後暫停）、早安三明治＝未設定（核准 applicant@ 時開始試用）。
 
 已經有 `.emulator-data` 存檔的話不會自動重灌，兩種做法擇一：`npm run dev:emulator:reset`（清掉重灌），或 emulator 開著時另開終端機執行
 `$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"; $env:FIREBASE_AUTH_EMULATOR_HOST="127.0.0.1:9099"; $env:GCLOUD_PROJECT="bunnbaa-mvp-5474"; node scripts/seed.js --catalog-only`（只補帳號跟目錄資料，不重複灌歷史紀錄）。

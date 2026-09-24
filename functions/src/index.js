@@ -32,6 +32,15 @@ function assertAdminOrEmulator(request) {
   }
 }
 
+// Consumer actions (locking, checkout, resale claims, draws) need a real
+// account since 2026-09-24 — anonymous sign-in is no longer used anywhere,
+// so an anonymous token here means a stale or hand-crafted client.
+function assertSignedInUser(request, action) {
+  if (!request.auth || request.auth.token?.firebase?.sign_in_provider === "anonymous") {
+    throw new HttpsError("unauthenticated", `Please log in to ${action}`);
+  }
+}
+
 async function assertAdminOrVendorOwner(request, vendorId) {
   if (isEmulator()) return;
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in required.");
@@ -199,9 +208,7 @@ exports.markLockOutcome = onCall({ region: "asia-east1" }, async (request) => {
  * take it over.
  */
 exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Must be signed in (anonymous is fine) to claim a lock");
-  }
+  assertSignedInUser(request, "claim a lock");
   const { lock_id: lockId } = request.data || {};
   if (!lockId) throw new HttpsError("invalid-argument", "lock_id is required");
 
@@ -250,9 +257,7 @@ async function assertVendorExists(vendorId, cache) {
 }
 
 exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Must be signed in (anonymous is fine) to check out");
-  }
+  assertSignedInUser(request, "check out");
   const {
     vendor_id: vendorId,
     item_name: itemName,
@@ -333,9 +338,7 @@ const MAX_CART_LINES = 50;
 const MAX_CART_UNITS = 100; // bounds the Firestore batch confirmLinePayPayment writes
 
 exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Must be signed in (anonymous is fine) to check out");
-  }
+  assertSignedInUser(request, "check out");
   const { items } = request.data || {};
   if (!Array.isArray(items) || items.length === 0) {
     throw new HttpsError("invalid-argument", "items must be a non-empty array");
@@ -416,9 +419,7 @@ exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (r
 });
 
 exports.confirmLinePayPayment = onCall({ region: "asia-east1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Must be signed in to confirm a payment");
-  }
+  assertSignedInUser(request, "confirm a payment");
   const { order_id: orderId } = request.data || {};
   if (!orderId) throw new HttpsError("invalid-argument", "order_id is required");
 
@@ -531,6 +532,11 @@ exports.settleVendorPayouts = onSchedule(
       } catch (err) {
         logger.error(`Payout settlement failed for vendor ${vendorDoc.id}`, err);
       }
+      try {
+        await syncGrowthUnlock(vendorDoc.id);
+      } catch (err) {
+        logger.error(`Growth unlock sync failed for vendor ${vendorDoc.id}`, err);
+      }
     }
   }
 );
@@ -541,7 +547,8 @@ exports.triggerSettlementNow = onCall({ region: "asia-east1" }, async (request) 
   if (!vendorId) throw new HttpsError("invalid-argument", "vendor_id is required");
   await assertAdminOrVendorOwner(request, vendorId);
   const payoutId = await settleVendorPayout(vendorId);
-  return { payout_id: payoutId };
+  const unlocked = await syncGrowthUnlock(vendorId);
+  return { payout_id: payoutId, unlocked_milestones: unlocked };
 });
 
 /* ------------------------------------------------------------------ *
@@ -748,10 +755,22 @@ async function vendorCumulativeRevenue(vendorId) {
   return snap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
 }
 
+/**
+ * Consumers need to know whether a vendor's draw is unlocked, but payouts
+ * (the revenue itself) is owner/admin-only (ISO 27001 A.5.34). So publish
+ * only the milestone ids reached onto the public growth_rewards doc — never
+ * the amount. Recomputed at every settlement (daily schedule + manual
+ * trigger), which also backfills vendors that crossed a threshold earlier.
+ */
+async function syncGrowthUnlock(vendorId) {
+  const revenue = await vendorCumulativeRevenue(vendorId);
+  const unlocked = GROWTH_REWARD_MILESTONES.filter((m) => revenue >= m.threshold).map((m) => m.id);
+  await db.collection("growth_rewards").doc(vendorId).set({ unlocked_milestones: unlocked }, { merge: true });
+  return unlocked;
+}
+
 exports.drawGrowthReward = onCall({ region: "asia-east1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Must be signed in (anonymous is fine) to draw");
-  }
+  assertSignedInUser(request, "draw");
   const { vendor_id: vendorId, item_name: itemName } = request.data || {};
   if (!vendorId) throw new HttpsError("invalid-argument", "vendor_id is required");
 
@@ -778,9 +797,11 @@ exports.drawGrowthReward = onCall({ region: "asia-east1" }, async (request) => {
     return tier;
   });
 
+  // draws is publicly readable (winners ticker), so store only a short display
+  // tag, never the full uid — it now belongs to a registered account.
   await db.collection("draws").add({
     vendor_id: vendorId,
-    buyer_uid: request.auth.uid,
+    buyer_tag: request.auth.uid.slice(-6),
     item_name: itemName || null,
     price_percent: pricePercent,
     created_at: FieldValue.serverTimestamp(),

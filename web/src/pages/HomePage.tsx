@@ -5,7 +5,7 @@ import {
   collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { ensureFirebaseSession } from "@/lib/auth";
+import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { httpsCallable } from "firebase/functions";
 import {
   Clock, CalendarDays, Rocket, Star, User, MapPin, Trophy,
@@ -22,7 +22,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
 const GROWTH_VENDOR_ID = "cafe-renheya-demo";
-const GROWTH_UNLOCK_THRESHOLD = 200000;
 const GROWTH_TIER_LABEL: Record<number, string> = { 80: "8折", 60: "6折", 50: "5折", 30: "3折", 10: "1折", 0: "整份 0 元" };
 
 // 「取餐時段」選單的顯示文字跟送出去的 pickup_window 分開存——後者要用 ASCII
@@ -68,27 +67,30 @@ export default function HomePage() {
   const [lockingMealId, setLockingMealId] = useState<string | null>(null);
   const [lockDialogItem, setLockDialogItem] = useState<{ item: MenuItem; vendor: Vendor } | null>(null);
   const [uid, setUid] = useState<string | null>(null);
+  const requireLogin = useRequireLogin();
   const [joiningPlanId, setJoiningPlanId] = useState<string | null>(null);
   const [joinedPlanIds, setJoinedPlanIds] = useState<Record<string, boolean>>({});
-  const [growthRevenue, setGrowthRevenue] = useState(0);
+  const [growthUnlocked, setGrowthUnlocked] = useState(false);
   const [drawing, setDrawing] = useState(false);
 
   useEffect(() => {
-    ensureFirebaseSession().catch(console.error);
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
     return () => unsub();
   }, []);
 
+  // payouts（營收金額）只有管理員／店主能讀，消費者端改讀公開的
+  // growth_rewards.unlocked_milestones——撥款結算時由 Functions syncGrowthUnlock 更新，
+  // 只寫達到哪些門檻，不寫金額。真正能不能抽還是 drawGrowthReward 伺服器端再驗一次。
   useEffect(() => {
-    const unsub = onSnapshot(query(collection(db, "payouts"), where("vendor_id", "==", GROWTH_VENDOR_ID)), (snap) => {
-      setGrowthRevenue(snap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0));
+    const unsub = onSnapshot(doc(db, "growth_rewards", GROWTH_VENDOR_ID), (snap) => {
+      const unlocked: string[] = snap.data()?.unlocked_milestones ?? [];
+      setGrowthUnlocked(unlocked.includes("tier1"));
     });
     return () => unsub();
   }, []);
 
-  const growthUnlocked = growthRevenue >= GROWTH_UNLOCK_THRESHOLD;
-
   async function handleDrawGrowthReward() {
+    if (!requireLogin()) return;
     setDrawing(true);
     try {
       const fn = httpsCallable(functions, "drawGrowthReward");
@@ -163,7 +165,7 @@ export default function HomePage() {
     queryKey: ["homeTransferPreview"],
     queryFn: async () => {
       const snap = await getDocs(
-        query(collection(db, "locks"), where("vendor_id", "==", GROWTH_VENDOR_ID), orderBy("created_at", "desc"), limit(50))
+        query(collection(db, "locks"), where("vendor_id", "==", GROWTH_VENDOR_ID), where("status", "==", "for_resale"), orderBy("created_at", "desc"), limit(50))
       );
       return snap.docs
         .map((d) => ({ id: d.id, ...d.data() }) as Lock)
@@ -174,7 +176,7 @@ export default function HomePage() {
   });
 
   async function handleLockMeal(item: MenuItem) {
-    if (!uid) return;
+    if (!requireLogin() || !uid) return;
     setLockingMealId(item.id);
     try {
       const { discountPercent, lockedPrice } = applyEarlyBirdPrice(item.price, pickupDate);
@@ -200,7 +202,7 @@ export default function HomePage() {
   // Cloud Function 每天生一筆，所以不受 Blaze 卡住。之後在「我的餐點」會依
   // pickup_date 自動分組出現。
   async function handleJoinPlan(group: { vendorId: string; vendorName: string; plans: MealPlan[] }, plan: MealPlan) {
-    if (!uid) return;
+    if (!requireLogin() || !uid) return;
     const planKey = `${group.vendorId}-${plan.id}`;
     setJoiningPlanId(planKey);
     try {

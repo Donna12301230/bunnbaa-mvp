@@ -10,6 +10,11 @@ export interface Vendor {
   address?: string;
   phone?: string;
   owner_uid?: string | null; // 平台審核後綁定的真實 Firebase Auth uid，只有 admin 能寫
+  // 商家訂閱，見 lib/subscription.ts；舊資料可能沒有這些欄位
+  subscription_status?: "trial" | "active" | "cancelled" | "expired";
+  subscription_end_date?: unknown; // Firestore Timestamp
+  cancelled_from?: "trial" | "active";
+  cancel_requested_at?: unknown; // Firestore Timestamp
 }
 
 export interface MenuItem {

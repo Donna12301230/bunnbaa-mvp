@@ -3,9 +3,8 @@ import { Link, useLocation } from "wouter";
 import { LayoutDashboard, UtensilsCrossed, ClipboardList, Settings, ArrowLeft, CalendarDays, Search, TrendingUp, AlertTriangle, ChefHat, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
-import { mockVendors } from "@/lib/mockData";
+import { useMyVendor } from "@/hooks/useMyVendor";
+import { getSubscriptionState, PLATFORM_CONTACT_EMAIL } from "@/lib/subscription";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,13 +22,13 @@ const navItems = [
 ];
 
 // Ported from BunnBaa Parse_Ref's client/src/components/VendorLayout.tsx.
-// TODO(firebase): the subscription-status query and the reactivate mutation
-// read/mutate mockVendors instead of Parse.Query("Vendor")/Parse.Cloud.run —
-// swap for real Firestore + Cloud Functions once the backend is wired up.
+// 訂閱狀態讀真實 vendors/{id}（lib/subscription.ts）：到期後整個廠商後台擋住，
+// 沒有訂閱金流，所以續約要聯絡平台、由管理員在 /admin/vendors 延長。
 export default function VendorPortalLayout({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
   const { user, isVendor, isLoading } = useAuth();
   const { toast } = useToast();
+  const { data: myVendor } = useMyVendor();
 
   useEffect(() => {
     if (!isLoading && !isVendor) {
@@ -42,40 +41,14 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
     }
   }, [isLoading, isVendor]);
 
-  const { data: subInfo } = useQuery({
-    queryKey: ["myVendorSub", user?.id],
-    queryFn: async () => {
-      const v = mockVendors[0];
-      if (!v) return null;
-      return { status: v.subscriptionStatus, endDate: v.subscriptionEndDate };
-    },
-    enabled: !!user && isVendor,
-  });
-
-  const reactivateMutation = useMutation({
-    mutationFn: async () => {
-      const v = mockVendors[0];
-      if (v) v.subscriptionStatus = "active";
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["myVendorSub", user?.id] });
-      toast({ title: "訂閱已恢復", description: "歡迎回來！帳號已恢復正常使用。" });
-    },
-    onError: (err: Error) => toast({ variant: "destructive", title: "操作失敗", description: err.message }),
-  });
-
   // 放在所有 hooks 之後，登入狀態從載入中變成確定時 hook 數量才不會變
   if (isLoading || !isVendor) {
     return null;
   }
 
-  const now = new Date();
-  const isSubscriptionBlocked = subInfo && (
-    subInfo.status === "expired" ||
-    (subInfo.status === "cancelled" && subInfo.endDate && subInfo.endDate <= now)
-  );
+  const subscription = myVendor ? getSubscriptionState(myVendor) : null;
 
-  if (isSubscriptionBlocked) {
+  if (subscription?.blocked) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="bg-sidebar border-b border-sidebar-border px-4 h-12 flex items-center justify-between">
@@ -89,18 +62,16 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
             <AlertTriangle className="w-12 h-12 mx-auto text-amber-500" />
             <h2 className="text-xl font-bold text-gray-800">帳號已暫停</h2>
             <p className="text-sm text-gray-600">
-              您的訂閱已到期，廠商後台功能暫時停用。
-              <br />所有店家資料、菜單及訂單記錄均已保留，重新訂閱即可完整恢復。
+              您的訂閱已到期{subscription.endDate ? `（${subscription.endDate.toLocaleDateString("zh-TW")}）` : ""}，廠商後台功能暫時停用。
+              <br />所有店家資料、菜單及訂單記錄均已保留，續約後即可完整恢復。
             </p>
             <div className="bg-amber-50 rounded-lg p-3 text-sm text-amber-800">
-              重新訂閱方案：<b>首月免費，之後每月 NT$1,999</b>
+              續約方案：<b>每月 NT$1,999</b>，付款確認後由平台為您恢復
             </div>
-            <Button
-              className="w-full"
-              disabled={reactivateMutation.isPending}
-              onClick={() => reactivateMutation.mutate()}
-            >
-              {reactivateMutation.isPending ? "處理中..." : "立即重新訂閱"}
+            <Button asChild className="w-full">
+              <a href={`mailto:${PLATFORM_CONTACT_EMAIL}?subject=${encodeURIComponent(`續約：${myVendor?.name ?? ""}`)}`}>
+                聯絡平台續約
+              </a>
             </Button>
           </div>
         </div>

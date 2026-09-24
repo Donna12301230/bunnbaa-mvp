@@ -9,7 +9,8 @@ import { db } from "@/lib/firebase";
 // 拿掉假資料——沒有人真的抽過獎之前，這裡就是空的，不補假的中獎名單。
 interface BigWin {
   id: string;
-  buyer_uid: string;
+  buyer_tag?: string;
+  buyer_uid?: string; // 2026-09-24 前的舊紀錄
   item_name?: string | null;
 }
 
@@ -33,7 +34,7 @@ export default function GrowthRewardTicker() {
         {items.map((win, i) => (
           <span key={`${win.id}-${i}`} className="inline-flex items-center gap-2 text-xs font-bold text-amber-200 shrink-0">
             <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            使用者 {win.buyer_uid.slice(-6)} 剛抽中「{win.item_name ?? "整份餐點"}」整份 0 元大獎！
+            使用者 {win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} 剛抽中「{win.item_name ?? "整份餐點"}」整份 0 元大獎！
           </span>
         ))}
       </div>

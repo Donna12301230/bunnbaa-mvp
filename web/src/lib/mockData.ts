@@ -101,14 +101,6 @@ export const mockBanAppeals: MockBanAppeal[] = [
 ];
 
 // ── Mock "cloud function" mutations (Parse.Cloud.run stand-ins) ────────────
-export function mockApproveVendor(id: string, approved: boolean) {
-  const vendor = mockVendors.find(v => v.id === id);
-  if (vendor) {
-    vendor.isApproved = approved;
-    vendor.isActive = approved;
-  }
-}
-
 export function mockProcessBanAppeal(appealId: string, approved: boolean) {
   const appeal = mockBanAppeals.find(a => a.id === appealId);
   if (appeal) {
@@ -182,14 +174,6 @@ export function mockUpdateVendor(vendorId: string, patch: Partial<VendorData>) {
 
 export async function mockSaveVendorSettings(vendorId: string, patch: Partial<VendorData>) {
   return mockUpdateVendor(vendorId, patch);
-}
-
-export async function mockRequestCancelSubscription(vendorId: string) {
-  mockUpdateVendor(vendorId, { subscriptionStatus: "cancelled", cancelRequestedAt: new Date() });
-}
-
-export async function mockReactivateSubscription(vendorId: string) {
-  mockUpdateVendor(vendorId, { subscriptionStatus: "active", cancelRequestedAt: undefined });
 }
 
 export function mockSyncOrderSessions(vendor: VendorData, weekDates: Date[]): number {

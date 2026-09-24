@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { mockGetMyVendor, mockSaveVendorSettings, mockRequestCancelSubscription, mockReactivateSubscription } from "@/lib/mockData";
+import { mockGetMyVendor, mockSaveVendorSettings } from "@/lib/mockData";
+import { useMyVendor, myVendorDocKey } from "@/hooks/useMyVendor";
+import { getSubscriptionState, requestCancelSubscription, undoCancelSubscription, PLATFORM_CONTACT_EMAIL } from "@/lib/subscription";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +22,7 @@ import { ImageUploadField } from "@/components/ImageUploadField";
 import { QRCodeCanvas } from "qrcode.react";
 import { format, parseISO } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import type { BusinessHour } from "@/types";
+import type { BusinessHour, Vendor } from "@/types";
 import { Tooltip } from "@/components/ds";
 
 const ORDER_DEADLINE_OFFSET = 30;
@@ -50,14 +52,14 @@ const DEFAULT_BH: BusinessHour[] = [0, 1, 2, 3, 4, 5, 6].map(d => ({
   closeTime: "17:00",
 }));
 
-// ── SubscriptionCancelButton ────────────────────────────────────────────────
-function SubscriptionCancelButton({ vendorId }: { vendorId: string }) {
+// ── Subscription buttons（真實 vendors/{id}，轉換限制見 firestore.rules）──────────
+function SubscriptionCancelButton({ vendor }: { vendor: Vendor }) {
   const { toast } = useToast();
   const confirm = useConfirm();
   const mut = useMutation({
-    mutationFn: () => mockRequestCancelSubscription(vendorId),
+    mutationFn: () => requestCancelSubscription(vendor),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["myVendor"] });
+      queryClient.invalidateQueries({ queryKey: myVendorDocKey(vendor.id) });
       toast({ title: "已申請取消訂閱", description: "帳號將於到期日後暫停，資料持續保留。" });
     },
     onError: (err: Error) => toast({ variant: "destructive", title: "操作失敗", description: err.message }),
@@ -66,38 +68,35 @@ function SubscriptionCancelButton({ vendorId }: { vendorId: string }) {
     <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
       disabled={mut.isPending}
       onClick={async () => {
-        if (await confirm({ title: "要申請取消訂閱嗎？", description: "帳號將於到期日後暫停，您的資料仍會保留。", confirmLabel: "確定取消訂閱", destructive: true })) mut.mutate();
+        if (await confirm({ title: "要申請取消訂閱嗎？", description: "帳號將於到期日後暫停，您的資料仍會保留；到期前都可以恢復。", confirmLabel: "確定取消訂閱", destructive: true })) mut.mutate();
       }}>
       {mut.isPending ? "處理中..." : "申請取消訂閱"}
     </Button>
   );
 }
 
-function SubscriptionReactivateButton({ vendorId }: { vendorId: string }) {
+function SubscriptionUndoCancelButton({ vendor }: { vendor: Vendor }) {
   const { toast } = useToast();
   const mut = useMutation({
-    mutationFn: () => mockReactivateSubscription(vendorId),
+    mutationFn: () => undoCancelSubscription(vendor),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["myVendor"] });
-      toast({ title: "訂閱已恢復", description: "歡迎回來！帳號已恢復正常使用。" });
+      queryClient.invalidateQueries({ queryKey: myVendorDocKey(vendor.id) });
+      toast({ title: "已恢復訂閱", description: "取消申請已撤回，帳號會照常續約。" });
     },
     onError: (err: Error) => toast({ variant: "destructive", title: "操作失敗", description: err.message }),
   });
   return (
-    <Button size="sm" className="text-xs"
-      disabled={mut.isPending} onClick={() => mut.mutate()}>
-      {mut.isPending ? "處理中..." : "重新訂閱（NT$1,999/月）"}
+    <Button size="sm" className="text-xs" disabled={mut.isPending} onClick={() => mut.mutate()}>
+      {mut.isPending ? "處理中..." : "撤回取消、繼續訂閱"}
     </Button>
   );
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/settings.tsx.
-// TODO(firebase): reads/writes mockData.ts's mockVendors via
-// mockGetMyVendor/mockSaveVendorSettings/mockRequestCancelSubscription/
-// mockReactivateSubscription instead of Parse.Query("Vendor")/
-// saveVendorSettings()/Parse.Cloud.run(...) — swap for Firestore once the
-// backend is wired up.
+// 訂閱狀態卡片接真實 vendors/{id}（useMyVendor + lib/subscription.ts）。
+// TODO(firebase): 店家資料／營業時間／公休／桌位仍讀寫 mockData.ts 的
+// mockGetMyVendor/mockSaveVendorSettings——真實 Vendor 型別還沒有這些欄位。
 export default function VendorPortalSettings() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -136,6 +135,7 @@ export default function VendorPortalSettings() {
   }, [myVendor]);
 
   const tables: string[] = myVendor?.tables ?? [];
+  const { data: realVendor } = useMyVendor();
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const saveMutation = useMutation({
@@ -381,18 +381,15 @@ export default function VendorPortalSettings() {
         </Button>
 
         {/* ── 訂閱狀態 ── */}
-        {myVendor && (() => {
-          const subStatus = myVendor.subscriptionStatus ?? "trial";
-          const endDate = myVendor.subscriptionEndDate;
-          const now = new Date();
-          const isCancelledActive = subStatus === "cancelled" && endDate && endDate > now;
+        {realVendor && (() => {
+          const sub = getSubscriptionState(realVendor);
           const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
             trial:     { label: "首月免費試用中", variant: "default" },
             active:    { label: "訂閱中",        variant: "default" },
-            cancelled: { label: isCancelledActive ? "已申請取消（到期前仍可使用）" : "已取消", variant: "outline" },
+            cancelled: { label: "已申請取消（到期前仍可使用）", variant: "outline" },
             expired:   { label: "已到期／暫停",  variant: "destructive" },
           };
-          const cfg = statusConfig[subStatus] ?? statusConfig.trial;
+          const cfg = statusConfig[sub.status] ?? statusConfig.active;
           return (
             <Card>
               <CardHeader className="pb-2">
@@ -403,38 +400,40 @@ export default function VendorPortalSettings() {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">目前狀態</span>
-                  <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                  <Badge variant={cfg.variant}>{sub.unset ? "尚未設定" : cfg.label}</Badge>
                 </div>
-                {endDate && (
+                {sub.endDate && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {subStatus === "trial" ? "試用到期日" : subStatus === "cancelled" ? "帳號暫停日" : "下次續約日"}
+                      {sub.status === "trial" ? "試用到期日" : sub.status === "cancelled" ? "帳號暫停日" : sub.status === "expired" ? "到期日" : "下次續約日"}
                     </span>
-                    <span className="font-medium">{endDate.toLocaleDateString("zh-TW")}</span>
+                    <span className="font-medium">{sub.endDate.toLocaleDateString("zh-TW")}</span>
                   </div>
                 )}
-                {(subStatus === "trial" || subStatus === "active") && (
-                  <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-100 rounded p-2">
-                    {subStatus === "trial"
-                      ? "試用期結束後將自動進入每月 NT$1,999 的訂閱方案。"
-                      : "每月自動續約，費用 NT$1,999。"}
+                {sub.unset && (
+                  <p className="text-xs text-muted-foreground bg-gray-50 border rounded p-2">
+                    平台尚未為這個店家設定訂閱方案，目前可正常使用，之後由平台通知續約。
                   </p>
                 )}
-                {isCancelledActive && (
+                {!sub.unset && (sub.status === "trial" || sub.status === "active") && (
+                  <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-100 rounded p-2">
+                    {sub.status === "trial"
+                      ? "試用期結束後進入每月 NT$1,999 的訂閱方案，平台會在到期前聯絡您付款。"
+                      : "每月 NT$1,999，平台確認收款後延長到下一期。"}
+                  </p>
+                )}
+                {sub.canUndoCancel && (
                   <div className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
                     <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <span>您已申請取消訂閱，帳號將於到期日後暫停。資料完整保留，重新訂閱即可恢復。</span>
-                  </div>
-                )}
-                {(subStatus === "expired" || (subStatus === "cancelled" && endDate && endDate <= now)) && (
-                  <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2">
-                    <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <span>帳號已暫停。您的所有資料均已保留，重新訂閱即可恢復使用。</span>
+                    <span>您已申請取消訂閱，帳號將於暫停日後停用。資料完整保留，暫停日前都可以撤回。</span>
                   </div>
                 )}
                 <div className="flex gap-2 pt-1">
-                  {(subStatus === "trial" || subStatus === "active") && <SubscriptionCancelButton vendorId={myVendor.id} />}
-                  {(subStatus === "expired" || subStatus === "cancelled") && <SubscriptionReactivateButton vendorId={myVendor.id} />}
+                  {sub.canCancel && <SubscriptionCancelButton vendor={realVendor} />}
+                  {sub.canUndoCancel && <SubscriptionUndoCancelButton vendor={realVendor} />}
+                  <Button asChild size="sm" variant="ghost" className="text-xs">
+                    <a href={`mailto:${PLATFORM_CONTACT_EMAIL}?subject=${encodeURIComponent(`訂閱：${realVendor.name}`)}`}>聯絡平台</a>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
