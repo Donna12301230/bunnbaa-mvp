@@ -2,6 +2,9 @@
   "name": "bunnbaa",
   "private": true,
   "scripts": {
+    "dev": "npm --prefix web run dev -- --port 5199",
+    "dev:emulator": "powershell -ExecutionPolicy Bypass -File scripts/dev-local.ps1",
+    "dev:emulator:reset": "powershell -ExecutionPolicy Bypass -File scripts/dev-local.ps1 -Reset",
     "deploy:rules": "firebase deploy --only firestore:rules",
     "deploy:functions": "firebase deploy --only functions",
     "deploy:hosting": "npm --prefix web run deploy",

@@ -96,17 +96,21 @@ BunnBaa/
    ```
    推播需要在 `web/src/lib/messaging.ts` 填入 `VAPID_KEY`（Firebase Console → Cloud Messaging → Web Push 憑證）；沒填的話只會跳過註冊，不影響其他功能。
 4. **種子資料腳本**：`cd scripts && npm install`
-5. **本機測試（Emulator）**：
-   ```bash
-   # 專案根目錄（中文路徑下會卡住，請改從 ASCII junction 執行，見 TODO.md）
-   firebase emulators:start --only functions,firestore,auth
+5. **本機開發**：`web/.env.local` 設 `VITE_USE_EMULATORS=false`（目前設定），本機直接讀寫雲端 Firestore，與正式站同一份資料：
+   ```powershell
+   npm run dev          # 只開 Vite：http://localhost:5199
    ```
-   另開一個終端機灌種子資料：
-   ```bash
-   GOOGLE_APPLICATION_CREDENTIALS= FIRESTORE_EMULATOR_HOST=localhost:8080 \
-     node scripts/seed.js
+   ⚠️ 本機的操作（鎖定、核銷、撥款）會直接寫進正式資料。
+
+   **要隔離測試時改用 Emulator**：`.env.local` 改成 `VITE_USE_EMULATORS=true`，再執行
+   ```powershell
+   npm run dev:emulator         # 啟動 emulator、首次自動灌種子、再開 Vite；資料存在 .emulator-data/
+   npm run dev:emulator:reset   # 清掉本機資料重灌（種子裡「今天／明天」的訂單過期時用）
    ```
-   前端在 `web/.env.local` 加 `VITE_USE_EMULATORS=true`，再執行 `cd web && npm run dev`。
+   前提：ASCII junction 已建立（見 TODO.md「📌 環境備忘」）。
+   emulator 會開在另一個視窗；**要在那個視窗按 Ctrl+C 關閉**，資料才會存檔。
+   腳本內容見 `scripts/dev-local.ps1`（手動步驟：從 junction 執行 `firebase emulators:start --only functions,firestore,auth --import=.emulator-data --export-on-exit=.emulator-data`，
+   再以 `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=bunnbaa-mvp-5474 node scripts/seed.js` 灌資料）。
 6. **正式部署**：
    ```bash
    cd web && npm run build && cd ..

@@ -6,3 +6,5 @@ dist/
 *.log
 .DS_Store
 .firebase/
+# 本機 emulator 存檔（scripts/dev-local.ps1）
+.emulator-data/

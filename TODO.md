@@ -36,7 +36,7 @@
 
 ### 4. Demo 準備（整合與交付）
 
-- [ ] 正式站灌 demo 資料（`scripts/seed.js`，正式環境 Firestore 目前是空的）
+- [x] 正式站灌 demo 資料（`scripts/seed.js`）——2026-09-24 確認雲端已有資料（seed.js 回報 locks already exist），不需再灌
 - [ ] 照 ISO27001 文件的「商家帳號綁定」流程建商家帳號並設定 `vendors/{id}.owner_uid`，否則商家儀表板看不到資料
 - [ ] 整合測試（端到端跑過消費者、商家、管理員三條線）
 - [ ] 錄 Demo（3 分鐘腳本見 v6 §8）
@@ -71,7 +71,8 @@
   - Firebase emulator 在中文路徑下會卡在 discovery timeout → 要從 ASCII junction `C:\Users\USER\bunnbaa-dev` 執行（2026-09-24 已確認指向 repo 根目錄）。若日後 repo 搬家要重建：`rmdir C:\Users\USER\bunnbaa-dev` 後執行 `mklink /J C:\Users\USER\bunnbaa-dev "D:\雅婷\03赫滋與羊\+程式碼\BunnBaa"`（在 cmd 裡跑）
   - Vite dev server 從 junction 路徑執行會出現空白頁 → **要留在原本的中文路徑** `D:\雅婷\03赫滋與羊\+程式碼\BunnBaa\web`
 - **Java**：Firestore/Auth emulator 需要 JRE，已用 winget 裝 Microsoft OpenJDK 21 並加進 PATH。
-- **`web/.env.local` 的 `VITE_USE_EMULATORS=true`**：會讓前端連本機 emulator。已排除在 `.gitignore`，2026-09-24 已在 `firebase.ts` 加上 `import.meta.env.DEV` 判斷，正式建置不會誤連 emulator。
+- **`web/.env.local` 的 `VITE_USE_EMULATORS`**：`true` 連本機 emulator、`false` 連雲端 Firestore（2026-09-24 起本機設為 `false`）。已排除在 `.gitignore`，2026-09-24 已在 `firebase.ts` 加上 `import.meta.env.DEV` 判斷，正式建置不會誤連 emulator。
+- **本機開發**：repo 根目錄 `npm run dev` 只開 Vite :5199，直接讀寫雲端 Firestore（⚠️ 本機操作會寫進正式資料）。要隔離測試：`.env.local` 改 `true` 後 `npm run dev:emulator`（`scripts/dev-local.ps1`＝junction 啟動 emulator，資料存 `.emulator-data/` → 首次自動灌種子 → 中文路徑啟動 Vite）；重灌用 `npm run dev:emulator:reset`；emulator 視窗要用 Ctrl+C 關才會存檔。
 - **設計系統預覽**：本機 http://localhost:5199/#/design-system
 - **網域**：`bunnbaa.com` 掛在舊專案（Parse 版本），MVP 先不動，暫用 https://bunnbaa-mvp-5474.web.app ，之後要換網域再處理 DNS。
 - **GitHub**：獨立的 private repo，不跟舊專案共用：https://github.com/Donna12301230/bunnbaa-mvp
