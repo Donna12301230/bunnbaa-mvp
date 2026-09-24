@@ -4,10 +4,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import { QrCode, Gift, Repeat, Copy, ClipboardList } from "lucide-react";
+import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2 } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
@@ -105,6 +106,7 @@ export default function MyBookingsPage() {
   const [now, setNow] = useState(() => Date.now());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState<Record<string, boolean>>({});
+  const [zoomedLock, setZoomedLock] = useState<Lock | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState<Record<string, boolean>>({});
   const [feedbackDraft, setFeedbackDraft] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -255,9 +257,19 @@ export default function MyBookingsPage() {
                         <div className="flex flex-col gap-2 pt-1">
                           {qrOpen[lock.id] ? (
                             <div className="flex flex-col items-center gap-1.5 text-center py-2">
-                              <QRCodeSVG value={JSON.stringify({ lockId: lock.id, vendorId: lock.vendor_id })} size={120} level="M" />
+                              <button
+                                type="button"
+                                onClick={() => setZoomedLock(lock)}
+                                className="relative rounded-md ring-offset-2 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+                                aria-label="放大顯示核銷 QR Code"
+                              >
+                                <QRCodeSVG value={JSON.stringify({ lockId: lock.id, vendorId: lock.vendor_id })} size={120} level="M" />
+                                <span className="absolute -bottom-1 -right-1 bg-card border border-border rounded-full p-1 shadow-sm">
+                                  <Maximize2 size={12} />
+                                </span>
+                              </button>
                               <span className="text-body-sm font-bold">取餐編號 {lock.id.slice(-8).toUpperCase()}</span>
-                              <span className="text-caption text-muted-foreground">請於取餐時向店員出示</span>
+                              <span className="text-caption text-muted-foreground">點擊 QR Code 可放大，請於取餐時向店員出示</span>
                               <Button variant="link" size="sm" onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: false }))}>
                                 收起
                               </Button>
@@ -405,6 +417,25 @@ export default function MyBookingsPage() {
           </>
         )}
       </div>
+
+      <Dialog open={!!zoomedLock} onOpenChange={(open) => !open && setZoomedLock(null)}>
+        <DialogContent className="max-w-xs flex flex-col items-center gap-3 py-8">
+          <DialogTitle className="text-center">取餐核銷碼</DialogTitle>
+          {zoomedLock && (
+            <>
+              <div className="bg-white p-4 rounded-lg">
+                <QRCodeSVG
+                  value={JSON.stringify({ lockId: zoomedLock.id, vendorId: zoomedLock.vendor_id })}
+                  size={260}
+                  level="M"
+                />
+              </div>
+              <span className="text-h3 font-bold tracking-wide">{zoomedLock.id.slice(-8).toUpperCase()}</span>
+              <span className="text-caption text-muted-foreground text-center">請將畫面出示給店員核對，核對後即完成取餐</span>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
