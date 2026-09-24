@@ -46,11 +46,11 @@
 
 - [ ] 長期觀察沒有 CSP 違規後，把 `firebase.json` 的 `Content-Security-Policy-Report-Only` 改成 `Content-Security-Policy`（目前只測過 `/lock` 跟兩個管理頁）
 - [ ] Console 手動項目：帳號 2FA；Firebase API key 加 referrer 限制（`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`localhost:*`，存檔後立刻重測正式站）；Cloud Audit Logs 開資料讀寫；GitHub `master` branch protection（要先跟雅婷討論改走 PR）
-- [ ] 建立認證所需的 ISMS 管理制度文件
+- [x] 建立認證所需的 ISMS 管理制度文件——2026-09-25 完成 v1：[ISMS_管理制度文件.md](ISMS_管理制度文件.md)（資安政策、角色職責、風險評鑑與登錄表、適用性聲明 SoA、事件應變程序、備份與 BCP 現況、供應商清單、人員安全、文件審查）。這是符合兩人團隊試營運規模的精簡版，不是拿去給認證機構稽核用的完整版；風險登錄表列了 9 項風險，其中 R1/R4/R5/R7 對應到還沒做的待辦（2FA、branch protection、Firestore 備份、Secret Manager）
 
 ### 6. 尚未實作的功能
 
-- [ ] **手機門號 OTP 登入**（`LoginPage.tsx`，草圖 `Login.dc.html` 已確認兩段式流程）——2026-09-24 已先改成 Email＋密碼的真實 Firebase Auth（`web/src/lib/auth.ts`），OTP 之後可以直接加在同一個模組。角色：管理員＝email 白名單、廠商＝`vendors/{id}.owner_uid`、其餘＝會員；`users/{uid}` 只存個人資料不存角色
+- [x] **手機門號 OTP 登入**（`LoginPage.tsx`，草圖 `Login.dc.html` 兩段式流程）——2026-09-25 完成：登入分頁新增「改用手機門號登入」，輸入號碼→`sendOtp()`送簡訊驗證碼→輸入驗證碼→`confirmOtp()`登入（`web/src/lib/auth.ts`，用 Firebase Phone Auth + 隱形 reCAPTCHA）。沒有 email 時 `resolveProfile()` 改用門號當 username／displayName，角色判斷不受影響（管理員＝email 白名單，門號登入者一律是會員或已綁定的廠商）。順便修正 CSP：加放 `www.google.com`／`recaptcha.net` 的 script／frame，不然 reCAPTCHA 之後會被擋（`firebase.json`）。**還沒驗證**：要先去 Firebase Console → Authentication → Sign-in method 手動啟用「電話號碼」登入方式（跟啟用 Email/Password 一樣，免費、跟 Blaze 無關），且要等這批一起部署（見上方 §2）後才能在正式站測；本機/emulator 也還沒測過，因為 Phone Auth 的 reCAPTCHA 在沒有真實網域時常會失敗，建議直接在正式站用真手機號碼測
 - [x] 2026-09-24 決定**不再使用匿名登入**：瀏覽不用登入，但鎖定／下單／購物車結帳／轉讓接手／抽獎都要先登入（前端 `useRequireLogin`、`firestore.rules` `isSignedInUser()`、Functions `assertSignedInUser()` 三層都擋）。舊的匿名帳號跟它們名下的鎖定紀錄**不搬移、不保留**
 - [ ] 部署規則＋Functions 後，到 Firebase Console → Authentication → Sign-in method 把「匿名」停用
 - [ ] **消費者端提交解封申訴**——完全沒有入口（登入頁條款的「會員中心提交申訴」只是文字）。現在消費者已有穩定帳號，可以開始做了
@@ -114,8 +114,8 @@
 | 商家後台儀表板 | 🟡 | 含撥款區塊＋手動觸發按鈕；需要綁定 `owner_uid` |
 | 商家校準報告呈現（含 what-if 追問） | 🟡 | Gemini Key 已到位，待部署後在正式站驗證 |
 | 通知系統（FCM） | 🟡 | 同 Donna「取餐提醒推播」 |
-| 會員／身分驗證（手機門號 OTP） | 🟡 | 2026-09-24 改為 Email＋密碼的真實 Firebase Auth；OTP 未做，見待辦 §6 |
-| ISO27001 | 🟡 | 技術面已修補並部署，剩餘項目見待辦 §5 |
+| 會員／身分驗證（手機門號 OTP） | 🟡 | Email＋密碼、OTP 兩種都已接真實 Firebase Auth；OTP 待 Console 手動啟用＋部署後在正式站驗證，見待辦 §6 |
+| ISO27001 | 🟡 | 技術面已修補並部署；ISMS 管理制度文件 v1 已完成；剩餘項目（CSP 改強制、2FA、API key referrer、Audit Logs、branch protection）見待辦 §5 |
 
 ---
 
@@ -129,7 +129,7 @@ UI 草圖：https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc （只參考版面
 | `Main.dc.html`「預購鎖定」 | `HomePage.tsx` | ✅ 「今日推薦鎖定方案」呼叫 `createLinePayReservation`，套用早鳥折扣 |
 | `Marketplace.dc.html`「轉讓市集」 | `TransferMarketPage.tsx`（`/marketplace`） | ✅ 瀏覽／接手／免費領取／我的轉讓／取消轉讓都接真 Firestore |
 | `MyBookings.dc.html`「我的商品」 | `MyBookingsPage.tsx`（`/my-bookings`） | ✅ 資料驅動的週曆；使用（QR）／贈送／交易／回饋都接真 Firestore |
-| `Login.dc.html`（手機門號 OTP） | `LoginPage.tsx` | 🟡 Email＋密碼已接真實 Firebase Auth，OTP 見待辦 §6 |
+| `Login.dc.html`（手機門號 OTP） | `LoginPage.tsx` | 🟡 Email＋密碼、OTP 都已完成，待 Console 啟用＋部署後驗證 |
 | `VendorDashboard.dc.html`（商家後台） | `VendorPortalLayout.tsx` 系列 | 🟡 備料、成長獎勵、菜單接真資料；揪團場次類頁面仍是 mock（待辦 §7） |
 
 ---
