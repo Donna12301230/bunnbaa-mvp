@@ -8,8 +8,7 @@ import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import {
   Clock, CalendarDays, Rocket, Star, User, MapPin, Trophy,
-  ShieldCheck, Bell, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal,
-} from "lucide-react";
+  ShieldCheck, Bell, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store, UtensilsCrossed } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -393,23 +392,23 @@ export default function HomePage() {
               {lockMealCards.map(({ item, vendor }) => {
                 const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
                 return (
-                  <article key={item.id} className="bg-white rounded-2xl border border-border overflow-hidden flex flex-col">
-                    <div className="relative h-32 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl">
-                      🍱
+                  <article key={item.id} className="bg-white rounded-xl border border-border overflow-hidden flex flex-col">
+                    <div className="relative h-32 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                      <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                       {vendor.verified && (
-                        <span className="absolute top-2.5 left-2.5 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
+                        <span className="absolute top-2.5 left-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
                           <BadgeCheck className="w-3 h-3" /> 認證商家
                         </span>
                       )}
                       {vendor.reliability_tone === "stable" && (
-                        <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-white text-green-700">
+                        <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-white text-green-700">
                           <CheckCircle2 className="w-3 h-3" /> 履約穩定度：穩定
                         </span>
                       )}
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
                       <div>
-                        <h4 className="font-bold text-[15px] leading-snug">{item.name}</h4>
+                        <h4 className="font-bold text-body leading-snug">{item.name}</h4>
                         <p className="text-xs text-muted-foreground font-semibold mt-0.5">{vendor.name}・取餐時段：{pickupDate}（{TIME_SLOT_WINDOWS[selectedSlot]}）</p>
                       </div>
 
@@ -451,7 +450,7 @@ export default function HomePage() {
 
                       <div className="flex gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
                         <Star className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5 fill-amber-500" />
-                        <p className="text-[11px] leading-relaxed text-amber-900">
+                        <p className="text-caption leading-relaxed text-amber-900">
                           {discountPercent > 0
                             ? `提前預付鎖定，換到 ${10 - discountPercent / 10}折早鳥價；全額預付、不可退款但可轉賣過戶。`
                             : "當日鎖定；全額預付、不可退款但可轉賣過戶。"}
@@ -465,13 +464,13 @@ export default function HomePage() {
                           onChange={() => setWaiverAck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
                           className="mt-0.5 accent-orange-500 w-3.5 h-3.5 shrink-0"
                         />
-                        <span className="text-[10.5px] leading-relaxed text-muted-foreground">
+                        <span className="text-caption leading-relaxed text-muted-foreground">
                           我了解本商品為現做餐點，依消保法通訊交易解除權合理例外情事適用準則，<strong className="text-foreground">鎖定後不適用 7 天猶豫期</strong>，除商家未履約外恕不接受退款
                         </span>
                       </label>
                       <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
                         <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
-                        <span className="text-[10.5px] leading-relaxed text-orange-900">
+                        <span className="text-caption leading-relaxed text-orange-900">
                           取餐時段結束仍未取餐，將<strong>自動開放到轉讓市集、$0 元供人領取</strong>，避免整份浪費
                         </span>
                       </div>
@@ -502,8 +501,8 @@ export default function HomePage() {
                 <div key={group.vendorId} className="bg-white rounded-xl border border-border p-4 grid grid-cols-1 md:grid-cols-[220px_1fr_1fr] gap-4">
                   {/* 店家資訊 */}
                   <Link href={`/vendor/${group.vendorId}`} className="flex md:flex-col gap-3 hover:opacity-90">
-                    <div className="w-20 h-20 md:w-full md:h-32 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-3xl shrink-0">
-                      🥩
+                    <div className="w-20 h-20 md:w-full md:h-32 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center shrink-0">
+                      <Store className="h-8 w-8 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-sm mb-1 truncate">{group.vendorName}</p>
@@ -546,12 +545,12 @@ export default function HomePage() {
           </section>
 
           {/* 同學轉讓保底專區（含轉讓優惠橫捲清單，併成同一區塊放最下面） */}
-          <section className="rounded-2xl p-6 bg-gradient-to-br from-orange-500 to-orange-600 space-y-5">
+          <section className="rounded-xl p-6 bg-gradient-to-br from-orange-500 to-orange-600 space-y-5">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div className="flex items-center gap-3.5">
                 <Repeat className="w-7 h-7 text-white shrink-0" />
                 <div>
-                  <h3 className="font-bold text-white text-[15.5px] mb-0.5">同學轉讓保底專區</h3>
+                  <h3 className="font-bold text-white text-body mb-0.5">同學轉讓保底專區</h3>
                   <p className="text-sm text-white max-w-xl">
                     臨時去不了？可安全轉讓給同學，全額入袋；逾時沒人接手，系統會自動開放到轉讓市集、$0 元供人領取，不浪費一份鎖定。
                   </p>

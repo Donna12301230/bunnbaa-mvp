@@ -54,8 +54,8 @@ export default function VendorPage() {
 
       <div className="bg-white rounded-xl border border-border p-5">
         <div className="flex flex-col sm:flex-row gap-4">
-          <div className="w-full sm:w-32 h-32 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-5xl shrink-0">
-            🍱
+          <div className="w-full sm:w-32 h-32 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center shrink-0">
+            <Store className="h-12 w-12 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <h1 className="text-xl font-bold mb-1">{vendor.name}</h1>
@@ -90,7 +90,7 @@ export default function VendorPage() {
               <Link
                 key={item.id}
                 href={`/item/${item.id}`}
-                className="block bg-white rounded-xl border border-border p-4 hover:border-orange-300 hover:shadow-sm transition-all"
+                className="block bg-white rounded-xl border border-border p-4 shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">

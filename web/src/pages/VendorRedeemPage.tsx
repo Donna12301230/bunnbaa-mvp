@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "@/hooks/use-toast";
 
 const VENDOR_ID = "cafe-renheya-demo";
 
@@ -157,7 +158,7 @@ export default function VendorRedeemPage() {
       setFoundLock({ ...foundLock, status: outcome, no_show_note: note ?? foundLock.no_show_note });
       setShowNoShowForm(false);
     } catch (err) {
-      alert("操作失敗：" + (err as Error).message);
+      toast({ variant: "destructive", title: "操作失敗", description: (err as Error).message });
     } finally {
       setSubmitting(false);
     }
@@ -194,13 +195,13 @@ export default function VendorRedeemPage() {
           </h2>
 
           {loadingCalendar ? (
-            <div className="bg-white border border-border rounded-2xl p-8 text-center text-sm text-muted-foreground">載入中…</div>
+            <div className="bg-white border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">載入中…</div>
           ) : recentLocks.length === 0 ? (
-            <div className="bg-white border border-border rounded-2xl p-8 text-center text-sm text-muted-foreground">
+            <div className="bg-white border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">
               尚無取餐紀錄——消費端在 <span className="font-mono">/lock</span> 鎖定後會出現在這裡。
             </div>
           ) : (
-            <div className="bg-white border border-border rounded-2xl overflow-x-auto">
+            <div className="bg-white border border-border rounded-xl overflow-x-auto">
               <div className="min-w-[560px] grid" style={{ gridTemplateColumns: `96px repeat(${pickupDates.length}, minmax(140px, 1fr))` }}>
                 <div className="border-b border-border" />
                 {pickupDates.map((date) => (
@@ -219,7 +220,7 @@ export default function VendorRedeemPage() {
                       return (
                         <div key={date + slot} className="border-b border-l border-border p-2 flex flex-col gap-1.5 min-h-[76px]">
                           {cellLocks.length === 0 ? (
-                            <span className="text-[10px] text-gray-300">—</span>
+                            <span className="text-micro text-gray-300">—</span>
                           ) : (
                             cellLocks.map((lock) => {
                               const style = LOCK_STATUS_STYLE[lock.status];
@@ -228,14 +229,14 @@ export default function VendorRedeemPage() {
                                 <button
                                   key={lock.id}
                                   onClick={() => selectLock(lock)}
-                                  className={`text-left rounded-lg border px-2 py-1.5 text-[11px] transition-colors ${
+                                  className={`text-left rounded-lg border px-2 py-1.5 text-micro transition-colors ${
                                     isSelected ? "border-orange-400 bg-orange-50" : "border-border bg-gray-50 hover:bg-gray-100"
                                   }`}
                                 >
                                   <div className="font-semibold truncate">{lock.item_name}</div>
                                   <div className="flex items-center justify-between mt-1 gap-1">
                                     {style && (
-                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full truncate ${style.className}`}>
+                                      <span className={`text-micro font-bold px-1.5 py-0.5 rounded-full truncate ${style.className}`}>
                                         {style.label}
                                       </span>
                                     )}

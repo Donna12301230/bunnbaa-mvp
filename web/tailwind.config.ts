@@ -26,6 +26,18 @@ export default {
         lg: "0 16px 40px rgba(120, 80, 40, 0.12)",
         xl: "0 20px 48px rgba(120, 80, 40, 0.14)",
       },
+      // 字級對齊設計系統（tokens.css --font-*-size）；text-xs/sm/base 等 Tailwind 預設仍可用
+      fontSize: {
+        display: ["32px", { lineHeight: "1.3", fontWeight: "700" }],
+        h1: ["24px", { lineHeight: "1.35", fontWeight: "700" }],
+        h2: ["20px", { lineHeight: "1.4", fontWeight: "600" }],
+        h3: ["17px", { lineHeight: "1.4", fontWeight: "600" }],
+        body: ["15px", { lineHeight: "1.6" }],
+        "body-sm": ["13px", { lineHeight: "1.5" }],
+        caption: ["12px", { lineHeight: "1.5" }],
+        // 只給數字角標、極小徽章用（對應 Badge sm 的 11px）
+        micro: ["11px", { lineHeight: "1.2" }],
+      },
       transitionTimingFunction: {
         DEFAULT: "cubic-bezier(0.2, 0.8, 0.2, 1)",
       },

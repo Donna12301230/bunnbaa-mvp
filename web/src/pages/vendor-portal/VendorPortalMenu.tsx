@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, UtensilsCrossed } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
 import { auth, db } from "@/lib/firebase";
 import type { MenuItem, Vendor } from "@/types";
@@ -34,6 +35,7 @@ const VENDOR_ID = "cafe-renheya-demo";
 
 export default function VendorPortalMenu() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -196,7 +198,12 @@ export default function VendorPortalMenu() {
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon" className="w-8 h-8 text-red-500"
-                            onClick={() => { if (confirm(`確定刪除「${item.name}」？`)) deleteMutation.mutate(item.id); }}>
+                            aria-label={`刪除「${item.name}」`}
+                            onClick={async () => {
+                              if (await confirm({ title: `要刪除「${item.name}」嗎？`, description: "刪除後無法復原。", confirmLabel: "確定刪除", destructive: true })) {
+                                deleteMutation.mutate(item.id);
+                              }
+                            }}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>

@@ -136,7 +136,7 @@ export default function VendorDashboard() {
                 {asking ? "思考中…" : "詢問"}
               </button>
             </div>
-            {scenarioAnswer && <p className="muted" style={{ marginTop: 10 }}>{scenarioAnswer}</p>}
+            {scenarioAnswer && <p className="muted" style={{ marginTop: 12 }}>{scenarioAnswer}</p>}
           </div>
 
           <div className="disclaimer">{report.disclaimer}</div>

@@ -83,7 +83,7 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
           </Link>
         </div>
         <div className="flex items-center justify-center min-h-[calc(100vh-3rem)] px-4">
-          <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center space-y-4">
+          <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center space-y-4">
             <AlertTriangle className="w-12 h-12 mx-auto text-amber-500" />
             <h2 className="text-xl font-bold text-gray-800">帳號已暫停</h2>
             <p className="text-sm text-gray-600">

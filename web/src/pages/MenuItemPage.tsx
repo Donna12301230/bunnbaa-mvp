@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
-import { ArrowLeft, Minus, Plus, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Minus, Plus, ShoppingCart, UtensilsCrossed } from "lucide-react";
 import { db } from "@/lib/firebase";
 import type { MenuItem, Vendor } from "@/types";
 import { useCart } from "@/hooks/useCart";
@@ -73,8 +73,8 @@ export default function MenuItemPage() {
       </Link>
 
       <div className="bg-white rounded-xl border border-border overflow-hidden">
-        <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-6xl">
-          🍱
+        <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+          <UtensilsCrossed className="h-14 w-14 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
         </div>
         <div className="p-5 space-y-4">
           <div>

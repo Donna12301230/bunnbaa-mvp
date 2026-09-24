@@ -190,7 +190,7 @@ export default function LoginPage() {
                     <Button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-white" disabled={isPendingLogin}>
                       {isPendingLogin ? "登入中..." : "登入"}
                     </Button>
-                    <p className="text-center text-[11px] text-muted-foreground">
+                    <p className="text-center text-caption text-muted-foreground">
                       Demo：帳號含 "admin" 登入為平台管理員、含 "vendor" 登入為廠商，其餘為一般會員
                     </p>
                   </form>

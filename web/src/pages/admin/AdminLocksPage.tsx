@@ -7,7 +7,9 @@ import RequireRealAdmin from "@/components/RequireRealAdmin";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClipboardList } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 const STATUS_LABELS: Record<LockStatus, string> = {
   locked: "鎖定中",
@@ -85,7 +87,7 @@ function LocksContent() {
       });
       await batch.commit();
     } catch (err) {
-      alert("操作失敗：" + (err as Error).message);
+      toast({ variant: "destructive", title: "操作失敗", description: (err as Error).message });
     } finally {
       setActingId(null);
     }
@@ -94,26 +96,24 @@ function LocksContent() {
   return (
     <>
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as LockStatus | "all")}
-          className="border border-border rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="all">全部狀態</option>
-          {Object.entries(STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-        <select
-          value={vendorFilter}
-          onChange={(e) => setVendorFilter(e.target.value)}
-          className="border border-border rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="all">全部商家</option>
-          {Object.values(vendors).map((v) => (
-            <option key={v.id} value={v.id}>{v.name}</option>
-          ))}
-        </select>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LockStatus | "all")}>
+          <SelectTrigger className="sm:w-48" aria-label="篩選狀態"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部狀態</SelectItem>
+            {Object.entries(STATUS_LABELS).map(([value, label]) => (
+              <SelectItem key={value} value={value}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={vendorFilter} onValueChange={setVendorFilter}>
+          <SelectTrigger className="sm:w-48" aria-label="篩選商家"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部商家</SelectItem>
+            {Object.values(vendors).map((v) => (
+              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {filtered.length === 0 ? (

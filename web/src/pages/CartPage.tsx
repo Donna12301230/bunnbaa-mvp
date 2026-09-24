@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
-import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { Minus, Plus, ShoppingCart, Trash2, UtensilsCrossed } from "lucide-react";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { auth, db, functions } from "@/lib/firebase";
@@ -23,6 +24,7 @@ import type { Vendor } from "@/types";
 export default function CartPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const { items, vendorId, total, removeItem, updateQuantity, clearCart } = useCart();
   const [checkingOut, setCheckingOut] = useState(false);
 
@@ -80,7 +82,7 @@ export default function CartPage() {
         <h1 className="text-2xl font-bold">購物車</h1>
 
         {items.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-border py-16 px-6 text-center space-y-3">
+          <div className="bg-white rounded-xl border border-border py-16 px-6 text-center space-y-3">
             <ShoppingCart className="w-10 h-10 mx-auto text-gray-300" />
             <p className="text-muted-foreground">購物車是空的</p>
             <Button
@@ -99,11 +101,11 @@ export default function CartPage() {
               </p>
             )}
 
-            <div className="bg-white rounded-2xl border border-border divide-y divide-border">
+            <div className="bg-white rounded-xl border border-border divide-y divide-border">
               {items.map(({ menuItem, quantity, note }) => (
                 <div key={`${menuItem.id}-${note}`} className="p-4 flex items-start gap-3">
-                  <div className="w-14 h-14 shrink-0 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-2xl">
-                    🍱
+                  <div className="w-14 h-14 shrink-0 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                    <UtensilsCrossed className="h-6 w-6 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm">{menuItem.name}</p>
@@ -111,43 +113,53 @@ export default function CartPage() {
                     <p className="text-sm font-bold text-orange-600 mt-1">NT${menuItem.price}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:bg-red-50 hover:text-red-600"
                       onClick={() => removeItem(menuItem.id, note)}
-                      className="text-gray-400 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 rounded"
                       aria-label={`移除 ${menuItem.name}`}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      <Trash2 />
+                    </Button>
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 rounded-full"
                         onClick={() => updateQuantity(menuItem.id, note, quantity - 1)}
-                        className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
                         aria-label="減少數量"
                       >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
+                        <Minus />
+                      </Button>
                       <span className="w-5 text-center text-sm font-medium">{quantity}</span>
-                      <button
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 rounded-full"
                         onClick={() => updateQuantity(menuItem.id, note, quantity + 1)}
-                        className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
                         aria-label="增加數量"
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+                        <Plus />
+                      </Button>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            <button
-              onClick={clearCart}
-              className="text-xs text-muted-foreground hover:text-red-500 underline underline-offset-2"
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto px-0 text-muted-foreground hover:text-red-600"
+              onClick={async () => {
+                if (await confirm({ title: "要清空購物車嗎？", description: "購物車內的餐點都會被移除。", confirmLabel: "清空購物車", destructive: true })) clearCart();
+              }}
             >
               清空購物車
-            </button>
+            </Button>
 
-            <div className="bg-white rounded-2xl border border-border p-4 space-y-3 sticky bottom-4">
+            <div className="bg-white rounded-xl border border-border p-4 space-y-3 sticky bottom-4">
               <div className="flex items-center justify-between text-base font-bold">
                 <span>總計</span>
                 <span className="text-orange-600">NT${total}</span>

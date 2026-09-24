@@ -6,6 +6,9 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { QrCode, Gift, Repeat, Copy } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase";
 import type { Lock } from "@/types";
@@ -241,12 +244,12 @@ export default function MyBookingsPage() {
     const hasFeedback = !!lock.consumer_feedback;
 
     return (
-      <article className="bg-white border border-border rounded-xl p-4 flex flex-col gap-2 max-w-sm">
-                      <span className={`self-start text-xs font-bold px-2 py-0.5 rounded-full ${statusInfo.className}`}>
+      <article className="bg-card border border-border rounded-lg shadow-sm p-4 flex flex-col gap-2 max-w-sm">
+                      <Badge variant="muted" className={`self-start ${statusInfo.className}`}>
                         {statusInfo.label}
-                      </span>
-                      <h3 className="font-semibold leading-snug">{lock.item_name}</h3>
-                      <p className="text-sm text-muted-foreground">
+                      </Badge>
+                      <h3 className="text-h3 leading-snug">{lock.item_name}</h3>
+                      <p className="text-body-sm text-muted-foreground">
                         {formatDateLabel(lock.pickup_date)}・{lock.pickup_window} 取餐・${lock.locked_price}
                       </p>
 
@@ -255,103 +258,74 @@ export default function MyBookingsPage() {
                           {qrOpen[lock.id] ? (
                             <div className="flex flex-col items-center gap-1.5 text-center py-2">
                               <QRCodeSVG value={JSON.stringify({ lockId: lock.id, vendorId: lock.vendor_id })} size={120} level="M" />
-                              <span className="text-sm font-bold">取餐編號 {lock.id.slice(-8).toUpperCase()}</span>
-                              <span className="text-xs text-muted-foreground">請於取餐時向店員出示</span>
-                              <button
-                                onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: false }))}
-                                className="text-xs font-semibold text-muted-foreground underline"
-                              >
+                              <span className="text-body-sm font-bold">取餐編號 {lock.id.slice(-8).toUpperCase()}</span>
+                              <span className="text-caption text-muted-foreground">請於取餐時向店員出示</span>
+                              <Button variant="link" size="sm" onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: false }))}>
                                 收起
-                              </button>
+                              </Button>
                             </div>
                           ) : (
-                            <button
-                              onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: true }))}
-                              className="flex items-center justify-center gap-1.5 text-xs font-bold rounded-md bg-orange-500 text-white py-2"
-                            >
-                              <QrCode className="w-3.5 h-3.5" /> 使用（顯示取餐碼）
-                            </button>
+                            <Button size="sm" onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: true }))}>
+                              <QrCode /> 使用（顯示取餐碼）
+                            </Button>
                           )}
                           <div className="flex gap-2">
-                            <button
-                              disabled={isBusy}
-                              onClick={() => handleGift(lock)}
-                              className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold rounded-md border border-border py-2"
-                            >
-                              <Gift className="w-3.5 h-3.5" /> 贈送
-                            </button>
-                            <button
-                              disabled={isBusy}
-                              onClick={() => handleResell(lock)}
-                              className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold rounded-md border border-border py-2"
-                            >
-                              <Repeat className="w-3.5 h-3.5" /> 交易
-                            </button>
+                            <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => handleGift(lock)}>
+                              <Gift /> 贈送
+                            </Button>
+                            <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => handleResell(lock)}>
+                              <Repeat /> 交易
+                            </Button>
                           </div>
                         </div>
                       )}
 
                       {lock.status === "for_gift" && (
                         <div className="flex flex-col gap-1.5 pt-1">
-                          <p className="text-xs text-muted-foreground">把這組連結私下傳給朋友，對方打開就能收下：</p>
+                          <p className="text-caption text-muted-foreground">把這組連結私下傳給朋友，對方打開就能收下：</p>
                           <div className="flex items-center gap-1.5">
-                            <input readOnly value={giftLinkFor(lock.id)} className="flex-1 text-xs border border-border rounded-md px-2 py-1.5 truncate" />
-                            <button onClick={() => copyLink(giftLinkFor(lock.id))} className="shrink-0 p-1.5 rounded-md border border-border">
-                              <Copy className="w-3.5 h-3.5" />
-                            </button>
+                            <Input readOnly value={giftLinkFor(lock.id)} aria-label="贈送連結" className="flex-1 truncate" />
+                            <Button variant="outline" size="icon" className="shrink-0" aria-label="複製連結" onClick={() => copyLink(giftLinkFor(lock.id))}>
+                              <Copy />
+                            </Button>
                           </div>
-                          <button
-                            disabled={isBusy}
-                            onClick={() => handleCancelTransfer(lock)}
-                            className="text-xs font-semibold rounded-md border border-red-300 text-red-600 py-1.5"
-                          >
+                          <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-600" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
                             取消贈送
-                          </button>
+                          </Button>
                         </div>
                       )}
 
                       {lock.status === "for_resale" && (
                         <div className="flex flex-col gap-1.5 pt-1">
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-caption text-muted-foreground">
                             {deadline ? formatCountdown(deadline, now) : "等待有人接手"}・已上架到轉讓市集
                           </p>
-                          <button
-                            disabled={isBusy}
-                            onClick={() => handleCancelTransfer(lock)}
-                            className="text-xs font-semibold rounded-md border border-red-300 text-red-600 py-1.5"
-                          >
+                          <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-600" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
                             取消轉讓
-                          </button>
+                          </Button>
                         </div>
                       )}
 
                       {canFeedback && (
                         hasFeedback ? (
-                          <p className="text-xs text-muted-foreground pt-1">已回饋：「{lock.consumer_feedback}」</p>
+                          <p className="text-caption text-muted-foreground pt-1">已回饋：「{lock.consumer_feedback}」</p>
                         ) : feedbackOpen[lock.id] ? (
                           <div className="flex flex-col gap-1.5 pt-1">
-                            <input
+                            <Input
                               value={feedbackDraft[lock.id] || ""}
                               onChange={(e) => setFeedbackDraft((prev) => ({ ...prev, [lock.id]: e.target.value }))}
                               placeholder="這餐的心得…（送出後無法修改）"
+                              aria-label="用餐回饋"
                               maxLength={280}
-                              className="text-xs border border-border rounded-md px-2 py-1.5"
                             />
-                            <button
-                              disabled={isBusy || !(feedbackDraft[lock.id] || "").trim()}
-                              onClick={() => handleSubmitFeedback(lock)}
-                              className="text-xs font-bold rounded-md bg-orange-500 text-white py-2"
-                            >
+                            <Button size="sm" disabled={isBusy || !(feedbackDraft[lock.id] || "").trim()} onClick={() => handleSubmitFeedback(lock)}>
                               送出回饋
-                            </button>
+                            </Button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => setFeedbackOpen((prev) => ({ ...prev, [lock.id]: true }))}
-                            className="text-xs font-semibold rounded-md border border-border py-2 pt-1"
-                          >
+                          <Button variant="outline" size="sm" onClick={() => setFeedbackOpen((prev) => ({ ...prev, [lock.id]: true }))}>
                             留下回饋
-                          </button>
+                          </Button>
                         )
                       )}
       </article>
@@ -393,14 +367,14 @@ export default function MyBookingsPage() {
                           isToday ? "border-orange-400 bg-orange-50/50" : "border-border bg-white"
                         }`}
                       >
-                        <span className="text-[11px] font-semibold text-muted-foreground">{day.getDate()}</span>
+                        <span className="text-micro font-semibold text-muted-foreground">{day.getDate()}</span>
                         {dayLocks.map((lock) => {
                           const statusInfo = STATUS_STYLE[lock.status] ?? { label: lock.status, className: "bg-gray-100 text-gray-700" };
                           return (
                             <button
                               key={lock.id}
                               onClick={() => setExpandedId((prev) => (prev === lock.id ? null : lock.id))}
-                              className={`text-left text-[11px] leading-tight rounded px-1.5 py-1 truncate ${statusInfo.className} ${
+                              className={`text-left text-micro leading-tight rounded px-1.5 py-1 truncate ${statusInfo.className} ${
                                 expandedId === lock.id ? "ring-2 ring-orange-500" : ""
                               }`}
                               title={lock.item_name}

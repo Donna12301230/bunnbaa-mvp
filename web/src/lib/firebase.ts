@@ -21,7 +21,8 @@ export const auth = getAuth(app);
 
 // Point at local emulators during development.
 // Set VITE_USE_EMULATORS=true in a .env.local to enable.
-if (import.meta.env.VITE_USE_EMULATORS === "true") {
+// 限定 DEV：vite build 也會讀 .env.local，不擋的話正式站會誤連 localhost。
+if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true") {
   connectFirestoreEmulator(db, "localhost", 8080);
   connectFunctionsEmulator(functions, "localhost", 5001);
   // disableWarnings: 關掉 Firebase Auth SDK 預設會在畫面底部注入的

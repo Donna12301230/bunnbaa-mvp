@@ -13,8 +13,8 @@
 ### 1. 外部卡點（人工處理，歸 Donna）
 
 - [V] **Gemini API Key**——2026-09-24 完成，本機實測兩個 Agent 都能產出。注意：`bunnbaa-mvp-5474` 因為 Blaze 綁了帳單，會自動變成付費層（Prepay，餘額 $0 → 402），所以 key 是從**另一個沒綁帳單的新專案**申請，走免費層。同時把已下架的 `gemini-2.0-flash` 換成 `gemini-3.6-flash`，並對 503／429 加上重試（`functions/src/gemini.js`）。**還要重新部署 functions 才會在正式站生效**（見 §2）
-- [ ] **LINE Pay／綠界特約商店審核**（業務面，可能要數週，盡快送件）——只卡「正式上線」，Sandbox 已全部跑通。審核過後把 `functions/.env` 換成正式 Channel ID/Secret＋`LINE_PAY_ENV=production` 即可，程式碼不用改
-- [ ] **VAPID key**（Firebase Console → Cloud Messaging → Web Push 憑證，免費）——填進 `web/src/lib/messaging.ts` 的 `VAPID_KEY`，FCM 取餐提醒只差這一步
+- [-] **LINE Pay／綠界特約商店審核**（2026-09-24 決定：Demo 沿用 Sandbox，暫不送審）——Sandbox 已全部跑通。之後要正式上線再送審（可能要數週），審核過後把 `functions/.env` 換成正式 Channel ID/Secret＋`LINE_PAY_ENV=production` 即可，程式碼不用改
+- [V] **VAPID key**——2026-09-24 已填入，待部署 hosting 後在正式站驗證。（`web/src/lib/messaging.ts` 的 `VAPID_KEY`）
 
 ### 2. 部署（2026-09-23 晚上的變更還沒上正式站）
 
@@ -30,7 +30,7 @@
 - [ ] 撥款排程：`settleVendorPayouts`＋手動觸發（emulator 已驗證重複點擊不會重複結算）
 - [ ] 成長獎勵抽獎：`drawGrowthReward`
 - [ ] 我的鎖定頁：`MyLocksPage.tsx`（`/my-locks`）
-- [ ] 取餐提醒推播：`pickupReminders`／`triggerPickupRemindersNow`（等 VAPID key）
+- [ ] 取餐提醒推播：`pickupReminders`／`triggerPickupRemindersNow`
 - [ ] 商家校準報告＋what-if 追問：`dailyCalibration`／`askCalibrationScenario`，以及 `reliability_tone` 自動換算
 - [ ] 到 Firestore Console 確認 `admin_audit_logs` 有 2026-09-21 煙霧測試產生的兩筆（含 `admin_email` 與狀態變化）
 
@@ -68,10 +68,10 @@
 
 - **帳號**：GCP/Firebase 專案掛在 `ckchildlikekid@gmail.com`（鍾雅婷），**不是** `tom040798@gmail.com`。CLI 登入、瀏覽器操作都要用前者，否則 `firebase projects:list` 會顯示空的。
 - **路徑雷**（專案路徑含中文字和 `+` 號，Windows 上兩個工具的行為相反）：
-  - Firebase emulator 在中文路徑下會卡在 discovery timeout → 要從 ASCII junction `C:\Users\USER\bunnbaa-dev` 執行。⚠️ **這個 junction 目前指向已不存在的舊路徑 `BunnBaa\bunnbaa-prototype\bunnbaa`**，使用前要先重建，讓它指向 repo 根目錄：`rmdir C:\Users\USER\bunnbaa-dev` 後執行 `mklink /J C:\Users\USER\bunnbaa-dev "D:\雅婷\03赫滋與羊\+程式碼\BunnBaa"`（在 cmd 裡跑）
+  - Firebase emulator 在中文路徑下會卡在 discovery timeout → 要從 ASCII junction `C:\Users\USER\bunnbaa-dev` 執行（2026-09-24 已確認指向 repo 根目錄）。若日後 repo 搬家要重建：`rmdir C:\Users\USER\bunnbaa-dev` 後執行 `mklink /J C:\Users\USER\bunnbaa-dev "D:\雅婷\03赫滋與羊\+程式碼\BunnBaa"`（在 cmd 裡跑）
   - Vite dev server 從 junction 路徑執行會出現空白頁 → **要留在原本的中文路徑** `D:\雅婷\03赫滋與羊\+程式碼\BunnBaa\web`
 - **Java**：Firestore/Auth emulator 需要 JRE，已用 winget 裝 Microsoft OpenJDK 21 並加進 PATH。
-- **`web/.env.local` 的 `VITE_USE_EMULATORS=true`**：會讓前端連本機 emulator。已排除在 `.gitignore`，但正式部署前要確認建置沒有誤連 emulator。
+- **`web/.env.local` 的 `VITE_USE_EMULATORS=true`**：會讓前端連本機 emulator。已排除在 `.gitignore`，2026-09-24 已在 `firebase.ts` 加上 `import.meta.env.DEV` 判斷，正式建置不會誤連 emulator。
 - **設計系統預覽**：本機 http://localhost:5199/#/design-system
 - **網域**：`bunnbaa.com` 掛在舊專案（Parse 版本），MVP 先不動，暫用 https://bunnbaa-mvp-5474.web.app ，之後要換網域再處理 DNS。
 - **GitHub**：獨立的 private repo，不跟舊專案共用：https://github.com/Donna12301230/bunnbaa-mvp
@@ -87,12 +87,12 @@
 | Firebase 專案建置 | ✅ | Blaze 已啟用，Firestore／Auth／Functions／Hosting／規則都已上線 |
 | Firebase Hosting 部署 | ✅ | 2026-09-23 重新部署；之後的變更見待辦 §2 |
 | 鎖定＋付款流程 | ✅ | LINE Pay Sandbox 端到端測試通過 |
-| 金流串接（消費端） | 🔴 | Sandbox 完成；正式上線卡特約商店審核 |
+| 金流串接（消費端） | 🔴 | Sandbox 完成；Demo 沿用 Sandbox，正式上線才需特約商店審核 |
 | 轉賣流程（含取消轉讓） | ✅ | `claimResoldLock`，兩個匿名帳號互相接手已測 |
 | 轉賣金流（買家對買家） | ✅ | 設計上不經過平台，只轉移 `buyer_uid` |
 | QR Code 核銷 | 🟡 | 見待辦 §3 |
 | 撥款排程 | 🟡 | 見待辦 §3 |
-| 取餐提醒推播（FCM，同 SU「通知系統」） | 🟡 | 程式碼由 SU 完成，等 VAPID key |
+| 取餐提醒推播（FCM，同 SU「通知系統」） | 🟡 | 程式碼由 SU 完成，VAPID key 已填，待部署驗證 |
 | 我的鎖定／訂單記錄頁 | 🟡 | `MyLocksPage.tsx`，簡易列表（週曆版在 `MyBookingsPage.tsx`） |
 | Gemini — 商家校準 Agent | 🟡 | Key 已到位、本機測通，待部署後在正式站驗證 |
 | Gemini — 消費者折扣說明 Agent | 🟡 | 同上 |

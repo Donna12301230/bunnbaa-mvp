@@ -114,6 +114,10 @@
   --line: #ece6dc;                /* --border */
   --bg: #fff8ec;                  /* 奶油底 */
   --surface: #fff;
+  --surface-muted: #f7f5f0;       /* 輸入框底（淡灰無框） */
+  --line-strong: #dcd3c6;         /* --border-strong：輸入框 hover 外框 */
+  --focus: #f29e0c;               /* --brand-orange：focus 外框 */
+  --shadow-sm: 0 2px 8px rgba(120, 80, 40, 0.05);
 
   /* status colors — one pair per lock.status value (spec §04 設計代幣) */
   --status-locked: #a34f00;      --status-locked-bg: #fdebd3;
@@ -135,6 +139,9 @@
     --line: #3d342b;
     --bg: #1f1a15;
     --surface: #2a231d;
+    --surface-muted: #342b24;
+    --line-strong: #52463a;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
 
     --status-locked: #f29e0c;      --status-locked-bg: #43321c;
     --status-resale: #e8bd6a;      --status-resale-bg: #3a2f18;
@@ -152,25 +159,31 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
   font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
   color: var(--brand); text-transform: uppercase; margin-bottom: 4px;
 }
-.legacy-ui h1 { font-size: 26px; margin: 0 0 20px; }
-.legacy-ui h2 { font-size: 18px; margin: 0 0 8px; }
+/* 字級對齊設計系統：h1 24/700、卡片標題用 h3 17/600 */
+.legacy-ui h1 { font-size: 24px; font-weight: 700; line-height: 1.35; margin: 0 0 20px; }
+.legacy-ui h2 { font-size: 17px; font-weight: 600; line-height: 1.4; margin: 0 0 8px; }
+.legacy-ui .title-with-icon { display: flex; align-items: center; gap: 8px; }
+.legacy-ui .title-with-icon svg { width: 20px; height: 20px; color: var(--brand); flex-shrink: 0; }
 
 .legacy-ui .card {
-  border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
-  margin-bottom: 14px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+  margin-bottom: 16px; background: var(--surface); box-shadow: var(--shadow-sm);
 }
-.legacy-ui .card.tinted { background: var(--brand-light); border-color: transparent; }
+.legacy-ui .card.tinted { background: var(--brand-light); border-color: transparent; box-shadow: none; }
 
+/* 設計系統 Badge：唯讀標記，--radius-sm、高 24px */
 .legacy-ui .badge {
-  display: inline-block; font-size: 12px; font-weight: 600;
-  padding: 3px 10px; border-radius: 999px; background: var(--brand-light);
+  display: inline-flex; align-items: center; height: 24px; vertical-align: middle;
+  font-size: 12px; font-weight: 600; line-height: 1;
+  padding: 0 8px; border-radius: 6px; background: var(--brand-light);
   color: var(--brand);
 }
 
 /* lock.status badge — color is fixed per status value, shared by both ends (spec §05 元件庫) */
 .legacy-ui .status-badge {
-  display: inline-block; font-size: 12px; font-weight: 700;
-  padding: 3px 10px; border-radius: 999px;
+  display: inline-flex; align-items: center; height: 24px; vertical-align: middle;
+  font-size: 12px; font-weight: 600; line-height: 1;
+  padding: 0 8px; border-radius: 6px;
 }
 .legacy-ui .status-badge[data-status="locked"] { background: var(--status-locked-bg); color: var(--status-locked); }
 .legacy-ui .status-badge[data-status="for_resale"] { background: var(--status-resale-bg); color: var(--status-resale); }
@@ -178,18 +191,18 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .legacy-ui .status-badge[data-status="resold_and_fulfilled"] { background: var(--status-resold-bg); color: var(--status-resold); }
 .legacy-ui .status-badge[data-status="no_show"] { background: var(--status-noshow-bg); color: var(--status-noshow); }
 
-.legacy-ui .muted { color: var(--sub); font-size: 14px; }
+.legacy-ui .muted { color: var(--sub); font-size: 13px; line-height: 1.5; }
 .legacy-ui .faint { color: var(--faint); font-size: 12px; }
-.legacy-ui .disclaimer { color: var(--faint); font-size: 11px; font-style: italic; margin-top: 8px; }
+.legacy-ui .disclaimer { color: var(--faint); font-size: 12px; line-height: 1.5; margin-top: 8px; }
 
 .legacy-ui button {
   background: var(--brand); color: var(--on-brand); border: none; border-radius: 8px;
-  min-height: 44px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  min-height: 44px; padding: 0 20px; font-size: 15px; font-weight: 600; line-height: 1; cursor: pointer;
   transition: background-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .legacy-ui button:hover:not(:disabled) { background: var(--brand-strong); }
 .legacy-ui button:active:not(:disabled) { transform: scale(0.98); }
-.legacy-ui button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.legacy-ui button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .legacy-ui button:disabled { opacity: 0.5; cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .legacy-ui button { transition: none; }
@@ -198,22 +211,32 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 .legacy-ui button.secondary { background: var(--surface); color: var(--brand); border: 1px solid var(--brand); }
 .legacy-ui button.secondary:hover:not(:disabled) { background: var(--brand-light); }
 
+/* 設計系統 Input：淡灰底無框，hover 出現細框，focus 轉白底 + 品牌橘 ring */
 .legacy-ui input[type="text"], .legacy-ui textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid var(--line);
-  border-radius: 8px; font-size: 14px; font-family: inherit;
+  width: 100%; min-height: 44px; padding: 10px 12px; box-sizing: border-box;
+  background: var(--surface-muted); color: var(--ink);
+  border: 1px solid transparent; border-radius: 8px;
+  font-size: 15px; font-family: inherit;
+  transition: background-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.legacy-ui input[type="text"]::placeholder, .legacy-ui textarea::placeholder { color: var(--faint); }
+.legacy-ui input[type="text"]:hover, .legacy-ui textarea:hover { border-color: var(--line-strong); }
+.legacy-ui input[type="text"]:focus, .legacy-ui textarea:focus {
+  background: var(--surface); border-color: var(--focus);
+  outline: 2px solid var(--focus); outline-offset: 2px;
 }
 .legacy-ui textarea { margin-bottom: 8px; resize: vertical; }
 
 .legacy-ui .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.legacy-ui .stat { font-size: 28px; font-weight: 700; color: var(--brand); }
+.legacy-ui .stat { font-size: 24px; font-weight: 700; color: var(--brand); }
 
 .legacy-ui .qr-block { display: flex; align-items: center; gap: 16px; }
 .legacy-ui .qr-box { padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
-.legacy-ui .lock-code { font-size: 20px; font-weight: 700; letter-spacing: 0.08em; font-family: monospace; }
+.legacy-ui .lock-code { font-size: 20px; font-weight: 700; letter-spacing: 0.08em; font-family: var(--font-mono); }
 
 .legacy-ui .field { margin-bottom: 12px; }
 .legacy-ui .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-.legacy-ui .field-error { color: var(--status-noshow); font-size: 12px; margin-top: 4px; }
+.legacy-ui .field-error { color: var(--status-noshow); font-size: 12px; line-height: 1.5; margin-top: 4px; }
 
 .legacy-ui .image-preview { position: relative; width: 100%; height: 128px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); margin-bottom: 8px; }
 .legacy-ui .image-preview img { width: 100%; height: 100%; object-fit: cover; }

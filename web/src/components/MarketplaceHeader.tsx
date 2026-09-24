@@ -132,7 +132,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           >
             <ShoppingCart className="w-5 h-5" />
             {cartCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-micro font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}

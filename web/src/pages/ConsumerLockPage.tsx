@@ -15,6 +15,8 @@ import { signInAnonymously } from "firebase/auth";
 import type { Lock, Vendor } from "../types";
 import LockQRCode from "../components/LockQRCode";
 import { applyEarlyBirdPrice } from "../lib/pricing";
+import { toast } from "../hooks/use-toast";
+import { Gift } from "lucide-react";
 
 const VENDOR_ID = "cafe-renheya-demo";
 const ITEM_NAME = "招牌鮭魚御飯糰便當";
@@ -102,7 +104,7 @@ export default function ConsumerLockPage() {
       await fn({ lock_id: lockId });
       setMyLock({ id: lockId } as Lock);
     } catch (err) {
-      alert("接手失敗：" + (err as Error).message);
+      toast({ variant: "destructive", title: "接手失敗", description: (err as Error).message });
     } finally {
       setClaimingId(null);
     }
@@ -122,7 +124,7 @@ export default function ConsumerLockPage() {
       });
       setMyLock({ id: lockId } as Lock);
     } catch (err) {
-      alert("領取失敗：" + (err as Error).message);
+      toast({ variant: "destructive", title: "領取失敗", description: (err as Error).message });
     } finally {
       setClaimingId(null);
     }
@@ -139,7 +141,7 @@ export default function ConsumerLockPage() {
       setMyLock({ id: incomingGiftId } as Lock);
       setIncomingGiftId(null);
     } catch (err) {
-      alert("接受贈送失敗：" + (err as Error).message);
+      toast({ variant: "destructive", title: "接受贈送失敗", description: (err as Error).message });
     } finally {
       setClaimingGift(false);
     }
@@ -168,7 +170,7 @@ export default function ConsumerLockPage() {
       const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
       window.location.href = paymentUrl;
     } catch (err) {
-      alert("前往付款失敗：" + (err as Error).message);
+      toast({ variant: "destructive", title: "前往付款失敗", description: (err as Error).message });
       setLocking(false);
     }
   }
@@ -214,7 +216,7 @@ export default function ConsumerLockPage() {
     try {
       await updateDoc(doc(db, "locks", myLock.id), { consumer_feedback: text });
     } catch (err) {
-      alert("送出回饋失敗：" + (err as Error).message);
+      toast({ variant: "destructive", title: "送出回饋失敗", description: (err as Error).message });
     } finally {
       setSubmittingFeedback(false);
     }
@@ -229,7 +231,7 @@ export default function ConsumerLockPage() {
         <div className="card tinted">
           <div className="row">
             <div>
-              <h2>有人送你一份餐點 🎁</h2>
+              <h2 className="title-with-icon"><Gift aria-hidden="true" />有人送你一份餐點</h2>
               <p className="muted">有同學把已鎖定的餐點贈送給你，按下方即可收下並取得取餐編號。</p>
             </div>
             <button disabled={claimingGift} onClick={handleAcceptGift}>

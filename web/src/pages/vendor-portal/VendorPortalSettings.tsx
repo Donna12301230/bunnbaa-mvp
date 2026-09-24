@@ -9,13 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Settings, QrCode, Plus, Trash2, Download,
   CalendarDays, CreditCard, AlertTriangle,
-  Clock, X, CalendarOff, Copy,
-} from "lucide-react";
+  Clock, X, CalendarOff, Copy, LoaderCircle } from "lucide-react";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { QRCodeCanvas } from "qrcode.react";
 import { format, parseISO } from "date-fns";
@@ -52,6 +52,7 @@ const DEFAULT_BH: BusinessHour[] = [0, 1, 2, 3, 4, 5, 6].map(d => ({
 // ── SubscriptionCancelButton ────────────────────────────────────────────────
 function SubscriptionCancelButton({ vendorId }: { vendorId: string }) {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const mut = useMutation({
     mutationFn: () => mockRequestCancelSubscription(vendorId),
     onSuccess: () => {
@@ -63,7 +64,9 @@ function SubscriptionCancelButton({ vendorId }: { vendorId: string }) {
   return (
     <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
       disabled={mut.isPending}
-      onClick={() => { if (confirm("確認申請取消訂閱？帳號將於到期日後暫停，您的資料仍會保留。")) mut.mutate(); }}>
+      onClick={async () => {
+        if (await confirm({ title: "要申請取消訂閱嗎？", description: "帳號將於到期日後暫停，您的資料仍會保留。", confirmLabel: "確定取消訂閱", destructive: true })) mut.mutate();
+      }}>
       {mut.isPending ? "處理中..." : "申請取消訂閱"}
     </Button>
   );
@@ -205,7 +208,10 @@ export default function VendorPortalSettings() {
   if (isLoading) return (
     <VendorPortalLayout>
       <div className="flex justify-center py-20">
-        <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <div role="status" className="flex flex-col items-center gap-2 text-muted-foreground">
+          <LoaderCircle className="w-6 h-6 animate-spin text-orange-400 motion-reduce:animate-none" aria-hidden="true" />
+          <span className="sr-only">載入中</span>
+        </div>
       </div>
     </VendorPortalLayout>
   );

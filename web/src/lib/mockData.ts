@@ -559,7 +559,7 @@ interface LockMealOption {
 }
 
 export const mockLockMeals: LockMealOption[] = [
-  { id: "lm1", title: "舒肥雞胸溫沙拉餐盒", time: "12:00–12:30", original: 150, price: 120, photoFrom: "from-emerald-100", photoTo: "to-green-100" },
+  { id: "lm1", title: "舒肥雞胸溫沙拉餐盒", time: "12:00–12:30", original: 150, price: 120, photoFrom: "from-green-100", photoTo: "to-green-50" },
   { id: "lm2", title: "塔香牛肉藜麥碗", time: "11:30–12:00", original: 160, price: 128, photoFrom: "from-orange-100", photoTo: "to-amber-100" },
-  { id: "lm3", title: "地中海鮪魚酪梨碗", time: "12:30–13:00", original: 145, price: 116, photoFrom: "from-yellow-100", photoTo: "to-lime-100" },
+  { id: "lm3", title: "地中海鮪魚酪梨碗", time: "12:30–13:00", original: 145, price: 116, photoFrom: "from-yellow-100", photoTo: "to-amber-50" },
 ];

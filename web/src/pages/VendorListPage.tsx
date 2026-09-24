@@ -63,10 +63,10 @@ export default function VendorListPage() {
             <Link
               key={vendor.id}
               href={`/vendor/${vendor.id}`}
-              className="block bg-white rounded-xl border border-border p-4 hover:border-orange-300 hover:shadow-sm transition-all"
+              className="block bg-white rounded-xl border border-border p-4 shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
-              <div className="w-full h-28 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl mb-3">
-                🍱
+              <div className="w-full h-28 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center mb-3">
+                <Store className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
               </div>
               <h3 className="font-semibold mb-1 truncate">{vendor.name}</h3>
               {vendor.description && (

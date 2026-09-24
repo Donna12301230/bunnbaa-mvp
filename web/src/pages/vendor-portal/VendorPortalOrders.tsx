@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { CalendarDays, MapPin, Users, ClipboardList, TableProperties, RefreshCw, QrCode, Plus, Minus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import type { PreOrderData, TableOrderData } from "@/types";
@@ -31,6 +32,7 @@ import { STATUS_MAP } from "@/lib/statusMap";
 export default function VendorPortalOrders() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   // 新增現場訂單表單狀態
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -229,8 +231,8 @@ export default function VendorPortalOrders() {
                     </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs text-orange-600 border-orange-300"
                       disabled={markNoPickupMutation.isPending}
-                      onClick={() => {
-                        if (confirm("確認標記為「未取貨」？此操作將累計該會員的未取貨次數。")) {
+                      onClick={async () => {
+                        if (await confirm({ title: "要標記為「未取貨」嗎？", description: "此操作將累計該會員的未取貨次數。", confirmLabel: "標記未取貨", destructive: true })) {
                           markNoPickupMutation.mutate(order.id);
                         }
                       }}>

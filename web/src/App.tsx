@@ -4,6 +4,7 @@ import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
+import { ConfirmProvider } from "@/components/ConfirmDialog";
 import { useAuth } from "@/hooks/useAuth";
 
 import ConsumerLockPage from "./pages/ConsumerLockPage";
@@ -64,6 +65,7 @@ function RootGate() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <ConfirmProvider>
       <Router hook={useHashLocation}>
         <Switch>
           {/* 根路徑：未登入 = 登入頁，已登入 = 首頁（與 bunnbaa.com 行為一致） */}
@@ -179,6 +181,7 @@ export default function App() {
           </Route>
         </Switch>
       </Router>
+      </ConfirmProvider>
       <Toaster />
     </QueryClientProvider>
   );

@@ -4,7 +4,7 @@ import { app } from "./firebase";
 // Firebase Console → 專案設定 → Cloud Messaging → Web Push 憑證 → 產生金鑰組。
 // 這步免信用卡、跟 Blaze 無關，純粹是 Console 裡點一下就能拿到的 key，
 // 拿到後貼進這裡（或改用 import.meta.env 從 .env.local 讀）。
-const VAPID_KEY = "";
+const VAPID_KEY = "BCFVXCWoIbTmVcU9mQs5_PDhhUlDoceytu711JkCQ_2-ur33RqaFbdz425OpWVTHK4R0OGsIhzx8HHmmWPVRHwY";
 
 /**
  * Best-effort: asks for notification permission and registers an FCM token

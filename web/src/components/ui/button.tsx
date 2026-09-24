@@ -20,11 +20,12 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
+      // 尺寸對齊設計系統：md 44px / body 15px、sm 36px / body-sm 13px、lg 52px
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        default: "h-11 px-5 text-body font-semibold",
+        sm: "h-9 rounded-md px-4 text-body-sm font-semibold",
+        lg: "h-[52px] rounded-md px-8 text-body font-semibold",
+        icon: "h-11 w-11",
       },
     },
     defaultVariants: {

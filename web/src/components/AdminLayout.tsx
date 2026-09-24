@@ -95,7 +95,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 <Icon className="w-5 h-5 mb-0.5" />
                 {label}
                 {href === "/admin/appeals" && pendingAppealsCount > 0 && (
-                  <span className="absolute top-1 right-1/4 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                  <span className="absolute top-1 right-1/4 bg-red-500 text-white text-micro rounded-full w-4 h-4 flex items-center justify-center">
                     {pendingAppealsCount}
                   </span>
                 )}

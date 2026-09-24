@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, X } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string;
@@ -34,7 +35,7 @@ export function ImageUploadField({ label, value, onChange }: Props) {
       const data = await res.json();
       onChange(data.secure_url as string);
     } catch (err: any) {
-      alert("上傳失敗：" + err.message);
+      toast({ variant: "destructive", title: "上傳失敗", description: err.message });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

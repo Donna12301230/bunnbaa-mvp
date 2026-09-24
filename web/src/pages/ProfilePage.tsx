@@ -86,7 +86,7 @@ export default function ProfilePage() {
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button
             onClick={() => navigate("/my-bookings")}
-            className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left hover:border-orange-300 transition-colors"
+            className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
           >
             <ClipboardList className="w-5 h-5 text-orange-500 shrink-0" />
             <div>
@@ -96,7 +96,7 @@ export default function ProfilePage() {
           </button>
           <button
             onClick={() => navigate("/my-locks")}
-            className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left hover:border-orange-300 transition-colors"
+            className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
           >
             <History className="w-5 h-5 text-orange-500 shrink-0" />
             <div>
@@ -106,7 +106,7 @@ export default function ProfilePage() {
           </button>
           <button
             onClick={() => comingSoon("我的開團")}
-            className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left hover:border-orange-300 transition-colors"
+            className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
           >
             <Users className="w-5 h-5 text-orange-500 shrink-0" />
             <div>
@@ -117,7 +117,7 @@ export default function ProfilePage() {
           {user?.role === "customer" && (
             <button
               onClick={() => comingSoon("申請成為廠商")}
-              className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left hover:border-orange-300 transition-colors"
+              className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               <Store className="w-5 h-5 text-orange-500 shrink-0" />
               <div>

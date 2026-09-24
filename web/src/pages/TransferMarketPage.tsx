@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
-import { Search, Clock, MapPin } from "lucide-react";
+import { Search, Clock, MapPin, UtensilsCrossed } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -156,7 +156,7 @@ export default function TransferMarketPage() {
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-1.5">轉讓市集</h1>
             <p className="text-sm text-white">同學安全轉讓已鎖定的方案，全額入袋；逾時沒人接手，系統會自動開放 $0 元供人領取。</p>
           </div>
-          <div className="flex items-center gap-2 bg-white rounded-2xl p-1.5 pl-4 min-w-[300px]">
+          <div className="flex items-center gap-2 bg-white rounded-xl p-1.5 pl-4 min-w-[300px]">
             <Search className="w-4 h-4 text-gray-400 shrink-0" />
             <label htmlFor="marketplaceSearch" className="sr-only">搜尋轉讓項目</label>
             <input
@@ -206,17 +206,17 @@ export default function TransferMarketPage() {
                 {activeListings.map(item => {
                   const deadline = deadlineOf(item);
                   return (
-                    <article key={item.id} className="rounded-2xl bg-white border border-border overflow-hidden flex flex-col">
-                      <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl">
-                        🍱
+                    <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
+                      <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                        <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                         {deadline && (
-                          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-900 text-white">
+                          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-gray-900 text-white">
                             <Clock className="w-3 h-3" /> {formatCountdown(deadline, now)}
                           </span>
                         )}
                       </div>
                       <div className="flex flex-col gap-2.5 p-4 flex-1">
-                        <h3 className="text-[15px] font-bold leading-snug">{item.item_name}</h3>
+                        <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
                         </div>
@@ -249,15 +249,15 @@ export default function TransferMarketPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {expiredListings.map(item => (
-                  <article key={item.id} className="rounded-2xl bg-white border border-border overflow-hidden flex flex-col">
-                    <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl">
-                      🍱
-                      <span className="absolute top-2.5 right-2.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-900 text-white">
+                  <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
+                    <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                      <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-gray-900 text-white">
                         已逾期・開放中
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <h3 className="text-[15px] font-bold leading-snug">{item.item_name}</h3>
+                      <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
                       </div>
@@ -292,15 +292,15 @@ export default function TransferMarketPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {myListings.map(item => (
-                  <article key={item.id} className="rounded-2xl bg-white border border-border overflow-hidden flex flex-col">
-                    <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-4xl">
-                      🍱
-                      <span className="absolute top-2.5 right-2.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
+                  <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
+                    <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                      <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
                         轉讓中
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <h3 className="text-[15px] font-bold leading-snug">{item.item_name}</h3>
+                      <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
                       </div>
