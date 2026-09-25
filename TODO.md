@@ -26,7 +26,14 @@
 
 ### 3. 正式站驗證（已部署，但還沒在正式站實際跑過）
 
-- [ ] QR Code 核銷：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證）
+- [ ] QR Code 核銷：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證，但 **emulator 下 `assertAdminOrVendorOwner` 直接放行，權限這段只有正式站測得到**）。前置：§2 部署完＋§4 商家帳號綁定。步驟：
+  1. 一般會員帳號鎖定一筆仁和雅咖啡的餐（LINE Pay Sandbox 付款）→ `/my-bookings`「使用」記下取餐編號末 8 碼
+  2. 商家帳號登入 `/lock/vendor/redeem`：取餐總覽要看得到這筆（驗證 `locks` 讀取規則＋`vendor_id+created_at` 索引），輸入末 8 碼查得到
+  3. 按「確認取餐」→ Firestore Console 看 `locks/{id}.status` 變 `fulfilled`
+  4. 再鎖一筆，改按「登記未取餐」填備註 → `status=no_show`＋`no_show_note`
+  5. 負面測試：已核銷的同一碼再查一次要被擋；用**別家**商家帳號或一般會員呼叫要回 `permission-denied`
+  - 註：目前商家端**沒有相機掃碼**，是店員看 QR 下方的取餐編號手動輸入（QR 內容是 `{lockId, vendorId}` JSON，但沒有頁面去解它）。Demo 若要真的「掃 QR」得另外接掃碼套件
+  - 2026-09-25：`markLockOutcome` 補上伺服器端狀態檢查（只有 `locked`／`for_resale` 可核銷，用 transaction 防兩台裝置重複核銷），原本直接呼叫可以把已完成／已結算的鎖定改成 `no_show`。要跟 §2 的 functions 一起部署
 - [ ] 撥款排程：`settleVendorPayouts`＋手動觸發（emulator 已驗證重複點擊不會重複結算）
 - [ ] 成長獎勵抽獎：`drawGrowthReward`（2026-09-24 修：消費者首頁原本讀 `payouts` 判斷是否解鎖，但 `payouts` 只限管理員／店主讀，消費者永遠看不到抽獎。改成讀公開的 `growth_rewards.unlocked_milestones`，由撥款結算的 `syncGrowthUnlock` 寫入、只有門檻 id 不含金額。**部署 Functions 後要跑一次** `triggerSettlementNow`（或等當天 20:00 排程）把正式站的解鎖狀態補上，不然首頁還是顯示未解鎖）
 - [ ] 我的鎖定頁：`MyLocksPage.tsx`（`/my-locks`）

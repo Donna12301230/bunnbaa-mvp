@@ -166,6 +166,8 @@ exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request)
  * ------------------------------------------------------------------ */
 
 const VALID_OUTCOMES = ["fulfilled", "resold_and_fulfilled", "no_show"];
+// Same set VendorRedeemPage lets the counter act on.
+const OPEN_LOCK_STATUSES = ["locked", "for_resale"];
 
 /**
  * Vendor-side pickup counter action: mark a lock as picked up or not.
@@ -190,11 +192,22 @@ exports.markLockOutcome = onCall({ region: "asia-east1" }, async (request) => {
   }
   await assertAdminOrVendorOwner(request, lockSnap.data().vendor_id);
 
-  const update = { status: outcome };
-  if (outcome === "no_show" && note) {
-    update.no_show_note = note;
-  }
-  await lockRef.update(update);
+  // Only still-open locks can be redeemed. Without this a direct call could
+  // flip an already fulfilled (and possibly already settled) lock to no_show,
+  // or mark an unclaimed gift as picked up. Transaction so two counter
+  // devices redeeming the same code can't both succeed.
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(lockRef);
+    const current = fresh.data().status;
+    if (!OPEN_LOCK_STATUSES.includes(current)) {
+      throw new HttpsError("failed-precondition", `This lock is already "${current}" and can't be redeemed again`);
+    }
+    const update = { status: outcome };
+    if (outcome === "no_show" && note) {
+      update.no_show_note = note;
+    }
+    tx.update(lockRef, update);
+  });
 
   return { lock_id: lockId, status: outcome };
 });
