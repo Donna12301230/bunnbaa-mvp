@@ -9,10 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
-import { login, register, applyAsVendor, requestPasswordReset } from "@/lib/auth";
+import { login, register, applyAsVendor, requestPasswordReset, sendOtp, confirmOtp } from "@/lib/auth";
+import type { ConfirmationResult } from "firebase/auth";
 import TAIWAN_UNIV_DEPTS from "@/constants/taiwanUnivDepts.json";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ShoppingBag, Clock, Tag, Store, Eye, EyeOff } from "lucide-react";
+import { ShoppingBag, Clock, Tag, Store, Eye, EyeOff, Smartphone, Mail } from "lucide-react";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/landing.tsx.
 // 登入／註冊／忘記密碼接真正的 Firebase Auth（@/lib/auth），登入用 Email。
@@ -51,6 +52,13 @@ export default function LoginPage() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
+  // 手機門號 OTP 登入（草圖兩段式流程：輸入號碼送驗證碼 -> 輸入驗證碼登入）
+  const [loginMode, setLoginMode] = useState<"password" | "phone">("password");
+  const [otpStage, setOtpStage] = useState<"phone" | "code">("phone");
+  const [otpPhone, setOtpPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpConfirmation, setOtpConfirmation] = useState<ConfirmationResult | null>(null);
+
   // 廠商申請欄位
   const [vendorEmail, setVendorEmail] = useState("");
   const [vendorPassword, setVendorPassword] = useState("");
@@ -65,6 +73,26 @@ export default function LoginPage() {
     mutationFn: () => login(username, password),
     onSuccess: () => navigate("/"),
     onError: (err: Error) => toast({ variant: "destructive", title: "登入失敗", description: err.message }),
+  });
+
+  const sendOtpMutation = useMutation({
+    mutationFn: () => sendOtp(otpPhone, "recaptcha-container"),
+    onSuccess: (confirmation) => {
+      setOtpConfirmation(confirmation);
+      setOtpStage("code");
+      setOtpCode("");
+      toast({ title: "驗證碼已送出", description: "請查看簡訊訊息" });
+    },
+    onError: (err: Error) => toast({ variant: "destructive", title: "傳送失敗", description: err.message }),
+  });
+
+  const confirmOtpMutation = useMutation({
+    mutationFn: () => {
+      if (!otpConfirmation) throw new Error("請先取得驗證碼");
+      return confirmOtp(otpConfirmation, otpCode);
+    },
+    onSuccess: () => navigate("/"),
+    onError: (err: Error) => toast({ variant: "destructive", title: "驗證失敗", description: err.message }),
   });
 
   const registerMutation = useMutation({
@@ -112,6 +140,8 @@ export default function LoginPage() {
   });
 
   const isPendingLogin = loginMutation.isPending;
+  const isPendingSendOtp = sendOtpMutation.isPending;
+  const isPendingConfirmOtp = confirmOtpMutation.isPending;
   const isPendingReg = registerMutation.isPending;
   const isPendingVendor = vendorRegisterMutation.isPending;
 
@@ -167,39 +197,106 @@ export default function LoginPage() {
 
                 {/* Login */}
                 <TabsContent value="login">
-                  <form onSubmit={(e) => { e.preventDefault(); loginMutation.mutate(); }} className="space-y-3 max-w-xs mx-auto">
-                    <div>
-                      <Label>Email</Label>
-                      <Input autoComplete="username" type="email" placeholder="請輸入 Email" value={username} onChange={e => setUsername(e.target.value)} required />
-                    </div>
-                    <div>
-                      <Label>密碼</Label>
-                      <div className="relative mt-1">
-                        <Input autoComplete="current-password" type={showPassword ? "text" : "password"} placeholder="請輸入密碼" value={password} onChange={e => setPassword(e.target.value)} required className="pr-11" />
-                        <button type="button" aria-label={showPassword ? "隱藏密碼" : "顯示密碼"} aria-pressed={showPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowPassword(v => !v)}>
-                          {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
-                        </button>
+                  {loginMode === "password" ? (
+                    <form onSubmit={(e) => { e.preventDefault(); loginMutation.mutate(); }} className="space-y-3 max-w-xs mx-auto">
+                      <div>
+                        <Label>Email</Label>
+                        <Input autoComplete="username" type="email" placeholder="請輸入 Email" value={username} onChange={e => setUsername(e.target.value)} required />
                       </div>
-                    </div>
-                    <div className="text-right -mt-1">
+                      <div>
+                        <Label>密碼</Label>
+                        <div className="relative mt-1">
+                          <Input autoComplete="current-password" type={showPassword ? "text" : "password"} placeholder="請輸入密碼" value={password} onChange={e => setPassword(e.target.value)} required className="pr-11" />
+                          <button type="button" aria-label={showPassword ? "隱藏密碼" : "顯示密碼"} aria-pressed={showPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowPassword(v => !v)}>
+                            {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-right -mt-1">
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto px-0 text-caption"
+                          onClick={() => { setResetEmail(""); setResetDialogOpen(true); }}
+                        >
+                          忘記密碼？
+                        </Button>
+                      </div>
+                      <Button type="submit" className="w-full" disabled={isPendingLogin}>
+                        {isPendingLogin ? "登入中..." : "登入"}
+                      </Button>
+                      {import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true" && (
+                        <p className="text-center text-caption text-muted-foreground">
+                          本機 emulator：測試帳號見 TODO.md「測試帳號」
+                        </p>
+                      )}
                       <Button
                         type="button"
                         variant="link"
-                        className="h-auto px-0 text-caption"
-                        onClick={() => { setResetEmail(""); setResetDialogOpen(true); }}
+                        className="w-full h-auto text-caption"
+                        onClick={() => { setLoginMode("phone"); setOtpStage("phone"); setOtpConfirmation(null); }}
                       >
-                        忘記密碼？
+                        <Smartphone className="w-3.5 h-3.5 mr-1" /> 改用手機門號登入
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="space-y-3 max-w-xs mx-auto">
+                      {otpStage === "phone" ? (
+                        <form onSubmit={(e) => { e.preventDefault(); sendOtpMutation.mutate(); }} className="space-y-3">
+                          <div>
+                            <Label>手機號碼</Label>
+                            <Input
+                              autoComplete="tel"
+                              type="tel"
+                              placeholder="0912345678"
+                              value={otpPhone}
+                              onChange={e => setOtpPhone(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <Button type="submit" className="w-full" disabled={isPendingSendOtp}>
+                            {isPendingSendOtp ? "傳送中..." : "取得驗證碼"}
+                          </Button>
+                        </form>
+                      ) : (
+                        <form onSubmit={(e) => { e.preventDefault(); confirmOtpMutation.mutate(); }} className="space-y-3">
+                          <div>
+                            <Label>驗證碼</Label>
+                            <Input
+                              autoComplete="one-time-code"
+                              inputMode="numeric"
+                              placeholder="請輸入簡訊收到的 6 碼"
+                              value={otpCode}
+                              onChange={e => setOtpCode(e.target.value)}
+                              required
+                            />
+                            <p className="text-caption text-muted-foreground mt-1">已發送到 {otpPhone}</p>
+                          </div>
+                          <Button type="submit" className="w-full" disabled={isPendingConfirmOtp}>
+                            {isPendingConfirmOtp ? "驗證中..." : "驗證並登入"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="w-full h-auto text-caption"
+                            onClick={() => { setOtpStage("phone"); setOtpConfirmation(null); }}
+                          >
+                            重新輸入手機號碼
+                          </Button>
+                        </form>
+                      )}
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="w-full h-auto text-caption"
+                        onClick={() => setLoginMode("password")}
+                      >
+                        <Mail className="w-3.5 h-3.5 mr-1" /> 改用 Email 登入
                       </Button>
                     </div>
-                    <Button type="submit" className="w-full" disabled={isPendingLogin}>
-                      {isPendingLogin ? "登入中..." : "登入"}
-                    </Button>
-                    {import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true" && (
-                      <p className="text-center text-caption text-muted-foreground">
-                        本機 emulator：測試帳號見 TODO.md「測試帳號」
-                      </p>
-                    )}
-                  </form>
+                  )}
+                  {/* invisible reCAPTCHA，手機 OTP 送驗證碼要用；一直掛著不影響畫面 */}
+                  <div id="recaptcha-container" />
                 </TabsContent>
 
                 {/* 會員註冊 */}
