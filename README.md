@@ -98,7 +98,7 @@ BunnBaa/
 4. **種子資料腳本**：`cd scripts && npm install`
 5. **本機開發**：`web/.env.local` 設 `VITE_USE_EMULATORS=false`（目前設定），本機直接讀寫雲端 Firestore，與正式站同一份資料：
    ```powershell
-   npm run dev          # 只開 Vite：http://localhost:5199
+   npm run dev          # 只開 Vite：http://localhost:5300
    ```
    ⚠️ 本機的操作（鎖定、核銷、撥款）會直接寫進正式資料。
 

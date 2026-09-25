@@ -89,4 +89,4 @@ if (-not ((Test-Path $envLocal) -and (Select-String -Path $envLocal -Pattern "^V
   Write-Host "提醒：web\.env.local 沒有 VITE_USE_EMULATORS=true，前端會連正式站而不是 emulator。" -ForegroundColor Yellow
 }
 Set-Location (Join-Path $repo "web")
-npx vite --port 5199
+npx vite

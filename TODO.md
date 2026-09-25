@@ -74,8 +74,8 @@
   - Vite dev server 從 junction 路徑執行會出現空白頁 → **要留在原本的中文路徑** `D:\雅婷\03赫滋與羊\+程式碼\BunnBaa\web`
 - **Java**：Firestore/Auth emulator 需要 JRE，已用 winget 裝 Microsoft OpenJDK 21 並加進 PATH。
 - **`web/.env.local` 的 `VITE_USE_EMULATORS`**：`true` 連本機 emulator、`false` 連雲端 Firestore（2026-09-24 起本機設為 `false`）。已排除在 `.gitignore`，2026-09-24 已在 `firebase.ts` 加上 `import.meta.env.DEV` 判斷，正式建置不會誤連 emulator。
-- **本機開發**：repo 根目錄 `npm run dev` 只開 Vite :5199，直接讀寫雲端 Firestore（⚠️ 本機操作會寫進正式資料）。要隔離測試：`.env.local` 改 `true` 後 `npm run dev:emulator`（`scripts/dev-local.ps1`＝junction 啟動 emulator，資料存 `.emulator-data/` → 首次自動灌種子 → 中文路徑啟動 Vite）；重灌用 `npm run dev:emulator:reset`；emulator 視窗要用 Ctrl+C 關才會存檔。
-- **設計系統預覽**：本機 http://localhost:5199/#/design-system
+- **本機開發**：repo 根目錄 `npm run dev` 只開 Vite :5300，直接讀寫雲端 Firestore（⚠️ 本機操作會寫進正式資料）。要隔離測試：`.env.local` 改 `true` 後 `npm run dev:emulator`（`scripts/dev-local.ps1`＝junction 啟動 emulator，資料存 `.emulator-data/` → 首次自動灌種子 → 中文路徑啟動 Vite）；重灌用 `npm run dev:emulator:reset`；emulator 視窗要用 Ctrl+C 關才會存檔。
+- **設計系統預覽**：本機 http://localhost:5300/#/design-system
 - **網域**：`bunnbaa.com` 掛在舊專案（Parse 版本），MVP 先不動，暫用 https://bunnbaa-mvp-5474.web.app ，之後要換網域再處理 DNS。
 - **GitHub**：獨立的 private repo，不跟舊專案共用：https://github.com/Donna12301230/bunnbaa-mvp
 
