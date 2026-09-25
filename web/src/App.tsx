@@ -43,6 +43,7 @@ import VendorPortalSessionSummary from "./pages/vendor-portal/VendorPortalSessio
 import VendorPortalSettings from "./pages/vendor-portal/VendorPortalSettings";
 
 const DesignSystemPreview = lazy(() => import("./pages/DesignSystemPreview"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 
 function NotFound() {
   return (
@@ -178,6 +179,11 @@ export default function App() {
           {/* 設計系統預覽（tokens + 元件狀態一覽）；lazy 載入，不增加其他頁面的 bundle */}
           <Route path="/design-system">
             <Suspense fallback={null}><DesignSystemPreview /></Suspense>
+          </Route>
+
+          {/* 品牌形象頁（版面參考 cafen，視覺全用設計系統）；lazy 載入 */}
+          <Route path="/landing">
+            <Suspense fallback={null}><LandingPage /></Suspense>
           </Route>
 
           <Route>
