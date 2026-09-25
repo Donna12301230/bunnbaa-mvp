@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 
 // 點擊區：視覺尺寸不變，以 ::after 把可點範圍撐到至少 44×44（設計系統無障礙規範）
 const buttonVariants = cva(
-  "relative after:absolute after:left-1/2 after:top-1/2 after:-translate-x-1/2 after:-translate-y-1/2 after:h-full after:w-full after:min-h-11 after:min-w-11 after:content-[''] inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "relative after:absolute after:left-1/2 after:top-1/2 after:-translate-x-1/2 after:-translate-y-1/2 after:h-full after:w-full after:min-h-11 after:min-w-11 after:content-[''] inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--btn-radius,8px)] text-sm font-medium ring-offset-background transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -23,8 +23,8 @@ const buttonVariants = cva(
       // 尺寸對齊設計系統：md 44px / body 15px、sm 36px / body-sm 13px、lg 52px
       size: {
         default: "h-11 px-5 text-body font-semibold",
-        sm: "h-9 rounded-md px-4 text-body-sm font-semibold",
-        lg: "h-[52px] rounded-md px-8 text-body font-semibold",
+        sm: "h-9 rounded-[var(--btn-radius,8px)] px-4 text-body-sm font-semibold",
+        lg: "h-[52px] rounded-[var(--btn-radius,8px)] px-8 text-body font-semibold",
         icon: "h-11 w-11",
       },
     },

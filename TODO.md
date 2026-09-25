@@ -12,22 +12,22 @@
 
 ### 1. 外部卡點（人工處理，歸 Donna）
 
-- [V] **Gemini API Key**——2026-09-24 完成，本機實測兩個 Agent 都能產出。注意：`bunnbaa-mvp-5474` 因為 Blaze 綁了帳單，會自動變成付費層（Prepay，餘額 $0 → 402），所以 key 是從**另一個沒綁帳單的新專案**申請，走免費層。同時把已下架的 `gemini-2.0-flash` 換成 `gemini-3.6-flash`，並對 503／429 加上重試（`functions/src/gemini.js`）。**還要重新部署 functions 才會在正式站生效**（見 §2）
+- [V] **Gemini API Key**——2026-09-24 完成，本機實測兩個 Agent 都能產出。注意：`bunnbaa-mvp-5474` 因為 Blaze 綁了帳單，會自動變成付費層（Prepay，餘額 $0 → 402），所以 key 是從**另一個沒綁帳單的新專案**申請，走免費層。同時把已下架的 `gemini-2.0-flash` 換成 `gemini-3.6-flash`，並對 503／429 加上重試（`functions/src/gemini.js`）。2026-09-25 已部署 functions，正式站驗證見 §3「商家校準報告」
 - [-] **LINE Pay／綠界特約商店審核**（2026-09-24 決定：Demo 沿用 Sandbox，暫不送審）——Sandbox 已全部跑通。之後要正式上線再送審（可能要數週），審核過後把 `functions/.env` 換成正式 Channel ID/Secret＋`LINE_PAY_ENV=production` 即可，程式碼不用改
-- [V] **VAPID key**——2026-09-24 已填入，待部署 hosting 後在正式站驗證。（`web/src/lib/messaging.ts` 的 `VAPID_KEY`）
+- [V] **VAPID key**——2026-09-24 已填入，2026-09-25 已部署 hosting，推播實測見 §3「取餐提醒推播」。（`web/src/lib/messaging.ts` 的 `VAPID_KEY`）
 
 ### 2. 部署（2026-09-25 已全部部署：規則＋索引、Functions、hosting）
 
 `firestore.rules` 新增 `menu_items`／`meal_plans`／`ban_appeals` 規則，`functions/src/index.js` 改了 `createCartLinePayReservation`／`createLinePayReservation`（改吃每個品項的真實 `vendor_id`）：
-- [x] `firebase deploy --only firestore:rules,firestore:indexes`（2026-09-24 再次更新：`locks` 改成只有轉賣中／贈送中公開讀，新增 `vendor_id+status+created_at` 複合索引——**索引要先建好**，不然轉讓市集查詢會失敗；2026-09-24 又新增 `users`／`vendor_applications` 規則，平台登入改真實 Firebase Auth 後註冊、廠商申請都要靠這兩條）
-- [x] `firebase deploy --only functions`（2026-09-24 起消費端 callable 會擋匿名身分，前端已不再匿名登入，**規則、Functions、hosting 要一起部署**，不然舊版前端的匿名使用者會全部被擋）
-- [x] `cd web && npm run build` 後 `firebase deploy --only hosting`（設計系統／新 design tokens 也還沒上線）
+- [V] `firebase deploy --only firestore:rules,firestore:indexes`（2026-09-24 再次更新：`locks` 改成只有轉賣中／贈送中公開讀，新增 `vendor_id+status+created_at` 複合索引——**索引要先建好**，不然轉讓市集查詢會失敗；2026-09-24 又新增 `users`／`vendor_applications` 規則，平台登入改真實 Firebase Auth 後註冊、廠商申請都要靠這兩條）
+- [V] `firebase deploy --only functions`（2026-09-24 起消費端 callable 會擋匿名身分，前端已不再匿名登入，**規則、Functions、hosting 要一起部署**，不然舊版前端的匿名使用者會全部被擋）
+- [V] `cd web && npm run build` 後 `firebase deploy --only hosting`（設計系統／新 design tokens 也還沒上線）
 - [ ] **Functions runtime 升級**：部署時警告 Node.js 20 於 **2026-10-30 停用**，之後無法再部署 Functions。10/18 Demo 不受影響，比賽後要繼續改 Functions 前，先把 `functions/package.json` 的 engines 升到 Node 22＋`firebase-functions@latest`（有 breaking changes，要重測）
 - [ ] 部署後實測一次購物車結帳，到 Firestore Console 確認新的 `locks.vendor_id` 對應下單的商家，不是全部掛在 `cafe-renheya-demo`（2026-09-25 單品項 `/lock` 下單仁和雅咖啡已確認 `vendor_id` 正確；還要用**別家**商家的品項走一次購物車才算驗完）
 
 ### 3. 正式站驗證（已部署，但還沒在正式站實際跑過）
 
-- [ ] QR Code 核銷（2026-09-25 正式站已驗證步驟 1、2、3 與「重複核銷被擋」：取餐編號 `XVTVDHP0` 由仁和雅咖啡店主帳號核銷成功；**還沒測**步驟 4 未取餐、別家商家／一般會員的 `permission-denied`、取餐編號夾帶空白——後者要等防空白版本部署 hosting）：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證，但 **emulator 下 `assertAdminOrVendorOwner` 直接放行，權限這段只有正式站測得到**）。前置：§2 部署完＋§4 商家帳號綁定。步驟：
+- [ ] QR Code 核銷（2026-09-25 正式站已驗證步驟 1、2、3、「重複核銷被擋」與取餐編號夾空白（輸入 `ejel 6pro` 自動變 `EJEL6PRO` 查得到）：取餐編號 `XVTVDHP0` 由仁和雅咖啡店主帳號核銷成功；**還沒測**步驟 4 未取餐、別家商家／一般會員的 `permission-denied`）：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證，但 **emulator 下 `assertAdminOrVendorOwner` 直接放行，權限這段只有正式站測得到**）。前置：§2 部署完＋§4 商家帳號綁定。步驟：
   1. 一般會員帳號鎖定一筆仁和雅咖啡的餐（LINE Pay Sandbox 付款）→ `/my-bookings`「使用」記下取餐編號末 8 碼
   2. 商家帳號登入 `/lock/vendor/redeem`：取餐總覽要看得到這筆（驗證 `locks` 讀取規則＋`vendor_id+created_at` 索引），輸入末 8 碼查得到
   3. 按「確認取餐」→ Firestore Console 看 `locks/{id}.status` 變 `fulfilled`
@@ -44,8 +44,8 @@
 
 ### 4. Demo 準備（整合與交付）
 
-- [x] 正式站灌 demo 資料（`scripts/seed.js`）——2026-09-24 確認雲端已有資料（seed.js 回報 locks already exist），不需再灌
-- [ ] **正式站商家帳號綁定**（2026-09-24 起平台登入是真實 Firebase Auth，沒綁 `owner_uid` 的帳號進不了廠商後台）：規則部署後，商家到 `/login`「廠商申請」送出 → 管理員登入 `/admin/vendors` 核准並選「綁定到既有商家：仁和雅咖啡」等（會寫 `admin_audit_logs`）。正式站目前**沒有任何**商家帳號，種子資料的 `owner_uid` 全是 `null`
+- [V] 正式站灌 demo 資料（`scripts/seed.js`）——2026-09-24 確認雲端已有資料（seed.js 回報 locks already exist），不需再灌
+- [V] **正式站商家帳號綁定**——2026-09-25 仁和雅咖啡已綁定店主帳號（廠商申請 → `/admin/vendors` 核准）。同日新增第二個管理員 `ckchildlikekid@gmail.com`（`firestore.rules`／`functions/src/index.js`／`web/src/lib/adminAuth.ts` 三處白名單，ISMS 角色表已更新），因為 `suw192336@gmail.com` 的正式站密碼只有 SU 知道。王媽媽便當／阿嘉炸雞排／早安三明治仍沒有店主帳號，要 Demo 多家店再照同流程綁
 - [ ] 整合測試（端到端跑過消費者、商家、管理員三條線）
 - [ ] 錄 Demo（3 分鐘腳本見 v6 §8）
 - [ ] 撰寫英文版 Proposal
@@ -53,19 +53,22 @@
 ### 5. ISO27001 剩餘項目（詳見 [ISO27001_落差分析.md](ISO27001_落差分析.md)）
 
 - [ ] 長期觀察沒有 CSP 違規後，把 `firebase.json` 的 `Content-Security-Policy-Report-Only` 改成 `Content-Security-Policy`（目前只測過 `/lock` 跟兩個管理頁）
-- [x] SU 自己的 Google／GitHub 帳號 2FA——2026-09-25 完成（理由見 ISO27001 文件「情境重新評估」：這是參賽用原型不是正式上線，但比賽規則要求公開 repo＋公開網址，評審期間客觀上是曝露的，值得做）
-- [x] Firebase API key 加 referrer 限制——2026-09-25 完成並驗證：已加三筆（`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`localhost:*`）。用 `curl` 帶假 Referer 直接打 Firebase Auth 初始化 API 測過：正確網域回 200，不相干網域（`evil.example.com`）與完全不帶 Referer 都回 403 `API_KEY_HTTP_REFERRER_BLOCKED`，正式站本身仍正常載入（HTTP 200）
+- [V] SU 自己的 Google／GitHub 帳號 2FA——2026-09-25 完成（理由見 ISO27001 文件「情境重新評估」：這是參賽用原型不是正式上線，但比賽規則要求公開 repo＋公開網址，評審期間客觀上是曝露的，值得做）
+- [V] Firebase API key 加 referrer 限制——2026-09-25 完成並驗證：已加三筆（`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`localhost:*`）。用 `curl` 帶假 Referer 直接打 Firebase Auth 初始化 API 測過：正確網域回 200，不相干網域（`evil.example.com`）與完全不帶 Referer 都回 403 `API_KEY_HTTP_REFERRER_BLOCKED`，正式站本身仍正常載入（HTTP 200）
 - [-] ~~Cloud Audit Logs 開資料讀寫~~——2026-09-25 決定暫緩：只有事後鑑識用途（查誰讀寫過什麼），不會擋下任何事，對三週衝刺的參賽專案報酬率低，等要往正式商轉再開
 - [ ] **待跟雅婷討論，不預設要做**：`ckchildlikekid@gmail.com` 開 2FA；GitHub `master` branch protection（會改變目前直接推 master 自動部署的流程，衝刺截止日前可能得不償失，見 ISO27001 文件）
-- [x] 建立認證所需的 ISMS 管理制度文件——2026-09-25 完成 v1：[ISMS_管理制度文件.md](ISMS_管理制度文件.md)（資安政策、角色職責、風險評鑑與登錄表、適用性聲明 SoA、事件應變程序、備份與 BCP 現況、供應商清單、人員安全、文件審查）。這是符合兩人團隊試營運規模的精簡版，不是拿去給認證機構稽核用的完整版；風險登錄表列了 9 項風險，其中 R1/R4/R5/R7 對應到還沒做的待辦（2FA、branch protection、Firestore 備份、Secret Manager）
+- [V] 建立認證所需的 ISMS 管理制度文件——2026-09-25 完成 v1：[ISMS_管理制度文件.md](ISMS_管理制度文件.md)（資安政策、角色職責、風險評鑑與登錄表、適用性聲明 SoA、事件應變程序、備份與 BCP 現況、供應商清單、人員安全、文件審查）。這是符合兩人團隊試營運規模的精簡版，不是拿去給認證機構稽核用的完整版；風險登錄表列了 9 項風險，其中 R1/R4/R5/R7 對應到還沒做的待辦（2FA、branch protection、Firestore 備份、Secret Manager）
 
 ### 6. 尚未實作的功能
 
-- [x] **手機門號 OTP 登入**（`LoginPage.tsx`，草圖 `Login.dc.html` 兩段式流程）——2026-09-25 完成：登入分頁新增「改用手機門號登入」，輸入號碼→`sendOtp()`送簡訊驗證碼→輸入驗證碼→`confirmOtp()`登入（`web/src/lib/auth.ts`，用 Firebase Phone Auth + 隱形 reCAPTCHA）。沒有 email 時 `resolveProfile()` 改用門號當 username／displayName，角色判斷不受影響（管理員＝email 白名單，門號登入者一律是會員或已綁定的廠商）。順便修正 CSP：加放 `www.google.com`／`recaptcha.net` 的 script／frame，不然 reCAPTCHA 之後會被擋（`firebase.json`）。**還沒驗證**：要先去 Firebase Console → Authentication → Sign-in method 手動啟用「電話號碼」登入方式（跟啟用 Email/Password 一樣，免費、跟 Blaze 無關），且要等這批一起部署（見上方 §2）後才能在正式站測；本機/emulator 也還沒測過，因為 Phone Auth 的 reCAPTCHA 在沒有真實網域時常會失敗，建議直接在正式站用真手機號碼測
-- [x] 2026-09-24 決定**不再使用匿名登入**：瀏覽不用登入，但鎖定／下單／購物車結帳／轉讓接手／抽獎都要先登入（前端 `useRequireLogin`、`firestore.rules` `isSignedInUser()`、Functions `assertSignedInUser()` 三層都擋）。舊的匿名帳號跟它們名下的鎖定紀錄**不搬移、不保留**
-- [ ] 部署規則＋Functions 後，到 Firebase Console → Authentication → Sign-in method 把「匿名」停用
-- [x] **從商家點餐沒有取餐日期／時段**——2026-09-25 完成（未部署）：購物車結帳前選日期＋時段（`components/PickupPicker.tsx`，今天已開始的時段不能選、最遠 30 天），列出訂單明細（商家、地點、時間、早鳥價、備註、總計），商品備註改成真的寫進 `locks.note` 並顯示在商家核對取餐頁。同時段已有「已鎖定」訂單只**提醒不擋**（`hooks/useSlotConflicts.ts`，首頁也有）。**價格改由伺服器從 `menu_items` 重算**（`functions/src/pricing.js`），原本前端送什麼價格就收什麼。`createLinePayReservation`／`createCartLinePayReservation` 參數改了（改送 `menu_item_id`＋`pickup_date`＋`pickup_window`），**Functions 跟 hosting 要一起部署**，不然舊前端結帳會失敗
-- [x] **取餐時段／公休／份數上限由商家後台控制**——2026-09-25 完成（未部署）：店家設定頁（`VendorPortalSettings.tsx`）的簡介、地址、電話、營業日、公休日改接真實 `vendors/{id}`，新增「取餐時段」與「每個時段份數上限」（`pickup_windows`／`business_hours`／`holidays`／`slot_capacity`；店名仍只有管理員能改）。消費端 `PickupPicker` 照商家設定顯示時段、公休、剩幾份；伺服器結帳照同一套驗證（`functions/src/pricing.js`），份數在 `confirmLinePayPayment` 用 transaction 預扣（`slot_counters`），**先扣份數再向 LINE Pay 確認扣款**，額滿就不扣款。已知限制：① 首頁左側時段選擇是先選、所有店共用預設時段，下單時才檢查該店有沒有開；② 「加入計畫」（多日方案）是前端直接寫 locks，**不受時段／公休／份數限制**；③ 2026-09-25 以前的訂單不計入份數。**要部署 rules＋functions＋hosting**
+- [V] **手機門號 OTP 登入**（`LoginPage.tsx`，草圖 `Login.dc.html` 兩段式流程）——2026-09-25 完成：登入分頁新增「改用手機門號登入」，輸入號碼→`sendOtp()`送簡訊驗證碼→輸入驗證碼→`confirmOtp()`登入（`web/src/lib/auth.ts`，用 Firebase Phone Auth + 隱形 reCAPTCHA）。沒有 email 時 `resolveProfile()` 改用門號當 username／displayName，角色判斷不受影響（管理員＝email 白名單，門號登入者一律是會員或已綁定的廠商）。順便修正 CSP：加放 `www.google.com`／`recaptcha.net` 的 script／frame，不然 reCAPTCHA 之後會被擋（`firebase.json`）。2026-09-25 已在 Console 啟用「電話號碼」登入並部署。**還沒驗證**：要在正式站用真手機號碼實際收一次簡訊登入（本機/emulator 的 reCAPTCHA 常會失敗，不建議在本機測）
+- [V] 2026-09-24 決定**不再使用匿名登入**：瀏覽不用登入，但鎖定／下單／購物車結帳／轉讓接手／抽獎都要先登入（前端 `useRequireLogin`、`firestore.rules` `isSignedInUser()`、Functions `assertSignedInUser()` 三層都擋）。舊的匿名帳號跟它們名下的鎖定紀錄**不搬移、不保留**
+- [V] 到 Firebase Console → Authentication → Sign-in method 把「匿名」停用——2026-09-25 完成
+- [V] **從商家點餐沒有取餐日期／時段**——2026-09-25 完成並部署、正式站驗證通過：購物車結帳前選日期＋時段（`components/PickupPicker.tsx`，今天已開始的時段不能選、最遠 30 天），列出訂單明細（商家、地點、時間、早鳥價、備註、總計），商品備註改成真的寫進 `locks.note` 並顯示在商家核對取餐頁。同時段已有「已鎖定」訂單只**提醒不擋**（`hooks/useSlotConflicts.ts`，首頁也有）。**價格改由伺服器從 `menu_items` 重算**（`functions/src/pricing.js`），原本前端送什麼價格就收什麼。`createLinePayReservation`／`createCartLinePayReservation` 參數改了（改送 `menu_item_id`＋`pickup_date`＋`pickup_window`），之後改這兩支 Function 都要跟 hosting 一起部署
+- [V] **取餐時段／公休／份數上限由商家後台控制**——2026-09-25 完成並部署：店家設定頁（`VendorPortalSettings.tsx`）的簡介、地址、電話、營業日、公休日改接真實 `vendors/{id}`，新增「取餐時段」與「每個時段份數上限」（`pickup_windows`／`business_hours`／`holidays`／`slot_capacity`；店名仍只有管理員能改）。消費端 `PickupPicker` 照商家設定顯示時段、公休、剩幾份；伺服器結帳照同一套驗證（`functions/src/pricing.js`），份數在 `confirmLinePayPayment` 用 transaction 預扣（`slot_counters`），**先扣份數再向 LINE Pay 確認扣款**，額滿就不扣款。已知限制：① 首頁左側時段選擇是先選、所有店共用預設時段，下單時才檢查該店有沒有開；② 「加入計畫」（多日方案）是前端直接寫 locks，**不受時段／公休／份數限制**；③ 2026-09-25 以前的訂單不計入份數；④ 商家改設定後，消費者要重新整理頁面才看得到（前端快取），伺服器結帳一律照最新設定。
+  - 正式站驗證（2026-09-25，仁和雅咖啡店主帳號）：設定頁儲存份數 1＋公休日 10/3 成功且重新載入仍在；購物車公休日顯示「這天是店家公休日」並停用結帳、各時段顯示「剩 1 份」、數量 2 時提示只剩 1 份；實際付款一筆（10/5 11:30–12:00，NT$128＝伺服器算的 8 折，取餐編號 `EJEL6PRO`）後該時段變「已額滿」；份數改回不限後，同時段重複訂購出現提醒但不擋。測試完已把份數改回不限、刪除 10/3 公休日。`EJEL6PRO` 這筆測試訂單掛在店主帳號名下，不需要可到 Firestore Console 刪除
+  - **還沒測**：兩人同時搶最後一份（transaction 應只讓一人成功、另一人不扣款）、LINE Pay 確認失敗時份數退回
+- [ ] **「加入計畫」（多日方案）改走伺服器**：目前 `HomePage.tsx` 的 `handleJoinPlan` 在前端直接寫 N 筆 locks，固定 `12:00-13:00`、不經付款，也不受商家時段／公休／份數限制
 - [ ] **消費者端提交解封申訴**——完全沒有入口（登入頁條款的「會員中心提交申訴」只是文字）。現在消費者已有穩定帳號，可以開始做了
 - [ ] 「我的轉讓」無法追蹤已被接手的項目（資料模型沒有記錄原轉讓者）
 

@@ -105,7 +105,7 @@
 .bb-btn--danger {
   --btn-bg: var(--danger-strong);
   --btn-bg-hover: var(--danger-strong-hover);
-  --btn-fg: var(--text-on-brand);
+  --btn-fg: var(--text-on-danger);
 }
 
 /* ── sizes ── */

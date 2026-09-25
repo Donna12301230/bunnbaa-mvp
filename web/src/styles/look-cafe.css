@@ -1,0 +1,337 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   BunnBaa 飯飽 — Cafe Look（<ThemeRoot look="cafe">）
+   ──────────────────────────────────────────────────────────────────────────
+   參考咖啡館形象站：深可可棕 + 奶油黃雙主色、襯線標題、1px 深棕描邊
+   取代靜態陰影、膠囊按鈕、更大的區塊圓角。
+   做法：
+   · 主要按鈕改「深棕底 + 奶油字」，強調色改「奶油黃底 + 深棕字」，
+     品牌橘 #F29E0C 不必再為了白字對比而加深。
+   · 文字色帶暖棕，不用中性灰。
+   · 只覆寫 tokens 與少數元件外觀，元件 API 不變。
+   · 渲染到 body 的 shadcn 彈層（Dialog 等）不在 ThemeRoot 之內，
+     可在彈層元素上加 className="bb-look" data-look="cafe" 取得同一組 tokens。
+   specificity 說明：淺色區塊 (0,2,0) 會蓋過 tokens.css 的深色區塊，
+   所以深色區塊 (0,3,0) 必須重設淺色區塊裡的每一個 token。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:is(.bb-theme, .bb-look)[data-look='cafe'] {
+  /* ── 品牌 ── */
+  --cafe-ink: #3b2314;              /* 深可可棕：文字、主要按鈕、描邊 */
+  --cafe-ink-hover: #22130a;
+  --cafe-butter: #ffe1a1;           /* 奶油黃：強調底、選取、標籤 */
+  --cafe-butter-hover: #ffd37a;
+
+  --brand-brown: var(--cafe-ink);            /* 品牌標題改深棕：on bg 13.9:1 */
+  --brand-brown-dark: #6e3a1f;
+  --brand-orange-soft: var(--cafe-butter);
+  --brand-orange-tint: #fdf0d2;
+  --brand-orange-strong: var(--cafe-ink);    /* 主要按鈕、勾選、focus ring */
+  --brand-orange-strong-hover: var(--cafe-ink-hover);
+  --brand-orange-text: #9a4a00;              /* on bg 5.96、on butter 5.07 */
+  --text-on-brand: #fff3d6;                  /* on ink 12.9:1 */
+
+  /* ── 中性色（全部帶暖棕） ── */
+  --bg: #fff8ec;
+  --surface: #fffdf7;
+  --surface-muted: #f8eedc;
+  --border: #e8d6bf;
+  --border-strong: #c9ae92;
+  --border-control: #7a5a48;
+  --border-ink: var(--cafe-ink);
+  --text: var(--cafe-ink);
+  --text-secondary: #6e4a3a;       /* on bg 7.4:1 */
+  --text-muted: #806050;           /* on bg 5.38、on surface-muted 4.91 */
+  --tooltip-bg: var(--cafe-ink);
+  --tooltip-text: #fff3d6;
+  --skeleton-base: #f3e6d0;
+
+  /* ── 色帶表面 ── */
+  --surface-inverse: var(--cafe-ink);
+  --text-on-inverse: var(--cafe-butter);     /* 11.6:1 */
+  --surface-accent: var(--cafe-butter);
+  --text-on-accent: var(--cafe-ink);
+
+  /* ── 字體：襯線標題，字重偏細、字級放大 ── */
+  --font-heading: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
+  --font-display-size: 40px; --font-display-weight: 600; --font-display-lh: 1.25;
+  --font-h1-size: 28px;      --font-h1-weight: 600;
+  --font-h2-size: 22px;      --font-h2-weight: 600;
+
+  /* ── 圓角放大 ── */
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 40px;
+
+  /* ── 陰影：靜態元件不用陰影；浮層保留但更收斂 ── */
+  --shadow-sm: none;
+  --shadow-md: 0 8px 24px rgba(59, 35, 20, 0.12);
+  --shadow-lg: 0 16px 40px rgba(59, 35, 20, 0.18);
+}
+
+:is(.bb-theme, .bb-look)[data-look='cafe'][data-theme='dark'] {
+  --cafe-ink: #f6ead6;
+  --cafe-ink-hover: #ffffff;
+  --cafe-butter: #ffd98a;
+  --cafe-butter-hover: #ffe7b0;
+
+  --brand-brown: #ffd98a;
+  --brand-brown-dark: #f3c98a;
+  --brand-orange-soft: #4a3219;
+  --brand-orange-tint: #2e2016;
+  --brand-orange-strong: #ffd98a;            /* 深色模式主要按鈕：奶油黃底 + 深棕字 */
+  --brand-orange-strong-hover: #ffe7b0;
+  --brand-orange-text: #ffc766;
+  --text-on-brand: #2a1709;
+
+  --bg: #1c130d;
+  --surface: #271b13;
+  --surface-muted: #33251b;
+  --border: #45342a;
+  --border-strong: #5e4839;
+  --border-control: #a88d76;
+  --border-ink: #8a6f5a;
+  --text: #f6ead6;
+  --text-secondary: #dcc7ae;
+  --text-muted: #bfa992;
+  --tooltip-bg: #f6ead6;
+  --tooltip-text: #2a1709;
+  --skeleton-base: #3a2a1f;
+
+  --surface-inverse: #120b07;
+  --text-on-inverse: #ffd98a;
+  --surface-accent: #ffd98a;
+  --text-on-accent: #2a1709;
+
+  --shadow-sm: none;
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* ══ shadcn/ui 變數（index.css）對應到 cafe tokens ═══════════════════════
+   行銷平台頁面（首頁等）用 Tailwind + shadcn，改這組就會跟著換裝。
+   引用 ds tokens，深色模式自動跟著走。 */
+:is(.bb-theme, .bb-look)[data-look='cafe'] {
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--brand-orange-strong);
+  --primary-foreground: var(--text-on-brand);
+  --primary-hover: var(--brand-orange-strong-hover);
+  --secondary: var(--surface-accent);
+  --secondary-foreground: var(--text-on-accent);
+  --muted: var(--surface-muted);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--brand-orange-tint);
+  --accent-foreground: var(--text);
+  --input: var(--border-strong);
+  --ring: var(--focus-ring-color);
+  --brand-navy: var(--brand-orange-strong);
+  --brand-navy-hover: var(--brand-orange-strong-hover);
+  --surface-dark: var(--surface-inverse);
+  --btn-radius: 999px;
+  --font-sans: var(--font-family);
+  color: var(--text);
+
+  /* Tailwind 品牌色階（tokens.css --palette-*）：「主要色」orange-500 → 深可可棕、
+     淡色 orange-50/100/200 → 奶油黃系。orange-300/400 與狀態色維持原值。 */
+  --palette-orange-50: var(--brand-orange-tint);
+  --palette-orange-100: var(--brand-orange-soft);
+  --palette-orange-200: var(--cafe-butter-hover);
+  --palette-orange-500: var(--brand-orange-strong);
+  --palette-orange-600: var(--brand-orange-strong-hover);
+}
+
+/* Tailwind 頁面的卡片（白底 + 邊框）改深棕描邊；輸入框、下拉選單不在此列 */
+:is(.bb-theme, .bb-look)[data-look='cafe'] :is(.bg-white, .bg-card):is(.border, .border-2) {
+  border-color: var(--border-ink);
+}
+
+/* 標題一律襯線 */
+:is(.bb-theme, .bb-look)[data-look='cafe'] :is(h1, h2, h3, h4) {
+  font-family: var(--font-heading);
+}
+
+/* 舊原型頁（.legacy-ui，index.css 的 --ink / --brand / --legacy-* 變數）對應 cafe 色 */
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui {
+  --ink: #3b2314;
+  --sub: #6e4a3a;
+  --faint: #806050;
+  --brand: #3b2314;          /* 主要按鈕底、強調文字 */
+  --brand-strong: #22130a;
+  --brand-light: #ffe1a1;    /* 標籤底、tinted 卡片 */
+  --on-brand: #fff3d6;       /* on #3B2314 12.9:1 */
+  --line: #e8d6bf;
+  --line-strong: #c9ae92;
+  --legacy-bg: #fff8ec;
+  --legacy-surface: #fffdf7;
+  --legacy-surface-muted: #f8eedc;
+  --focus: #3b2314;
+  --legacy-shadow-sm: none;
+  --status-locked: #9a4a00;  --status-locked-bg: #ffe1a1;
+}
+@media (prefers-color-scheme: dark) {
+  :is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui {
+    --ink: #f6ead6;
+    --sub: #dcc7ae;
+    --faint: #bfa992;
+    --brand: #ffd98a;
+    --brand-strong: #ffe7b0;
+    --brand-light: #4a3219;
+    --on-brand: #2a1709;
+    --line: #45342a;
+    --line-strong: #5e4839;
+    --legacy-bg: #1c130d;
+    --legacy-surface: #271b13;
+    --legacy-surface-muted: #33251b;
+    --focus: #ffd98a;
+    --status-locked: #ffc766;  --status-locked-bg: #4a3219;
+  }
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui :is(h1, h2) {
+  font-family: var(--font-heading);
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui .card {
+  border-color: var(--ink);
+  border-radius: 20px;
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui .card.tinted {
+  border-color: var(--ink);
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui button {
+  border-radius: 999px;
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui button.secondary {
+  background: var(--brand-light);
+  color: var(--ink);
+  border-color: var(--ink);
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui :is(.badge, .status-badge) {
+  border-radius: 999px;
+}
+
+/* ══ 元件外觀 ════════════════════════════════════════════════════════════ */
+
+/* 標題類元件跟著換襯線 */
+.bb-theme[data-look='cafe'] :is(.bb-feature__title, .bb-modal__title, .bb-sheet__title, .bb-empty__title) {
+  font-family: var(--font-heading);
+}
+
+/* ── Button：膠囊 ── */
+.bb-theme[data-look='cafe'] .bb-btn,
+.bb-theme[data-look='cafe'] .bb-btn--lg {
+  border-radius: var(--radius-full);
+}
+/* secondary：奶油黃底 + 深棕描邊（參考站的「Explore our menu」） */
+.bb-theme[data-look='cafe'] .bb-btn--secondary {
+  --btn-bg: var(--surface-accent);
+  --btn-bg-hover: var(--cafe-butter-hover);
+  --btn-fg: var(--text-on-accent);
+  --btn-fg-hover: var(--text-on-accent);
+  --btn-border: var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-btn--outline {
+  --btn-bg: transparent;
+  --btn-bg-hover: var(--brand-orange-tint);
+  --btn-fg: var(--text);
+  --btn-fg-hover: var(--text);
+  --btn-border: var(--border-ink);
+  --btn-border-hover: var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-btn--text {
+  --btn-fg: var(--text);
+}
+/* 深色模式：primary 已是奶油黃實心，secondary 改為深底 + 奶油描邊以拉開層級 */
+.bb-theme[data-look='cafe'][data-theme='dark'] .bb-btn--secondary {
+  --btn-bg: var(--brand-orange-soft);
+  --btn-bg-hover: color-mix(in srgb, var(--brand-orange-soft) 80%, var(--cafe-butter));
+  --btn-fg: var(--cafe-butter);
+  --btn-fg-hover: var(--cafe-butter);
+  --btn-border: var(--cafe-butter);
+}
+
+/* ── Card：描邊取代陰影；hover 換底色，不上浮 ── */
+.bb-theme[data-look='cafe'] :is(.bb-card--elevated, .bb-card--outlined) {
+  background: var(--surface);
+  border-color: var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-card--tinted {
+  border-color: var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-card--interactive:hover,
+.bb-theme[data-look='cafe'] .bb-card--interactive.is-hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--border-ink);
+  background: var(--brand-orange-tint);
+}
+.bb-theme[data-look='cafe'] .bb-card--interactive:active,
+.bb-theme[data-look='cafe'] .bb-card--interactive.is-active {
+  transform: scale(0.99);
+  box-shadow: none;
+  background: var(--brand-orange-tint);
+}
+.bb-theme[data-look='cafe'] .bb-card:disabled,
+.bb-theme[data-look='cafe'] .bb-card[aria-disabled='true'] {
+  border-color: var(--border-strong);
+}
+
+/* ── IconBox：奶油黃底 + 深棕描邊 + 深棕 icon ── */
+.bb-theme[data-look='cafe'] .bb-iconbox {
+  border: 1px solid var(--border-ink);
+  color: var(--text);
+}
+.bb-theme[data-look='cafe'] .bb-iconbox--brand {
+  background: var(--surface-accent);
+  color: var(--text-on-accent);
+}
+
+/* ── Tabs：選中塊 = 奶油黃膠囊 + 描邊（參考站導覽列） ── */
+.bb-theme[data-look='cafe'] .bb-tabs {
+  background: transparent;
+  border: 1px solid var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-tabs__indicator,
+.bb-theme[data-look='cafe'][data-theme='dark'] .bb-tabs__indicator {
+  background: var(--surface-accent);
+  box-shadow: inset 0 0 0 1px var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-tabs__tab[aria-selected='true'],
+.bb-theme[data-look='cafe'] .bb-tabs__tab[aria-selected='true'] .bb-tabs__icon {
+  color: var(--text-on-accent);
+}
+
+/* ── Badge：膠囊；brand soft 款加描邊（參考站的「Popular」標籤） ── */
+.bb-theme[data-look='cafe'] .bb-badge {
+  border-radius: var(--radius-full);
+  padding-inline: 10px;
+}
+.bb-theme[data-look='cafe'] .bb-badge--brand:not(.bb-badge--solid) {
+  --badge-fg: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border-ink);
+}
+
+/* ── Tag：描邊膠囊；選取 = 奶油黃底 ── */
+.bb-theme[data-look='cafe'] .bb-tag {
+  background: transparent;
+  border-color: var(--border-ink);
+  color: var(--text);
+}
+.bb-theme[data-look='cafe'] .bb-tag:hover:not(.is-disabled),
+.bb-theme[data-look='cafe'] .bb-tag.is-hover {
+  border-color: var(--border-ink);
+  background: var(--brand-orange-tint);
+  color: var(--text);
+}
+.bb-theme[data-look='cafe'] .bb-tag.is-selected {
+  background: var(--surface-accent);
+  border-color: var(--border-ink);
+  color: var(--text-on-accent);
+}
+
+/* ── 浮層：加一圈描邊 ── */
+.bb-theme[data-look='cafe'] :is(.bb-modal__panel, .bb-sheet__panel, .bb-toast) {
+  border: 1px solid var(--border-ink);
+}

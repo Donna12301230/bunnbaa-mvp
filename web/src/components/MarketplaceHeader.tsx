@@ -73,7 +73,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-border">
+    <header className="sticky top-0 z-40 bg-card border-b border-border">
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 h-16 flex items-center gap-3 md:gap-6">
         <Button
           variant="ghost"
@@ -99,7 +99,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
               onClick={() => navigate(href)}
               className={cn(
                 "flex items-center gap-1.5 h-16 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                active === tab ? "border-orange-500 text-orange-600" : "border-transparent text-muted-foreground hover:text-foreground"
+                active === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
               <Icon className="w-4 h-4" /> {label}

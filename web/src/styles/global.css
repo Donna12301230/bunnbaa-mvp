@@ -71,6 +71,12 @@
 }
 
 /* 字級 utility —— 元件以外的排版請用這組 class */
+.bb-display,
+.bb-h1,
+.bb-h2,
+.bb-h3 {
+  font-family: var(--font-heading);
+}
 .bb-display {
   font-size: var(--font-display-size);
   font-weight: var(--font-display-weight);

@@ -3,8 +3,9 @@ import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } 
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
-import { Search, Clock, MapPin, UtensilsCrossed, Repeat } from "lucide-react";
+import { Clock, MapPin, UtensilsCrossed, Repeat } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
+import PageHero, { HeroSearch } from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db, functions } from "@/lib/firebase";
@@ -157,26 +158,12 @@ export default function TransferMarketPage() {
     <div className="min-h-screen bg-gray-50">
       <MarketplaceHeader active="transfer" />
 
-      {/* ── Hero ── */}
-      <section className="bg-gradient-to-br from-orange-500 to-orange-600 px-4 md:px-6 py-10">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-6 flex-wrap">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-1.5">轉讓市集</h1>
-            <p className="text-sm text-white">同學安全轉讓已鎖定的方案，全額入袋；逾時沒人接手，系統會自動開放 $0 元供人領取。</p>
-          </div>
-          <div className="flex items-center gap-2 bg-white rounded-xl p-1.5 pl-4 min-w-[300px]">
-            <Search className="w-4 h-4 text-gray-400 shrink-0" />
-            <label htmlFor="marketplaceSearch" className="sr-only">搜尋轉讓項目</label>
-            <input
-              id="marketplaceSearch"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="搜尋餐點名稱"
-              className="flex-1 border-none outline-none bg-transparent text-sm py-2"
-            />
-          </div>
-        </div>
-      </section>
+      <PageHero
+        title="轉讓市集"
+        description="同學安全轉讓已鎖定的方案，全額入袋；逾時沒人接手，系統會自動開放 $0 元供人領取。"
+      >
+        <HeroSearch id="marketplaceSearch" label="搜尋轉讓項目" value={search} onChange={setSearch} placeholder="搜尋餐點名稱" />
+      </PageHero>
 
       {/* ── Body ── */}
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
@@ -208,7 +195,7 @@ export default function TransferMarketPage() {
                       <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
                         <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                         {deadline && (
-                          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-gray-900 text-white">
+                          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-rice text-rice-foreground">
                             <Clock className="w-3 h-3" /> {formatCountdown(deadline, now)}
                           </span>
                         )}
@@ -249,7 +236,7 @@ export default function TransferMarketPage() {
                   <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
                     <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
                       <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
-                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-gray-900 text-white">
+                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-rice text-rice-foreground">
                         已逾期・開放中
                       </span>
                     </div>
@@ -267,7 +254,6 @@ export default function TransferMarketPage() {
                           size="sm"
                           disabled={claimingId === item.id}
                           onClick={() => handleClaimFree(item.id)}
-                          className="bg-gray-900 hover:bg-gray-800 text-white"
                         >
                           {claimingId === item.id ? "處理中…" : "免費領取"}
                         </Button>

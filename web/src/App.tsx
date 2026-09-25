@@ -5,7 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { ConfirmProvider } from "@/components/ConfirmDialog";
-import { ThemeRoot } from "@/components/ds";
+import { SiteThemeRoot } from "@/lib/siteLook";
 import { useAuth } from "@/hooks/useAuth";
 
 import ConsumerLockPage from "./pages/ConsumerLockPage";
@@ -68,7 +68,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* 設計系統 tokens 限定在 .bb-theme 之內；包住全站，頁面才能直接使用 @/components/ds */}
-      <ThemeRoot>
+      <SiteThemeRoot>
       <ConfirmProvider>
       <Router hook={useHashLocation}>
         <Switch>
@@ -121,7 +121,7 @@ export default function App() {
             <MarketplacePage><CartPage /></MarketplacePage>
           </Route>
           <Route path="/vendors">
-            <MarketplacePage><CustomerLayout><VendorListPage /></CustomerLayout></MarketplacePage>
+            <MarketplacePage><VendorListPage /></MarketplacePage>
           </Route>
           <Route path="/vendor/:id">
             <MarketplacePage><CustomerLayout><VendorPage /></CustomerLayout></MarketplacePage>
@@ -187,7 +187,7 @@ export default function App() {
       </Router>
       </ConfirmProvider>
       <Toaster />
-      </ThemeRoot>
+      </SiteThemeRoot>
     </QueryClientProvider>
   );
 }

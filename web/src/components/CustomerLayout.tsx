@@ -5,10 +5,12 @@ import MarketplaceHeader from "./MarketplaceHeader";
 // 原本掛的是另一套 Navbar.tsx（購物車／我的訂單／我的開團連結指向的路由其實都
 // 不存在，會 404），2026-09-21 改成跟 /home、/marketplace、/my-bookings 共用同一顆
 // MarketplaceHeader，導覽列在全站保持一致。
-export default function CustomerLayout({ children }: { children: ReactNode }) {
+// hero：全寬頁首橫幅（PageHero），放在導覽列與內容之間，例如 /vendors。
+export default function CustomerLayout({ children, hero }: { children: ReactNode; hero?: ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <MarketplaceHeader active="vendors" />
+      {hero}
       <main className="flex-1 max-w-6xl mx-auto w-full px-3 md:px-4 py-3 md:py-6">
         {children}
       </main>

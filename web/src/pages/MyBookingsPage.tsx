@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2 } from "lucide-react";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
+import PageHero from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -346,12 +347,9 @@ export default function MyBookingsPage() {
     <div className="min-h-screen bg-gray-50">
       <MarketplaceHeader active="bookings" />
 
-      <section className="px-4 md:px-6 py-6 max-w-[1400px] mx-auto">
-        <h1 className="text-2xl font-bold mb-1">我的餐點</h1>
-        <p className="text-sm text-muted-foreground">週曆上點一筆訂單看詳情、使用取餐碼或轉讓／贈送。</p>
-      </section>
+      <PageHero title="我的餐點" description="週曆上點一筆訂單看詳情、使用取餐碼或轉讓／贈送。" />
 
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 pb-10 space-y-6">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         {!authLoading && !uid ? (
           <EmptyState
             icon={<ClipboardList size={32} />}

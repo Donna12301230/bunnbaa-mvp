@@ -52,7 +52,7 @@
 .bb-badge--solid.bb-badge--brand   { --badge-bg: var(--brand-orange-strong); --badge-fg: var(--text-on-brand); --badge-dot: currentColor; }
 .bb-badge--solid.bb-badge--success { --badge-bg: var(--success-text); --badge-fg: #ffffff; --badge-dot: currentColor; }
 .bb-badge--solid.bb-badge--warning { --badge-bg: var(--warning-text); --badge-fg: #ffffff; --badge-dot: currentColor; }
-.bb-badge--solid.bb-badge--danger  { --badge-bg: var(--danger-strong); --badge-fg: var(--text-on-brand); --badge-dot: currentColor; }
+.bb-badge--solid.bb-badge--danger  { --badge-bg: var(--danger-strong); --badge-fg: var(--text-on-danger); --badge-dot: currentColor; }
 .bb-badge--solid.bb-badge--info    { --badge-bg: var(--info-text); --badge-fg: #ffffff; --badge-dot: currentColor; }
 .bb-theme[data-theme='dark'] .bb-badge--solid:is(.bb-badge--success, .bb-badge--warning, .bb-badge--info) {
   --badge-fg: var(--bg);

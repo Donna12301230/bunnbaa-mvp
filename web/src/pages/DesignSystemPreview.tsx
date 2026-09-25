@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Bell,
+  Coffee,
   CalendarCheck,
   ChevronRight,
   Gift,
@@ -47,9 +48,11 @@ import {
   Tooltip,
   useToast,
   type BadgeTone,
+  type BbLook,
   type BbTheme,
   type ButtonVariant,
 } from '@/components/ds';
+import { DEFAULT_SITE_LOOK, useSiteLook } from '@/lib/siteLook';
 import './DesignSystemPreview.css';
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -57,6 +60,7 @@ import './DesignSystemPreview.css';
    ══════════════════════════════════════════════════════════════════════════ */
 
 const SECTIONS = [
+  { id: 'showcase', label: '版面範例' },
   { id: 'colors', label: '色彩' },
   { id: 'contrast', label: '對比檢查' },
   { id: 'typography', label: '字體' },
@@ -123,6 +127,17 @@ const COLOR_GROUPS: { title: string; description?: string; swatches: SwatchDef[]
     ],
   },
   {
+    title: '描邊與色帶',
+    description: '色帶是整段滿版的區塊（品牌故事、促銷跑馬燈）。classic 與 cafe 風格各有一組值。',
+    swatches: [
+      { token: '--border-ink', note: '卡片、按鈕、標籤描邊（cafe）' },
+      { token: '--surface-inverse', note: '深色色帶底' },
+      { token: '--text-on-inverse', note: '深色色帶上的文字' },
+      { token: '--surface-accent', note: '強調色帶、secondary 按鈕底' },
+      { token: '--text-on-accent', note: '強調色帶上的文字' },
+    ],
+  },
+  {
     title: '狀態色',
     description: '實色用於 icon、圓點、框線；文字請用 *-text，底色用 *-soft。',
     swatches: [
@@ -148,8 +163,10 @@ const CONTRAST_PAIRS: { fg: string; bg: string; usage: string; large?: boolean; 
   { fg: '--text-on-brand', bg: '--brand-orange-strong-hover', usage: '主要按鈕 hover' },
   { fg: '--brand-orange-text', bg: '--bg', usage: '連結 on 頁面底' },
   { fg: '--brand-orange-text', bg: '--brand-orange-soft', usage: '次要按鈕、品牌標籤' },
-  { fg: '--text-on-brand', bg: '--danger-strong', usage: '危險按鈕' },
+  { fg: '--text-on-danger', bg: '--danger-strong', usage: '危險按鈕' },
   { fg: '--text', bg: '--bg', usage: '內文' },
+  { fg: '--text-on-inverse', bg: '--surface-inverse', usage: '深色色帶文字' },
+  { fg: '--text-on-accent', bg: '--surface-accent', usage: '強調色帶、secondary 按鈕' },
   { fg: '--text-secondary', bg: '--surface', usage: '次要文字 on 卡片' },
   { fg: '--text-muted', bg: '--bg', usage: '輔助說明 on 頁面底' },
   { fg: '--text-muted', bg: '--surface-muted', usage: 'placeholder on 輸入框' },
@@ -175,11 +192,12 @@ const TYPE_SCALE = [
 
 const SPACING = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16];
 const RADII = [
-  { token: '--radius-sm', px: 6, use: '標籤' },
-  { token: '--radius-md', px: 8, use: '按鈕、輸入框' },
-  { token: '--radius-lg', px: 12, use: '小卡片、icon 方塊' },
-  { token: '--radius-xl', px: 16, use: '大卡片、彈窗' },
-  { token: '--radius-full', px: 999, use: '膠囊、頭像' },
+  { token: '--radius-sm', use: '標籤' },
+  { token: '--radius-md', use: '按鈕、輸入框' },
+  { token: '--radius-lg', use: '小卡片、icon 方塊' },
+  { token: '--radius-xl', use: '大卡片、彈窗' },
+  { token: '--radius-2xl', use: '頁面大區塊' },
+  { token: '--radius-full', use: '膠囊、頭像' },
 ];
 const SHADOWS = [
   { token: '--shadow-sm', use: '卡片靜止' },
@@ -233,7 +251,7 @@ function contrastRatio(a: string, b: string) {
 }
 
 /** 讀取目前主題下 token 的實際值（切換深色模式時會重讀） */
-function useTokenReader(theme: BbTheme) {
+function useTokenReader(theme: string) {
   const ref = useRef<HTMLDivElement>(null);
   const [, force] = useState(0);
   useEffect(() => force((n) => n + 1), [theme]);
@@ -471,16 +489,16 @@ function SpacingSection() {
   );
 }
 
-function RadiusSection() {
+function RadiusSection({ read }: { read: (t: string) => string }) {
   return (
     <Section id="radius" title="圓角" lead="大圓角是親切感的來源；同一張卡片內，內層圓角要小於外層。">
-      <div className="dsp-grid dsp-grid--5">
+      <div className="dsp-grid dsp-grid--6">
         {RADII.map((r) => (
           <div key={r.token} className="dsp-token-tile">
             <span className="dsp-radius-box" style={{ borderRadius: `var(${r.token})` }} />
             <code>{r.token}</code>
             <span className="bb-caption bb-text-muted">
-              {r.px === 999 ? '999px' : `${r.px}px`}・{r.use}
+              {read(r.token).toLowerCase()}・{r.use}
             </span>
           </div>
         ))}
@@ -1326,6 +1344,87 @@ function DividerSection() {
   );
 }
 
+const MENU = [
+  { name: '阿嬤滷肉飯', desc: '慢火滷足 6 小時，肥瘦剛好', price: 95, badge: '早鳥價' },
+  { name: '日式豬排便當', desc: '現炸厚切豬排，附三樣配菜', price: 135 },
+  { name: '番茄牛肉麵', desc: '牛骨湯頭加整顆番茄燉煮', price: 150, badge: '剩 3 份' },
+  { name: '蔬食咖哩飯', desc: '根莖蔬菜與椰奶，微辣', price: 110 },
+];
+
+function ShowcaseSection() {
+  return (
+    <Section
+      id="showcase"
+      title="版面範例"
+      lead="滿版色帶、菜單列表、統計數字。切換上方「風格」比較 classic 與 cafe。"
+    >
+      <div className="dsp-band dsp-band--inverse">
+        <Coffee size={24} aria-hidden="true" />
+        <p className="bb-h1 dsp-band__statement">
+          前一天先訂好，隔天不用排隊，<br />
+          把午休留給<span className="dsp-band__chip">好好吃飯</span>這件事。
+        </p>
+        <p className="bb-body-sm">BunnBaa 飯飽從一個念頭開始：讓每個人都能準時吃到一頓熱騰騰的午餐。</p>
+      </div>
+      <div className="dsp-band dsp-band--accent" aria-hidden="true">
+        <span>早鳥優惠中</span>・<span>明天 10:30 前免費取消</span>・<span>轉讓給同學也可以</span>・<span>早鳥優惠中</span>
+      </div>
+
+      <div className="dsp-menu">
+        <div className="dsp-menu__head">
+          <IconBox>
+            <Utensils />
+          </IconBox>
+          <p className="bb-h1">本週最受歡迎</p>
+          <div className="dsp-row">
+            {['便當', '麵食', '素食', '飲料'].map((t, i) => (
+              <Tag key={t} selected={i === 0}>
+                {t}
+              </Tag>
+            ))}
+          </div>
+        </div>
+        <ul className="dsp-menu__list">
+          {MENU.map((m) => (
+            <li key={m.name} className="dsp-menu__item">
+              <span className="dsp-menu__photo" aria-hidden="true">
+                <Utensils size={24} />
+                {m.badge && (
+                  <Badge tone="brand" size="sm" className="dsp-menu__badge">
+                    {m.badge}
+                  </Badge>
+                )}
+              </span>
+              <div className="dsp-menu__text">
+                <p className="bb-h3">{m.name}</p>
+                <p className="bb-body-sm bb-text-secondary">{m.desc}</p>
+              </div>
+              <span className="bb-h3 bb-num">NT$ {m.price}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="dsp-row dsp-row--center dsp-menu__foot">
+          <Button variant="secondary">看完整菜單</Button>
+          <Button>立即預約</Button>
+        </div>
+      </div>
+
+      <div className="dsp-stats">
+        {[
+          ['12K', '份午餐已送達'],
+          ['38', '家合作店家'],
+          ['4.9', '平均評分'],
+        ].map(([n, l]) => (
+          <div key={l} className="dsp-stats__item">
+            <span className="bb-display bb-num">{n}</span>
+            <span className="bb-body-sm bb-text-secondary">{l}</span>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    頁面
    ══════════════════════════════════════════════════════════════════════════ */
@@ -1338,7 +1437,10 @@ export default function DesignSystemPreview() {
       return 'light';
     }
   });
-  const { ref, read } = useTokenReader(theme);
+  // 風格切換的是整站狀態（外層 SiteThemeRoot 與 <html>），離開本頁時還原預設
+  const { look, setLook } = useSiteLook();
+  useEffect(() => () => setLook(DEFAULT_SITE_LOOK), [setLook]);
+  const { ref, read } = useTokenReader(`${theme}-${look}`);
 
   useEffect(() => {
     try {
@@ -1353,7 +1455,7 @@ export default function DesignSystemPreview() {
   }, []);
 
   return (
-    <ThemeRoot theme={theme} className="dsp" ref={ref}>
+    <ThemeRoot theme={theme} look={look} className="dsp" ref={ref}>
       <ToastProvider>
         <header className="dsp-top">
           <div className="dsp-top__inner">
@@ -1364,6 +1466,16 @@ export default function DesignSystemPreview() {
               </span>
               <span className="dsp-brand__sub">飯飽 Design System</span>
             </div>
+            <div className="dsp-top__switches">
+            <Tabs
+              aria-label="風格"
+              value={look}
+              onValueChange={(v) => setLook(v as BbLook)}
+              items={[
+                { value: 'classic', label: 'Classic' },
+                { value: 'cafe', label: 'Cafe', icon: <Coffee size={16} /> },
+              ]}
+            />
             <Tabs
               aria-label="主題"
               value={theme}
@@ -1373,6 +1485,7 @@ export default function DesignSystemPreview() {
                 { value: 'dark', label: '深色', icon: <Moon size={16} /> },
               ]}
             />
+            </div>
           </div>
           <nav className="dsp-nav" aria-label="章節">
             {SECTIONS.map((s) => (
@@ -1395,11 +1508,12 @@ export default function DesignSystemPreview() {
             </p>
           </div>
 
+          <ShowcaseSection />
           <ColorSection read={read} />
           <ContrastSection read={read} />
           <TypographySection />
           <SpacingSection />
-          <RadiusSection />
+          <RadiusSection read={read} />
           <ShadowSection />
           <MotionSection />
           <IconSection />

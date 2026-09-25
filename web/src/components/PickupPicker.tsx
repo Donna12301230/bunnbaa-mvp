@@ -71,7 +71,7 @@ export default function PickupPicker({ date, window, onDateChange, onWindowChang
                   checked={selected && slot.open}
                   disabled={!slot.open}
                   onChange={() => onWindowChange(slot.window)}
-                  className="accent-orange-500 w-4 h-4"
+                  className="accent-primary w-4 h-4"
                 />
                 <span className="text-sm font-medium">{slotLabel(slot.window)}</span>
                 {status && <span className="text-xs text-muted-foreground ml-auto">{status}</span>}

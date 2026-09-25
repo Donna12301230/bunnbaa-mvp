@@ -11,20 +11,22 @@ export default {
   theme: {
     extend: {
       // 圓角對齊設計系統：sm 6（標籤）/ md 8（按鈕、輸入框）/ lg 12（小卡片）/ xl 16（大卡片、彈窗）
+      // lg / xl / 2xl 讀 tokens，cafe 風格會整體放大
       borderRadius: {
         sm: "6px",
         md: "8px",
-        lg: "12px",
-        xl: "16px",
-        "2xl": "20px",
+        lg: "var(--radius-lg)",
+        xl: "var(--radius-xl)",
+        "2xl": "calc(var(--radius-xl) + 4px)",
       },
       // 暖棕色調陰影，不用純黑（對應 --shadow-sm / md / lg）
+      // 讀 tokens；cafe 風格的 --shadow-sm 為 none（靜態卡片改用描邊）
       boxShadow: {
-        sm: "0 2px 8px rgba(120, 80, 40, 0.05)",
-        DEFAULT: "0 2px 8px rgba(120, 80, 40, 0.06)",
-        md: "0 8px 24px rgba(120, 80, 40, 0.08)",
-        lg: "0 16px 40px rgba(120, 80, 40, 0.12)",
-        xl: "0 20px 48px rgba(120, 80, 40, 0.14)",
+        sm: "var(--shadow-sm)",
+        DEFAULT: "var(--shadow-sm)",
+        md: "var(--shadow-md)",
+        lg: "var(--shadow-lg)",
+        xl: "var(--shadow-lg)",
       },
       // 字級對齊設計系統（tokens.css --font-*-size）；text-xs/sm/base 等 Tailwind 預設仍可用
       fontSize: {
@@ -46,13 +48,14 @@ export default {
            這裡整組換成品牌色系，不改頁面檔即可整站換裝。
            500 以上的色階皆確保白字對比 ≥ 4.5:1（見 #/design-system 對比檢查）。 */
         orange: {
-          50: "#FFF4E3",   // --brand-orange-tint
-          100: "#FDEBD3",  // --brand-orange-soft
-          200: "#FBDDB5",
+          // 50–200、500、600 讀 tokens.css --palette-orange-*（cafe 風格會改寫）
+          50: withAlpha("--palette-orange-50"),   // --brand-orange-tint
+          100: withAlpha("--palette-orange-100"), // --brand-orange-soft
+          200: withAlpha("--palette-orange-200"),
           300: "#F7C27A",
           400: "#F29E0C",  // --brand-orange（Logo、icon、裝飾、focus 外框）
-          500: "#B35A00",  // --brand-orange-strong：主要按鈕底，白字 4.80:1
-          600: "#944A00",  // --brand-orange-strong-hover
+          500: withAlpha("--palette-orange-500"), // --brand-orange-strong：主要按鈕底，白字 4.80:1
+          600: withAlpha("--palette-orange-600"), // --brand-orange-strong-hover
           700: "#7A3D00",
           800: "#5E3000",
           900: "#472400",
@@ -65,8 +68,8 @@ export default {
           300: "#E8BD6A",
           400: "#E0A030",  // --warning
           // 頁面把 amber-500 / 600 當主要按鈕底（登入頁、廠商後台），統一為品牌主行動色
-          500: "#B35A00",  // = orange-500，白字 4.80:1
-          600: "#944A00",  // = orange-600
+          500: withAlpha("--palette-orange-500"), // = orange-500，白字 4.80:1
+          600: withAlpha("--palette-orange-600"), // = orange-600
           700: "#7A4D0F",
           800: "#653F0E",
           900: "#4F310C",
@@ -210,11 +213,24 @@ export default {
           hover: withAlpha("--brand-navy-hover"),
         },
         "surface-dark": withAlpha("--surface-dark"),
+        // logo「飯」字色帶（tokens.css --brand-rice），用法：bg-rice text-rice-foreground
+        rice: {
+          DEFAULT: withAlpha("--brand-rice"),
+          hover: withAlpha("--brand-rice-hover"),
+          foreground: withAlpha("--text-on-rice"),
+        },
+        // 設計系統描邊線與色帶（tokens.css；cafe 風格下為深可可棕 / 奶油黃）
+        ink: withAlpha("--border-ink"),
+        inverse: {
+          DEFAULT: withAlpha("--surface-inverse"),
+          foreground: withAlpha("--text-on-inverse"),
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+        heading: ["var(--font-heading)"],
       },
       keyframes: {
         "accordion-down": {

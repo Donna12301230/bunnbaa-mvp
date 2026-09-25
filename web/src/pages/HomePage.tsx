@@ -235,18 +235,18 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <MarketplaceHeader active="plans" />
       <GrowthRewardTicker />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 flex flex-col lg:flex-row gap-6">
         {/* ── 左側：計畫工具箱 ── */}
         <aside className="lg:w-72 shrink-0 space-y-4">
-          <h2 className="text-lg font-bold">計畫工具箱</h2>
+          <h2 className="font-heading text-2xl font-semibold">計畫工具箱</h2>
 
-          <div className="bg-white rounded-xl border border-border p-4 space-y-3">
+          <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
             <h3 className="text-sm font-semibold flex items-center gap-1.5">
-              <CalendarDays className="w-4 h-4 text-orange-500" /> 預約日曆
+              <CalendarDays className="w-4 h-4 text-primary" /> 預約日曆
             </h3>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">開始日期</label>
@@ -269,7 +269,7 @@ export default function HomePage() {
             <p className="text-xs text-center text-muted-foreground pt-1 border-t border-border">最快下週一供餐</p>
           </div>
 
-          <div className="bg-white rounded-xl border border-border p-4 space-y-3">
+          <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
             <h3 className="text-sm font-semibold">取餐時段</h3>
             <label className="text-xs text-muted-foreground block -mt-1">單點型鎖定用，選一個日期跟時段</label>
             <PickupPicker
@@ -281,47 +281,47 @@ export default function HomePage() {
             />
           </div>
 
-          <div className="bg-green-50 border border-green-200 rounded-xl p-3.5 flex gap-2.5">
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-3.5 flex gap-2.5">
             <ShieldCheck className="w-4 h-4 text-green-700 shrink-0 mt-0.5" />
             <p className="text-xs leading-relaxed text-green-800">保障說明：店家若未如期出餐，全額退款並加贈 20 點回饋金。</p>
           </div>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex gap-2.5">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex gap-2.5">
             <Bell className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
             <p className="text-xs leading-relaxed text-amber-800">取餐提醒：鎖定成功後，我們會在取餐時段開始前推播通知，降低錯過取餐的機率。</p>
           </div>
 
-          <div className="bg-white rounded-xl border border-border p-4 space-y-3">
+          <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
             <h3 className="text-sm font-semibold">早鳥預約折扣</h3>
             <div className="space-y-2.5 text-sm">
               <div className="flex items-center gap-2.5">
-                <Clock className="w-4 h-4 text-orange-500 shrink-0" />
+                <Clock className="w-4 h-4 text-primary shrink-0" />
                 <span className="flex-1 text-muted-foreground">預約今天/明天</span>
-                <span className="font-bold text-orange-600">95折</span>
+                <span className="font-heading text-base font-semibold">95折</span>
               </div>
               <div className="flex items-center gap-2.5">
-                <CalendarDays className="w-4 h-4 text-orange-500 shrink-0" />
+                <CalendarDays className="w-4 h-4 text-primary shrink-0" />
                 <span className="flex-1 text-muted-foreground">提前 2-13 天</span>
-                <span className="font-bold text-orange-600">8折</span>
+                <span className="font-heading text-base font-semibold">8折</span>
               </div>
               <div className="flex items-center gap-2.5">
-                <Rocket className="w-4 h-4 text-orange-500 shrink-0" />
+                <Rocket className="w-4 h-4 text-primary shrink-0" />
                 <span className="flex-1 text-muted-foreground">提前 14-30 天</span>
-                <span className="font-bold text-orange-600">7折</span>
+                <span className="font-heading text-base font-semibold">7折</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-border p-4 space-y-2.5">
+          <div className="bg-card rounded-2xl border border-ink p-4 space-y-2.5">
             <h3 className="text-sm font-semibold flex items-center gap-1.5">
-              <Trophy className="w-4 h-4 text-orange-500" /> 成長獎勵抽獎
+              <Trophy className="w-4 h-4 text-primary" /> 成長獎勵抽獎
             </h3>
             {growthUnlocked ? (
               <>
                 <p className="text-xs text-muted-foreground">校園咖啡廳已解鎖抽獎，手氣好可以抽到整份 0 元！</p>
                 <Button
                   size="sm"
-                  className="w-full bg-brand-navy hover:bg-brand-navy-hover text-white"
+                  className="w-full"
                   disabled={drawing}
                   onClick={handleDrawGrowthReward}
                 >
@@ -333,9 +333,9 @@ export default function HomePage() {
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-border p-4 space-y-3">
+          <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
             <h3 className="text-sm font-semibold flex items-center gap-1.5">
-              <SlidersHorizontal className="w-4 h-4 text-orange-500" /> 進階篩選
+              <SlidersHorizontal className="w-4 h-4 text-primary" /> 進階篩選
             </h3>
             <p className="text-xs font-semibold text-muted-foreground">排序依</p>
             <div className="space-y-1.5">
@@ -346,7 +346,7 @@ export default function HomePage() {
                     name="sortBy"
                     checked={selectedSort === opt.id}
                     onChange={() => setSelectedSort(opt.id)}
-                    className="accent-orange-500 w-4 h-4"
+                    className="accent-primary w-4 h-4"
                   />
                   <span className={`text-sm ${selectedSort === opt.id ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
                     {opt.label}
@@ -363,8 +363,8 @@ export default function HomePage() {
           <section className="space-y-4">
             <div className="flex items-baseline justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2.5">
-                <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-orange-500 text-white">單點型</span>
-                <h3 className="text-lg font-bold">今日推薦鎖定方案</h3>
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground border border-ink">單點型</span>
+                <h3 className="font-heading text-2xl font-semibold">今日推薦鎖定方案</h3>
               </div>
               <span className="text-sm text-muted-foreground font-semibold">{pickupDate}・{pickupWindow}</span>
             </div>
@@ -373,30 +373,30 @@ export default function HomePage() {
               {lockMealCards.map(({ item, vendor }) => {
                 const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
                 return (
-                  <article key={item.id} className="bg-white rounded-xl border border-border overflow-hidden flex flex-col">
-                    <div className="relative h-32 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
-                      <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                  <article key={item.id} className="bg-card rounded-2xl border border-ink overflow-hidden flex flex-col">
+                    <div className="relative h-32 bg-secondary border-b border-ink flex items-center justify-center">
+                      <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/70" strokeWidth={1.75} aria-hidden="true" />
                       {vendor.verified && (
-                        <span className="absolute top-2.5 left-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
+                        <span className="absolute top-2.5 left-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-card text-foreground border border-ink">
                           <BadgeCheck className="w-3 h-3" /> 認證商家
                         </span>
                       )}
                       {vendor.reliability_tone === "stable" && (
-                        <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-white text-green-700">
+                        <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-card text-green-700 border border-ink">
                           <CheckCircle2 className="w-3 h-3" /> 履約穩定度：穩定
                         </span>
                       )}
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
                       <div>
-                        <h4 className="font-bold text-body leading-snug">{item.name}</h4>
+                        <h4 className="font-heading text-h3 leading-snug">{item.name}</h4>
                         <p className="text-xs text-muted-foreground font-semibold mt-0.5">{vendor.name}・取餐時段：{pickupDate}（{pickupWindow}）</p>
                       </div>
 
                       <div className="flex items-center justify-between mt-auto pt-1">
                         <div>
-                          {discountPercent > 0 && <span className="text-xs text-gray-500 line-through mr-1.5">原價 ${item.price}</span>}
-                          <span className="text-xl font-extrabold">${lockedPrice}</span>
+                          {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through mr-1.5">原價 ${item.price}</span>}
+                          <span className="font-heading text-2xl font-semibold">${lockedPrice}</span>
                         </div>
                         <Button
                           size="sm"
@@ -437,7 +437,7 @@ export default function HomePage() {
                         </p>
                       </div>
 
-                      <label className="flex items-start gap-1.5 p-2 rounded-lg bg-gray-50 border border-border cursor-pointer">
+                      <label className="flex items-start gap-1.5 p-2 rounded-lg bg-muted border border-border cursor-pointer">
                         <Checkbox
                           checked={hasAcked}
                           onCheckedChange={() => setWaiverAck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
@@ -473,17 +473,17 @@ export default function HomePage() {
 
           {/* 合作店家與計畫 */}
           <section>
-            <h3 className="text-lg font-bold mb-3">合作店家與計畫</h3>
+            <h3 className="font-heading text-2xl font-semibold mb-3">合作店家與計畫</h3>
             <div className="space-y-4">
               {vendorPlanGroups.map(group => (
-                <div key={group.vendorId} className="bg-white rounded-xl border border-border p-4 grid grid-cols-1 md:grid-cols-[220px_1fr_1fr] gap-4">
+                <div key={group.vendorId} className="bg-accent rounded-3xl border border-ink p-5 grid grid-cols-1 md:grid-cols-[220px_1fr_1fr] gap-4">
                   {/* 店家資訊 */}
                   <Link href={`/vendor/${group.vendorId}`} className="flex md:flex-col gap-3 hover:opacity-90">
-                    <div className="w-20 h-20 md:w-full md:h-32 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center shrink-0">
-                      <Store className="h-8 w-8 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                    <div className="w-20 h-20 md:w-full md:h-32 rounded-2xl bg-secondary border border-ink flex items-center justify-center shrink-0">
+                      <Store className="h-8 w-8 text-secondary-foreground/70" strokeWidth={1.75} aria-hidden="true" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-sm mb-1 truncate">{group.vendorName}</p>
+                      <p className="font-heading text-h3 mb-1 truncate">{group.vendorName}</p>
                       {group.plans.map(p => (
                         <div key={p.id} className="flex items-center gap-1 text-xs text-muted-foreground">
                           <span className="truncate">{p.label}：{p.name}</span>
@@ -497,15 +497,15 @@ export default function HomePage() {
 
                   {/* 方案卡片 */}
                   {group.plans.map(plan => (
-                    <div key={plan.id} className="bg-gray-50 rounded-lg p-3 flex flex-col">
-                      <p className="text-sm font-semibold mb-0.5">{plan.label}：{plan.name}</p>
+                    <div key={plan.id} className="bg-card rounded-2xl border border-ink p-4 flex flex-col">
+                      <p className="font-heading text-base font-semibold mb-0.5">{plan.label}：{plan.name}</p>
                       <p className="text-xs text-muted-foreground mb-3">{plan.description}</p>
-                      <p className="text-sm font-bold text-orange-600 mb-2">NT$ {plan.price_per_meal} / 餐起</p>
-                      <span className="inline-block w-fit text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full mb-3">
+                      <p className="font-heading text-lg font-semibold mb-2">NT$ {plan.price_per_meal} / 餐起</p>
+                      <span className="inline-block w-fit text-xs bg-secondary text-secondary-foreground border border-ink px-2.5 py-0.5 rounded-full mb-3">
                         最快履約：{plan.fastest_booking}
                       </span>
                       <Button
-                        className="mt-auto w-full bg-brand-navy hover:bg-brand-navy-hover text-white text-sm"
+                        className="mt-auto w-full text-sm"
                         disabled={joiningPlanId === `${group.vendorId}-${plan.id}` || !!joinedPlanIds[`${group.vendorId}-${plan.id}`]}
                         onClick={() => handleJoinPlan(group, plan)}
                       >
@@ -522,21 +522,21 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* 同學轉讓保底專區（含轉讓優惠橫捲清單，併成同一區塊放最下面） */}
-          <section className="rounded-xl p-6 bg-gradient-to-br from-orange-500 to-orange-600 space-y-5">
+          {/* 同學轉讓保底專區（含轉讓優惠橫捲清單，併成同一區塊放最下面）；底色跟轉讓市集橫幅一樣用 logo「飯」字色 */}
+          <section className="rounded-3xl p-6 md:p-8 bg-rice text-rice-foreground space-y-5">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div className="flex items-center gap-3.5">
-                <Repeat className="w-7 h-7 text-white shrink-0" />
+                <Repeat className="w-7 h-7 shrink-0" />
                 <div>
-                  <h3 className="font-bold text-white text-body mb-0.5">同學轉讓保底專區</h3>
-                  <p className="text-sm text-white max-w-xl">
+                  <h3 className="font-heading text-2xl font-semibold mb-1">同學轉讓保底專區</h3>
+                  <p className="text-sm max-w-xl">
                     臨時去不了？可安全轉讓給同學，全額入袋；逾時沒人接手，系統會自動開放到轉讓市集、$0 元供人領取，不浪費一份鎖定。
                   </p>
                 </div>
               </div>
               <Link
                 href="/marketplace"
-                className="shrink-0 text-sm font-bold px-5 py-2.5 rounded-xl bg-white text-orange-600 hover:bg-amber-50 transition-colors"
+                className="shrink-0 text-sm font-bold px-5 py-2.5 rounded-full bg-secondary text-secondary-foreground border border-ink hover:bg-secondary/85 transition-colors"
               >
                 前往轉讓市集
               </Link>
@@ -544,18 +544,18 @@ export default function HomePage() {
 
             <div className="flex gap-3 overflow-x-auto pb-1">
               {transfers.map(t => (
-                <div key={t.id} className="shrink-0 w-64 bg-white rounded-xl p-3 shadow-sm">
+                <div key={t.id} className="shrink-0 w-64 bg-card text-foreground rounded-2xl p-3 border border-ink">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-                      <User className="w-3.5 h-3.5 text-orange-500" />
+                    <div className="w-6 h-6 rounded-full bg-secondary border border-ink flex items-center justify-center shrink-0">
+                      <User className="w-3.5 h-3.5 text-secondary-foreground" />
                     </div>
                     <span className="text-xs font-medium truncate">使用者 {t.buyer_uid.slice(-6)} 轉讓</span>
                   </div>
                   <p className="text-sm font-semibold line-clamp-1 mb-2">{t.item_name}</p>
                   <div className="flex items-baseline gap-1.5 mb-1">
-                    <span className="text-sm font-bold text-orange-600">轉讓價 ${t.locked_price}</span>
+                    <span className="font-heading text-base font-semibold">轉讓價 ${t.locked_price}</span>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-1.5 mt-1.5 border-t border-gray-100">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-1.5 mt-1.5 border-t border-border">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       {(t as any).resale_deadline?.toDate ? formatResaleCountdown((t as any).resale_deadline.toDate(), now) : "—"}

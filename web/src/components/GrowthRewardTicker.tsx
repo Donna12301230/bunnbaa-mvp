@@ -29,11 +29,11 @@ export default function GrowthRewardTicker() {
   const items = [...bigWins, ...bigWins]; // 重複一次讓 -50% 位移可以無縫循環
 
   return (
-    <div className="overflow-hidden bg-surface-dark py-2.5 whitespace-nowrap">
+    <div className="overflow-hidden bg-rice py-3 whitespace-nowrap">
       <div className="inline-flex items-center gap-12 animate-marquee">
         {items.map((win, i) => (
-          <span key={`${win.id}-${i}`} className="inline-flex items-center gap-2 text-xs font-bold text-amber-200 shrink-0">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span key={`${win.id}-${i}`} className="inline-flex items-center gap-2 text-sm md:text-base font-bold text-rice-foreground shrink-0">
+            <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-amber-200 shrink-0" />
             使用者 {win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} 剛抽中「{win.item_name ?? "整份餐點"}」整份 0 元大獎！
           </span>
         ))}
