@@ -6,7 +6,7 @@ import { auth } from "./firebase";
 // there's no custom-claims backend yet (Cloud Functions blocked on Blaze),
 // so this is a plain email allowlist checked on the client for UX purposes.
 // The real access boundary is firestore.rules.
-export const ADMIN_EMAILS = ["suw192336@gmail.com"];
+export const ADMIN_EMAILS = ["suw192336@gmail.com", "ckchildlikekid@gmail.com"];
 
 export function useAdminUser() {
   const [user, setUser] = useState<User | null>(null);

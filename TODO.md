@@ -16,12 +16,13 @@
 - [-] **LINE Pay／綠界特約商店審核**（2026-09-24 決定：Demo 沿用 Sandbox，暫不送審）——Sandbox 已全部跑通。之後要正式上線再送審（可能要數週），審核過後把 `functions/.env` 換成正式 Channel ID/Secret＋`LINE_PAY_ENV=production` 即可，程式碼不用改
 - [V] **VAPID key**——2026-09-24 已填入，待部署 hosting 後在正式站驗證。（`web/src/lib/messaging.ts` 的 `VAPID_KEY`）
 
-### 2. 部署（2026-09-23 晚上的變更還沒上正式站）
+### 2. 部署（2026-09-25 已全部部署：規則＋索引、Functions、hosting）
 
 `firestore.rules` 新增 `menu_items`／`meal_plans`／`ban_appeals` 規則，`functions/src/index.js` 改了 `createCartLinePayReservation`／`createLinePayReservation`（改吃每個品項的真實 `vendor_id`）：
-- [ ] `firebase deploy --only firestore:rules,firestore:indexes`（2026-09-24 再次更新：`locks` 改成只有轉賣中／贈送中公開讀，新增 `vendor_id+status+created_at` 複合索引——**索引要先建好**，不然轉讓市集查詢會失敗；2026-09-24 又新增 `users`／`vendor_applications` 規則，平台登入改真實 Firebase Auth 後註冊、廠商申請都要靠這兩條）
-- [ ] `firebase deploy --only functions`（2026-09-24 起消費端 callable 會擋匿名身分，前端已不再匿名登入，**規則、Functions、hosting 要一起部署**，不然舊版前端的匿名使用者會全部被擋）
-- [ ] `cd web && npm run build` 後 `firebase deploy --only hosting`（設計系統／新 design tokens 也還沒上線）
+- [x] `firebase deploy --only firestore:rules,firestore:indexes`（2026-09-24 再次更新：`locks` 改成只有轉賣中／贈送中公開讀，新增 `vendor_id+status+created_at` 複合索引——**索引要先建好**，不然轉讓市集查詢會失敗；2026-09-24 又新增 `users`／`vendor_applications` 規則，平台登入改真實 Firebase Auth 後註冊、廠商申請都要靠這兩條）
+- [x] `firebase deploy --only functions`（2026-09-24 起消費端 callable 會擋匿名身分，前端已不再匿名登入，**規則、Functions、hosting 要一起部署**，不然舊版前端的匿名使用者會全部被擋）
+- [x] `cd web && npm run build` 後 `firebase deploy --only hosting`（設計系統／新 design tokens 也還沒上線）
+- [ ] **Functions runtime 升級**：部署時警告 Node.js 20 於 **2026-10-30 停用**，之後無法再部署 Functions。10/18 Demo 不受影響，比賽後要繼續改 Functions 前，先把 `functions/package.json` 的 engines 升到 Node 22＋`firebase-functions@latest`（有 breaking changes，要重測）
 - [ ] 部署後實測一次購物車結帳，到 Firestore Console 確認新的 `locks.vendor_id` 對應下單的商家，不是全部掛在 `cafe-renheya-demo`
 
 ### 3. 正式站驗證（已部署，但還沒在正式站實際跑過）
@@ -82,6 +83,7 @@
 - **路徑雷**（專案路徑含中文字和 `+` 號，Windows 上兩個工具的行為相反）：
   - Firebase emulator 在中文路徑下會卡在 discovery timeout → 要從 ASCII junction `C:\Users\USER\bunnbaa-dev` 執行（2026-09-24 已確認指向 repo 根目錄）。若日後 repo 搬家要重建：`rmdir C:\Users\USER\bunnbaa-dev` 後執行 `mklink /J C:\Users\USER\bunnbaa-dev "D:\雅婷\03赫滋與羊\+程式碼\BunnBaa"`（在 cmd 裡跑）
   - Vite dev server 從 junction 路徑執行會出現空白頁 → **要留在原本的中文路徑** `D:\雅婷\03赫滋與羊\+程式碼\BunnBaa\web`
+- **Functions 部署逾時**：`firebase deploy --only functions` 偶爾在 Windows 上報 `User code failed to load ... Timeout after 10000`（程式碼本身沒問題，是 CLI 分析階段超過 10 秒）。改用 `FUNCTIONS_DISCOVERY_TIMEOUT=60 npx firebase deploy --only functions`（Git Bash 語法）重跑即可。
 - **Java**：Firestore/Auth emulator 需要 JRE，已用 winget 裝 Microsoft OpenJDK 21 並加進 PATH。
 - **`web/.env.local` 的 `VITE_USE_EMULATORS`**：`true` 連本機 emulator、`false` 連雲端 Firestore（2026-09-24 起本機設為 `false`）。已排除在 `.gitignore`，2026-09-24 已在 `firebase.ts` 加上 `import.meta.env.DEV` 判斷，正式建置不會誤連 emulator。
 - **本機開發**：repo 根目錄 `npm run dev` 只開 Vite :5300，直接讀寫雲端 Firestore（⚠️ 本機操作會寫進正式資料）。要隔離測試：`.env.local` 改 `true` 後 `npm run dev:emulator`（`scripts/dev-local.ps1`＝junction 啟動 emulator，資料存 `.emulator-data/` → 首次自動灌種子 → 中文路徑啟動 Vite）；重灌用 `npm run dev:emulator:reset`；emulator 視窗要用 Ctrl+C 關才會存檔。

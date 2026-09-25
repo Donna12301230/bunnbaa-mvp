@@ -126,6 +126,18 @@ function friendlyAuthError(err: unknown): Error {
   return new Error(messages[code] ?? (err as Error)?.message ?? "發生未知錯誤");
 }
 
+// 表單欄位一律去掉前後空白；只有空白的欄位視同沒填。
+function clean(value?: string): string {
+  return (value ?? "").trim();
+}
+
+// 密碼不 trim（會改到使用者真正設定的密碼），但註冊時擋掉全空白和前後空白，
+// 避免不小心多打一個空格、之後怎麼登都登不進去。
+function assertValidNewPassword(password: string) {
+  if (!password.trim()) throw new Error("請輸入密碼");
+  if (password !== password.trim()) throw new Error("密碼前後不能有空白");
+}
+
 export async function login(email: string, password: string): Promise<void> {
   if (!email.trim() || !password) throw new Error("請輸入 Email 與密碼");
   try {
@@ -143,14 +155,18 @@ export async function register(input: {
   school?: string;
   department?: string;
 }): Promise<void> {
+  const email = clean(input.email);
+  const displayName = clean(input.displayName);
+  if (!email) throw new Error("請輸入 Email");
+  assertValidNewPassword(input.password);
   try {
-    const { user } = await createUserWithEmailAndPassword(auth, input.email.trim(), input.password);
-    if (input.displayName) await updateProfile(user, { displayName: input.displayName });
+    const { user } = await createUserWithEmailAndPassword(auth, email, input.password);
+    if (displayName) await updateProfile(user, { displayName });
     await setDoc(doc(db, "users", user.uid), {
-      display_name: input.displayName ?? "",
-      phone: input.phone ?? "",
-      school: input.school ?? "",
-      department: input.department ?? "",
+      display_name: displayName,
+      phone: clean(input.phone),
+      school: clean(input.school),
+      department: clean(input.department),
       created_at: serverTimestamp(),
     });
     // onAuthStateChanged 在寫入顯示名稱／個人資料之前就觸發了，手動再解析一次
@@ -170,19 +186,23 @@ export async function applyAsVendor(input: {
   storeName: string;
   phone?: string;
 }): Promise<void> {
-  await register({ email: input.email, password: input.password, displayName: input.storeName, phone: input.phone });
+  const storeName = clean(input.storeName);
+  // 先檢查再建帳號，不然會留下一個沒有申請單的空帳號
+  if (!storeName) throw new Error("請填寫店家名稱");
+  await register({ email: input.email, password: input.password, displayName: storeName, phone: input.phone });
   const user = auth.currentUser;
   if (!user) throw new Error("帳號建立失敗，請重試");
   await setDoc(doc(db, "vendor_applications", user.uid), {
-    store_name: input.storeName.trim(),
-    phone: input.phone ?? "",
-    email: input.email.trim(),
+    store_name: storeName,
+    phone: clean(input.phone),
+    email: clean(input.email),
     status: "pending",
     created_at: serverTimestamp(),
   });
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
+  if (!email.trim()) throw new Error("請輸入 Email");
   try {
     await sendPasswordResetEmail(auth, email.trim());
   } catch (err) {

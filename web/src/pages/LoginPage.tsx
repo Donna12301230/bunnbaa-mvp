@@ -101,7 +101,7 @@ export default function LoginPage() {
       return register({
         email: regEmail,
         password: regPassword,
-        displayName: displayName || regUsername,
+        displayName: displayName.trim() || regUsername.trim(),
         phone,
         school,
         department,

@@ -28,7 +28,7 @@
 | 角色 | 負責人 | 職責 |
 |---|---|---|
 | 資安負責人 | SU | `firestore.rules`／Cloud Functions 授權邏輯、ISO27001 對照與修補、管理員帳號（`suw192336@gmail.com`）持有人 |
-| 專案與帳務負責人 | Donna | GCP/Firebase 專案擁有者（`ckchildlikekid@gmail.com`）、Blaze 帳單、GitHub repo 擁有者、產品功能開發 |
+| 專案與帳務負責人 | Donna | GCP/Firebase 專案擁有者（`ckchildlikekid@gmail.com`）、Blaze 帳單、GitHub repo 擁有者、產品功能開發；2026-09-25 起同一個 email 也是**第二個平台管理員帳號**（App 層 Firebase Auth，跟 GCP 的 Google 帳號是兩套獨立登入），用於 SU 不在時核准廠商／續約，風險同 R1 |
 | 商家 | 平台核准後的獨立帳號 | 只能操作自己綁定的 `vendors/{id}`（`owner_uid`），無法存取其他商家或平台管理功能 |
 | 消費者 | 一般會員 | 只能操作自己的訂單／鎖定紀錄，無管理權限 |
 

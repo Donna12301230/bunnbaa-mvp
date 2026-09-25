@@ -8,7 +8,7 @@ service cloud.firestore {
     // ADMIN_EMAILS in web/src/lib/adminAuth.ts.
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email in ['suw192336@gmail.com'];
+        && request.auth.token.email in ['suw192336@gmail.com', 'ckchildlikekid@gmail.com'];
     }
 
     // Consumers must log in with a real account to lock, resell, gift or claim

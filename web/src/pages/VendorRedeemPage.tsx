@@ -24,7 +24,7 @@ import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 const DEMO_VENDOR_ID = "cafe-renheya-demo";
 
 const noShowSchema = z.object({
-  note: z.string().min(2, "請簡短描述狀況（至少 2 個字），這會餵給校準報告的落差模式分析"),
+  note: z.string().trim().min(2, "請簡短描述狀況（至少 2 個字），這會餵給校準報告的落差模式分析"),
 });
 type NoShowForm = z.infer<typeof noShowSchema>;
 
@@ -119,7 +119,8 @@ export default function VendorRedeemPage() {
   }
 
   async function handleSearch() {
-    const input = code.trim().toUpperCase();
+    // 取餐編號本身沒有空白，貼上時夾帶的空格（例如「AB3F 9K2M」）一律拿掉
+    const input = code.replace(/\s/g, "").toUpperCase();
     if (!input) return;
 
     setSearchError("");
@@ -271,7 +272,7 @@ export default function VendorRedeemPage() {
                 <Input
                   placeholder="例如：AB3F9K2M"
                   value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  onChange={(e) => setCode(e.target.value.replace(/\s/g, "").toUpperCase())}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   maxLength={10}
                   className="font-mono tracking-widest"

@@ -18,7 +18,7 @@ const { requestPayment, confirmPayment } = require("./linePay");
 // stored in vendors/{id}.owner_uid. The emulator is exempt so local demos keep
 // working. Keep the admin list in sync with firestore.rules isAdmin() and
 // web/src/lib/adminAuth.ts.
-const ADMIN_EMAILS = ["suw192336@gmail.com"];
+const ADMIN_EMAILS = ["suw192336@gmail.com", "ckchildlikekid@gmail.com"];
 
 function isEmulator() {
   return process.env.FUNCTIONS_EMULATOR === "true";
