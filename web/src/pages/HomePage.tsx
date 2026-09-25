@@ -18,20 +18,16 @@ import GrowthRewardTicker from "@/components/GrowthRewardTicker";
 import { auth, db, functions } from "@/lib/firebase";
 import type { Vendor, MenuItem, MealPlan, Lock } from "@/types";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
+import { nextAvailablePickup } from "@/lib/pickupSlots";
+import PickupPicker from "@/components/PickupPicker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
 const GROWTH_VENDOR_ID = "cafe-renheya-demo";
 const GROWTH_TIER_LABEL: Record<number, string> = { 80: "8折", 60: "6折", 50: "5折", 30: "3折", 10: "1折", 0: "整份 0 元" };
 
-// 「取餐時段」選單的顯示文字跟送出去的 pickup_window 分開存——後者要用 ASCII
-// 連字號（跟 discount_explanations 的 cacheKeyFor()/其他真實 locks 一致），
-// en dash 會被 cacheKeyFor() 的白名單正規化成底線，對不上快取的鍵。
-const TIME_SLOT_WINDOWS: Record<string, string> = {
-  slot1: "11:30-12:00",
-  slot2: "12:00-12:30",
-  slot3: "12:30-13:00",
-};
+// 取餐時段清單在 lib/pickupSlots.ts（pickup_window 用 ASCII 連字號，跟
+// discount_explanations 的 cacheKeyFor()/其他真實 locks 一致）。
 
 function formatResaleCountdown(deadline: Date, now: number): string {
   const diffMin = Math.round((deadline.getTime() - now) / 60000);
@@ -50,18 +46,13 @@ const SORT_OPTIONS = [
   { id: "rating", label: "評分" },
 ] as const;
 
-const TIME_SLOTS = [
-  { id: "slot1", label: "11:30–12:00" },
-  { id: "slot2", label: "12:00–12:30" },
-  { id: "slot3", label: "12:30–13:00" },
-] as const;
 
 export default function HomePage() {
   const { toast } = useToast();
   const [startDate, setStartDate] = useState("2026-09-22");
   const [endDate, setEndDate] = useState("2026-09-26");
-  const [pickupDate, setPickupDate] = useState("2026-09-25");
-  const [selectedSlot, setSelectedSlot] = useState<string>("slot2");
+  const [pickupDate, setPickupDate] = useState(() => nextAvailablePickup().date);
+  const [pickupWindow, setPickupWindow] = useState(() => nextAvailablePickup().window);
   const [selectedSort, setSelectedSort] = useState<string>("relevance");
   const [waiverAck, setWaiverAck] = useState<Record<string, boolean>>({});
   const [lockingMealId, setLockingMealId] = useState<string | null>(null);
@@ -179,15 +170,12 @@ export default function HomePage() {
     if (!requireLogin() || !uid) return;
     setLockingMealId(item.id);
     try {
-      const { discountPercent, lockedPrice } = applyEarlyBirdPrice(item.price, pickupDate);
+      // 價格由伺服器依 menu_items 重算，只送品項 id 跟取餐時間
       const fn = httpsCallable(functions, "createLinePayReservation");
       const result = await fn({
-        vendor_id: item.vendor_id,
-        item_name: item.name,
-        pickup_window: TIME_SLOT_WINDOWS[selectedSlot],
+        menu_item_id: item.id,
+        pickup_window: pickupWindow,
         pickup_date: pickupDate,
-        discount_percent: discountPercent,
-        locked_price: lockedPrice,
       });
       const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
       window.location.href = paymentUrl;
@@ -275,34 +263,13 @@ export default function HomePage() {
           <div className="bg-white rounded-xl border border-border p-4 space-y-3">
             <h3 className="text-sm font-semibold">取餐時段</h3>
             <label className="text-xs text-muted-foreground block -mt-1">單點型鎖定用，選一個日期跟時段</label>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">取餐日期</label>
-              <Input
-                type="date"
-                value={pickupDate}
-                onChange={e => setPickupDate(e.target.value)}
-                className="h-10"
-              />
-            </div>
-            <div className="space-y-2">
-              {TIME_SLOTS.map(slot => (
-                <label
-                  key={slot.id}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors ${
-                    selectedSlot === slot.id ? "border-orange-400 bg-orange-50" : "border-border bg-gray-50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="pickupSlot"
-                    checked={selectedSlot === slot.id}
-                    onChange={() => setSelectedSlot(slot.id)}
-                    className="accent-orange-500 w-4 h-4"
-                  />
-                  <span className="text-sm font-medium">{slot.label}</span>
-                </label>
-              ))}
-            </div>
+            <PickupPicker
+              date={pickupDate}
+              window={pickupWindow}
+              onDateChange={setPickupDate}
+              onWindowChange={setPickupWindow}
+              uid={uid}
+            />
           </div>
 
           <div className="bg-green-50 border border-green-200 rounded-xl p-3.5 flex gap-2.5">
@@ -390,7 +357,7 @@ export default function HomePage() {
                 <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-orange-500 text-white">單點型</span>
                 <h3 className="text-lg font-bold">今日推薦鎖定方案</h3>
               </div>
-              <span className="text-sm text-muted-foreground font-semibold">{pickupDate}・{TIME_SLOT_WINDOWS[selectedSlot]}</span>
+              <span className="text-sm text-muted-foreground font-semibold">{pickupDate}・{pickupWindow}</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -414,7 +381,7 @@ export default function HomePage() {
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
                       <div>
                         <h4 className="font-bold text-body leading-snug">{item.name}</h4>
-                        <p className="text-xs text-muted-foreground font-semibold mt-0.5">{vendor.name}・取餐時段：{pickupDate}（{TIME_SLOT_WINDOWS[selectedSlot]}）</p>
+                        <p className="text-xs text-muted-foreground font-semibold mt-0.5">{vendor.name}・取餐時段：{pickupDate}（{pickupWindow}）</p>
                       </div>
 
                       <div className="flex items-center justify-between mt-auto pt-1">
@@ -450,7 +417,7 @@ export default function HomePage() {
                       <DialogTitle>{item.name}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3 py-1">
-                      <p className="text-sm text-muted-foreground">{vendor.name}・取餐時段：{pickupDate}（{TIME_SLOT_WINDOWS[selectedSlot]}）・${lockedPrice}</p>
+                      <p className="text-sm text-muted-foreground">{vendor.name}・取餐時段：{pickupDate}（{pickupWindow}）・${lockedPrice}</p>
 
                       <div className="flex gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
                         <Star className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5 fill-amber-500" />

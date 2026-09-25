@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
-import { Minus, Plus, ShoppingCart, Trash2, UtensilsCrossed } from "lucide-react";
+import { CalendarDays, MapPin, Minus, Plus, ShoppingCart, Trash2, UtensilsCrossed } from "lucide-react";
 import { httpsCallable } from "firebase/functions";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { useCart } from "@/hooks/useCart";
@@ -13,6 +13,10 @@ import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { db, functions } from "@/lib/firebase";
 import type { Vendor } from "@/types";
 import { EmptyState } from "@/components/ds";
+import PickupPicker from "@/components/PickupPicker";
+import { useAuth } from "@/hooks/useAuth";
+import { applyEarlyBirdPrice } from "@/lib/pricing";
+import { PICKUP_SLOTS, nextAvailablePickup } from "@/lib/pickupSlots";
 
 // 購物車頁面。
 // UIUX 檢視後新增:原本 MenuItemPage「加入購物車」只會彈 toast,useCart 把品項存進
@@ -22,6 +26,8 @@ import { EmptyState } from "@/components/ds";
 // functions/src/index.js），付款確認後才建立真實 locks 文件。每個 cart
 // item 現在都帶著真實 vendor_id（來自真實 menu_items），Cloud Function
 // 依此各自歸戶到正確的商家，不再全部掛在單一寫死的商家底下。
+// 2026-09-25：結帳前要選取餐日期＋時段（原本伺服器寫死「今天 12:00-13:00」、
+// 沒有早鳥價），並列出完整明細。價格由伺服器依 menu_items 重算，這裡的金額只是預覽。
 export default function CartPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -29,6 +35,15 @@ export default function CartPage() {
   const { items, vendorId, total, removeItem, updateQuantity, clearCart } = useCart();
   const [checkingOut, setCheckingOut] = useState(false);
   const requireLogin = useRequireLogin();
+  const { user } = useAuth();
+  const [pickup, setPickup] = useState(nextAvailablePickup);
+  const { discountPercent, tierLabel } = applyEarlyBirdPrice(100, pickup.date);
+  const lines = items.map((line) => ({
+    ...line,
+    unitPrice: applyEarlyBirdPrice(line.menuItem.price, pickup.date).lockedPrice,
+  }));
+  const discountedTotal = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  const slotLabel = PICKUP_SLOTS.find((s) => s.window === pickup.window)?.label ?? pickup.window;
 
   const { data: vendor } = useQuery({
     queryKey: ["vendor", vendorId],
@@ -48,11 +63,12 @@ export default function CartPage() {
 
       const fn = httpsCallable(functions, "createCartLinePayReservation");
       const result = await fn({
-        items: items.map(({ menuItem, quantity }) => ({
-          vendor_id: menuItem.vendor_id,
-          item_name: menuItem.name,
-          unit_price: menuItem.price,
+        pickup_date: pickup.date,
+        pickup_window: pickup.window,
+        items: items.map(({ menuItem, quantity, note }) => ({
+          menu_item_id: menuItem.id,
           quantity,
+          note: note.trim(),
         })),
       });
       const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
@@ -89,8 +105,22 @@ export default function CartPage() {
               </p>
             )}
 
+            <div className="bg-white rounded-xl border border-border p-4 space-y-3">
+              <h2 className="text-sm font-semibold flex items-center gap-1.5">
+                <CalendarDays className="w-4 h-4 text-orange-500" /> 取餐日期與時段
+              </h2>
+              <PickupPicker
+                date={pickup.date}
+                window={pickup.window}
+                onDateChange={(date) => setPickup((p) => ({ ...p, date }))}
+                onWindowChange={(window) => setPickup((p) => ({ ...p, window }))}
+                uid={user?.id}
+              />
+              <p className="text-xs text-muted-foreground">早鳥優惠：{discountPercent > 0 ? tierLabel : "此日期沒有早鳥折扣"}</p>
+            </div>
+
             <div className="bg-white rounded-xl border border-border divide-y divide-border">
-              {items.map(({ menuItem, quantity, note }) => (
+              {lines.map(({ menuItem, quantity, note, unitPrice }) => (
                 <div key={`${menuItem.id}-${note}`} className="p-4 flex items-start gap-3">
                   <div className="w-14 h-14 shrink-0 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
                     <UtensilsCrossed className="h-6 w-6 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
@@ -98,7 +128,12 @@ export default function CartPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm">{menuItem.name}</p>
                     {note && <p className="text-xs text-muted-foreground mt-0.5">備註：{note}</p>}
-                    <p className="text-sm font-bold text-orange-600 mt-1">NT${menuItem.price}</p>
+                    <p className="text-sm font-bold text-orange-600 mt-1">
+                      NT${unitPrice}
+                      {unitPrice < menuItem.price && (
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground line-through">NT${menuItem.price}</span>
+                      )}
+                    </p>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <Button
@@ -147,10 +182,37 @@ export default function CartPage() {
               清空購物車
             </Button>
 
-            <div className="bg-white rounded-xl border border-border p-4 space-y-3 sticky bottom-4">
-              <div className="flex items-center justify-between text-base font-bold">
+            <div className="bg-white rounded-xl border border-border p-4 space-y-3">
+              <h2 className="text-sm font-semibold">訂單明細</h2>
+              <dl className="text-sm space-y-1.5">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">商家</dt>
+                  <dd className="text-right">{vendor?.name ?? "—"}</dd>
+                </div>
+                {vendor?.address && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> 取餐地點</dt>
+                    <dd className="text-right">{vendor.address}</dd>
+                  </div>
+                )}
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">取餐時間</dt>
+                  <dd className="text-right font-medium">{pickup.date}・{slotLabel}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">原價小計</dt>
+                  <dd className="text-right">NT${total}</dd>
+                </div>
+                {total > discountedTotal && (
+                  <div className="flex justify-between gap-3 text-green-700">
+                    <dt>早鳥折扣</dt>
+                    <dd className="text-right">−NT${total - discountedTotal}</dd>
+                  </div>
+                )}
+              </dl>
+              <div className="flex items-center justify-between text-base font-bold pt-2 border-t border-border">
                 <span>總計</span>
-                <span className="text-orange-600">NT${total}</span>
+                <span className="text-orange-600">NT${discountedTotal}</span>
               </div>
               <Button
                 className="w-full"

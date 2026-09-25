@@ -11,6 +11,7 @@ const db = admin.firestore();
 const { generateVendorCalibrationReport } = require("./vendorCalibration");
 const { generateDiscountExplanation } = require("./consumerExplanation");
 const { requestPayment, confirmPayment } = require("./linePay");
+const { validatePickup, applyEarlyBirdPrice } = require("./pricing");
 
 // ISO 27001 A.5.15/A.8.3: privileged and cost-bearing callables fail closed in
 // deployed environments. Callers must be a platform admin, or (for anything
@@ -269,28 +270,51 @@ async function assertVendorExists(vendorId, cache) {
   cache?.add(vendorId);
 }
 
+// Checkout prices come from menu_items, not the request — the client only
+// says *which* item, the server decides what it costs.
+async function loadOrderableMenuItem(menuItemId, vendorCache) {
+  if (typeof menuItemId !== "string" || !menuItemId) {
+    throw new HttpsError("invalid-argument", "menu_item_id is required");
+  }
+  const snap = await db.collection("menu_items").doc(menuItemId).get();
+  if (!snap.exists) throw new HttpsError("not-found", `No menu item ${menuItemId}`);
+  const item = snap.data();
+  if (item.is_available === false) {
+    throw new HttpsError("failed-precondition", `「${item.name}」目前暫停供應`);
+  }
+  if (typeof item.price !== "number" || item.price <= 0) {
+    throw new HttpsError("failed-precondition", `「${item.name}」沒有設定價格`);
+  }
+  await assertVendorExists(item.vendor_id, vendorCache);
+  return item;
+}
+
+function assertValidPickup(pickupDate, pickupWindow) {
+  const problem = validatePickup(pickupDate, pickupWindow);
+  if (problem) throw new HttpsError("invalid-argument", problem);
+}
+
+function cleanNote(note) {
+  return typeof note === "string" ? note.trim().slice(0, 100) : "";
+}
+
 exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
   assertSignedInUser(request, "check out");
   const {
-    vendor_id: vendorId,
-    item_name: itemName,
+    menu_item_id: menuItemId,
     pickup_window: pickupWindow,
     pickup_date: pickupDate,
-    discount_percent: discountPercent,
-    locked_price: lockedPrice,
   } = request.data || {};
-  if (!vendorId || !itemName || !pickupWindow || !pickupDate || typeof lockedPrice !== "number" || lockedPrice <= 0) {
-    throw new HttpsError(
-      "invalid-argument",
-      "vendor_id, item_name, pickup_window, pickup_date and a positive locked_price are required"
-    );
-  }
-  await assertVendorExists(vendorId);
+  assertValidPickup(pickupDate, pickupWindow);
+  const item = await loadOrderableMenuItem(menuItemId);
+  const vendorId = item.vendor_id;
+  const itemName = item.name;
+  const { discountPercent, lockedPrice } = applyEarlyBirdPrice(item.price, pickupDate);
 
   const appBaseUrl = process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
   const intentRef = db.collection("payment_intents").doc();
   const orderId = intentRef.id;
-  const amount = Math.round(lockedPrice);
+  const amount = lockedPrice;
 
   let info;
   try {
@@ -327,7 +351,7 @@ exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (reque
         item_name: itemName,
         pickup_window: pickupWindow,
         pickup_date: pickupDate,
-        discount_percent: discountPercent ?? 0,
+        discount_percent: discountPercent,
         resellable: true,
         locked_price: amount,
       },
@@ -352,7 +376,8 @@ const MAX_CART_UNITS = 100; // bounds the Firestore batch confirmLinePayPayment 
 
 exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
   assertSignedInUser(request, "check out");
-  const { items } = request.data || {};
+  const { items, pickup_date: pickupDate, pickup_window: pickupWindow } = request.data || {};
+  assertValidPickup(pickupDate, pickupWindow);
   if (!Array.isArray(items) || items.length === 0) {
     throw new HttpsError("invalid-argument", "items must be a non-empty array");
   }
@@ -360,40 +385,30 @@ exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (r
     throw new HttpsError("invalid-argument", `Too many cart lines (max ${MAX_CART_LINES})`);
   }
 
-  const pickupDate = new Date().toISOString().slice(0, 10);
   const products = [];
   const lockDrafts = [];
   const checkedVendors = new Set();
   let amount = 0;
   for (const item of items) {
-    const vendorId = item?.vendor_id;
-    const itemName = item?.item_name;
-    const unitPrice = item?.unit_price;
     const quantity = item?.quantity;
-    if (
-      typeof vendorId !== "string" || !vendorId ||
-      typeof itemName !== "string" || !itemName ||
-      typeof unitPrice !== "number" || unitPrice <= 0 ||
-      !Number.isInteger(quantity) || quantity <= 0
-    ) {
-      throw new HttpsError(
-        "invalid-argument",
-        "Each item needs vendor_id, item_name, a positive unit_price and a positive integer quantity"
-      );
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new HttpsError("invalid-argument", "Each item needs a menu_item_id and a positive integer quantity");
     }
-    await assertVendorExists(vendorId, checkedVendors);
-    const price = Math.round(unitPrice);
-    products.push({ name: itemName, quantity, price });
+    const menuItem = await loadOrderableMenuItem(item?.menu_item_id, checkedVendors);
+    const { discountPercent, lockedPrice: price } = applyEarlyBirdPrice(menuItem.price, pickupDate);
+    const note = cleanNote(item?.note);
+    products.push({ name: menuItem.name, quantity, price });
     amount += price * quantity;
     for (let i = 0; i < quantity; i++) {
       lockDrafts.push({
-        vendor_id: vendorId,
-        item_name: itemName,
-        pickup_window: "12:00-13:00",
+        vendor_id: menuItem.vendor_id,
+        item_name: menuItem.name,
+        pickup_window: pickupWindow,
         pickup_date: pickupDate,
-        discount_percent: 0,
+        discount_percent: discountPercent,
         resellable: true,
         locked_price: price,
+        ...(note ? { note } : {}),
       });
     }
   }

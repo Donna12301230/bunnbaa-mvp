@@ -15,12 +15,15 @@ import { useRequireLogin } from "../hooks/useRequireLogin";
 import type { Lock, Vendor } from "../types";
 import LockQRCode from "../components/LockQRCode";
 import { applyEarlyBirdPrice } from "../lib/pricing";
+import { nextAvailablePickup } from "@/lib/pickupSlots";
 import { toast } from "../hooks/use-toast";
 import { Gift } from "lucide-react";
 
 const VENDOR_ID = "cafe-renheya-demo";
 const ITEM_NAME = "招牌鮭魚御飯糰便當";
-const ORIGINAL_PRICE = 120;
+// 跟 menu_items/cafe-renheya-demo-item-1 的原價一致（伺服器用那筆重算價格，這裡只是顯示）
+const MENU_ITEM_ID = `${VENDOR_ID}-item-1`;
+const ORIGINAL_PRICE = 160;
 
 // Mirrors functions/src/index.js's pickupWindowStart, but for the window's
 // end — used as the resale_deadline after which anyone may free-claim.
@@ -53,7 +56,9 @@ export default function ConsumerLockPage() {
   const [feedbackDraft, setFeedbackDraft] = useState("");
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const todayPricing = applyEarlyBirdPrice(ORIGINAL_PRICE, new Date().toISOString().slice(0, 10));
+  // 這頁沒有時段選擇，固定訂最近一個還能訂的時段（完整選擇在首頁／購物車）
+  const nextPickup = nextAvailablePickup();
+  const todayPricing = applyEarlyBirdPrice(ORIGINAL_PRICE, nextPickup.date);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "vendors", VENDOR_ID), (snap) => {
@@ -162,16 +167,11 @@ export default function ConsumerLockPage() {
     if (!requireLogin() || !auth.currentUser) return;
     setLocking(true);
     try {
-      const pickupDate = new Date().toISOString().slice(0, 10);
-      const { discountPercent, lockedPrice } = applyEarlyBirdPrice(ORIGINAL_PRICE, pickupDate);
       const fn = httpsCallable(functions, "createLinePayReservation");
       const result = await fn({
-        vendor_id: VENDOR_ID,
-        item_name: ITEM_NAME,
-        pickup_window: "12:00-13:00",
-        pickup_date: pickupDate,
-        discount_percent: discountPercent,
-        locked_price: lockedPrice,
+        menu_item_id: MENU_ITEM_ID,
+        pickup_window: nextPickup.window,
+        pickup_date: nextPickup.date,
       });
       const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
       window.location.href = paymentUrl;
@@ -252,7 +252,7 @@ export default function ConsumerLockPage() {
           <div className="row">
             <div>
               <h2>{vendor.name} {vendor.verified && <span className="badge">認證商家</span>}</h2>
-              <div className="muted">{ITEM_NAME} · 12:00–13:00 取餐</div>
+              <div className="muted">{ITEM_NAME} · {nextPickup.window} 取餐</div>
             </div>
             <span className="badge">
               近期履約穩定度：
@@ -267,7 +267,7 @@ export default function ConsumerLockPage() {
           <div>
             <div style={{ textDecoration: "line-through", color: "var(--faint)" }}>NT${ORIGINAL_PRICE}</div>
             <div className="stat">NT${todayPricing.lockedPrice}</div>
-            <div className="muted">{todayPricing.tierLabel} · 全額預付，鎖定後直接歸商家</div>
+            <div className="muted">{todayPricing.tierLabel} · 取餐 {nextPickup.date} {nextPickup.window} · 全額預付，鎖定後直接歸商家</div>
           </div>
           <button onClick={handleLock} disabled={locking || !!myLock}>
             {myLock ? "已鎖定" : locking ? "處理中…" : "鎖定這份"}

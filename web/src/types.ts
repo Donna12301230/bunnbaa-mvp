@@ -66,6 +66,7 @@ export interface Lock {
   // claimed for free (firestore.rules), no scheduled function needed.
   resale_deadline?: unknown; // Firestore Timestamp
   no_show_note?: string | null;
+  note?: string; // 消費者下單時的備註（例如「不要香菜」），購物車結帳才會有
   consumer_feedback?: string | null;
   discount_explanation?: string | null; // filled in by onLockCreated
   buyer_uid: string;

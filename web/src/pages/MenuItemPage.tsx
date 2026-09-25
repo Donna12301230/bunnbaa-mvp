@@ -62,7 +62,7 @@ export default function MenuItemPage() {
         description: "加入這項會清空目前的購物車（一次只能跟一家商家預購）。",
       });
     }
-    for (let i = 0; i < qty; i++) addItem(item!, item!.vendor_id, note);
+    for (let i = 0; i < qty; i++) addItem(item!, item!.vendor_id, note.trim());
     toast({ title: "已加入購物車", description: `${item!.name} x${qty}` });
   }
 
@@ -86,6 +86,7 @@ export default function MenuItemPage() {
           </div>
 
           <div className="text-2xl font-bold text-orange-600">NT${item.price}</div>
+          <p className="text-xs text-muted-foreground -mt-2">取餐日期與時段在購物車結帳時選擇，提前預約享早鳥折扣。</p>
 
           {(item.dietary_tags?.length > 0 || item.allergens?.length > 0) && (
             <div className="space-y-1.5">

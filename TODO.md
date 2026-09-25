@@ -23,11 +23,11 @@
 - [x] `firebase deploy --only functions`（2026-09-24 起消費端 callable 會擋匿名身分，前端已不再匿名登入，**規則、Functions、hosting 要一起部署**，不然舊版前端的匿名使用者會全部被擋）
 - [x] `cd web && npm run build` 後 `firebase deploy --only hosting`（設計系統／新 design tokens 也還沒上線）
 - [ ] **Functions runtime 升級**：部署時警告 Node.js 20 於 **2026-10-30 停用**，之後無法再部署 Functions。10/18 Demo 不受影響，比賽後要繼續改 Functions 前，先把 `functions/package.json` 的 engines 升到 Node 22＋`firebase-functions@latest`（有 breaking changes，要重測）
-- [ ] 部署後實測一次購物車結帳，到 Firestore Console 確認新的 `locks.vendor_id` 對應下單的商家，不是全部掛在 `cafe-renheya-demo`
+- [ ] 部署後實測一次購物車結帳，到 Firestore Console 確認新的 `locks.vendor_id` 對應下單的商家，不是全部掛在 `cafe-renheya-demo`（2026-09-25 單品項 `/lock` 下單仁和雅咖啡已確認 `vendor_id` 正確；還要用**別家**商家的品項走一次購物車才算驗完）
 
 ### 3. 正式站驗證（已部署，但還沒在正式站實際跑過）
 
-- [ ] QR Code 核銷：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證，但 **emulator 下 `assertAdminOrVendorOwner` 直接放行，權限這段只有正式站測得到**）。前置：§2 部署完＋§4 商家帳號綁定。步驟：
+- [ ] QR Code 核銷（2026-09-25 正式站已驗證步驟 1、2、3 與「重複核銷被擋」：取餐編號 `XVTVDHP0` 由仁和雅咖啡店主帳號核銷成功；**還沒測**步驟 4 未取餐、別家商家／一般會員的 `permission-denied`、取餐編號夾帶空白——後者要等防空白版本部署 hosting）：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證，但 **emulator 下 `assertAdminOrVendorOwner` 直接放行，權限這段只有正式站測得到**）。前置：§2 部署完＋§4 商家帳號綁定。步驟：
   1. 一般會員帳號鎖定一筆仁和雅咖啡的餐（LINE Pay Sandbox 付款）→ `/my-bookings`「使用」記下取餐編號末 8 碼
   2. 商家帳號登入 `/lock/vendor/redeem`：取餐總覽要看得到這筆（驗證 `locks` 讀取規則＋`vendor_id+created_at` 索引），輸入末 8 碼查得到
   3. 按「確認取餐」→ Firestore Console 看 `locks/{id}.status` 變 `fulfilled`
@@ -64,6 +64,7 @@
 - [x] **手機門號 OTP 登入**（`LoginPage.tsx`，草圖 `Login.dc.html` 兩段式流程）——2026-09-25 完成：登入分頁新增「改用手機門號登入」，輸入號碼→`sendOtp()`送簡訊驗證碼→輸入驗證碼→`confirmOtp()`登入（`web/src/lib/auth.ts`，用 Firebase Phone Auth + 隱形 reCAPTCHA）。沒有 email 時 `resolveProfile()` 改用門號當 username／displayName，角色判斷不受影響（管理員＝email 白名單，門號登入者一律是會員或已綁定的廠商）。順便修正 CSP：加放 `www.google.com`／`recaptcha.net` 的 script／frame，不然 reCAPTCHA 之後會被擋（`firebase.json`）。**還沒驗證**：要先去 Firebase Console → Authentication → Sign-in method 手動啟用「電話號碼」登入方式（跟啟用 Email/Password 一樣，免費、跟 Blaze 無關），且要等這批一起部署（見上方 §2）後才能在正式站測；本機/emulator 也還沒測過，因為 Phone Auth 的 reCAPTCHA 在沒有真實網域時常會失敗，建議直接在正式站用真手機號碼測
 - [x] 2026-09-24 決定**不再使用匿名登入**：瀏覽不用登入，但鎖定／下單／購物車結帳／轉讓接手／抽獎都要先登入（前端 `useRequireLogin`、`firestore.rules` `isSignedInUser()`、Functions `assertSignedInUser()` 三層都擋）。舊的匿名帳號跟它們名下的鎖定紀錄**不搬移、不保留**
 - [ ] 部署規則＋Functions 後，到 Firebase Console → Authentication → Sign-in method 把「匿名」停用
+- [x] **從商家點餐沒有取餐日期／時段**——2026-09-25 完成（未部署）：購物車結帳前選日期＋時段（`components/PickupPicker.tsx`，今天已開始的時段不能選、最遠 30 天），列出訂單明細（商家、地點、時間、早鳥價、備註、總計），商品備註改成真的寫進 `locks.note` 並顯示在商家核對取餐頁。同時段已有「已鎖定」訂單只**提醒不擋**（`hooks/useSlotConflicts.ts`，首頁也有）。**價格改由伺服器從 `menu_items` 重算**（`functions/src/pricing.js`），原本前端送什麼價格就收什麼。`createLinePayReservation`／`createCartLinePayReservation` 參數改了（改送 `menu_item_id`＋`pickup_date`＋`pickup_window`），**Functions 跟 hosting 要一起部署**，不然舊前端結帳會失敗
 - [ ] **消費者端提交解封申訴**——完全沒有入口（登入頁條款的「會員中心提交申訴」只是文字）。現在消費者已有穩定帳號，可以開始做了
 - [ ] 「我的轉讓」無法追蹤已被接手的項目（資料模型沒有記錄原轉讓者）
 
