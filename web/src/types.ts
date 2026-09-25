@@ -15,6 +15,11 @@ export interface Vendor {
   subscription_end_date?: unknown; // Firestore Timestamp
   cancelled_from?: "trial" | "active";
   cancel_requested_at?: unknown; // Firestore Timestamp
+  // 取餐排程（店家設定頁，店主可改），沒設定＝預設時段、每天營業，見 lib/pickupSlots.ts
+  pickup_windows?: string[]; // "11:30-12:00"
+  business_hours?: BusinessHour[];
+  holidays?: string[]; // YYYY-MM-DD
+  slot_capacity?: number; // 每個取餐時段所有餐點合計上限；0／沒設＝不限，已訂數在 slot_counters
 }
 
 export interface MenuItem {

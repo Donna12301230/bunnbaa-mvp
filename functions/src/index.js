@@ -11,7 +11,7 @@ const db = admin.firestore();
 const { generateVendorCalibrationReport } = require("./vendorCalibration");
 const { generateDiscountExplanation } = require("./consumerExplanation");
 const { requestPayment, confirmPayment } = require("./linePay");
-const { validatePickup, applyEarlyBirdPrice } = require("./pricing");
+const { validatePickup, applyEarlyBirdPrice, vendorSlotCapacity } = require("./pricing");
 
 // ISO 27001 A.5.15/A.8.3: privileged and cost-bearing callables fail closed in
 // deployed environments. Callers must be a platform admin, or (for anything
@@ -261,13 +261,16 @@ exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
 // eventually settles as) to an arbitrary vendor_id string that doesn't
 // correspond to a real vendor doc. Cache hits within one function
 // invocation so a multi-item cart doesn't re-read the same vendor N times.
+// Returns the vendor doc's data (its pickup schedule is needed for validation).
 async function assertVendorExists(vendorId, cache) {
-  if (cache?.has(vendorId)) return;
+  if (cache?.has(vendorId)) return cache.get(vendorId);
   const snap = await db.collection("vendors").doc(vendorId).get();
   if (!snap.exists) {
     throw new HttpsError("invalid-argument", `Unknown vendor_id: ${vendorId}`);
   }
-  cache?.add(vendorId);
+  const vendor = snap.data();
+  cache?.set(vendorId, vendor);
+  return vendor;
 }
 
 // Checkout prices come from menu_items, not the request — the client only
@@ -285,13 +288,58 @@ async function loadOrderableMenuItem(menuItemId, vendorCache) {
   if (typeof item.price !== "number" || item.price <= 0) {
     throw new HttpsError("failed-precondition", `「${item.name}」沒有設定價格`);
   }
-  await assertVendorExists(item.vendor_id, vendorCache);
-  return item;
+  const vendor = await assertVendorExists(item.vendor_id, vendorCache);
+  return { item, vendor };
 }
 
-function assertValidPickup(pickupDate, pickupWindow) {
-  const problem = validatePickup(pickupDate, pickupWindow);
+function assertValidPickup(pickupDate, pickupWindow, vendor) {
+  const problem = validatePickup(pickupDate, pickupWindow, vendor);
   if (problem) throw new HttpsError("invalid-argument", problem);
+}
+
+/* Per-slot capacity (vendors/{id}.slot_capacity = max meals per pickup date +
+ * window, all items combined). Booked counts live in slot_counters/{key},
+ * written only here: reserved inside a transaction in confirmLinePayPayment
+ * *before* LINE Pay captures the money, so two buyers racing for the last
+ * meal can't both get it and the loser is never charged. Locks created
+ * before 2026-09-25 (and plan-join locks, written client-side) aren't
+ * counted. */
+function slotCounterRef(vendorId, pickupDate, pickupWindow) {
+  return db.collection("slot_counters").doc(`${vendorId}__${pickupDate}__${pickupWindow}`);
+}
+
+// Groups lock drafts by vendor + date + window, counting meals in each.
+function groupDraftsBySlot(drafts) {
+  const groups = new Map();
+  for (const d of drafts) {
+    const key = `${d.vendor_id}__${d.pickup_date}__${d.pickup_window}`;
+    const g = groups.get(key) ?? { vendorId: d.vendor_id, pickupDate: d.pickup_date, pickupWindow: d.pickup_window, count: 0 };
+    g.count += 1;
+    groups.set(key, g);
+  }
+  return [...groups.values()];
+}
+
+const SOLD_OUT_DURING_PAYMENT = "你選的取餐時段在付款期間額滿了，這筆沒有扣款，請重新選擇時段下單";
+
+// Early, non-binding check at reservation time so a buyer doesn't go all the
+// way to LINE Pay for a full slot. The binding check is in confirmLinePayPayment.
+async function assertSlotsHaveRoom(drafts, vendorCache) {
+  for (const g of groupDraftsBySlot(drafts)) {
+    const vendor = vendorCache.get(g.vendorId);
+    const capacity = vendorSlotCapacity(vendor);
+    if (capacity === null) continue;
+    const snap = await slotCounterRef(g.vendorId, g.pickupDate, g.pickupWindow).get();
+    const booked = snap.exists ? snap.data().count ?? 0 : 0;
+    if (booked + g.count > capacity) {
+      const left = Math.max(0, capacity - booked);
+      const where = `「${vendor?.name ?? "這家店"}」${g.pickupDate} ${g.pickupWindow}`;
+      throw new HttpsError(
+        "resource-exhausted",
+        left > 0 ? `${where} 只剩 ${left} 份，請減少數量或改選其他時段` : `${where} 已額滿，請改選其他時段`
+      );
+    }
+  }
 }
 
 function cleanNote(note) {
@@ -305,8 +353,10 @@ exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (reque
     pickup_window: pickupWindow,
     pickup_date: pickupDate,
   } = request.data || {};
-  assertValidPickup(pickupDate, pickupWindow);
-  const item = await loadOrderableMenuItem(menuItemId);
+  const vendorCache = new Map();
+  const { item, vendor } = await loadOrderableMenuItem(menuItemId, vendorCache);
+  assertValidPickup(pickupDate, pickupWindow, vendor);
+  await assertSlotsHaveRoom([{ vendor_id: item.vendor_id, pickup_date: pickupDate, pickup_window: pickupWindow }], vendorCache);
   const vendorId = item.vendor_id;
   const itemName = item.name;
   const { discountPercent, lockedPrice } = applyEarlyBirdPrice(item.price, pickupDate);
@@ -377,7 +427,6 @@ const MAX_CART_UNITS = 100; // bounds the Firestore batch confirmLinePayPayment 
 exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
   assertSignedInUser(request, "check out");
   const { items, pickup_date: pickupDate, pickup_window: pickupWindow } = request.data || {};
-  assertValidPickup(pickupDate, pickupWindow);
   if (!Array.isArray(items) || items.length === 0) {
     throw new HttpsError("invalid-argument", "items must be a non-empty array");
   }
@@ -387,14 +436,15 @@ exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (r
 
   const products = [];
   const lockDrafts = [];
-  const checkedVendors = new Set();
+  const checkedVendors = new Map();
   let amount = 0;
   for (const item of items) {
     const quantity = item?.quantity;
     if (!Number.isInteger(quantity) || quantity <= 0) {
       throw new HttpsError("invalid-argument", "Each item needs a menu_item_id and a positive integer quantity");
     }
-    const menuItem = await loadOrderableMenuItem(item?.menu_item_id, checkedVendors);
+    const { item: menuItem, vendor } = await loadOrderableMenuItem(item?.menu_item_id, checkedVendors);
+    assertValidPickup(pickupDate, pickupWindow, vendor);
     const { discountPercent, lockedPrice: price } = applyEarlyBirdPrice(menuItem.price, pickupDate);
     const note = cleanNote(item?.note);
     products.push({ name: menuItem.name, quantity, price });
@@ -415,6 +465,7 @@ exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (r
   if (lockDrafts.length > MAX_CART_UNITS) {
     throw new HttpsError("invalid-argument", `Too many items total (max ${MAX_CART_UNITS})`);
   }
+  await assertSlotsHaveRoom(lockDrafts, checkedVendors);
 
   const appBaseUrl = process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
   const intentRef = db.collection("payment_intents").doc();
@@ -465,14 +516,57 @@ exports.confirmLinePayPayment = onCall({ region: "asia-east1" }, async (request)
   if (intent.status === "confirmed") {
     return { lock_ids: intent.lock_ids };
   }
+  if (intent.status === "sold_out") {
+    throw new HttpsError("resource-exhausted", SOLD_OUT_DURING_PAYMENT);
+  }
   if (intent.status !== "pending") {
     throw new HttpsError("failed-precondition", `This payment is ${intent.status}, not pending`);
   }
 
+  // 1) Reserve capacity atomically and flip the intent to "confirming" so a
+  //    concurrent double-confirm can't reserve twice. Nothing is charged yet.
+  const slots = groupDraftsBySlot(intent.lock_drafts);
+  const counterRefs = slots.map((g) => slotCounterRef(g.vendorId, g.pickupDate, g.pickupWindow));
+  const soldOut = await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(intentRef);
+    if (fresh.data().status !== "pending") {
+      throw new HttpsError("failed-precondition", "這筆付款正在處理中，請稍候重新整理");
+    }
+    const vendorSnaps = await Promise.all(slots.map((g) => tx.get(db.collection("vendors").doc(g.vendorId))));
+    const counterSnaps = await Promise.all(counterRefs.map((ref) => tx.get(ref)));
+    const booked = counterSnaps.map((snap) => (snap.exists ? snap.data().count ?? 0 : 0));
+    const full = slots.some((g, i) => {
+      const capacity = vendorSlotCapacity(vendorSnaps[i].data());
+      return capacity !== null && booked[i] + g.count > capacity;
+    });
+    if (full) {
+      tx.update(intentRef, { status: "sold_out" });
+      return true;
+    }
+    slots.forEach((g, i) => {
+      tx.set(counterRefs[i], {
+        vendor_id: g.vendorId,
+        pickup_date: g.pickupDate,
+        pickup_window: g.pickupWindow,
+        count: booked[i] + g.count,
+        updated_at: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+    tx.update(intentRef, { status: "confirming" });
+    return false;
+  });
+  if (soldOut) throw new HttpsError("resource-exhausted", SOLD_OUT_DURING_PAYMENT);
+
+  // 2) Capture the payment. On failure give the reserved meals back and let
+  //    the buyer retry the same order.
   try {
     await confirmPayment({ transactionId: intent.transaction_id, amount: intent.amount });
   } catch (err) {
     logger.error("LINE Pay confirm failed", err);
+    const rollback = db.batch();
+    slots.forEach((g, i) => rollback.update(counterRefs[i], { count: FieldValue.increment(-g.count) }));
+    rollback.update(intentRef, { status: "pending" });
+    await rollback.commit().catch((e) => logger.error("Capacity rollback failed", e));
     throw new HttpsError("internal", "LINE Pay 付款確認失敗，請稍後再試或聯絡客服");
   }
 

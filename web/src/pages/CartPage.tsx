@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
@@ -16,7 +16,8 @@ import { EmptyState } from "@/components/ds";
 import PickupPicker from "@/components/PickupPicker";
 import { useAuth } from "@/hooks/useAuth";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
-import { PICKUP_SLOTS, nextAvailablePickup } from "@/lib/pickupSlots";
+import { DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, slotLabel as toSlotLabel, todayStr } from "@/lib/pickupSlots";
+import { useSlotAvailability } from "@/hooks/useSlotAvailability";
 
 // 購物車頁面。
 // UIUX 檢視後新增:原本 MenuItemPage「加入購物車」只會彈 toast,useCart 把品項存進
@@ -36,14 +37,16 @@ export default function CartPage() {
   const [checkingOut, setCheckingOut] = useState(false);
   const requireLogin = useRequireLogin();
   const { user } = useAuth();
-  const [pickup, setPickup] = useState(nextAvailablePickup);
+  const [pickup, setPickup] = useState(
+    () => nextAvailablePickup() ?? { date: todayStr(), window: DEFAULT_PICKUP_WINDOWS[0] }
+  );
   const { discountPercent, tierLabel } = applyEarlyBirdPrice(100, pickup.date);
   const lines = items.map((line) => ({
     ...line,
     unitPrice: applyEarlyBirdPrice(line.menuItem.price, pickup.date).lockedPrice,
   }));
   const discountedTotal = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
-  const slotLabel = PICKUP_SLOTS.find((s) => s.window === pickup.window)?.label ?? pickup.window;
+  const slotLabel = toSlotLabel(pickup.window);
 
   const { data: vendor } = useQuery({
     queryKey: ["vendor", vendorId],
@@ -54,6 +57,19 @@ export default function CartPage() {
     },
     enabled: !!vendorId,
   });
+
+  // 商家資料載入後，如果目前選的日期這家店不營業，跳到這家店最近一個能訂的日期
+  const [pickupSyncedFor, setPickupSyncedFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!vendor || pickupSyncedFor === vendor.id) return;
+    setPickupSyncedFor(vendor.id);
+    const next = nextAvailablePickup(vendor);
+    if (next && next.date > pickup.date) setPickup(next);
+  }, [vendor, pickupSyncedFor, pickup.date]);
+  const { closedReason, slots } = useSlotAvailability(vendor, pickup.date);
+  const selectedSlot = slots.find((s) => s.window === pickup.window);
+  const canCheckout = !closedReason && !!selectedSlot?.open
+    && (selectedSlot.remaining === null || selectedSlot.remaining >= items.reduce((n, i) => n + i.quantity, 0));
 
   async function handleCheckout() {
     // 購物車可以先放著不登入，結帳才要求登入（購物車存在本機，登入回來還在）
@@ -115,6 +131,7 @@ export default function CartPage() {
                 onDateChange={(date) => setPickup((p) => ({ ...p, date }))}
                 onWindowChange={(window) => setPickup((p) => ({ ...p, window }))}
                 uid={user?.id}
+                vendor={vendor}
               />
               <p className="text-xs text-muted-foreground">早鳥優惠：{discountPercent > 0 ? tierLabel : "此日期沒有早鳥折扣"}</p>
             </div>
@@ -214,10 +231,17 @@ export default function CartPage() {
                 <span>總計</span>
                 <span className="text-orange-600">NT${discountedTotal}</span>
               </div>
+              {!canCheckout && (
+                <p className="text-xs text-red-600">
+                  {selectedSlot?.remaining != null && selectedSlot.remaining > 0
+                    ? `這個時段只剩 ${selectedSlot.remaining} 份，請減少數量或改選其他時段。`
+                    : "請先選一個可以預約的取餐日期與時段。"}
+                </p>
+              )}
               <Button
                 className="w-full"
                 onClick={handleCheckout}
-                disabled={checkingOut}
+                disabled={checkingOut || !canCheckout}
               >
                 {checkingOut ? "前往付款中…" : "送出預購並付款"}
               </Button>

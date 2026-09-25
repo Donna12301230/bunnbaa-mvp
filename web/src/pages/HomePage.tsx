@@ -18,7 +18,7 @@ import GrowthRewardTicker from "@/components/GrowthRewardTicker";
 import { auth, db, functions } from "@/lib/firebase";
 import type { Vendor, MenuItem, MealPlan, Lock } from "@/types";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
-import { nextAvailablePickup } from "@/lib/pickupSlots";
+import { DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, openWindowsOn, todayStr, vendorClosedReason } from "@/lib/pickupSlots";
 import PickupPicker from "@/components/PickupPicker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -51,8 +51,8 @@ export default function HomePage() {
   const { toast } = useToast();
   const [startDate, setStartDate] = useState("2026-09-22");
   const [endDate, setEndDate] = useState("2026-09-26");
-  const [pickupDate, setPickupDate] = useState(() => nextAvailablePickup().date);
-  const [pickupWindow, setPickupWindow] = useState(() => nextAvailablePickup().window);
+  const [pickupDate, setPickupDate] = useState(() => nextAvailablePickup()?.date ?? todayStr());
+  const [pickupWindow, setPickupWindow] = useState(() => nextAvailablePickup()?.window ?? DEFAULT_PICKUP_WINDOWS[0]);
   const [selectedSort, setSelectedSort] = useState<string>("relevance");
   const [waiverAck, setWaiverAck] = useState<Record<string, boolean>>({});
   const [lockingMealId, setLockingMealId] = useState<string | null>(null);
@@ -166,8 +166,17 @@ export default function HomePage() {
     staleTime: 2 * 60 * 1000,
   });
 
-  async function handleLockMeal(item: MenuItem) {
+  async function handleLockMeal(item: MenuItem, vendor: Vendor) {
     if (!requireLogin() || !uid) return;
+    // 首頁左側的時段是先選的、所有店共用；下單前確認這家店這天有開這個時段
+    if (!openWindowsOn(vendor, pickupDate).includes(pickupWindow)) {
+      toast({
+        title: "這家店這個時段不開放預購",
+        description: vendorClosedReason(vendor, pickupDate) ?? "請到左側改選其他日期或時段，或從商家頁點餐選這家店的時段。",
+        variant: "destructive",
+      });
+      return;
+    }
     setLockingMealId(item.id);
     try {
       // 價格由伺服器依 menu_items 重算，只送品項 id 跟取餐時間
@@ -451,7 +460,7 @@ export default function HomePage() {
                       </Button>
                       <Button
                         disabled={!hasAcked || isSubmitting}
-                        onClick={() => handleLockMeal(item)}
+                        onClick={() => handleLockMeal(item, vendor)}
                       >
                         {isSubmitting ? "前往付款中…" : "確認鎖定並付款"}
                       </Button>

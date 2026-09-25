@@ -45,7 +45,38 @@ service cloud.firestore {
                         && resource.data.get('subscription_status', null) == 'cancelled'
                         && resource.data.subscription_end_date > request.time
                         && request.resource.data.subscription_status == resource.data.get('cancelled_from', 'active')
-                        && !request.resource.data.keys().hasAny(['cancelled_from', 'cancel_requested_at']));
+                        && !request.resource.data.keys().hasAny(['cancelled_from', 'cancel_requested_at']))
+                    // Store profile + pickup schedule from the vendor portal's settings
+                    // page. Name stays admin-only (it's what buyers trust/recognise).
+                    // Element formats are checked again server-side at checkout
+                    // (functions/src/pricing.js); rules only bound types and sizes.
+                    || (isVendorOwner(vendorId)
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['description', 'address', 'phone', 'pickup_windows',
+                                       'business_hours', 'holidays', 'slot_capacity'])
+                        && request.resource.data.get('description', '') is string
+                        && request.resource.data.get('description', '').size() <= 500
+                        && request.resource.data.get('address', '') is string
+                        && request.resource.data.get('address', '').size() <= 200
+                        && request.resource.data.get('phone', '') is string
+                        && request.resource.data.get('phone', '').size() <= 30
+                        && request.resource.data.get('pickup_windows', []) is list
+                        && request.resource.data.get('pickup_windows', []).size() <= 12
+                        && request.resource.data.get('business_hours', []) is list
+                        && request.resource.data.get('business_hours', []).size() <= 7
+                        && request.resource.data.get('holidays', []) is list
+                        && request.resource.data.get('holidays', []).size() <= 100
+                        && request.resource.data.get('slot_capacity', 0) is int
+                        && request.resource.data.get('slot_capacity', 0) >= 0
+                        && request.resource.data.get('slot_capacity', 0) <= 10000);
+    }
+
+    // Booked meals per vendor + pickup date + window (capacity), written only
+    // by confirmLinePayPayment. Public read so the pickup picker can show
+    // "剩 N 份" — it holds counts only, no buyer data.
+    match /slot_counters/{counterId} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // locks: consumer creates their own lock. Reads are limited (ISO 27001

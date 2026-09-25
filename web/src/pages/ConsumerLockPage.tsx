@@ -57,7 +57,8 @@ export default function ConsumerLockPage() {
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   // 這頁沒有時段選擇，固定訂最近一個還能訂的時段（完整選擇在首頁／購物車）
-  const nextPickup = nextAvailablePickup();
+  // 店家 30 天內都不開放時退回今天第一個預設時段，送出後由伺服器擋下並顯示原因
+  const nextPickup = nextAvailablePickup(vendor) ?? { date: new Date().toLocaleDateString("en-CA"), window: "11:30-12:00" };
   const todayPricing = applyEarlyBirdPrice(ORIGINAL_PRICE, nextPickup.date);
 
   useEffect(() => {

@@ -65,6 +65,7 @@
 - [x] 2026-09-24 決定**不再使用匿名登入**：瀏覽不用登入，但鎖定／下單／購物車結帳／轉讓接手／抽獎都要先登入（前端 `useRequireLogin`、`firestore.rules` `isSignedInUser()`、Functions `assertSignedInUser()` 三層都擋）。舊的匿名帳號跟它們名下的鎖定紀錄**不搬移、不保留**
 - [ ] 部署規則＋Functions 後，到 Firebase Console → Authentication → Sign-in method 把「匿名」停用
 - [x] **從商家點餐沒有取餐日期／時段**——2026-09-25 完成（未部署）：購物車結帳前選日期＋時段（`components/PickupPicker.tsx`，今天已開始的時段不能選、最遠 30 天），列出訂單明細（商家、地點、時間、早鳥價、備註、總計），商品備註改成真的寫進 `locks.note` 並顯示在商家核對取餐頁。同時段已有「已鎖定」訂單只**提醒不擋**（`hooks/useSlotConflicts.ts`，首頁也有）。**價格改由伺服器從 `menu_items` 重算**（`functions/src/pricing.js`），原本前端送什麼價格就收什麼。`createLinePayReservation`／`createCartLinePayReservation` 參數改了（改送 `menu_item_id`＋`pickup_date`＋`pickup_window`），**Functions 跟 hosting 要一起部署**，不然舊前端結帳會失敗
+- [x] **取餐時段／公休／份數上限由商家後台控制**——2026-09-25 完成（未部署）：店家設定頁（`VendorPortalSettings.tsx`）的簡介、地址、電話、營業日、公休日改接真實 `vendors/{id}`，新增「取餐時段」與「每個時段份數上限」（`pickup_windows`／`business_hours`／`holidays`／`slot_capacity`；店名仍只有管理員能改）。消費端 `PickupPicker` 照商家設定顯示時段、公休、剩幾份；伺服器結帳照同一套驗證（`functions/src/pricing.js`），份數在 `confirmLinePayPayment` 用 transaction 預扣（`slot_counters`），**先扣份數再向 LINE Pay 確認扣款**，額滿就不扣款。已知限制：① 首頁左側時段選擇是先選、所有店共用預設時段，下單時才檢查該店有沒有開；② 「加入計畫」（多日方案）是前端直接寫 locks，**不受時段／公休／份數限制**；③ 2026-09-25 以前的訂單不計入份數。**要部署 rules＋functions＋hosting**
 - [ ] **消費者端提交解封申訴**——完全沒有入口（登入頁條款的「會員中心提交申訴」只是文字）。現在消費者已有穩定帳號，可以開始做了
 - [ ] 「我的轉讓」無法追蹤已被接手的項目（資料模型沒有記錄原轉讓者）
 

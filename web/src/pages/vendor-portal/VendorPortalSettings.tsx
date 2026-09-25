@@ -17,10 +17,13 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   Settings, QrCode, Plus, Trash2, Download,
   CalendarDays, CreditCard, AlertTriangle,
-  Clock, X, CalendarOff, Copy, LoaderCircle } from "lucide-react";
+  Clock, X, CalendarOff, Copy, LoaderCircle, Timer, Users } from "lucide-react";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { QRCodeCanvas } from "qrcode.react";
 import { format, parseISO } from "date-fns";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { DEFAULT_PICKUP_WINDOWS, MAX_HOLIDAYS, MAX_PICKUP_WINDOWS, isValidWindow, slotLabel, windowsOverlap } from "@/lib/pickupSlots";
 import { zhTW } from "date-fns/locale";
 import type { BusinessHour, Vendor } from "@/types";
 import { Tooltip } from "@/components/ds";
@@ -45,12 +48,32 @@ function fmtHoliday(dateStr: string): string {
   }
 }
 
+// 沒設定過的商家，消費端是「每天營業」，這裡的預設要一致
 const DEFAULT_BH: BusinessHour[] = [0, 1, 2, 3, 4, 5, 6].map(d => ({
   weekday: d,
-  open: d >= 1 && d <= 5,
+  open: true,
   openTime: "08:00",
   closeTime: "17:00",
 }));
+
+function addMinutes(hhmm: string, mins: number): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  return minsToTime(h * 60 + m + mins);
+}
+
+/** 取餐時段清單有問題就回傳錯誤訊息。 */
+function pickupWindowsProblem(windows: string[]): string | null {
+  if (windows.length === 0) return "至少要有一個取餐時段";
+  if (windows.length > MAX_PICKUP_WINDOWS) return `取餐時段最多 ${MAX_PICKUP_WINDOWS} 個`;
+  const bad = windows.find(w => !isValidWindow(w));
+  if (bad) return `取餐時段「${slotLabel(bad)}」的結束時間要晚於開始時間`;
+  for (let i = 0; i < windows.length; i++) {
+    for (let j = i + 1; j < windows.length; j++) {
+      if (windowsOverlap(windows[i], windows[j])) return `取餐時段「${slotLabel(windows[i])}」跟「${slotLabel(windows[j])}」重疊了`;
+    }
+  }
+  return null;
+}
 
 // ── Subscription buttons（真實 vendors/{id}，轉換限制見 firestore.rules）──────────
 function SubscriptionCancelButton({ vendor }: { vendor: Vendor }) {
@@ -94,9 +117,10 @@ function SubscriptionUndoCancelButton({ vendor }: { vendor: Vendor }) {
 
 // ── Main Component ───────────────────────────────────────────────────────────
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/settings.tsx.
-// 訂閱狀態卡片接真實 vendors/{id}（useMyVendor + lib/subscription.ts）。
-// TODO(firebase): 店家資料／營業時間／公休／桌位仍讀寫 mockData.ts 的
-// mockGetMyVendor/mockSaveVendorSettings——真實 Vendor 型別還沒有這些欄位。
+// 2026-09-25：簡介／地址／電話／營業日／公休日／取餐時段／份數上限改讀寫真實
+// vendors/{id}（firestore.rules 限定店主只能改這幾個欄位，店名只有管理員能改），
+// 消費端取餐時段選擇跟結帳驗證都照這裡的設定（lib/pickupSlots.ts、functions/src/pricing.js）。
+// TODO(firebase): 封面圖／桌位仍讀寫 mockData.ts。
 export default function VendorPortalSettings() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -109,6 +133,8 @@ export default function VendorPortalSettings() {
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>(DEFAULT_BH);
   const [holidays, setHolidays] = useState<string[]>([]);
   const [newHoliday, setNewHoliday] = useState("");
+  const [pickupWindows, setPickupWindows] = useState<string[]>(DEFAULT_PICKUP_WINDOWS);
+  const [slotCapacity, setSlotCapacity] = useState("");
   const [newTable, setNewTable] = useState("");
 
   const { data: myVendor, isLoading } = useQuery({
@@ -119,37 +145,53 @@ export default function VendorPortalSettings() {
 
   useEffect(() => {
     if (!myVendor) return;
-    setName(myVendor.name ?? "");
-    setDescription(myVendor.description ?? "");
-    setAddress(myVendor.address ?? "");
-    setPhone(myVendor.phone ?? "");
     setCoverImage(myVendor.coverImage ?? "");
-    setHolidays(myVendor.holidays ?? []);
-    const bh = myVendor.businessHours;
-    if (bh && bh.length > 0) {
-      setBusinessHours(bh);
-    } else {
-      const ow = myVendor.orderWeekdays ?? [];
-      if (ow.length > 0) setBusinessHours(DEFAULT_BH.map(h => ({ ...h, open: ow.includes(h.weekday) })));
-    }
   }, [myVendor]);
 
   const tables: string[] = myVendor?.tables ?? [];
-  const { data: realVendor } = useMyVendor();
+  const { data: realVendor, isLoading: realVendorLoading } = useMyVendor();
+
+  useEffect(() => {
+    if (!realVendor) return;
+    setName(realVendor.name ?? "");
+    setDescription(realVendor.description ?? "");
+    setAddress(realVendor.address ?? "");
+    setPhone(realVendor.phone ?? "");
+    setHolidays(realVendor.holidays ?? []);
+    const bh = realVendor.business_hours;
+    setBusinessHours(bh && bh.length === 7 ? bh : DEFAULT_BH);
+    setPickupWindows(realVendor.pickup_windows?.length ? realVendor.pickup_windows : DEFAULT_PICKUP_WINDOWS);
+    setSlotCapacity(realVendor.slot_capacity ? String(realVendor.slot_capacity) : "");
+  }, [realVendor]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const saveMutation = useMutation({
-    mutationFn: () => {
-      if (!myVendor) throw new Error("找不到店家資料");
-      return mockSaveVendorSettings(myVendor.id, {
-        name, description, address, phone,
-        coverImage: coverImage || undefined,
-        businessHours, holidays,
+    mutationFn: async () => {
+      if (!realVendor) throw new Error("這個帳號還沒綁定商家，請聯絡平台");
+      const windowsProblem = pickupWindowsProblem(pickupWindows);
+      if (windowsProblem) throw new Error(windowsProblem);
+      const capacityText = slotCapacity.trim();
+      const capacity = capacityText === "" ? 0 : Number(capacityText);
+      if (!Number.isInteger(capacity) || capacity < 0 || capacity > 10000) {
+        throw new Error("份數上限請填 0～10000 的整數（空白或 0 代表不限）");
+      }
+      if (holidays.length > MAX_HOLIDAYS) throw new Error(`公休日最多 ${MAX_HOLIDAYS} 天`);
+      await updateDoc(doc(db, "vendors", realVendor.id), {
+        description: description.trim(),
+        address: address.trim(),
+        phone: phone.trim(),
+        business_hours: businessHours,
+        holidays,
+        pickup_windows: [...pickupWindows].sort(),
+        slot_capacity: capacity,
       });
+      // 封面圖還沒有真實欄位，照舊存在 mock
+      if (myVendor) await mockSaveVendorSettings(myVendor.id, { coverImage: coverImage || undefined });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: myVendorDocKey(realVendor?.id) });
       queryClient.invalidateQueries({ queryKey: ["myVendor", user?.id] });
-      toast({ title: "儲存成功" });
+      toast({ title: "儲存成功", description: "消費者下單時會照新的取餐時段與份數上限。" });
     },
     onError: (err: Error) => toast({ variant: "destructive", title: "儲存失敗", description: err.message }),
   });
@@ -206,7 +248,22 @@ export default function VendorPortalSettings() {
     a.click();
   }
 
-  if (isLoading) return (
+  function setWindowPart(index: number, part: 0 | 1, value: string) {
+    setPickupWindows(prev => prev.map((w, i) => {
+      if (i !== index) return w;
+      const pieces = w.split("-");
+      pieces[part] = value;
+      return pieces.join("-");
+    }));
+  }
+
+  function addPickupWindow() {
+    const last = [...pickupWindows].sort().at(-1);
+    const start = last ? last.split("-")[1] : "12:00";
+    setPickupWindows(prev => [...prev, `${start}-${addMinutes(start, 30)}`]);
+  }
+
+  if (isLoading || realVendorLoading) return (
     <VendorPortalLayout>
       <div className="flex justify-center py-20">
         <div role="status" className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -234,8 +291,9 @@ export default function VendorPortalSettings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>店家名稱 <span className="text-red-500">*</span></Label>
-              <Input value={name} onChange={e => setName(e.target.value)} className="mt-1" />
+              <Label>店家名稱</Label>
+              <Input value={name} readOnly disabled className="mt-1" />
+              <p className="text-xs text-muted-foreground mt-1">店名變更請聯絡平台（避免冒用其他店家名稱）。</p>
             </div>
             <div>
               <Label>店家簡介</Label>
@@ -371,11 +429,72 @@ export default function VendorPortalSettings() {
           </CardContent>
         </Card>
 
+        {/* ── 取餐時段 ── */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Timer className="w-4 h-4 text-orange-500" /> 取餐時段
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              消費者預購時只能選這些時段；上面設定為休息的星期、公休日當天不開放預購。
+            </p>
+            {[...pickupWindows.keys()].map(i => {
+              const [start, end] = pickupWindows[i].split("-");
+              return (
+                <div key={i} className="flex items-center gap-1.5">
+                  <Input type="time" value={start} aria-label={`第 ${i + 1} 個時段開始`}
+                    onChange={e => setWindowPart(i, 0, e.target.value)} className="h-10 w-[6.8rem] px-2" />
+                  <span className="text-muted-foreground text-xs">─</span>
+                  <Input type="time" value={end} aria-label={`第 ${i + 1} 個時段結束`}
+                    onChange={e => setWindowPart(i, 1, e.target.value)} className="h-10 w-[6.8rem] px-2" />
+                  <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-red-600"
+                    aria-label={`刪除第 ${i + 1} 個時段`} disabled={pickupWindows.length <= 1}
+                    onClick={() => setPickupWindows(prev => prev.filter((_, j) => j !== i))}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              );
+            })}
+            {pickupWindowsProblem(pickupWindows) && (
+              <p className="text-xs text-red-600">{pickupWindowsProblem(pickupWindows)}</p>
+            )}
+            <Button type="button" size="sm" variant="outline" onClick={addPickupWindow}
+              disabled={pickupWindows.length >= MAX_PICKUP_WINDOWS}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> 新增時段
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ── 份數上限 ── */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="w-4 h-4 text-orange-500" /> 每個時段份數上限
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Input type="number" inputMode="numeric" min={0} max={10000} step={1}
+                value={slotCapacity} onChange={e => setSlotCapacity(e.target.value)}
+                placeholder="不限" className="h-10 w-32" aria-label="每個時段份數上限" />
+              <span className="text-sm text-muted-foreground">份／每個取餐時段</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              同一天同一時段所有餐點合計的上限，額滿後消費者就選不到這個時段。空白或 0 代表不限。
+            </p>
+          </CardContent>
+        </Card>
+
         {/* ── 儲存按鈕 ── */}
+        {!realVendor && (
+          <p className="text-sm text-muted-foreground">這個帳號還沒綁定商家，無法儲存設定。</p>
+        )}
         <Button
           className="w-full"
           onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending || !name.trim()}
+          disabled={saveMutation.isPending || !realVendor}
         >
           {saveMutation.isPending ? "儲存中..." : "儲存設定"}
         </Button>
