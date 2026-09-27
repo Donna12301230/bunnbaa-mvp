@@ -42,6 +42,20 @@ function assertSignedInUser(request, action) {
   }
 }
 
+// Repeated no-shows (see markLockOutcome) set users/{uid}.orderBanned. Checked
+// at reservation time so a banned buyer never reaches LINE Pay; the
+// client-side plan-join path is blocked the same way via firestore.rules'
+// isBanned(). Missing doc/field = not banned.
+async function assertNotBanned(uid) {
+  const snap = await db.collection("users").doc(uid).get();
+  if (snap.exists && snap.data().orderBanned) {
+    throw new HttpsError(
+      "permission-denied",
+      "您的帳號因多次未取餐已被限制下單，請至會員中心提交解封申訴"
+    );
+  }
+}
+
 async function assertAdminOrVendorOwner(request, vendorId) {
   if (isEmulator()) return;
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in required.");
@@ -169,6 +183,9 @@ exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request)
 const VALID_OUTCOMES = ["fulfilled", "resold_and_fulfilled", "no_show"];
 // Same set VendorRedeemPage lets the counter act on.
 const OPEN_LOCK_STATUSES = ["locked", "for_resale"];
+// Membership terms (LoginPage.tsx 會員須知): "累計超過一次" no-show loses
+// order privileges, i.e. banned starting on the 2nd no-show.
+const NO_SHOW_BAN_THRESHOLD = 2;
 
 /**
  * Vendor-side pickup counter action: mark a lock as picked up or not.
@@ -203,11 +220,28 @@ exports.markLockOutcome = onCall({ region: "asia-east1" }, async (request) => {
     if (!OPEN_LOCK_STATUSES.includes(current)) {
       throw new HttpsError("failed-precondition", `This lock is already "${current}" and can't be redeemed again`);
     }
+
+    // Reads must come before writes in a transaction, so resolve the buyer's
+    // no-show count now even though it's only used for a no_show outcome.
+    const buyerUid = fresh.data().buyer_uid;
+    const userRef = db.collection("users").doc(buyerUid);
+    const userSnap = outcome === "no_show" ? await tx.get(userRef) : null;
+
     const update = { status: outcome };
     if (outcome === "no_show" && note) {
       update.no_show_note = note;
     }
     tx.update(lockRef, update);
+
+    if (outcome === "no_show") {
+      const noPickupCount = (userSnap.exists && userSnap.data().noPickupCount) || 0;
+      const nextCount = noPickupCount + 1;
+      const userUpdate = { noPickupCount: nextCount };
+      if (nextCount >= NO_SHOW_BAN_THRESHOLD) userUpdate.orderBanned = true;
+      // set+merge, not update: a phone/email signup always creates users/{uid}
+      // (web/src/lib/auth.ts), but don't fail redemption if that's ever missing.
+      tx.set(userRef, userUpdate, { merge: true });
+    }
   });
 
   return { lock_id: lockId, status: outcome };
@@ -348,6 +382,7 @@ function cleanNote(note) {
 
 exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
   assertSignedInUser(request, "check out");
+  await assertNotBanned(request.auth.uid);
   const {
     menu_item_id: menuItemId,
     pickup_window: pickupWindow,
@@ -426,6 +461,7 @@ const MAX_CART_UNITS = 100; // bounds the Firestore batch confirmLinePayPayment 
 
 exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
   assertSignedInUser(request, "check out");
+  await assertNotBanned(request.auth.uid);
   const { items, pickup_date: pickupDate, pickup_window: pickupWindow } = request.data || {};
   if (!Array.isArray(items) || items.length === 0) {
     throw new HttpsError("invalid-argument", "items must be a non-empty array");

@@ -1,13 +1,113 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { addDoc, collection, getDocs, limit, orderBy, query, serverTimestamp, where } from "firebase/firestore";
 import {
   User, Mail, Phone, GraduationCap, ArrowLeft, LogOut,
-  ClipboardList, Users, Store, History,
+  ClipboardList, Users, Store, History, ShieldAlert,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { logout } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { db } from "@/lib/firebase";
+import type { UserProfile } from "@/types";
+
+interface BanAppeal {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  admin_note: string | null;
+}
+
+const APPEAL_STATUS_LABEL: Record<BanAppeal["status"], string> = {
+  pending: "審核中",
+  approved: "已核准",
+  rejected: "已拒絕",
+};
+
+// 只有目前狀態是 isOrderBanned 才會顯示這塊；規則上 ban_appeals 的 create 也要求
+// isBanned()，所以未被封鎖的人就算硬呼叫也會被擋。
+function BanAppealSection({ user }: { user: UserProfile }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [reason, setReason] = useState("");
+
+  const { data: latestAppeal, isLoading } = useQuery({
+    queryKey: ["myLatestBanAppeal", user.id],
+    queryFn: async () => {
+      const snap = await getDocs(
+        query(collection(db, "ban_appeals"), where("buyer_uid", "==", user.id), orderBy("created_at", "desc"), limit(1))
+      );
+      return snap.empty ? null : ({ id: snap.docs[0].id, ...(snap.docs[0].data() as any) } as BanAppeal);
+    },
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      if (!reason.trim()) throw new Error("請填寫申訴原因");
+      await addDoc(collection(db, "ban_appeals"), {
+        buyer_uid: user.id,
+        username: user.username,
+        display_name: user.displayName ?? "",
+        reason: reason.trim(),
+        status: "pending",
+        created_at: serverTimestamp(),
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "申訴已送出", description: "管理員審核後會解除限制，請耐心等候。" });
+      setReason("");
+      queryClient.invalidateQueries({ queryKey: ["myLatestBanAppeal", user.id] });
+    },
+    onError: (err: Error) => toast({ variant: "destructive", title: "送出失敗", description: err.message }),
+  });
+
+  const canSubmitNew = !isLoading && (!latestAppeal || latestAppeal.status === "rejected");
+
+  return (
+    <section className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-3">
+      <div className="flex items-center gap-2 text-red-700 font-semibold">
+        <ShieldAlert className="w-5 h-5 shrink-0" /> 帳號目前限制下單
+      </div>
+      <p className="text-sm text-red-700">
+        因累計多次未取餐，暫時無法鎖定新的餐點。如果有特殊狀況，可以在下面提出申訴，管理員審核通過後會立即解除限制。
+      </p>
+
+      {!isLoading && latestAppeal && (
+        <div className="text-sm bg-white rounded-lg border border-red-100 p-3">
+          <p className="font-medium">
+            最近一次申訴：{APPEAL_STATUS_LABEL[latestAppeal.status]}
+          </p>
+          {latestAppeal.status === "pending" && (
+            <p className="text-muted-foreground mt-1">管理員審核中，請耐心等候，不需要重複送出。</p>
+          )}
+          {latestAppeal.status === "rejected" && latestAppeal.admin_note && (
+            <p className="text-muted-foreground mt-1">管理員備註：{latestAppeal.admin_note}</p>
+          )}
+        </div>
+      )}
+
+      {canSubmitNew && (
+        <div className="space-y-2">
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="請說明這次未取餐的原因……"
+            rows={3}
+          />
+          <Button
+            size="sm"
+            disabled={submitMutation.isPending || !reason.trim()}
+            onClick={() => submitMutation.mutate()}
+          >
+            {submitMutation.isPending ? "送出中…" : "送出申訴"}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
 
 const roleLabel: Record<string, string> = {
   customer: "一般會員",
@@ -81,6 +181,8 @@ export default function ProfilePage() {
             )}
           </div>
         </section>
+
+        {user?.orderBanned && <BanAppealSection user={user} />}
 
         {/* 快速功能 */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

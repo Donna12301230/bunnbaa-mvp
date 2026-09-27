@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, doc, getDocs, serverTimestamp, writeBatch } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
 import AdminLayout from "@/components/AdminLayout";
 import RequireRealAdmin from "@/components/RequireRealAdmin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,10 +23,10 @@ interface BanAppeal {
   created_at: { toDate?: () => Date };
 }
 
-// 只做管理員後台這半邊：讀取 + 核准/拒絕，對應真實 ban_appeals collection
-// （firestore.rules 限管理員讀寫）。沒有消費者自動提交申訴的畫面——真實後端
-// 目前沒有穩定的使用者帳號體系可以綁定封禁狀態，這半邊功能刻意只到這裡
-// （TODO.md 有記錄，見「解封申訴」待辦）。
+// 消費者端在 ProfilePage.tsx 的 BanAppealSection 提交；這裡讀取 + 核准/拒絕。
+// 核准時要一併解除 users/{uid} 的 orderBanned，不然申訴核准了但使用者還是下不了單，
+// 所以跟 firestore.rules 一樣把兩個寫入包進同一個 batch，並比照其他管理員覆寫動作
+// 補一筆 admin_audit_logs（ISO 27001 A.8.15）。
 function AppealsList() {
   const { toast } = useToast();
 
@@ -41,8 +41,26 @@ function AppealsList() {
   });
 
   const processAppealMutation = useMutation({
-    mutationFn: async ({ appealId, approved }: { appealId: string; approved: boolean }) =>
-      updateDoc(doc(db, "ban_appeals", appealId), { status: approved ? "approved" : "rejected" }),
+    mutationFn: async ({ appeal, approved, adminNote }: { appeal: BanAppeal; approved: boolean; adminNote?: string }) => {
+      const batch = writeBatch(db);
+      batch.update(doc(db, "ban_appeals", appeal.id), {
+        status: approved ? "approved" : "rejected",
+        admin_note: adminNote ?? null,
+      });
+      if (approved) {
+        // 一併清乾淨 noPickupCount，不然核准後立刻又因為舊的累計次數被判定已達門檻。
+        batch.update(doc(db, "users", appeal.buyer_uid), { orderBanned: false, noPickupCount: 0 });
+      }
+      batch.set(doc(collection(db, "admin_audit_logs")), {
+        admin_email: auth.currentUser?.email ?? null,
+        action: approved ? "approve_ban_appeal" : "reject_ban_appeal",
+        appeal_id: appeal.id,
+        buyer_uid: appeal.buyer_uid,
+        note: adminNote ?? null,
+        at: serverTimestamp(),
+      });
+      await batch.commit();
+    },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["adminAppeals"] });
       toast({ title: vars.approved ? "已核准解封" : "已拒絕申訴" });
@@ -96,7 +114,7 @@ function AppealsList() {
                       size="sm"
                       className="h-7 text-xs bg-green-500 hover:bg-green-600 text-white"
                       disabled={processAppealMutation.isPending}
-                      onClick={() => processAppealMutation.mutate({ appealId: appeal.id, approved: true })}
+                      onClick={() => processAppealMutation.mutate({ appeal, approved: true })}
                     >
                       <CheckCircle className="w-3.5 h-3.5 mr-1" /> 核准解封
                     </Button>
@@ -105,7 +123,10 @@ function AppealsList() {
                       variant="outline"
                       className="h-7 text-xs text-red-500"
                       disabled={processAppealMutation.isPending}
-                      onClick={() => processAppealMutation.mutate({ appealId: appeal.id, approved: false })}
+                      onClick={() => {
+                        const adminNote = window.prompt("拒絕原因（選填，會顯示給使用者看）") ?? undefined;
+                        processAppealMutation.mutate({ appeal, approved: false, adminNote });
+                      }}
                     >
                       <XCircle className="w-3.5 h-3.5 mr-1" /> 拒絕
                     </Button>

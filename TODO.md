@@ -69,8 +69,16 @@
   - 正式站驗證（2026-09-25，仁和雅咖啡店主帳號）：設定頁儲存份數 1＋公休日 10/3 成功且重新載入仍在；購物車公休日顯示「這天是店家公休日」並停用結帳、各時段顯示「剩 1 份」、數量 2 時提示只剩 1 份；實際付款一筆（10/5 11:30–12:00，NT$128＝伺服器算的 8 折，取餐編號 `EJEL6PRO`）後該時段變「已額滿」；份數改回不限後，同時段重複訂購出現提醒但不擋。測試完已把份數改回不限、刪除 10/3 公休日。`EJEL6PRO` 這筆測試訂單掛在店主帳號名下，不需要可到 Firestore Console 刪除
   - **還沒測**：兩人同時搶最後一份（transaction 應只讓一人成功、另一人不扣款）、LINE Pay 確認失敗時份數退回
 - [ ] **「加入計畫」（多日方案）改走伺服器**：目前 `HomePage.tsx` 的 `handleJoinPlan` 在前端直接寫 N 筆 locks，固定 `12:00-13:00`、不經付款，也不受商家時段／公休／份數限制
-- [ ] **消費者端提交解封申訴**——完全沒有入口（登入頁條款的「會員中心提交申訴」只是文字）。現在消費者已有穩定帳號，可以開始做了
+- [x] **消費者端提交解封申訴（含實際的封鎖機制）**——2026-09-28 完成，這項原本沒人排進分工表，SU 認領後做成完整版（不只是入口，連「真的會封鎖人」都補上了，理由：光做申訴表單，沒有封鎖機制配合的話永遠不會有真實使用者用到）：
+  - `markLockOutcome` 標記 `no_show` 時，在同一個 transaction 裡把 `users/{buyer_uid}.noPickupCount` 加一，累計滿 2 次（對應會員條款「累計超過一次」）自動設 `orderBanned: true`
+  - 封鎖後擋兩條路：`createLinePayReservation`／`createCartLinePayReservation` 開頭擋（`assertNotBanned`），`firestore.rules` 的 `locks` create 規則也擋（防 `HomePage.tsx` 的「加入計畫」這條純前端直寫路徑繞過）
+  - 會員中心（`/profile`）新增 `BanAppealSection`：只有 `orderBanned` 為 true 才顯示，可填理由送出 `ban_appeals`；已有審核中/已拒絕的申訴會顯示狀態，拒絕時看得到管理員備註
+  - `firestore.rules`：`ban_appeals` 改成被封鎖者能建立自己的申訴（原本是 `allow read, write: if isAdmin()`，完全沒有消費者建立的路）；`users/{uid}` 新增 isAdmin() 才能改的 `orderBanned`/`noPickupCount` 欄位，且**自己更新個人資料的規則改用 `diff().affectedKeys()` 而不是整份文件的 `keys()`**——不改的話，任何人只要被封鎖過一次，文件上多了這兩個欄位，從此連自己的顯示名稱都改不了（本機規則測試抓到這個，寫規則時沒想到）
+  - `AdminAppealsPage.tsx` 核准時原本只改 `ban_appeals.status`，沒有真的解除封鎖——改成 batch 一起寫 `users/{uid}.orderBanned=false`＋`noPickupCount=0`，並補一筆 `admin_audit_logs`；拒絕時可以填備註（`window.prompt`，跟其他管理員操作一致的做法）
+  - 本機 Firestore emulator 寫了 22 項規則測試全數通過（涵蓋封鎖後擋建立訂單、只有被封鎖者能建立申訴、管理員核准會連動解除封鎖、自己不能亂改封鎖欄位等）；也重跑了之前的 43 項舊測試確認沒有牽連壞掉（1 個舊測試失敗是雅婷之前把 `locks` 公開讀取範圍縮小造成的，跟這次改動無關）
+  - **還沒驗證**：規則跟 Functions 都還沒部署，也還沒實際走過一次「兩次未取餐→被擋下單→送申訴→管理員核准→解封後能重新下單」的真實流程
 - [ ] 「我的轉讓」無法追蹤已被接手的項目（資料模型沒有記錄原轉讓者）
+- [x] **商家頁（`/vendor/:id`）手機呈現優化**——2026-09-28 完成，參考外部點餐網站的手機版面。品項改依 `menu_items.category` 分組，商家頁上方新增可橫向滑動的分類標籤列（`sticky top-16`，跟站頭疊在一起），點分類會平滑捲動到對應區塊（用 `scrollIntoView`，不是 `<a href="#..">`——整站是 hash router，網址的 `#` 是路由本身，不能拿來當錨點）。純呈現層改動，沒有動到加入購物車／取餐時間選擇等既有邏輯。只有 1 種分類時不顯示標籤列（沒意義）。**還沒在真實手機或瀏覽器裝置模式下看過**，只確認 `tsc`／`build` 過關
 
 ### 7. 待決策
 

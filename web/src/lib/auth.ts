@@ -59,8 +59,15 @@ async function resolveProfile(u: User): Promise<UserProfile> {
     }
   }
 
-  // users/{uid} 是註冊時寫的個人資料（電話、學校、科系），沒有也不影響登入
-  let extra: { display_name?: string; phone?: string; department?: string } = {};
+  // users/{uid} 是註冊時寫的個人資料（電話、學校、科系），沒有也不影響登入。
+  // orderBanned/noPickupCount 是 markLockOutcome 在標記 no_show 時順手寫的。
+  let extra: {
+    display_name?: string;
+    phone?: string;
+    department?: string;
+    orderBanned?: boolean;
+    noPickupCount?: number;
+  } = {};
   try {
     const snap = await getDoc(doc(db, "users", u.uid));
     if (snap.exists()) extra = snap.data();
@@ -79,6 +86,8 @@ async function resolveProfile(u: User): Promise<UserProfile> {
     department: extra.department || undefined,
     role,
     vendorId,
+    orderBanned: extra.orderBanned || false,
+    noPickupCount: extra.noPickupCount || 0,
   };
 }
 

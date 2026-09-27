@@ -19,6 +19,15 @@ service cloud.firestore {
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
+    // Repeated no-shows set users/{uid}.orderBanned (written server-side by
+    // markLockOutcome). Missing field/doc = not banned, so this never blocks
+    // someone who's never had a users/ doc written for them.
+    function isBanned() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('orderBanned', false) == true;
+    }
+
     // vendors: publicly readable (browsing); writes via admin backend only for MVP
     match /vendors/{vendorId} {
       allow read: if true;
@@ -92,8 +101,12 @@ service cloud.firestore {
                   || isAdmin()
                   || isVendorOwner(resource.data.vendor_id);
       // A new lock must start as "locked" and can't carry server-managed fields,
-      // otherwise a client could mint an already-fulfilled/settled lock.
+      // otherwise a client could mint an already-fulfilled/settled lock. Also
+      // blocks the client-side plan-join path (HomePage handleJoinPlan) for a
+      // banned buyer — LINE Pay checkout is blocked server-side, see
+      // assertNotBanned in functions/src/index.js.
       allow create: if isSignedInUser()
+                    && !isBanned()
                     && request.resource.data.buyer_uid == request.auth.uid
                     && request.resource.data.status == 'locked'
                     && !request.resource.data.keys().hasAny(
@@ -266,22 +279,41 @@ service cloud.firestore {
       allow delete: if isAdmin() || (request.auth != null && isVendorOwner(resource.data.vendor_id));
     }
 
-    // ban_appeals: admin-only in both directions for now — there is no
-    // consumer submission flow yet (no stable non-anonymous user identity
-    // to attach a ban to; see TODO.md). This collection is seeded/managed
-    // by admins only; AdminAppealsPage just lists + approves/rejects.
+    // ban_appeals: a banned user files one for themselves (status must start
+    // "pending"); only an admin decides it. Approving one also resets the
+    // user's ban (users/{uid} rule below), done client-side as a batch in
+    // AdminAppealsPage.tsx.
     match /ban_appeals/{appealId} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin() || (request.auth != null && resource.data.buyer_uid == request.auth.uid);
+      allow create: if isSignedInUser() && isBanned()
+                    && request.resource.data.buyer_uid == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.keys().hasOnly(
+                         ['buyer_uid', 'username', 'display_name', 'reason', 'status', 'created_at']);
+      allow update: if isAdmin();
+      allow delete: if false;
     }
 
     // users/{uid}: platform profile written at registration (web/src/lib/auth.ts).
     // Deliberately holds no role — admin comes from the email allowlist and
     // vendor from vendors/{id}.owner_uid, so nothing here can grant access.
+    // orderBanned/noPickupCount are set server-side by markLockOutcome (admin
+    // SDK bypasses rules); the isAdmin() branch below is only for resetting
+    // them when an appeal is approved.
     match /users/{uid} {
       allow read: if (request.auth != null && request.auth.uid == uid) || isAdmin();
-      allow create, update: if isSignedInUser() && request.auth.uid == uid
-                            && request.resource.data.keys().hasOnly(
-                                 ['display_name', 'phone', 'school', 'department', 'created_at']);
+      allow create: if isSignedInUser() && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(
+                         ['display_name', 'phone', 'school', 'department', 'created_at']);
+      // diff().affectedKeys(), not the whole document's keys() — otherwise once
+      // orderBanned/noPickupCount exist on a doc (any past ban), the owner could
+      // never touch their own profile fields again, since the resulting document
+      // would always carry keys outside this allowlist.
+      allow update: if isSignedInUser() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+                         ['display_name', 'phone', 'school', 'department', 'created_at']);
+      allow update: if isAdmin()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['orderBanned', 'noPickupCount']);
       allow delete: if false;
     }
 
