@@ -22,18 +22,19 @@
 - [V] `firebase deploy --only firestore:rules,firestore:indexes`（2026-09-24 再次更新：`locks` 改成只有轉賣中／贈送中公開讀，新增 `vendor_id+status+created_at` 複合索引——**索引要先建好**，不然轉讓市集查詢會失敗；2026-09-24 又新增 `users`／`vendor_applications` 規則，平台登入改真實 Firebase Auth 後註冊、廠商申請都要靠這兩條）
 - [V] `firebase deploy --only functions`（2026-09-24 起消費端 callable 會擋匿名身分，前端已不再匿名登入，**規則、Functions、hosting 要一起部署**，不然舊版前端的匿名使用者會全部被擋）
 - [V] `cd web && npm run build` 後 `firebase deploy --only hosting`（設計系統／新 design tokens 也還沒上線）
+- [ ] **部署 hosting（QR 相機掃碼）**：2026-09-28 改了 `firebase.json` 的 `Permissions-Policy`（`camera=(self)`）＋新增 `QrScannerDialog.tsx`／`jsqr` 依賴，`cd web && npm run build` 後 `firebase deploy --only hosting`。只動前端和 hosting 標頭，不用部署規則／Functions
 - [ ] **Functions runtime 升級**：部署時警告 Node.js 20 於 **2026-10-30 停用**，之後無法再部署 Functions。10/18 Demo 不受影響，比賽後要繼續改 Functions 前，先把 `functions/package.json` 的 engines 升到 Node 22＋`firebase-functions@latest`（有 breaking changes，要重測）
 - [ ] 部署後實測一次購物車結帳，到 Firestore Console 確認新的 `locks.vendor_id` 對應下單的商家，不是全部掛在 `cafe-renheya-demo`（2026-09-25 單品項 `/lock` 下單仁和雅咖啡已確認 `vendor_id` 正確；還要用**別家**商家的品項走一次購物車才算驗完）
 
 ### 3. 正式站驗證（已部署，但還沒在正式站實際跑過）
 
-- [ ] QR Code 核銷（2026-09-25 正式站已驗證步驟 1、2、3、「重複核銷被擋」與取餐編號夾空白（輸入 `ejel 6pro` 自動變 `EJEL6PRO` 查得到）：取餐編號 `XVTVDHP0` 由仁和雅咖啡店主帳號核銷成功；2026-09-28 又驗證步驟 4「登記未取餐」（`KFAHATZZ`、`8HVO4YHO` → `no_show`＋備註）與一般會員的 `permission-denied`（開頁面被導回首頁、直接呼叫回 403）；**只剩**別家商家帳號的 `permission-denied`，要等第二家商家綁店主才能測）：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證，但 **emulator 下 `assertAdminOrVendorOwner` 直接放行，權限這段只有正式站測得到**）。前置：§2 部署完＋§4 商家帳號綁定。步驟：
+- [ ] QR Code 核銷（2026-09-25 正式站已驗證步驟 1、2、3、「重複核銷被擋」與取餐編號夾空白（輸入 `ejel 6pro` 自動變 `EJEL6PRO` 查得到）：取餐編號 `XVTVDHP0` 由仁和雅咖啡店主帳號核銷成功；2026-09-28 又驗證步驟 4「登記未取餐」（`KFAHATZZ`、`8HVO4YHO` → `no_show`＋備註）與一般會員的 `permission-denied`（開頁面被導回首頁、直接呼叫回 403）；**只剩**別家商家帳號的 `permission-denied`（要等第二家商家綁店主才能測）＋2026-09-28 新增的相機掃碼手機實測，兩者各自拆成下面獨立項目）：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證，但 **emulator 下 `assertAdminOrVendorOwner` 直接放行，權限這段只有正式站測得到**）。前置：§2 部署完＋§4 商家帳號綁定。步驟：
   1. 一般會員帳號鎖定一筆仁和雅咖啡的餐（LINE Pay Sandbox 付款）→ `/my-bookings`「使用」記下取餐編號末 8 碼
   2. 商家帳號登入 `/lock/vendor/redeem`：取餐總覽要看得到這筆（驗證 `locks` 讀取規則＋`vendor_id+created_at` 索引），輸入末 8 碼查得到
   3. 按「確認取餐」→ Firestore Console 看 `locks/{id}.status` 變 `fulfilled`
   4. 再鎖一筆，改按「登記未取餐」填備註 → `status=no_show`＋`no_show_note`
   5. 負面測試：已核銷的同一碼再查一次要被擋；用**別家**商家帳號或一般會員呼叫要回 `permission-denied`
-  - 註：目前商家端**沒有相機掃碼**，是店員看 QR 下方的取餐編號手動輸入（QR 內容是 `{lockId, vendorId}` JSON，但沒有頁面去解它）。Demo 若要真的「掃 QR」得另外接掃碼套件
+  - 2026-09-28：商家端補上**相機掃碼**（`QrScannerDialog.tsx`，用 `jsqr` 解，iOS Safari 也能用）：「用相機掃描 QR Code」→ 解出 `{lockId, vendorId}` → 用 lockId **直接讀那筆 lock**，以 Firestore 裡真正的 `vendor_id` 判斷是不是本店（讀不到或不同店就擋），不看 QR 裡的 vendorId、也不受末 8 碼查詢「最近 200 筆」的限制；同時修 `PaymentConfirmPage.tsx` 付款成功頁的 QR 原本 `vendorId` 寫死 `cafe-renheya-demo`（購物車跨店結帳時別家的 QR 也標成仁和雅），改成讀每筆 lock 的真實 `vendor_id`；手動輸入末 8 碼保留當備援。`firebase.json` 的 `Permissions-Policy` 從 `camera=()` 改成 `camera=(self)`，**不改的話正式站相機會被瀏覽器直接擋掉**。實測見下方「QR 相機掃碼」
   - 2026-09-25：`markLockOutcome` 補上伺服器端狀態檢查（只有 `locked`／`for_resale` 可核銷，用 transaction 防兩台裝置重複核銷），原本直接呼叫可以把已完成／已結算的鎖定改成 `no_show`。要跟 §2 的 functions 一起部署
 - [ ] 撥款排程：`settleVendorPayouts`＋手動觸發（emulator 已驗證重複點擊不會重複結算）
 - [ ] 成長獎勵抽獎：`drawGrowthReward`（2026-09-24 修：消費者首頁原本讀 `payouts` 判斷是否解鎖，但 `payouts` 只限管理員／店主讀，消費者永遠看不到抽獎。改成讀公開的 `growth_rewards.unlocked_milestones`，由撥款結算的 `syncGrowthUnlock` 寫入、只有門檻 id 不含金額。**部署 Functions 後要跑一次** `triggerSettlementNow`（或等當天 20:00 排程）把正式站的解鎖狀態補上，不然首頁還是顯示未解鎖）
@@ -41,7 +42,12 @@
 - [ ] 取餐提醒推播：`pickupReminders`／`triggerPickupRemindersNow`
 - [ ] 商家校準報告＋what-if 追問：`dailyCalibration`／`askCalibrationScenario`，以及 `reliability_tone` 自動換算
 - [ ] 到 Firestore Console 確認 `admin_audit_logs` 有 2026-09-21 煙霧測試產生的兩筆（含 `admin_email` 與狀態變化）
-- [ ] **別家商家帳號呼叫 `markLockOutcome` 要回 `permission-denied`**（QR 核銷步驟 5 最後一項）：正式站目前只有仁和雅綁了店主。等第二家商家綁定後，用那家店主帳號開 `/lock/vendor/redeem` 查仁和雅的取餐編號，或直接呼叫 `markLockOutcome`。為避免擋不住時改到真實資料，挑一筆已經 `fulfilled` 的仁和雅鎖定來打（例：`F1S63VpLVZqDxVTvdHp0`／`XVTVDHP0`）：權限檢查排在狀態檢查之前，擋得住回 403，擋不住只會回 `failed-precondition` 不寫入
+- [ ] **別家商家帳號呼叫 `markLockOutcome` 要回 `permission-denied`**（QR 核銷步驟 5 最後一項）：正式站目前只有仁和雅綁了店主。等第二家商家綁定後，用那家店主帳號開 `/lock/vendor/redeem` 查仁和雅的取餐編號，或直接呼叫 `markLockOutcome`。為避免擋不住時改到真實資料，挑一筆已經 `fulfilled` 的仁和雅鎖定來打（例：`F1S63VpLVZqDxVTvdHp0`／`XVTVDHP0`）：權限檢查排在狀態檢查之前，擋得住回 403，擋不住只會回 `failed-precondition` 不寫入。**注意：這項不能用相機掃碼測**——掃到別家店的碼前端就先擋掉，不會呼叫到 `markLockOutcome`，要用手動輸入末 8 碼或直接呼叫
+- [ ] **QR 相機掃碼**（2026-09-28 新增 `QrScannerDialog.tsx`，目前只過了 `tsc`＋`vite build`）：§2 部署 hosting 後用手機實測。前置：正式站是 HTTPS（相機必要條件）。步驟：
+  1. 消費者手機開 `/my-bookings` →「使用」顯示 QR
+  2. 仁和雅店主用**另一支手機**開 `/lock/vendor/redeem` →「用相機掃描 QR Code」，第一次要跳相機權限詢問，允許後看得到畫面（iPhone Safari＋Android Chrome 各試一次）
+  3. 對準 QR → 視窗自動關閉、下方跳出該筆的核對結果卡，取餐編號欄自動帶入末 8 碼 → 按「確認取餐」成功。付款成功頁（`/payment/confirm/...`）上的 QR 也掃一次，確認同樣查得到
+  4. 負面：再掃同一張 → 顯示「已經是『已完成取餐』狀態」；掃一張桌位點餐 QR（`VendorPortalSettings` 下載的）→ 顯示「這不是 BunnBaa 的取餐 QR Code」；拒絕相機權限 → 顯示改用手動輸入的提示
 - [ ] **「加入計畫」被封鎖時的白話提示**（§6 解封申訴，2026-09-28 改的 `HomePage.tsx`）：推 master 部署後，封鎖一個測試會員再按「預約加入計畫」，要看到「您的帳號因多次未取餐已被限制下單，請至會員中心提交解封申訴」，不是 `Missing or insufficient permissions.`。目前只過了 `tsc`
 - [ ] **清除正式站測試資料**：2026-09-28 解封流程測試在 `customer@bunnbaa.test` 名下留了「A方案：五日輕食計畫」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）＋一筆已核准的 `ban_appeals/lI5dGTVtIBfByBIUTy3W`，到 Firestore Console 刪除（前兩筆是 no_show，會被商家校準報告算進去）。另外 9/25 份數測試的 `EJEL6PRO` 掛在仁和雅店主帳號名下（見 §6），也可以一起刪
 
@@ -128,7 +134,7 @@
 | 金流串接（消費端） | 🔴 | Sandbox 完成；Demo 沿用 Sandbox，正式上線才需特約商店審核 |
 | 轉賣流程（含取消轉讓） | ✅ | `claimResoldLock`，兩個匿名帳號互相接手已測 |
 | 轉賣金流（買家對買家） | ✅ | 設計上不經過平台，只轉移 `buyer_uid` |
-| QR Code 核銷 | 🟡 | 見待辦 §3 |
+| QR Code 核銷 | 🟡 | 見待辦 §3；2026-09-28 補上商家端相機掃碼，待部署 hosting＋手機實測 |
 | 撥款排程 | 🟡 | 見待辦 §3 |
 | 取餐提醒推播（FCM，同 SU「通知系統」） | 🟡 | 程式碼由 SU 完成，VAPID key 已填，待部署驗證 |
 | 我的鎖定／訂單記錄頁 | 🟡 | `MyLocksPage.tsx`，簡易列表（週曆版在 `MyBookingsPage.tsx`） |

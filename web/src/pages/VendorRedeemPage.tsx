@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
-import { collection, getDocs, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { useCallback, useEffect, useState } from "react";
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, where, type DocumentSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import { Search, CheckCircle2, AlertCircle, XCircle, CalendarDays } from "lucide-react";
+import { Search, CheckCircle2, AlertCircle, XCircle, CalendarDays, ScanLine } from "lucide-react";
 import { db, functions } from "../lib/firebase";
 import type { Lock } from "../types";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import QrScannerDialog from "@/components/QrScannerDialog";
 
 // 沒綁定商家的帳號（例如 emulator 下的 admin）退回 demo 商家
 const DEMO_VENDOR_ID = "cafe-renheya-demo";
@@ -61,6 +62,11 @@ function formatDateLabel(dateStr: string): string {
  * ——依取餐日期（欄）× 取餐時段（列）排成跟消費端 MyBookingsPage 一樣的行事曆
  * 格式，點格子裡的卡片直接帶入下面的核對結果卡（跟手動輸入編號查詢共用同一套
  * markOutcome 邏輯，沒有另外寫一套）。
+ *
+ * 2026-09-28：補上相機掃碼（QrScannerDialog）。QR 內容是 { lockId, vendorId }，
+ * 掃到後用完整 lockId 直接讀那筆 lock、以 Firestore 裡真正的 vendor_id 判斷是不是
+ * 本店的單（QR 裡的 vendorId 不可信——舊版 PaymentConfirmPage 一律寫死仁和雅），
+ * 也不受「最近 200 筆」限制；手動輸入末 8 碼仍保留當備援。
  */
 export default function VendorRedeemPage() {
   const { user } = useAuth();
@@ -71,6 +77,7 @@ export default function VendorRedeemPage() {
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showNoShowForm, setShowNoShowForm] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const [recentLocks, setRecentLocks] = useState<Lock[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(true);
@@ -119,33 +126,51 @@ export default function VendorRedeemPage() {
     setShowNoShowForm(false);
   }
 
-  async function handleSearch() {
+  // fullLockId：掃碼時帶完整 id 精確比對；手動輸入只有末 8 碼
+  async function handleSearch(fullLockId?: string) {
     // 取餐編號本身沒有空白，貼上時夾帶的空格（例如「AB3F 9K2M」）一律拿掉
     const input = code.replace(/\s/g, "").toUpperCase();
-    if (!input) return;
+    if (!fullLockId && !input) return;
 
     setSearchError("");
     setFoundLock(null);
     setShowNoShowForm(false);
     setSearching(true);
     try {
-      // 撈最近 200 筆這個商家的鎖定紀錄，用末 8 碼比對——跟舊 Parse 版本的
-      // scan.tsx 一樣的作法，避免需要額外的複合索引。
-      const q = query(
-        collection(db, "locks"),
-        where("vendor_id", "==", VENDOR_ID),
-        orderBy("created_at", "desc"),
-        limit(200)
-      );
-      const snap = await getDocs(q);
-      const match = snap.docs.find((d) => d.id.slice(-8).toUpperCase() === input.slice(-8));
+      let match: DocumentSnapshot | undefined;
+      if (fullLockId) {
+        // 掃碼：直接讀那一筆。別家店的 lock 被 firestore.rules 擋下（permission-denied）
+        // 或讀得到但 vendor_id 不同（管理員、轉讓中公開讀），一律當成不是本店的單
+        let snap: DocumentSnapshot | null = null;
+        try {
+          snap = await getDoc(doc(db, "locks", fullLockId));
+        } catch (err) {
+          if ((err as { code?: string }).code !== "permission-denied") throw err;
+        }
+        if (!snap?.exists() || snap.data().vendor_id !== VENDOR_ID) {
+          setSearchError("這張取餐碼不是本店的訂單，請顧客確認取餐店家。");
+          return;
+        }
+        match = snap;
+      } else {
+        // 撈最近 200 筆這個商家的鎖定紀錄，用末 8 碼比對——跟舊 Parse 版本的
+        // scan.tsx 一樣的作法，避免需要額外的複合索引。
+        const q = query(
+          collection(db, "locks"),
+          where("vendor_id", "==", VENDOR_ID),
+          orderBy("created_at", "desc"),
+          limit(200)
+        );
+        const snap = await getDocs(q);
+        match = snap.docs.find((d) => d.id.slice(-8).toUpperCase() === input.slice(-8));
+      }
 
-      if (!match) {
+      if (!match?.exists()) {
         setSearchError("找不到符合的取餐編號，請確認是否輸入正確。");
         return;
       }
-      if (match.data().status !== "locked" && match.data().status !== "for_resale") {
-        const status = match.data().status;
+      const status = match.data().status;
+      if (status !== "locked" && status !== "for_resale") {
         setSearchError(`這筆已經是「${LOCK_STATUS_STYLE[status]?.label ?? status}」狀態了，無法再次核對。`);
         return;
       }
@@ -156,6 +181,30 @@ export default function VendorRedeemPage() {
       setSearching(false);
     }
   }
+
+  const handleScan = useCallback(
+    (text: string) => {
+      setScannerOpen(false);
+      // QR 內容是 { lockId, vendorId }，只取 lockId；店家歸屬由 handleSearch 讀 Firestore 判斷
+      let lockId: string | undefined;
+      try {
+        const parsed = JSON.parse(text);
+        lockId = typeof parsed?.lockId === "string" ? parsed.lockId : undefined;
+      } catch {
+        // 不是 JSON——可能是別的 QR（例如桌位點餐碼），下面統一報錯
+      }
+      if (!lockId) {
+        setFoundLock(null);
+        setSearchError("這不是 BunnBaa 的取餐 QR Code，請顧客打開「我的商品」→「使用」。");
+        return;
+      }
+      setCode(lockId.slice(-8).toUpperCase());
+      handleSearch(lockId);
+    },
+    // 要穩定引用，不然 QrScannerDialog 每次 render 都會重開相機。handleSearch
+    // 帶 fullLockId 時不讀 code state，所以只依賴 VENDOR_ID
+    [VENDOR_ID]
+  );
 
   async function markOutcome(outcome: "fulfilled" | "resold_and_fulfilled" | "no_show", note?: string) {
     if (!foundLock) return;
@@ -267,7 +316,7 @@ export default function VendorRedeemPage() {
           {/* 查詢區 */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground font-normal">或直接輸入取餐編號（末 8 碼）</CardTitle>
+              <CardTitle className="text-sm text-muted-foreground font-normal">掃描 QR Code，或輸入取餐編號（末 8 碼）</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex gap-2">
@@ -281,12 +330,15 @@ export default function VendorRedeemPage() {
                 />
                 <Button
                   className="shrink-0"
-                  onClick={handleSearch}
+                  onClick={() => handleSearch()}
                   disabled={!code.trim() || searching}
                 >
                   {searching ? "查詢中…" : "查詢"}
                 </Button>
               </div>
+              <Button variant="outline" className="w-full" onClick={() => setScannerOpen(true)}>
+                <ScanLine className="w-4 h-4 mr-1.5" /> 用相機掃描 QR Code
+              </Button>
 
               {searchError && (
                 <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -378,6 +430,7 @@ export default function VendorRedeemPage() {
           )}
         </div>
       </div>
+      <QrScannerDialog open={scannerOpen} onOpenChange={setScannerOpen} onScan={handleScan} />
     </VendorPortalLayout>
   );
 }

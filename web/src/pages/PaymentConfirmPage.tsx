@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
 import { httpsCallable } from "firebase/functions";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, functions } from "../lib/firebase";
 import LockQRCode from "../components/LockQRCode";
@@ -16,7 +16,8 @@ import { registerForPickupReminders } from "../lib/messaging";
  */
 export default function PaymentConfirmPage() {
   const [status, setStatus] = useState<"waiting-auth" | "confirming" | "done" | "error">("waiting-auth");
-  const [lockIds, setLockIds] = useState<string[]>([]);
+  // 每筆 lock 的 id＋真正的 vendor_id（購物車可能跨店，QR 裡的 vendorId 不能寫死）
+  const [locks, setLocks] = useState<{ id: string; vendorId: string }[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   // Route is /payment/confirm/:orderId. LINE Pay's ?transactionId=... append
   // can still end up glued onto this param (see App.tsx's comment on this
@@ -49,7 +50,16 @@ export default function PaymentConfirmPage() {
         const fn = httpsCallable(functions, "confirmLinePayPayment");
         const result = await fn({ order_id: orderId });
         const { lock_ids: ids } = result.data as { lock_ids: string[] };
-        setLockIds(ids);
+        // 付款已成功，讀不到 vendor_id 也不能讓頁面變成「付款確認失敗」；
+        // 商家掃碼只看 lockId、店家歸屬以 Firestore 為準，vendorId 空白不影響核銷
+        const vendorIds = await Promise.all(
+          ids.map((id) =>
+            getDoc(doc(db, "locks", id))
+              .then((d) => (d.data()?.vendor_id as string | undefined) ?? "")
+              .catch(() => "")
+          )
+        );
+        setLocks(ids.map((id, i) => ({ id, vendorId: vendorIds[i] })));
         setStatus("done");
 
         try {
@@ -78,11 +88,11 @@ export default function PaymentConfirmPage() {
           <p className="muted">確認付款中…</p>
         </div>
       )}
-      {status === "done" && lockIds.length > 0 && (
+      {status === "done" && locks.length > 0 && (
         <div className="card">
           <h2>付款成功！</h2>
-          {lockIds.map((id) => (
-            <LockQRCode key={id} lockId={id} vendorId="cafe-renheya-demo" />
+          {locks.map(({ id, vendorId }) => (
+            <LockQRCode key={id} lockId={id} vendorId={vendorId} />
           ))}
           <p className="muted" style={{ marginTop: 12 }}>
             <Link href="/my-locks">查看我的訂單</Link>

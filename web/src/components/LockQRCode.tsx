@@ -5,7 +5,7 @@ interface Props {
   vendorId: string;
 }
 
-/** QR 內容為 JSON 字串 { lockId, vendorId }；商家目前用手動輸入末 8 碼核對，QR 是給未來掃碼流程預留。 */
+/** QR 內容為 JSON 字串 { lockId, vendorId }；商家在 /lock/vendor/redeem 用相機掃碼，或手動輸入末 8 碼核對。 */
 export default function LockQRCode({ lockId, vendorId }: Props) {
   const payload = JSON.stringify({ lockId, vendorId });
   const shortCode = lockId.slice(-8).toUpperCase();
