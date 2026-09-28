@@ -114,7 +114,7 @@
 
 ### 8. 寫死資料盤點（2026-09-28 盤點，依序處理）
 
-**部署順序（全部還沒部署、沒在瀏覽器點過，只過了 `tsc`＋`vite build`＋rules 在 emulator 編譯）**：
+**部署順序**（2026-09-28 已完成 1、3、4：rules、Functions（21 支含 6 支新的翻譯相關）、hosting 從 `Donna` 分支 `2e1a59b` 部署；Functions 部署要加 `FUNCTIONS_DISCOVERY_TIMEOUT=60`，否則 CLI 分析程式碼 10 秒逾時。**第 2、5 步還沒做**）：
 1. `firebase deploy --only firestore:rules`（新增 `reviews`／`platform_config`／`landing_events`，`vendors` 店主可寫 `cover_image`，`users` 本人可寫 `lang`）
 2. 正式站補設定資料：`node scripts/seed.js --config-only`（只寫 `platform_config/growth`＋`landing_events`，不動其他資料）
 3. `firebase deploy --only functions`（成長門檻讀設定、計畫 locks 加 `meal_plan_id`、錯誤訊息依語言、新增自動翻譯觸發器與 `translateAllContent`）——前端呼叫格式有變（多帶 `lang`），**Functions 與 hosting 要一起部署**
