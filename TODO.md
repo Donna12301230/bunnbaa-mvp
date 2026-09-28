@@ -99,7 +99,9 @@
   - 2026-09-28 正式站後半段也通過：管理員 `ckchildlikekid@gmail.com` 在 `/admin/appeals` 核准 → `users` 變 `orderBanned=false`／`noPickupCount=0`、`admin_audit_logs` 多一筆 `approve_ban_appeal` → 會員中心限制提示消失、購物車結帳正常導向 LINE Pay Sandbox。**整條流程正式站驗證完成**
   - 剩下要測的已移到 §3 待辦
   - 測試留在正式站的資料：`customer@bunnbaa.test` 名下「A方案：五日輕食計畫」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz` 已是 no_show；`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe` 仍是 locked），清除見 §3 待辦
-- [x] 「我的轉讓」無法追蹤已被接手的項目 → 2026-09-28 locks 加 `transferred_from_uids`，接手時由 claimResoldLock／firestore.rules 強制寫入（需重新部署 rules，claimResoldLock 等 Blaze）
+- [V] 「我的轉讓」無法追蹤已被接手的項目 → 2026-09-28 locks 加 `transferred_from_uids`，接手時由 claimResoldLock／firestore.rules 強制寫入（需重新部署 rules，claimResoldLock 等 Blaze）
+  - 已知取捨：原持有人可讀整筆 lock（含新持有人的 consumer_feedback／no_show_note），試營運先接受；要收緊就改成獨立 transfer_records collection
+  - 舊資料用 `scripts/backfill-transfers.js` 從 payment_intents 補回原付款人（只補得回第一手，非 LINE Pay 建立的 lock 補不回）
 - [V] **商家頁（`/vendor/:id`）手機呈現優化**——2026-09-28 完成，參考外部點餐網站的手機版面。品項改依 `menu_items.category` 分組，商家頁上方新增可橫向滑動的分類標籤列（`sticky top-16`，跟站頭疊在一起），點分類會平滑捲動到對應區塊（用 `scrollIntoView`，不是 `<a href="#..">`——整站是 hash router，網址的 `#` 是路由本身，不能拿來當錨點）。純呈現層改動，沒有動到加入購物車／取餐時間選擇等既有邏輯。只有 1 種分類時不顯示標籤列（沒意義）。**還沒在真實手機或瀏覽器裝置模式下看過**，只確認 `tsc`／`build` 過關
 
 ### 7. 待決策

@@ -261,27 +261,31 @@ exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
   if (!lockId) throw new HttpsError("invalid-argument", "lock_id is required");
 
   const lockRef = db.collection("locks").doc(lockId);
-  const lockSnap = await lockRef.get();
-  if (!lockSnap.exists) {
-    throw new HttpsError("not-found", `No lock found with id ${lockId}`);
-  }
-  const lock = lockSnap.data();
-  if (lock.status !== "for_resale") {
-    throw new HttpsError("failed-precondition", "This lock isn't currently up for resale");
-  }
-  if (lock.buyer_uid === request.auth.uid) {
-    throw new HttpsError("failed-precondition", "You can't claim your own resale listing");
-  }
+  // Transaction so two buyers racing for the same listing can't both win —
+  // the loser re-reads a "locked" doc and gets failed-precondition.
+  await db.runTransaction(async (tx) => {
+    const lockSnap = await tx.get(lockRef);
+    if (!lockSnap.exists) {
+      throw new HttpsError("not-found", `No lock found with id ${lockId}`);
+    }
+    const lock = lockSnap.data();
+    if (lock.status !== "for_resale") {
+      throw new HttpsError("failed-precondition", "This lock isn't currently up for resale");
+    }
+    if (lock.buyer_uid === request.auth.uid) {
+      throw new HttpsError("failed-precondition", "You can't claim your own resale listing");
+    }
 
-  // Back to "locked" so the lock leaves the marketplace instead of showing up
-  // as the new owner's own listing; transferred_from_uids keeps it visible
-  // under the seller's 「我的轉讓」 (same field the client-side claim rules
-  // require in firestore.rules).
-  await lockRef.update({
-    status: "locked",
-    buyer_uid: request.auth.uid,
-    resale_deadline: FieldValue.delete(),
-    transferred_from_uids: FieldValue.arrayUnion(lock.buyer_uid),
+    // Back to "locked" so the lock leaves the marketplace instead of showing up
+    // as the new owner's own listing; transferred_from_uids keeps it visible
+    // under the seller's 「我的轉讓」 (same field the client-side claim rules
+    // require in firestore.rules).
+    tx.update(lockRef, {
+      status: "locked",
+      buyer_uid: request.auth.uid,
+      resale_deadline: FieldValue.delete(),
+      transferred_from_uids: FieldValue.arrayUnion(lock.buyer_uid),
+    });
   });
   // The previous owner's device token must not keep receiving this lock's reminders.
   await db.collection("lock_tokens").doc(lockId).delete();
