@@ -76,7 +76,10 @@
   - `firestore.rules`：`ban_appeals` 改成被封鎖者能建立自己的申訴（原本是 `allow read, write: if isAdmin()`，完全沒有消費者建立的路）；`users/{uid}` 新增 isAdmin() 才能改的 `orderBanned`/`noPickupCount` 欄位，且**自己更新個人資料的規則改用 `diff().affectedKeys()` 而不是整份文件的 `keys()`**——不改的話，任何人只要被封鎖過一次，文件上多了這兩個欄位，從此連自己的顯示名稱都改不了（本機規則測試抓到這個，寫規則時沒想到）
   - `AdminAppealsPage.tsx` 核准時原本只改 `ban_appeals.status`，沒有真的解除封鎖——改成 batch 一起寫 `users/{uid}.orderBanned=false`＋`noPickupCount=0`，並補一筆 `admin_audit_logs`；拒絕時可以填備註（`window.prompt`，跟其他管理員操作一致的做法）
   - 本機 Firestore emulator 寫了 22 項規則測試全數通過（涵蓋封鎖後擋建立訂單、只有被封鎖者能建立申訴、管理員核准會連動解除封鎖、自己不能亂改封鎖欄位等）；也重跑了之前的 43 項舊測試確認沒有牽連壞掉（1 個舊測試失敗是雅婷之前把 `locks` 公開讀取範圍縮小造成的，跟這次改動無關）
-  - **還沒驗證**：規則跟 Functions 都還沒部署，也還沒實際走過一次「兩次未取餐→被擋下單→送申訴→管理員核准→解封後能重新下單」的真實流程
+  - 2026-09-28 已部署：hosting 由 9/27 推 master 時 GitHub Actions 自動上線；規則＋索引、Functions（14 支）由本機部署
+  - 2026-09-28 本機 emulator 端到端 UI 測試通過（種子帳號，前端＋規則＋Functions 都是目前版本）：店主兩次「登記未取餐」→ `noPickupCount=2`／`orderBanned=true` → 會員 `/lock`、購物車結帳（「您的帳號因多次未取餐已被限制下單…」）、「加入計畫」（規則 `PERMISSION_DENIED`）三條路都被擋 → `/profile` 顯示申訴區塊、送出後顯示「審核中」→ 管理員核准 → `orderBanned=false`／`noPickupCount=0`＋`admin_audit_logs` 一筆 → 會員「加入計畫」成功、購物車結帳正常導向 LINE Pay Sandbox
+  - 2026-09-28 修：被封鎖時按「加入計畫」原本 toast 顯示原始錯誤 `PERMISSION_DENIED: evaluation error at L108…`。`HomePage.tsx` 的 `handleJoinPlan` 改成先檢查 `useAuth().isOrderBanned`，登入期間才被封鎖（前端狀態還是舊的）時則把 `permission-denied` 換成同一句白話提示。只過了 `tsc`，還沒在瀏覽器重測
+  - **還沒驗證**：正式站還沒實際走過一次（emulator 下 `assertAdminOrVendorOwner` 直接放行，店主權限那段只有正式站測得到）「兩次未取餐→被擋下單→送申訴→管理員核准→解封後能重新下單」的真實流程
 - [ ] 「我的轉讓」無法追蹤已被接手的項目（資料模型沒有記錄原轉讓者）
 - [V] **商家頁（`/vendor/:id`）手機呈現優化**——2026-09-28 完成，參考外部點餐網站的手機版面。品項改依 `menu_items.category` 分組，商家頁上方新增可橫向滑動的分類標籤列（`sticky top-16`，跟站頭疊在一起），點分類會平滑捲動到對應區塊（用 `scrollIntoView`，不是 `<a href="#..">`——整站是 hash router，網址的 `#` 是路由本身，不能拿來當錨點）。純呈現層改動，沒有動到加入購物車／取餐時間選擇等既有邏輯。只有 1 種分類時不顯示標籤列（沒意義）。**還沒在真實手機或瀏覽器裝置模式下看過**，只確認 `tsc`／`build` 過關
 
@@ -181,12 +184,7 @@ UI 草圖：https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc （只參考版面
 
 **正式站**：只有管理員 `suw192336@gmail.com`（密碼由帳號持有人保管，不寫在 repo）。會員自行在 `/login`「會員註冊」建立；廠商帳號流程見待辦 §4「正式站商家帳號綁定」。
 
----|---|---|---|
-| 一般會員 | customer@test.com | 任意 | 會員中心 `/profile` |
-| 廠商 | vendor@test.com | 任意 | 廠商後台 `/vendor-portal/dashboard` |
-| 管理員 | admin@test.com | 任意 | 管理後台 `/admin/vendors` |
-
-要寫入真實資料的管理頁，另外由 `RequireRealAdmin` 要求真實 Firebase Auth 管理員帳號登入（例：`suw192336@gmail.com`）。
+要寫入真實資料的管理頁，另外由 `RequireRealAdmin` 要求真實 Firebase Auth 管理員帳號登入。
 
 ---
 

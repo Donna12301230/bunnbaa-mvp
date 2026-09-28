@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
+import { useAuth } from "@/hooks/useAuth";
 import { httpsCallable } from "firebase/functions";
 import {
   Clock, CalendarDays, Rocket, Star, User, MapPin, Trophy,
@@ -24,6 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
 const GROWTH_VENDOR_ID = "cafe-renheya-demo";
+const BANNED_HINT = "您的帳號因多次未取餐已被限制下單，請至會員中心提交解封申訴";
 const GROWTH_TIER_LABEL: Record<number, string> = { 80: "8折", 60: "6折", 50: "5折", 30: "3折", 10: "1折", 0: "整份 0 元" };
 
 // 取餐時段清單在 lib/pickupSlots.ts（pickup_window 用 ASCII 連字號，跟
@@ -49,6 +51,7 @@ const SORT_OPTIONS = [
 
 export default function HomePage() {
   const { toast } = useToast();
+  const { isOrderBanned } = useAuth();
   const [startDate, setStartDate] = useState("2026-09-22");
   const [endDate, setEndDate] = useState("2026-09-26");
   const [pickupDate, setPickupDate] = useState(() => nextAvailablePickup()?.date ?? todayStr());
@@ -200,6 +203,10 @@ export default function HomePage() {
   // pickup_date 自動分組出現。
   async function handleJoinPlan(group: { vendorId: string; vendorName: string; plans: MealPlan[] }, plan: MealPlan) {
     if (!requireLogin() || !uid) return;
+    if (isOrderBanned) {
+      toast({ title: "目前無法加入計畫", description: BANNED_HINT, variant: "destructive" });
+      return;
+    }
     const planKey = `${group.vendorId}-${plan.id}`;
     setJoiningPlanId(planKey);
     try {
@@ -228,7 +235,10 @@ export default function HomePage() {
       setJoinedPlanIds(prev => ({ ...prev, [planKey]: true }));
       toast({ title: "已加入計畫", description: `${group.vendorName} · ${plan.name}・已生成 ${plan.days} 筆鎖定，可在「我的餐點」查看。` });
     } catch (err) {
-      toast({ title: "加入計畫失敗", description: (err as Error).message, variant: "destructive" });
+      // 登入期間才被封鎖的話 isOrderBanned 還是舊值，會一路寫到 firestore.rules
+      // 才被擋，這時錯誤是看不懂的 PERMISSION_DENIED 原文，換成白話提示。
+      const denied = (err as { code?: string }).code === "permission-denied";
+      toast({ title: "加入計畫失敗", description: denied ? BANNED_HINT : (err as Error).message, variant: "destructive" });
     } finally {
       setJoiningPlanId(null);
     }
