@@ -27,7 +27,7 @@
 
 ### 3. 正式站驗證（已部署，但還沒在正式站實際跑過）
 
-- [ ] QR Code 核銷（2026-09-25 正式站已驗證步驟 1、2、3、「重複核銷被擋」與取餐編號夾空白（輸入 `ejel 6pro` 自動變 `EJEL6PRO` 查得到）：取餐編號 `XVTVDHP0` 由仁和雅咖啡店主帳號核銷成功；**還沒測**步驟 4 未取餐、別家商家／一般會員的 `permission-denied`）：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證，但 **emulator 下 `assertAdminOrVendorOwner` 直接放行，權限這段只有正式站測得到**）。前置：§2 部署完＋§4 商家帳號綁定。步驟：
+- [ ] QR Code 核銷（2026-09-25 正式站已驗證步驟 1、2、3、「重複核銷被擋」與取餐編號夾空白（輸入 `ejel 6pro` 自動變 `EJEL6PRO` 查得到）：取餐編號 `XVTVDHP0` 由仁和雅咖啡店主帳號核銷成功；2026-09-28 又驗證步驟 4「登記未取餐」（`KFAHATZZ`、`8HVO4YHO` → `no_show`＋備註）與一般會員的 `permission-denied`（開頁面被導回首頁、直接呼叫回 403）；**只剩**別家商家帳號的 `permission-denied`，要等第二家商家綁店主才能測）：`markLockOutcome`／`VendorRedeemPage.tsx`（emulator 已驗證，但 **emulator 下 `assertAdminOrVendorOwner` 直接放行，權限這段只有正式站測得到**）。前置：§2 部署完＋§4 商家帳號綁定。步驟：
   1. 一般會員帳號鎖定一筆仁和雅咖啡的餐（LINE Pay Sandbox 付款）→ `/my-bookings`「使用」記下取餐編號末 8 碼
   2. 商家帳號登入 `/lock/vendor/redeem`：取餐總覽要看得到這筆（驗證 `locks` 讀取規則＋`vendor_id+created_at` 索引），輸入末 8 碼查得到
   3. 按「確認取餐」→ Firestore Console 看 `locks/{id}.status` 變 `fulfilled`
@@ -41,6 +41,9 @@
 - [ ] 取餐提醒推播：`pickupReminders`／`triggerPickupRemindersNow`
 - [ ] 商家校準報告＋what-if 追問：`dailyCalibration`／`askCalibrationScenario`，以及 `reliability_tone` 自動換算
 - [ ] 到 Firestore Console 確認 `admin_audit_logs` 有 2026-09-21 煙霧測試產生的兩筆（含 `admin_email` 與狀態變化）
+- [ ] **別家商家帳號呼叫 `markLockOutcome` 要回 `permission-denied`**（QR 核銷步驟 5 最後一項）：正式站目前只有仁和雅綁了店主。等第二家商家綁定後，用那家店主帳號開 `/lock/vendor/redeem` 查仁和雅的取餐編號，或直接呼叫 `markLockOutcome`。為避免擋不住時改到真實資料，挑一筆已經 `fulfilled` 的仁和雅鎖定來打（例：`F1S63VpLVZqDxVTvdHp0`／`XVTVDHP0`）：權限檢查排在狀態檢查之前，擋得住回 403，擋不住只會回 `failed-precondition` 不寫入
+- [ ] **「加入計畫」被封鎖時的白話提示**（§6 解封申訴，2026-09-28 改的 `HomePage.tsx`）：推 master 部署後，封鎖一個測試會員再按「預約加入計畫」，要看到「您的帳號因多次未取餐已被限制下單，請至會員中心提交解封申訴」，不是 `Missing or insufficient permissions.`。目前只過了 `tsc`
+- [ ] **清除正式站測試資料**：2026-09-28 解封流程測試在 `customer@bunnbaa.test` 名下留了「A方案：五日輕食計畫」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）＋一筆已核准的 `ban_appeals/lI5dGTVtIBfByBIUTy3W`，到 Firestore Console 刪除（前兩筆是 no_show，會被商家校準報告算進去）。另外 9/25 份數測試的 `EJEL6PRO` 掛在仁和雅店主帳號名下（見 §6），也可以一起刪
 
 ### 4. Demo 準備（整合與交付）
 
@@ -79,7 +82,11 @@
   - 2026-09-28 已部署：hosting 由 9/27 推 master 時 GitHub Actions 自動上線；規則＋索引、Functions（14 支）由本機部署
   - 2026-09-28 本機 emulator 端到端 UI 測試通過（種子帳號，前端＋規則＋Functions 都是目前版本）：店主兩次「登記未取餐」→ `noPickupCount=2`／`orderBanned=true` → 會員 `/lock`、購物車結帳（「您的帳號因多次未取餐已被限制下單…」）、「加入計畫」（規則 `PERMISSION_DENIED`）三條路都被擋 → `/profile` 顯示申訴區塊、送出後顯示「審核中」→ 管理員核准 → `orderBanned=false`／`noPickupCount=0`＋`admin_audit_logs` 一筆 → 會員「加入計畫」成功、購物車結帳正常導向 LINE Pay Sandbox
   - 2026-09-28 修：被封鎖時按「加入計畫」原本 toast 顯示原始錯誤 `PERMISSION_DENIED: evaluation error at L108…`。`HomePage.tsx` 的 `handleJoinPlan` 改成先檢查 `useAuth().isOrderBanned`，登入期間才被封鎖（前端狀態還是舊的）時則把 `permission-denied` 換成同一句白話提示。只過了 `tsc`，還沒在瀏覽器重測
-  - **還沒驗證**：正式站還沒實際走過一次（emulator 下 `assertAdminOrVendorOwner` 直接放行，店主權限那段只有正式站測得到）「兩次未取餐→被擋下單→送申訴→管理員核准→解封後能重新下單」的真實流程
+  - 2026-09-28 正式站驗證（`customer@bunnbaa.test` ＋仁和雅店主）：會員開 `/lock/vendor/redeem` 被導回首頁、直接呼叫 `markLockOutcome` 回 403 `PERMISSION_DENIED`；店主把會員「加入計畫」產生的兩筆（`KFAHATZZ`、`8HVO4YHO`）登記未取餐成功 → 會員中心出現限制下單 → `/lock`、購物車、「加入計畫」三條路都被擋 → 申訴成功寫入 `ban_appeals`
+  - **正式站抓到的 bug**：`/profile` 查「我最近一筆申訴」用 `where(buyer_uid)+orderBy(created_at desc)`，正式站缺複合索引（emulator 不檢查索引所以本機測不到），查詢失敗後畫面當成「沒有申訴」，不會顯示「審核中」，使用者可以一直重複送出。已在 `firestore.indexes.json` 補 `ban_appeals` `buyer_uid+created_at` 索引，2026-09-28 已部署，正式站確認 `/profile` 會顯示「最近一次申訴：審核中」且不能重複送出
+  - 2026-09-28 正式站後半段也通過：管理員 `ckchildlikekid@gmail.com` 在 `/admin/appeals` 核准 → `users` 變 `orderBanned=false`／`noPickupCount=0`、`admin_audit_logs` 多一筆 `approve_ban_appeal` → 會員中心限制提示消失、購物車結帳正常導向 LINE Pay Sandbox。**整條流程正式站驗證完成**
+  - 剩下要測的已移到 §3 待辦
+  - 測試留在正式站的資料：`customer@bunnbaa.test` 名下「A方案：五日輕食計畫」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz` 已是 no_show；`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe` 仍是 locked），清除見 §3 待辦
 - [ ] 「我的轉讓」無法追蹤已被接手的項目（資料模型沒有記錄原轉讓者）
 - [V] **商家頁（`/vendor/:id`）手機呈現優化**——2026-09-28 完成，參考外部點餐網站的手機版面。品項改依 `menu_items.category` 分組，商家頁上方新增可橫向滑動的分類標籤列（`sticky top-16`，跟站頭疊在一起），點分類會平滑捲動到對應區塊（用 `scrollIntoView`，不是 `<a href="#..">`——整站是 hash router，網址的 `#` 是路由本身，不能拿來當錨點）。純呈現層改動，沒有動到加入購物車／取餐時間選擇等既有邏輯。只有 1 種分類時不顯示標籤列（沒意義）。**還沒在真實手機或瀏覽器裝置模式下看過**，只確認 `tsc`／`build` 過關
 
