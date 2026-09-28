@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import {
   collection,
@@ -124,7 +125,7 @@ export default function ConsumerLockPage() {
       await fn({ lock_id: lockId });
       setMyLock({ id: lockId } as Lock);
     } catch (err) {
-      toast({ variant: "destructive", title: "接手失敗", description: (err as Error).message });
+      toast({ variant: "destructive", title: tr("接手失敗", "Couldn't take it over"), description: (err as Error).message });
     } finally {
       setClaimingId(null);
     }
@@ -140,7 +141,7 @@ export default function ConsumerLockPage() {
       await takeOverLock(lockId, auth.currentUser.uid, { locked_price: 0 });
       setMyLock({ id: lockId } as Lock);
     } catch (err) {
-      toast({ variant: "destructive", title: "領取失敗", description: (err as Error).message });
+      toast({ variant: "destructive", title: tr("領取失敗", "Couldn't claim it"), description: (err as Error).message });
     } finally {
       setClaimingId(null);
     }
@@ -154,7 +155,7 @@ export default function ConsumerLockPage() {
       setMyLock({ id: incomingGiftId } as Lock);
       setIncomingGiftId(null);
     } catch (err) {
-      toast({ variant: "destructive", title: "接受贈送失敗", description: (err as Error).message });
+      toast({ variant: "destructive", title: tr("接受贈送失敗", "Couldn't accept the gift"), description: (err as Error).message });
     } finally {
       setClaimingGift(false);
     }
@@ -178,7 +179,7 @@ export default function ConsumerLockPage() {
       const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
       window.location.href = paymentUrl;
     } catch (err) {
-      toast({ variant: "destructive", title: "前往付款失敗", description: (err as Error).message });
+      toast({ variant: "destructive", title: tr("前往付款失敗", "Couldn't start payment"), description: (err as Error).message });
       setLocking(false);
     }
   }
@@ -224,7 +225,7 @@ export default function ConsumerLockPage() {
     try {
       await updateDoc(doc(db, "locks", myLock.id), { consumer_feedback: text });
     } catch (err) {
-      toast({ variant: "destructive", title: "送出回饋失敗", description: (err as Error).message });
+      toast({ variant: "destructive", title: tr("送出回饋失敗", "Couldn't send feedback"), description: (err as Error).message });
     } finally {
       setSubmittingFeedback(false);
     }
@@ -232,18 +233,18 @@ export default function ConsumerLockPage() {
 
   return (
     <div className="page">
-      <div className="kicker">BunnBaa · 消費者端</div>
-      <h1>鎖定今天的午餐</h1>
+      <div className="kicker">BunnBaa · {tr("消費者端", "Customer")}</div>
+      <h1>{tr("鎖定今天的午餐", "Lock in today's lunch")}</h1>
 
       {incomingGiftId && !myLock && (
         <div className="card tinted">
           <div className="row">
             <div>
-              <h2 className="title-with-icon"><Gift aria-hidden="true" />有人送你一份餐點</h2>
-              <p className="muted">有同學把已鎖定的餐點贈送給你，按下方即可收下並取得取餐編號。</p>
+              <h2 className="title-with-icon"><Gift aria-hidden="true" />{tr("有人送你一份餐點", "Someone sent you a meal")}</h2>
+              <p className="muted">{tr("有同學把已鎖定的餐點贈送給你，按下方即可收下並取得取餐編號。", "A classmate gifted you a locked meal. Accept it below to get the pickup code.")}</p>
             </div>
             <button disabled={claimingGift} onClick={handleAcceptGift}>
-              {claimingGift ? "處理中…" : "接受贈送"}
+              {claimingGift ? tr("處理中…", "Working…") : tr("接受贈送", "Accept gift")}
             </button>
           </div>
         </div>
@@ -253,12 +254,12 @@ export default function ConsumerLockPage() {
         <div className="card">
           <div className="row">
             <div>
-              <h2>{vendor.name} {vendor.verified && <span className="badge">認證商家</span>}</h2>
-              <div className="muted">{menuItem?.name ?? "—"} · {nextPickup.window} 取餐</div>
+              <h2>{vendor.name} {vendor.verified && <span className="badge">{tr("認證商家", "Verified")}</span>}</h2>
+              <div className="muted">{menuItem?.name ?? "—"} · {nextPickup.window} {tr("取餐", "pickup")}</div>
             </div>
             <span className="badge">
-              近期履約穩定度：
-              {vendor.reliability_tone === "stable" ? "穩定" : vendor.reliability_tone === "variable" ? "波動中" : "累積中"}
+              {tr("近期履約穩定度：", "Recent reliability: ")}
+              {vendor.reliability_tone === "stable" ? tr("穩定", "stable") : vendor.reliability_tone === "variable" ? tr("波動中", "variable") : tr("累積中", "building up")}
             </span>
           </div>
         </div>
@@ -270,13 +271,13 @@ export default function ConsumerLockPage() {
             <div>
               <div style={{ textDecoration: "line-through", color: "var(--faint)" }}>NT${menuItem.price}</div>
               <div className="stat">NT${todayPricing.lockedPrice}</div>
-              <div className="muted">{todayPricing.tierLabel} · 取餐 {nextPickup.date} {nextPickup.window} · 全額預付，鎖定後直接歸商家</div>
+              <div className="muted">{todayPricing.tierLabel} · {tr("取餐", "Pickup")} {nextPickup.date} {nextPickup.window} · {tr("全額預付，鎖定後直接歸商家", "Fully prepaid — goes straight to the vendor once locked")}</div>
             </div>
           ) : (
-            <div className="muted">載入品項中…</div>
+            <div className="muted">{tr("載入品項中…", "Loading item…")}</div>
           )}
           <button onClick={handleLock} disabled={locking || !!myLock || !menuItem}>
-            {myLock ? "已鎖定" : locking ? "處理中…" : "鎖定這份"}
+            {myLock ? tr("已鎖定", "Locked") : locking ? tr("處理中…", "Working…") : tr("鎖定這份", "Lock this meal")}
           </button>
         </div>
       </div>
@@ -289,13 +290,13 @@ export default function ConsumerLockPage() {
 
       {myLock && (
         <div className="card">
-          <h2>為什麼是這個折扣？</h2>
+          <h2>{tr("為什麼是這個折扣？", "Why this discount?")}</h2>
           {myLock.discount_explanation ? (
             <p className="muted">{myLock.discount_explanation}</p>
           ) : (
-            <p className="faint">產生說明中…</p>
+            <p className="faint">{tr("產生說明中…", "Generating explanation…")}</p>
           )}
-          <div className="disclaimer">此為鎖定規則說明，非購買建議</div>
+          <div className="disclaimer">{tr("此為鎖定規則說明，非購買建議", "This explains the locking rules; it is not purchase advice")}</div>
         </div>
       )}
 
@@ -303,15 +304,15 @@ export default function ConsumerLockPage() {
         <div className="card">
           <div className="row">
             <div>
-              <h2>臨時去不了？</h2>
-              <p className="muted">取餐前可以把這份轉賣給其他人或直接贈送給朋友，把取餐編號給對方就好——這是解套機制，不是套利工具。</p>
+              <h2>{tr("臨時去不了？", "Can't make it?")}</h2>
+              <p className="muted">{tr("取餐前可以把這份轉賣給其他人或直接贈送給朋友，把取餐編號給對方就好——這是解套機制，不是套利工具。", "Before pickup you can resell this meal or gift it to a friend — just give them the pickup code. It's a way out, not a way to profit.")}</p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button className="secondary" disabled={reselling} onClick={handleResell}>
-                {reselling ? "處理中…" : "轉賣這份"}
+                {reselling ? tr("處理中…", "Working…") : tr("轉賣這份", "Resell")}
               </button>
               <button className="secondary" disabled={gifting} onClick={handleGift}>
-                {gifting ? "處理中…" : "贈送給朋友"}
+                {gifting ? tr("處理中…", "Working…") : tr("贈送給朋友", "Gift to a friend")}
               </button>
             </div>
           </div>
@@ -320,13 +321,13 @@ export default function ConsumerLockPage() {
 
       {myLock && myLock.status === "for_resale" && (
         <div className="card tinted">
-          <p className="muted">已標記轉賣中。把上面的取餐編號給接手的人，對方憑編號到店取餐即可；逾時沒人接手會自動開放 $0 元免費領取。</p>
+          <p className="muted">{tr("已標記轉賣中。把上面的取餐編號給接手的人，對方憑編號到店取餐即可；逾時沒人接手會自動開放 $0 元免費領取。", "Listed for resale. Give the pickup code above to whoever takes it — they pick up with that code. If nobody takes it in time, anyone can claim it for $0.")}</p>
         </div>
       )}
 
       {myLock && myLock.status === "for_gift" && (
         <div className="card tinted">
-          <p className="muted">已標記贈送中。把下面的連結傳給你要送的朋友，對方打開就能收下：</p>
+          <p className="muted">{tr("已標記贈送中。把下面的連結傳給你要送的朋友，對方打開就能收下：", "Ready to gift. Send this link to your friend — they can accept it by opening it:")}</p>
           {giftLink && (
             <p className="muted" style={{ wordBreak: "break-all" }}>
               <a href={giftLink}>{giftLink}</a>
@@ -337,9 +338,9 @@ export default function ConsumerLockPage() {
 
       {resaleListings.length > 0 && (
         <div className="card">
-          <h2>別人轉賣中</h2>
+          <h2>{tr("別人轉賣中", "Up for resale")}</h2>
           <p className="faint" style={{ marginBottom: 8 }}>
-            接手後款項請直接私下轉給對方，平台只負責把這份的歸屬換成你——不經手轉賣金流。
+            {tr("接手後款項請直接私下轉給對方，平台只負責把這份的歸屬換成你——不經手轉賣金流。", "Pay the seller directly after taking it over — the platform only transfers ownership to you and doesn't handle resale payments.")}
           </p>
           {resaleListings.map((lock) => {
             const deadline = lock.resale_deadline as Timestamp | undefined;
@@ -349,16 +350,16 @@ export default function ConsumerLockPage() {
                 <div>
                   <div>{lock.item_name}</div>
                   <div className="muted">
-                    {lock.pickup_window} 取餐 · {expired ? "已逾時・開放 $0 元領取" : `NT$${lock.locked_price}`}
+                    {lock.pickup_window} {tr("取餐", "pickup")} · {expired ? tr("已逾時・開放 $0 元領取", "Expired · free to claim") : `NT$${lock.locked_price}`}
                   </div>
                 </div>
                 {expired ? (
                   <button disabled={claimingId === lock.id} onClick={() => handleClaimFree(lock.id)}>
-                    {claimingId === lock.id ? "處理中…" : "免費領取"}
+                    {claimingId === lock.id ? tr("處理中…", "Working…") : tr("免費領取", "Claim free")}
                   </button>
                 ) : (
                   <button disabled={claimingId === lock.id} onClick={() => handleClaim(lock.id)}>
-                    {claimingId === lock.id ? "處理中…" : "接手這份"}
+                    {claimingId === lock.id ? tr("處理中…", "Working…") : tr("接手這份", "Take it")}
                   </button>
                 )}
               </div>
@@ -369,9 +370,9 @@ export default function ConsumerLockPage() {
 
       {myLock && ["fulfilled", "resold_and_fulfilled", "no_show"].includes(myLock.status) && (
         <div className="card">
-          <h2>這一餐吃得如何？</h2>
+          <h2>{tr("這一餐吃得如何？", "How was your meal?")}</h2>
           {myLock.consumer_feedback ? (
-            <p className="muted">已回饋：「{myLock.consumer_feedback}」</p>
+            <p className="muted">{tr("已回饋：", "Your feedback: ")}「{myLock.consumer_feedback}」</p>
           ) : (
             <>
               <textarea
@@ -379,10 +380,10 @@ export default function ConsumerLockPage() {
                 maxLength={280}
                 value={feedbackDraft}
                 onChange={(e) => setFeedbackDraft(e.target.value)}
-                placeholder="這餐的心得…（送出後無法修改）"
+                placeholder={tr("這餐的心得…（送出後無法修改）", "How was it? (can't be edited later)")}
               />
               <button disabled={submittingFeedback || !feedbackDraft.trim()} onClick={handleSubmitFeedback}>
-                {submittingFeedback ? "處理中…" : "送出回饋"}
+                {submittingFeedback ? tr("處理中…", "Working…") : tr("送出回饋", "Send feedback")}
               </button>
             </>
           )}

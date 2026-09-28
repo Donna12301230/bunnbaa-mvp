@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 import { Input } from "@/components/ui/input";
+import { tr } from "@/lib/i18n";
+import { tagEn } from "@/types";
 
 // 商品詳情頁。
 export default function MenuItemPage() {
@@ -48,9 +50,9 @@ export default function MenuItemPage() {
     return (
       <EmptyState
         icon={<UtensilsCrossed size={32} />}
-        title="找不到這個品項"
-        description="可能已下架，或連結有誤。"
-        action={<Button variant="outline" asChild><Link href="/vendors">回商家清單</Link></Button>}
+        title={tr("找不到這個品項", "Item not found")}
+        description={tr("可能已下架，或連結有誤。", "It may have been removed, or the link is wrong.")}
+        action={<Button variant="outline" asChild><Link href="/vendors">{tr("回商家清單", "Back to vendors")}</Link></Button>}
       />
     );
   }
@@ -58,12 +60,12 @@ export default function MenuItemPage() {
   function handleAddToCart() {
     if (cartVendorId && cartVendorId !== item!.vendor_id) {
       toast({
-        title: "購物車裡有別家商家的品項",
-        description: "加入這項會清空目前的購物車（一次只能跟一家商家預購）。",
+        title: tr("購物車裡有別家商家的品項", "Your cart has items from another vendor"),
+        description: tr("加入這項會清空目前的購物車（一次只能跟一家商家預購）。", "Adding this will clear your cart (you can only pre-order from one vendor at a time)."),
       });
     }
     for (let i = 0; i < qty; i++) addItem(item!, item!.vendor_id, note.trim());
-    toast({ title: "已加入購物車", description: `${item!.name} x${qty}` });
+    toast({ title: tr("已加入購物車", "Added to cart"), description: `${item!.name} x${qty}` });
   }
 
   return (
@@ -72,7 +74,7 @@ export default function MenuItemPage() {
         href={`/vendor/${item.vendor_id}`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="w-4 h-4" /> {vendor?.name ?? "回商家頁"}
+        <ArrowLeft className="w-4 h-4" /> {vendor?.name ?? tr("回商家頁", "Back to vendor")}
       </Link>
 
       <div className="bg-white rounded-xl border border-border overflow-hidden">
@@ -86,7 +88,7 @@ export default function MenuItemPage() {
           </div>
 
           <div className="text-2xl font-bold text-orange-600">NT${item.price}</div>
-          <p className="text-xs text-muted-foreground -mt-2">取餐日期與時段在購物車結帳時選擇，提前預約享早鳥折扣。</p>
+          <p className="text-xs text-muted-foreground -mt-2">{tr("取餐日期與時段在購物車結帳時選擇，提前預約享早鳥折扣。", "Choose your pickup date and time at checkout — book early for an early-bird discount.")}</p>
 
           {(item.dietary_tags?.length > 0 || item.allergens?.length > 0) && (
             <div className="space-y-1.5">
@@ -94,40 +96,40 @@ export default function MenuItemPage() {
                 <div className="flex flex-wrap gap-1.5">
                   {item.dietary_tags.map((tag) => (
                     <span key={tag} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                      {tag}
+                      {tr(tag, tagEn(tag))}
                     </span>
                   ))}
                 </div>
               )}
               {item.allergens?.length > 0 && (
-                <p className="text-xs text-red-500">含過敏原：{item.allergens.join("、")}</p>
+                <p className="text-xs text-red-500">{tr("含過敏原：", "Contains: ")}{item.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</p>
               )}
             </div>
           )}
 
           <div className="field">
-            <label htmlFor="item-note" className="text-sm font-medium block mb-1">備註（選填）</label>
+            <label htmlFor="item-note" className="text-sm font-medium block mb-1">{tr("備註（選填）", "Note (optional)")}</label>
             <Input
               id="item-note"
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="例如：不要香菜"
+              placeholder={tr("例如：不要香菜", "e.g. no coriander")}
             />
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-border">
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label="減少數量" onClick={() => setQty((q) => Math.max(1, q - 1))}>
+              <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label={tr("減少數量", "Decrease quantity")} onClick={() => setQty((q) => Math.max(1, q - 1))}>
                 <Minus />
               </Button>
               <span className="w-6 text-center font-medium bb-num" aria-live="polite">{qty}</span>
-              <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label="增加數量" onClick={() => setQty((q) => q + 1)}>
+              <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label={tr("增加數量", "Increase quantity")} onClick={() => setQty((q) => q + 1)}>
                 <Plus />
               </Button>
             </div>
             <Button onClick={handleAddToCart}>
-              <ShoppingCart /> 加入購物車 · NT${item.price * qty}
+              <ShoppingCart /> {tr("加入購物車", "Add to cart")} · NT${item.price * qty}
             </Button>
           </div>
         </div>

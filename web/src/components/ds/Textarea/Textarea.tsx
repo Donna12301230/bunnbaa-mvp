@@ -1,3 +1,4 @@
+import { tr } from '@/lib/i18n';
 import { forwardRef, useId, useState, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import { cx } from '../_shared/cx';
 import { Field, fieldDescribedBy, hasFieldError } from '../Field';
@@ -91,7 +92,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         />
         {loading && (
           <span className="bb-control__icon bb-textarea__spinner">
-            <Spinner size={16} label="儲存中" />
+            <Spinner size={16} label={tr('儲存中', 'Saving')} />
           </span>
         )}
       </div>

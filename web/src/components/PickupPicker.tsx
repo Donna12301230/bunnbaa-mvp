@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect } from "react";
 import { AlertTriangle, CalendarOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,7 @@ export default function PickupPicker({ date, window, onDateChange, onWindowChang
   return (
     <div className="space-y-3">
       <div>
-        <label htmlFor="pickup-date" className="text-xs text-muted-foreground block mb-1">取餐日期</label>
+        <label htmlFor="pickup-date" className="text-xs text-muted-foreground block mb-1">{tr("取餐日期", "Pickup date")}</label>
         <Input
           id="pickup-date"
           type="date"
@@ -47,13 +48,13 @@ export default function PickupPicker({ date, window, onDateChange, onWindowChang
       {closedReason ? (
         <div className="flex items-start gap-2 rounded-lg border border-border bg-gray-50 p-3 text-sm text-muted-foreground">
           <CalendarOff className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>{closedReason}，請改選其他日期。</span>
+          <span>{closedReason}{tr("，請改選其他日期。", ". Please choose another date.")}</span>
         </div>
       ) : (
-        <div className="space-y-2" role="radiogroup" aria-label="取餐時段">
+        <div className="space-y-2" role="radiogroup" aria-label={tr("取餐時段", "Pickup time")}>
           {slots.map((slot) => {
             const selected = window === slot.window;
-            const status = slot.started ? "已過" : slot.remaining === 0 ? "已額滿" : slot.remaining !== null ? `剩 ${slot.remaining} 份` : null;
+            const status = slot.started ? tr("已過", "Passed") : slot.remaining === 0 ? tr("已額滿", "Full") : slot.remaining !== null ? tr(`剩 ${slot.remaining} 份`, `${slot.remaining} left`) : null;
             return (
               <label
                 key={slot.window}
@@ -78,7 +79,7 @@ export default function PickupPicker({ date, window, onDateChange, onWindowChang
               </label>
             );
           })}
-          {!firstOpen && <p className="text-xs text-muted-foreground">這天已經沒有可以預約的時段，請改選其他日期。</p>}
+          {!firstOpen && <p className="text-xs text-muted-foreground">{tr("這天已經沒有可以預約的時段，請改選其他日期。", "No time slots left on this day. Please choose another date.")}</p>}
         </div>
       )}
 
@@ -86,8 +87,10 @@ export default function PickupPicker({ date, window, onDateChange, onWindowChang
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>
-            提醒：你在這個時段已經有 {conflicts.length} 筆訂單（{conflicts.map((l) => l.item_name).join("、")}）。
-            確定要再訂一份嗎？（例如幫朋友帶可以直接繼續）
+            {tr(
+              `提醒：你在這個時段已經有 ${conflicts.length} 筆訂單（${conflicts.map((l) => l.item_name).join("、")}）。確定要再訂一份嗎？（例如幫朋友帶可以直接繼續）`,
+              `Heads up: you already have ${conflicts.length} order(s) in this slot (${conflicts.map((l) => l.item_name).join(", ")}). Order another one? (e.g. if it's for a friend, just continue)`
+            )}
           </span>
         </div>
       )}

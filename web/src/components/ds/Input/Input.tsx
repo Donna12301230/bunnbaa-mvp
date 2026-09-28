@@ -1,3 +1,4 @@
+import { tr } from '@/lib/i18n';
 import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { cx } from '../_shared/cx';
@@ -86,7 +87,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         />
         {loading && (
           <span className="bb-control__icon">
-            <Spinner size={16} label="驗證中" />
+            <Spinner size={16} label={tr('驗證中', 'Validating')} />
           </span>
         )}
         {isPassword ? (
@@ -94,7 +95,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             type="button"
             className="bb-input__reveal"
             onClick={() => setReveal((v) => !v)}
-            aria-label={reveal ? '隱藏密碼' : '顯示密碼'}
+            aria-label={reveal ? tr('隱藏密碼', 'Hide password') : tr('顯示密碼', 'Show password')}
             aria-pressed={reveal}
             aria-controls={id}
             disabled={disabled}

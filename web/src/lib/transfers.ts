@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { arrayUnion, doc, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -8,7 +9,7 @@ export async function takeOverLock(lockId: string, uid: string, extra: Record<st
   const ref = doc(db, "locks", lockId);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
-    if (!snap.exists()) throw new Error("找不到這筆項目");
+    if (!snap.exists()) throw new Error(tr("找不到這筆項目", "This item no longer exists"));
     tx.update(ref, {
       status: "locked",
       buyer_uid: uid,

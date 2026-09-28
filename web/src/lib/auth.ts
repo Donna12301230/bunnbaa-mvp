@@ -14,6 +14,7 @@ import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc
 import { auth, db } from "./firebase";
 import { ADMIN_EMAILS } from "./adminAuth";
 import type { UserProfile } from "@/types";
+import { tr } from "./i18n";
 
 // 平台登入改接真正的 Firebase Auth（email/密碼），取代原本的 mockAuth.ts。
 // 角色判斷：
@@ -117,22 +118,23 @@ export const authStore = {
 
 function friendlyAuthError(err: unknown): Error {
   const code = (err as { code?: string })?.code ?? "";
+  const wrongLogin = tr("Email 或密碼錯誤", "Incorrect email or password");
   const messages: Record<string, string> = {
-    "auth/invalid-email": "Email 格式不正確",
-    "auth/invalid-credential": "Email 或密碼錯誤",
-    "auth/wrong-password": "Email 或密碼錯誤",
-    "auth/user-not-found": "Email 或密碼錯誤",
-    "auth/email-already-in-use": "這個 Email 已經註冊過了",
-    "auth/weak-password": "密碼至少需要 6 個字元",
-    "auth/too-many-requests": "嘗試次數過多，請稍後再試",
-    "auth/network-request-failed": "網路連線失敗，請稍後再試",
-    "auth/invalid-phone-number": "手機號碼格式不正確",
-    "auth/missing-phone-number": "請輸入手機號碼",
-    "auth/invalid-verification-code": "驗證碼錯誤，請重新輸入",
-    "auth/code-expired": "驗證碼已過期，請重新取得",
-    "auth/quota-exceeded": "簡訊發送已達上限，請稍後再試",
+    "auth/invalid-email": tr("Email 格式不正確", "Invalid email address"),
+    "auth/invalid-credential": wrongLogin,
+    "auth/wrong-password": wrongLogin,
+    "auth/user-not-found": wrongLogin,
+    "auth/email-already-in-use": tr("這個 Email 已經註冊過了", "This email is already registered"),
+    "auth/weak-password": tr("密碼至少需要 6 個字元", "Password must be at least 6 characters"),
+    "auth/too-many-requests": tr("嘗試次數過多，請稍後再試", "Too many attempts. Please try again later"),
+    "auth/network-request-failed": tr("網路連線失敗，請稍後再試", "Network error. Please try again later"),
+    "auth/invalid-phone-number": tr("手機號碼格式不正確", "Invalid phone number"),
+    "auth/missing-phone-number": tr("請輸入手機號碼", "Please enter your phone number"),
+    "auth/invalid-verification-code": tr("驗證碼錯誤，請重新輸入", "Wrong verification code. Please try again"),
+    "auth/code-expired": tr("驗證碼已過期，請重新取得", "The code has expired. Please request a new one"),
+    "auth/quota-exceeded": tr("簡訊發送已達上限，請稍後再試", "SMS limit reached. Please try again later"),
   };
-  return new Error(messages[code] ?? (err as Error)?.message ?? "發生未知錯誤");
+  return new Error(messages[code] ?? (err as Error)?.message ?? tr("發生未知錯誤", "Something went wrong"));
 }
 
 // 表單欄位一律去掉前後空白；只有空白的欄位視同沒填。
@@ -143,12 +145,12 @@ function clean(value?: string): string {
 // 密碼不 trim（會改到使用者真正設定的密碼），但註冊時擋掉全空白和前後空白，
 // 避免不小心多打一個空格、之後怎麼登都登不進去。
 function assertValidNewPassword(password: string) {
-  if (!password.trim()) throw new Error("請輸入密碼");
-  if (password !== password.trim()) throw new Error("密碼前後不能有空白");
+  if (!password.trim()) throw new Error(tr("請輸入密碼", "Please enter a password"));
+  if (password !== password.trim()) throw new Error(tr("密碼前後不能有空白", "Password can't start or end with a space"));
 }
 
 export async function login(email: string, password: string): Promise<void> {
-  if (!email.trim() || !password) throw new Error("請輸入 Email 與密碼");
+  if (!email.trim() || !password) throw new Error(tr("請輸入 Email 與密碼", "Please enter your email and password"));
   try {
     await signInWithEmailAndPassword(auth, email.trim(), password);
   } catch (err) {
@@ -166,7 +168,7 @@ export async function register(input: {
 }): Promise<void> {
   const email = clean(input.email);
   const displayName = clean(input.displayName);
-  if (!email) throw new Error("請輸入 Email");
+  if (!email) throw new Error(tr("請輸入 Email", "Please enter your email"));
   assertValidNewPassword(input.password);
   try {
     const { user } = await createUserWithEmailAndPassword(auth, email, input.password);
@@ -197,10 +199,10 @@ export async function applyAsVendor(input: {
 }): Promise<void> {
   const storeName = clean(input.storeName);
   // 先檢查再建帳號，不然會留下一個沒有申請單的空帳號
-  if (!storeName) throw new Error("請填寫店家名稱");
+  if (!storeName) throw new Error(tr("請填寫店家名稱", "Please enter a store name"));
   await register({ email: input.email, password: input.password, displayName: storeName, phone: input.phone });
   const user = auth.currentUser;
-  if (!user) throw new Error("帳號建立失敗，請重試");
+  if (!user) throw new Error(tr("帳號建立失敗，請重試", "Couldn't create the account. Please try again"));
   await setDoc(doc(db, "vendor_applications", user.uid), {
     store_name: storeName,
     phone: clean(input.phone),
@@ -211,7 +213,7 @@ export async function applyAsVendor(input: {
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  if (!email.trim()) throw new Error("請輸入 Email");
+  if (!email.trim()) throw new Error(tr("請輸入 Email", "Please enter your email"));
   try {
     await sendPasswordResetEmail(auth, email.trim());
   } catch (err) {
@@ -245,7 +247,7 @@ export function toE164TaiwanPhone(input: string): string {
   if (digits.startsWith("+")) return digits;
   if (digits.startsWith("886")) return `+${digits}`;
   if (digits.startsWith("09") && digits.length === 10) return `+886${digits.slice(1)}`;
-  throw new Error("請輸入正確的手機號碼（例如 0912345678）");
+  throw new Error(tr("請輸入正確的手機號碼（例如 0912345678）", "Please enter a valid phone number (e.g. 0912345678)"));
 }
 
 export async function sendOtp(phoneInput: string, recaptchaContainerId: string): Promise<ConfirmationResult> {
@@ -261,7 +263,7 @@ export async function sendOtp(phoneInput: string, recaptchaContainerId: string):
 }
 
 export async function confirmOtp(confirmation: ConfirmationResult, code: string): Promise<void> {
-  if (!code.trim()) throw new Error("請輸入驗證碼");
+  if (!code.trim()) throw new Error(tr("請輸入驗證碼", "Please enter the verification code"));
   try {
     const { user } = await confirmation.confirm(code.trim());
     // 手機登入沒有註冊表單可以先寫 users/{uid}，第一次登入時順手建一筆（沒有就建，已存在就跳過）。

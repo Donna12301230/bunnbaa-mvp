@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { Sparkles } from "lucide-react";
@@ -34,7 +35,10 @@ export default function GrowthRewardTicker() {
         {items.map((win, i) => (
           <span key={`${win.id}-${i}`} className="inline-flex items-center gap-2 text-sm md:text-base font-bold text-rice-foreground shrink-0">
             <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-amber-200 shrink-0" />
-            使用者 {win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} 剛抽中「{win.item_name ?? "整份餐點"}」整份 0 元大獎！
+            {tr(
+              `使用者 ${win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} 剛抽中「${win.item_name ?? "整份餐點"}」整份 0 元大獎！`,
+              `User ${win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} just won a free ${win.item_name ?? "meal"}!`
+            )}
           </span>
         ))}
       </div>

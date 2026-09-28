@@ -13,6 +13,8 @@ import { isClean } from "@/lib/searchFilter";
 import { takeOverLock } from "@/lib/transfers";
 import type { Lock } from "@/types";
 import { useVendors } from "@/hooks/useVendors";
+import { useSelectedArea, vendorInArea } from "@/lib/location";
+import { tr } from "@/lib/i18n";
 import { EmptyState, Tag } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { Link } from "wouter";
@@ -37,9 +39,9 @@ function millisOf(ts: unknown): number {
 
 function formatCountdown(deadline: Date, now: number): string {
   const diffMin = Math.round((deadline.getTime() - now) / 60000);
-  if (diffMin <= 0) return "已逾期";
-  if (diffMin < 60) return `${diffMin} 分後截止`;
-  return `${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`;
+  if (diffMin <= 0) return tr("已逾期", "Expired");
+  if (diffMin < 60) return tr(`${diffMin} 分後截止`, `Ends in ${diffMin} min`);
+  return tr(`${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`, `Ends in ${Math.floor(diffMin / 60)} h ${diffMin % 60} min`);
 }
 
 export default function TransferMarketPage() {
@@ -118,15 +120,17 @@ export default function TransferMarketPage() {
 
   // 不雅字詞當作沒輸入搜尋字串處理，不特別跳錯誤訊息。
   const searchLower = isClean(search) ? search.trim().toLowerCase() : "";
+  const area = useSelectedArea();
   const forResale = useMemo(
     () =>
       locks.filter(
         (l) =>
           l.status === "for_resale" &&
           l.buyer_uid !== uid &&
+          (!area || vendorInArea(vendors.find((v) => v.id === l.vendor_id), area)) &&
           (!searchLower || l.item_name.toLowerCase().includes(searchLower))
       ),
-    [locks, uid, searchLower]
+    [locks, uid, searchLower, area, vendors]
   );
   const activeListings = forResale.filter((l) => {
     const d = deadlineOf(l);
@@ -147,9 +151,9 @@ export default function TransferMarketPage() {
     try {
       const fn = httpsCallable(functions, "claimResoldLock");
       await fn({ lock_id: lockId });
-      toast({ title: "已接手", description: "取餐編號可在「我的餐點」查看。" });
+      toast({ title: tr("已接手", "It's yours"), description: tr("取餐編號可在「我的餐點」查看。", "Find the pickup code under My meals.") });
     } catch (err) {
-      toast({ title: "接手失敗", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("接手失敗", "Couldn't take it over"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setClaimingId(null);
     }
@@ -160,9 +164,9 @@ export default function TransferMarketPage() {
     setClaimingId(lockId);
     try {
       await takeOverLock(lockId, uid, { locked_price: 0 });
-      toast({ title: "已免費領取", description: "取餐編號可在「我的餐點」查看。" });
+      toast({ title: tr("已免費領取", "Claimed for free"), description: tr("取餐編號可在「我的餐點」查看。", "Find the pickup code under My meals.") });
     } catch (err) {
-      toast({ title: "領取失敗", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("領取失敗", "Couldn't claim it"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setClaimingId(null);
     }
@@ -172,9 +176,9 @@ export default function TransferMarketPage() {
     setClaimingId(lockId);
     try {
       await updateDoc(doc(db, "locks", lockId), { status: "locked" });
-      toast({ title: "已取消轉讓" });
+      toast({ title: tr("已取消轉讓", "Transfer cancelled") });
     } catch (err) {
-      toast({ title: "取消失敗", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("取消失敗", "Couldn't cancel"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setClaimingId(null);
     }
@@ -185,20 +189,20 @@ export default function TransferMarketPage() {
       <MarketplaceHeader active="transfer" />
 
       <PageHero
-        title="轉讓市集"
-        description="同學安全轉讓已鎖定的方案，全額入袋；逾時沒人接手，系統會自動開放 $0 元供人領取。"
+        title={tr("轉讓市集", "Transfer market")}
+        description={tr("同學安全轉讓已鎖定的方案，全額入袋；逾時沒人接手，系統會自動開放 $0 元供人領取。", "Safely pass locked meals between classmates. If nobody takes one in time, anyone can claim it for $0.")}
       >
-        <HeroSearch id="marketplaceSearch" label="搜尋轉讓項目" value={search} onChange={setSearch} placeholder="搜尋餐點名稱" />
+        <HeroSearch id="marketplaceSearch" label={tr("搜尋轉讓項目", "Search transfers")} value={search} onChange={setSearch} placeholder={tr("搜尋餐點名稱", "Search by meal name")} />
       </PageHero>
 
       {/* ── Body ── */}
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         <div className="flex gap-2">
           <Tag selected={browseTab === "browse"} onClick={() => setBrowseTab("browse")}>
-            瀏覽轉讓
+            {tr("瀏覽轉讓", "Browse")}
           </Tag>
           <Tag selected={browseTab === "mine"} onClick={() => setBrowseTab("mine")}>
-            我的轉讓
+            {tr("我的轉讓", "My transfers")}
           </Tag>
         </div>
 
@@ -207,11 +211,11 @@ export default function TransferMarketPage() {
         {!loading && browseTab === "browse" && (
           <>
             <div className="flex items-center justify-between flex-wrap gap-3.5">
-              <span className="text-sm text-muted-foreground font-semibold">目前 {activeListings.length} 筆轉讓中</span>
+              <span className="text-sm text-muted-foreground font-semibold">{tr(`目前 ${activeListings.length} 筆轉讓中`, `${activeListings.length} available`)}</span>
             </div>
 
             {activeListings.length === 0 ? (
-              <EmptyState icon={<Repeat size={32} />} title="目前沒有人轉讓" description="稍後再回來看看，有新的轉讓會即時出現。" />
+              <EmptyState icon={<Repeat size={32} />} title={tr("目前沒有人轉讓", "Nothing up for transfer")} description={tr("稍後再回來看看，有新的轉讓會即時出現。", "Check back later — new transfers appear instantly.")} />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {activeListings.map(item => {
@@ -238,7 +242,7 @@ export default function TransferMarketPage() {
                             disabled={claimingId === item.id}
                             onClick={() => handleClaim(item.id)}
                           >
-                            {claimingId === item.id ? "處理中…" : "我要接手"}
+                            {claimingId === item.id ? tr("處理中…", "Working…") : tr("我要接手", "Take it")}
                           </Button>
                         </div>
                       </div>
@@ -250,12 +254,12 @@ export default function TransferMarketPage() {
 
             <div className="flex items-center gap-2.5 pt-2 flex-wrap">
               <Clock className="w-5 h-5" />
-              <h2 className="text-lg font-bold">已逾期・開放 $0 元領取</h2>
-              <span className="text-xs text-muted-foreground">取餐時段結束仍未被接手，系統自動開放給任何人免費領取，先到先得</span>
+              <h2 className="text-lg font-bold">{tr("已逾期・開放 $0 元領取", "Expired · free to claim")}</h2>
+              <span className="text-xs text-muted-foreground">{tr("取餐時段結束仍未被接手，系統自動開放給任何人免費領取，先到先得", "Not taken by the end of the pickup window, so anyone can claim it for free — first come, first served")}</span>
             </div>
 
             {expiredListings.length === 0 ? (
-              <EmptyState size="compact" icon={<Clock size={32} />} title="目前沒有逾期的項目" />
+              <EmptyState size="compact" icon={<Clock size={32} />} title={tr("目前沒有逾期的項目", "No expired items")} />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {expiredListings.map(item => (
@@ -263,7 +267,7 @@ export default function TransferMarketPage() {
                     <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
                       <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                       <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-rice text-rice-foreground">
-                        已逾期・開放中
+                        {tr("已逾期・開放中", "Expired · open")}
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
@@ -281,7 +285,7 @@ export default function TransferMarketPage() {
                           disabled={claimingId === item.id}
                           onClick={() => handleClaimFree(item.id)}
                         >
-                          {claimingId === item.id ? "處理中…" : "免費領取"}
+                          {claimingId === item.id ? tr("處理中…", "Working…") : tr("免費領取", "Claim free")}
                         </Button>
                       </div>
                     </div>
@@ -294,14 +298,14 @@ export default function TransferMarketPage() {
 
         {!loading && browseTab === "mine" && (
           <>
-            <span className="text-sm text-muted-foreground font-semibold">你目前有 {myListings.length} 筆商品在轉讓市集</span>
+            <span className="text-sm text-muted-foreground font-semibold">{tr(`你目前有 ${myListings.length} 筆商品在轉讓市集`, `You have ${myListings.length} item(s) listed`)}</span>
 
             {myListings.length === 0 ? (
               <EmptyState
                 icon={<Repeat size={32} />}
-                title="你目前沒有轉讓中的項目"
-                description="臨時不能去？到「我的餐點」把還沒用到的份轉讓出去。"
-                action={<Button asChild variant="outline"><Link href="/my-bookings">前往我的餐點</Link></Button>}
+                title={tr("你目前沒有轉讓中的項目", "You have nothing listed")}
+                description={tr("臨時不能去？到「我的餐點」把還沒用到的份轉讓出去。", "Can't make it? Transfer an unused meal from My meals.")}
+                action={<Button asChild variant="outline"><Link href="/my-bookings">{tr("前往我的餐點", "Go to My meals")}</Link></Button>}
               />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -310,7 +314,7 @@ export default function TransferMarketPage() {
                     <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
                       <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                       <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
-                        轉讓中
+                        {tr("轉讓中", "Listed")}
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
@@ -327,7 +331,7 @@ export default function TransferMarketPage() {
                           disabled={claimingId === item.id}
                           onClick={() => handleCancelListing(item.id)}
                         >
-                          {claimingId === item.id ? "處理中…" : "取消轉讓"}
+                          {claimingId === item.id ? tr("處理中…", "Working…") : tr("取消轉讓", "Cancel transfer")}
                         </Button>
                       </div>
                     </div>
@@ -337,12 +341,12 @@ export default function TransferMarketPage() {
             )}
             <div className="flex items-center gap-2.5 pt-2 flex-wrap">
               <Repeat className="w-5 h-5" />
-              <h2 className="text-lg font-bold">已被接手</h2>
-              <span className="text-xs text-muted-foreground">你轉讓或贈送出去、已經有人接手的項目</span>
+              <h2 className="text-lg font-bold">{tr("已被接手", "Taken over")}</h2>
+              <span className="text-xs text-muted-foreground">{tr("你轉讓或贈送出去、已經有人接手的項目", "Meals you transferred or gifted that someone has taken")}</span>
             </div>
 
             {handedOver.length === 0 ? (
-              <EmptyState size="compact" icon={<Repeat size={32} />} title="還沒有被接手的項目" />
+              <EmptyState size="compact" icon={<Repeat size={32} />} title={tr("還沒有被接手的項目", "Nothing taken over yet")} />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {handedOver.map(item => (
@@ -350,7 +354,7 @@ export default function TransferMarketPage() {
                     <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
                       <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                       <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-gray-200 text-gray-700">
-                        已被接手
+                        {tr("已被接手", "Taken over")}
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">

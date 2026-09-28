@@ -130,10 +130,13 @@
 **B. 整頁假資料（讀寫 `web/src/lib/mockData.ts`）**
 - [V] 總覽 `VendorPortalDashboard.tsx`：改讀真實 `locks`／`menu_items`（今日待取餐／今日已取餐／近期訂單數／菜單數＋今日各取餐時段份數）
 - [V] 店家設定 `VendorPortalSettings.tsx`：封面圖改存 `vendors/{id}.cover_image`，商家列表／商家頁會顯示。**`firestore.rules` 有改（店主可寫 `cover_image`，限 https 網址），要部署 rules**
-- [ ] 店家設定的桌位 QR 仍存 mock：QR 連到的 `/menu/:id` 根本沒有這頁，屬於 §7「現場點餐」待決策
 - [V] 舊版掃碼核銷 `/vendor-portal/scan`：刪掉 `VendorPortalScan.tsx`，路由改導向 `/lock/vendor/redeem`
 - [V] 統計報表的「校準洞察」卡（寫死準確率＋假的 AI 回答）改讀真實 `accuracy_reports`＋呼叫 `askCalibrationScenario`
-- [ ] 訂餐時段 `VendorPortalSessions.tsx`、時段彙整 `VendorPortalSessionSummary.tsx`、訂單管理 `VendorPortalOrders.tsx`、統計報表的營收圖表 `VendorPortalReports.tsx`：屬於 §7「揪團預購場次」待決策，決定前先不動
+- [V] 訂餐時段、時段明細、訂單管理、統計報表圖表：2026-09-28 決定**改用現有 locks 模型**（§7 揪團預購／現場點餐不做），同日完成：
+  - 訂單管理：這家店的鎖定清單，分待取餐／已完成／未取餐／全部，可用取餐編號或品名搜尋，直接確認取餐／登記未取餐（共用元件 `components/LockOrderRow.tsx`，走 `markLockOutcome`）
+  - 訂餐時段：一週 × 取餐時段格子，顯示份數、待取、剩餘名額（有設份數上限時），公休日灰掉；點格子進時段明細（備料彙總＋每筆訂單）
+  - 統計報表：最近 15 天（依取餐日）收入、份數、平均單價、已取餐數、每日收入圖、熱銷 Top 10
+  - 四頁共用 `hooks/useVendorLocks.ts`（最近 500 筆）；店家設定的桌位 QR 拿掉；`lib/mockData.ts`、`lib/statusMap.ts` 與 mock 型別整個刪除
 - [V] 刪掉 `mockData.ts` 裡已沒人用的 mock（計畫方案、轉讓、單點卡片、解封申訴、總覽、掃碼、菜單、校準報告）
 
 **C. 畫面寫死或假功能**
@@ -142,7 +145,10 @@
 - [V] 新增評分機制 `reviews/{lockId}`（`firestore.rules` 驗證：只有持有人、只限已取餐、一筆只能評一次、公開可讀）：`/my-bookings` 已取餐的餐點可打 1–5 星，心得勾選公開才會寫進去，署名只顯示「系所＋同學」
 - [V] `LandingPage.tsx` 同學評價改讀 `reviews`（有公開心得、4 星以上），沒有就整段不顯示
 - [V] `LandingPage.tsx` 近期活動改讀 `landing_events`（公開可讀、管理員可寫，目前沒有後台編輯頁，要改內容到 Firestore Console）；「早鳥最高 7 折／最早 30 天」改從 `lib/pricing` 算；頁尾取餐時段改列各店家設定的時段
-- [ ] `MarketplaceHeader.tsx`：地址／語言選單只是靜態外觀——**沒有資料可以讀**：平台是自取、沒有外送地址；語言要先有翻譯（i18n）。要做需要先決定功能（例如「地址」改成選校區篩店家），暫不處理
+- [V] `MarketplaceHeader.tsx` 地址選單：改成「臺灣縣市＋鄉鎮市區」（22 縣市／368 鄉鎮市區，`constants/taiwanDistricts.ts`），選擇記在這台裝置（`lib/location.ts`），首頁（品項／計畫／轉讓）、商家列表、轉讓市集依店家地址篩選（台／臺視為相同；沒填地址的店家在選了地區後不會出現）
+- [V] `MarketplaceHeader.tsx` 語言選單：2026-09-28 決定做**英文版**，同日完成**消費端**：頂部列「中／EN」切換（手機選單也有），選擇記在這台裝置。做法是 `lib/i18n.ts`，中英字串並排寫在元件裡 `tr("預購餐點", "Pre-order")`；`App.tsx` 用語言當 Router 的 `key`，切換時整頁重新掛載，所以 toast／錯誤訊息／狀態標籤都會一起換。已翻：頂部列、地區選單、Landing（含 `landing_events` 的 `*_en` 欄位）、首頁、商家列表／商家頁／品項頁、購物車、轉讓市集、我的餐點、我的鎖定、登入／註冊（會員與廠商須知另外寫了英文版，`components/TermsNotices.tsx`，改條款要兩邊一起改）、會員中心、付款結果頁、`/lock` Demo 頁、設計系統元件的無障礙標籤；過敏原／飲食標籤照固定對照表翻（`types.ts` `tagEn`）。本機 `vite preview` 實測中英切換正常
+  - 順手修：首頁轉讓卡片店名原本寫死「仁和雅咖啡」、早鳥折扣說明欄寫死 95／8／7 折（改讀 `lib/pricing`）、Landing hero 範例票券寫死的滷肉飯（改成第一道真實餐點）；付款取消頁的返回連結從 `/lock` 改成 `/home`
+- [ ] **英文版還沒翻的**：① 商家後台（`vendor-portal/*`、核對取餐、QR 掃碼、校準報告）與管理後台（`admin/*`）；② **Cloud Functions 回的錯誤訊息**（額滿、公休、封鎖等）仍是中文——要做的話前端呼叫時帶 `lang`，Functions 依語言回訊息；③ 資料庫內容（店名、菜名、簡介、方案名稱、AI 折扣說明）照原文顯示，不翻
 - [V] 成長獎勵門檻改存 `platform_config/growth`（`milestones`＋`voucher_total`），商家後台與 `drawGrowthReward`／`syncGrowthUnlock` 讀同一份；文件不存在時 Functions 退回原本預設值。順手修掉 `growth_rewards` 文件只有 `unlocked_milestones` 時 `voucher_remaining` 變 `NaN` 的問題
 - [V] 計畫卡評分改讀 `reviews` 平均（顯示則數），沒人評過顯示「尚無評分」；`meal_plans.rating` 從型別與 seed 拿掉（正式站舊文件還留著這個欄位，不影響）。`createPlanLinePayReservation` 產生的 locks 新增 `meal_plan_id`，**之前加入的計畫沒有這個欄位，評分只算進店家平均、不會算進方案平均**
 - 刻意寫死、不用改：管理員白名單 `lib/adminAuth.ts`、早鳥級距 `lib/pricing.ts`、預設取餐時段 `lib/pickupSlots.ts`

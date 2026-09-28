@@ -97,7 +97,7 @@
 | Google Cloud / Firebase | 資料庫、驗證、後端運算、託管 | 幾乎所有使用者與交易資料 | 具 ISO 27001 認證；帳單／專案擁有者為 Donna 的帳號 |
 | LINE Pay | 消費端金流 | 訂單金額、交易編號（不經手信用卡卡號，卡號在 LINE Pay 端輸入） | 目前為 Sandbox，正式上線需走特約商店審核（TODO §1） |
 | Google Gemini API | 商家校準報告、消費者折扣說明文字生成 | 訂單歷史統計數據（不含個資姓名/電話），生成文字 | API Key 存 `functions/.env`，見風險 R7 |
-| Cloudinary | 商家/菜單圖片上傳（`ImageUploadField.tsx`） | 圖片檔案 | 目前尚未接到任何頁面（見 TODO 骨架清單），实际未使用中 |
+| Firebase Storage（Google Cloud） | 商家封面圖/菜單圖片上傳（`ImageUploadField.tsx`，規則見 `storage.rules`） | 圖片檔案 | 公開可讀；僅該店店主或管理員可寫，限 image/* 且 ≤ 5MB |
 
 供應商清單由新增第三方服務的人（通常是動到 `functions/.env` 或新增 npm 套件呼叫外部 API 的人）順手更新這裡。
 

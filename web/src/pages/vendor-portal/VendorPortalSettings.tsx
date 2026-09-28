@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { mockGetMyVendor, mockSaveVendorSettings } from "@/lib/mockData";
+import { useMutation } from "@tanstack/react-query";
 import { useMyVendor, myVendorDocKey } from "@/hooks/useMyVendor";
 import { getSubscriptionState, requestCancelSubscription, undoCancelSubscription, PLATFORM_CONTACT_EMAIL } from "@/lib/subscription";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
@@ -13,13 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/useAuth";
 import {
-  Settings, QrCode, Plus, Trash2, Download,
+  Settings, Plus,
   CalendarDays, CreditCard, AlertTriangle,
   Clock, X, CalendarOff, Copy, LoaderCircle, Timer, Users } from "lucide-react";
 import { ImageUploadField } from "@/components/ImageUploadField";
-import { QRCodeCanvas } from "qrcode.react";
 import { format, parseISO } from "date-fns";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -120,11 +117,9 @@ function SubscriptionUndoCancelButton({ vendor }: { vendor: Vendor }) {
 // 2026-09-25：簡介／地址／電話／營業日／公休日／取餐時段／份數上限改讀寫真實
 // vendors/{id}（firestore.rules 限定店主只能改這幾個欄位，店名只有管理員能改），
 // 消費端取餐時段選擇跟結帳驗證都照這裡的設定（lib/pickupSlots.ts、functions/src/pricing.js）。
-// 封面圖 2026-09-28 改存 vendors/{id}.cover_image。
-// TODO(firebase): 桌位（現場點餐 QR）仍讀寫 mockData.ts——屬於 TODO §7 待決策的現場點餐，
-// QR 連到的 /menu/:id 目前也沒有這個頁面。
+// 封面圖 2026-09-28 改存 vendors/{id}.cover_image。原本 Parse 雛型的「桌位 QR（現場點餐）」
+// 同日拿掉：TODO §7 決定不做現場點餐，QR 連到的 /menu/:id 也從來沒有這個頁面。
 export default function VendorPortalSettings() {
-  const { user } = useAuth();
   const { toast } = useToast();
 
   const [name, setName] = useState("");
@@ -137,15 +132,7 @@ export default function VendorPortalSettings() {
   const [newHoliday, setNewHoliday] = useState("");
   const [pickupWindows, setPickupWindows] = useState<string[]>(DEFAULT_PICKUP_WINDOWS);
   const [slotCapacity, setSlotCapacity] = useState("");
-  const [newTable, setNewTable] = useState("");
 
-  const { data: myVendor, isLoading } = useQuery({
-    queryKey: ["myVendor", user?.id],
-    queryFn: async () => mockGetMyVendor(),
-    enabled: !!user,
-  });
-
-  const tables: string[] = myVendor?.tables ?? [];
   const { data: realVendor, isLoading: realVendorLoading } = useMyVendor();
 
   useEffect(() => {
@@ -187,36 +174,9 @@ export default function VendorPortalSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: myVendorDocKey(realVendor?.id) });
-      queryClient.invalidateQueries({ queryKey: ["myVendor", user?.id] });
       toast({ title: "儲存成功", description: "消費者下單時會照新的取餐時段與份數上限。" });
     },
     onError: (err: Error) => toast({ variant: "destructive", title: "儲存失敗", description: err.message }),
-  });
-
-  const addTableMutation = useMutation({
-    mutationFn: async (tableName: string) => {
-      if (!myVendor) throw new Error("找不到店家資料");
-      if (tables.includes(tableName)) throw new Error("桌位名稱已存在");
-      return mockSaveVendorSettings(myVendor.id, { tables: [...tables, tableName] });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["myVendor", user?.id] });
-      setNewTable("");
-      toast({ title: "桌位已新增" });
-    },
-    onError: (err: Error) => toast({ variant: "destructive", title: "新增失敗", description: err.message }),
-  });
-
-  const removeTableMutation = useMutation({
-    mutationFn: (tableName: string) => {
-      if (!myVendor) throw new Error("找不到店家資料");
-      return mockSaveVendorSettings(myVendor.id, { tables: tables.filter(t => t !== tableName) });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["myVendor", user?.id] });
-      toast({ title: "桌位已刪除" });
-    },
-    onError: (err: Error) => toast({ variant: "destructive", title: "刪除失敗", description: err.message }),
   });
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -230,19 +190,6 @@ export default function VendorPortalSettings() {
     if (!first) return;
     setBusinessHours(prev => prev.map(h => h.open ? { ...h, openTime: first.openTime, closeTime: first.closeTime } : h));
     toast({ title: `已套用 ${first.openTime}─${first.closeTime} 至所有開放日` });
-  }
-
-  function getMenuUrl(tableName: string) {
-    return `${window.location.origin}/menu/${myVendor?.id}?table=${encodeURIComponent(tableName)}`;
-  }
-
-  function downloadQR(tableName: string) {
-    const canvas = document.getElementById(`qr-${tableName}`) as HTMLCanvasElement | null;
-    if (!canvas) return;
-    const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
-    a.download = `qr-${myVendor?.name ?? "table"}-${tableName}.png`;
-    a.click();
   }
 
   function setWindowPart(index: number, part: 0 | 1, value: string) {
@@ -260,7 +207,7 @@ export default function VendorPortalSettings() {
     setPickupWindows(prev => [...prev, `${start}-${addMinutes(start, 30)}`]);
   }
 
-  if (isLoading || realVendorLoading) return (
+  if (realVendorLoading) return (
     <VendorPortalLayout>
       <div className="flex justify-center py-20">
         <div role="status" className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -306,7 +253,7 @@ export default function VendorPortalSettings() {
                 <Input value={phone} onChange={e => setPhone(e.target.value)} className="mt-1" />
               </div>
             </div>
-            <ImageUploadField label="店家封面圖" value={coverImage} onChange={setCoverImage} />
+            <ImageUploadField label="店家封面圖" vendorId={realVendor?.id} value={coverImage} onChange={setCoverImage} />
           </CardContent>
         </Card>
 
@@ -555,59 +502,6 @@ export default function VendorPortalSettings() {
             </Card>
           );
         })()}
-
-        {/* ── 桌位 QR Code ── */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <QrCode className="w-4 h-4 text-orange-500" /> 桌位 QR Code 管理
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="桌位名稱（如：A1、戶外1）"
-                value={newTable}
-                onChange={e => setNewTable(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && newTable.trim()) addTableMutation.mutate(newTable.trim()); }}
-              />
-              <Button
-                className="flex-shrink-0"
-                onClick={() => { if (newTable.trim()) addTableMutation.mutate(newTable.trim()); }}
-                disabled={addTableMutation.isPending || !newTable.trim()}
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {tables.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">尚未建立桌位</p>
-            ) : (
-              <div className="space-y-4">
-                {tables.map(tableName => (
-                  <div key={tableName} className="border rounded-xl p-4 flex flex-col items-center gap-3">
-                    <div className="flex items-center justify-between w-full">
-                      <span className="font-semibold text-sm">桌號：{tableName}</span>
-                      <Button
-                        size="sm" variant="ghost"
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                        onClick={() => removeTableMutation.mutate(tableName)}
-                        disabled={removeTableMutation.isPending}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <QRCodeCanvas id={`qr-${tableName}`} value={getMenuUrl(tableName)} size={160} level="M" includeMargin />
-                    <p className="text-xs text-muted-foreground text-center break-all px-2">{getMenuUrl(tableName)}</p>
-                    <Button size="sm" variant="outline" className="w-full" onClick={() => downloadQR(tableName)}>
-                      <Download className="w-4 h-4 mr-1" /> 下載 QR Code
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
       </div>
     </VendorPortalLayout>

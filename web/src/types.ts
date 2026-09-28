@@ -9,7 +9,7 @@ export interface Vendor {
   description?: string;
   address?: string;
   phone?: string;
-  cover_image?: string; // 店家封面圖（Cloudinary https 網址），店主在店家設定頁上傳
+  cover_image?: string; // 店家封面圖（Firebase Storage 下載網址），店主在店家設定頁上傳
   owner_uid?: string | null; // 平台審核後綁定的真實 Firebase Auth uid，只有 admin 能寫
   // 商家訂閱，見 lib/subscription.ts；舊資料可能沒有這些欄位
   subscription_status?: "trial" | "active" | "cancelled" | "expired";
@@ -121,85 +121,22 @@ export interface BusinessHour {
   closeTime: string; // "HH:MM"
 }
 
-export interface VendorData {
-  id: string;
-  name: string;
-  description: string;
-  address: string;
-  phone: string;
-  coverImage?: string;
-  isApproved: boolean;
-  isActive: boolean;
-  subscriptionStatus: "trial" | "active" | "expired" | "cancelled";
-  subscriptionStartDate?: Date;
-  subscriptionEndDate?: Date;
-  cancelRequestedAt?: Date;
-  ownerId: string;
-  orderWeekdays?: number[]; // 舊欄位，保留向下相容
-  businessHours?: BusinessHour[]; // 營業時段（取代 orderWeekdays）
-  holidays?: string[];             // 指定公休日，格式 "YYYY-MM-DD"
-  tables?: string[];               // 現場點餐桌位 QR code 名稱清單
-  createdAt: Date;
-}
-
 export const ALLERGEN_LIST = [
   "蛋", "奶", "花生", "堅果", "小麥/麩質", "大豆", "海鮮", "芝麻",
 ] as const;
 
 export const DIETARY_TAGS = ["葷食", "素食", "全素", "辣"] as const;
 
-// MenuItemData（mock，camelCase）跟上面真實的 MenuItem（snake_case）並存——
-// 「揪團預購場次/現場點餐」那組 vendor-portal 頁面回復使用 mock 資料，只有
-// VendorListPage/VendorPage/MenuItemPage/CartPage/VendorPortalMenu 這五個
-// 真的接了 Firestore 的頁面用 MenuItem。
-export interface MenuItemData {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  image?: string;
-  isAvailable: boolean;
-  category: string;
-  allergens: string[];   // 過敏原標示
-  dietaryTags: string[]; // 葷素／辣度標記
-  vendorId: string;
-  createdAt: Date;
-}
+// 過敏原／飲食標籤是固定選項，英文版照這張表翻（資料庫存中文）
+const TAG_EN: Record<string, string> = {
+  蛋: "Egg", 奶: "Dairy", 花生: "Peanut", 堅果: "Tree nuts", "小麥/麩質": "Wheat / gluten", 大豆: "Soy", 海鮮: "Seafood", 芝麻: "Sesame",
+  葷食: "Meat", 素食: "Vegetarian", 全素: "Vegan", 辣: "Spicy",
+};
+export const tagEn = (tag: string): string => TAG_EN[tag] ?? tag;
 
 export interface CartItem {
   menuItem: MenuItem;
   quantity: number;
-  note: string;
-}
-
-export interface PreOrderData {
-  id: string;
-  customerId: string;
-  vendorId: string;
-  vendorName: string;
-  sessionId?: string;
-  pickupDate: Date;
-  pickupLocation: string;
-  orderType: "individual" | "group";
-  groupName?: string;
-  totalAmount: number;
-  discountAmount: number;
-  finalAmount: number;
-  status: "pending" | "confirmed" | "cancelled" | "completed";
-  paymentMethod: "cash";
-  paymentStatus: "unpaid" | "paid";
-  depositRequired?: boolean;
-  depositStatus?: "pending" | "confirmed" | "waived";
-  items: PreOrderItemData[];
-  createdAt: Date;
-}
-
-export interface PreOrderItemData {
-  id: string;
-  menuItemId: string;
-  menuItemName: string;
-  quantity: number;
-  unitPrice: number;
   note: string;
 }
 
@@ -216,44 +153,6 @@ export interface UserProfile {
   orderBanned?: boolean;
   noPickupCount?: number;
 }
-
-export interface TableOrderData {
-  id: string;
-  vendorId: string;
-  tableName: string;
-  customerName: string;
-  customerPhone: string;
-  totalAmount: number;
-  status: "pending" | "confirmed" | "completed" | "cancelled";
-  paymentMethod: "cash";
-  paymentStatus: "unpaid" | "paid";
-  note: string;
-  items: TableOrderItemData[];
-  createdAt: Date;
-}
-
-export interface TableOrderItemData {
-  id: string;
-  menuItemId: string;
-  menuItemName: string;
-  quantity: number;
-  unitPrice: number;
-  note: string;
-}
-
-export interface OrderSessionData {
-  id: string;
-  vendorId: string;
-  sessionDate: Date;
-  pickupTime: string;       // e.g. "12:00"
-  deadline: Date;
-  pickupLocation: string;
-  status: "open" | "closed" | "completed";
-  note: string;
-  autoCreated?: boolean;    // 由 businessHours 自動建立
-  createdAt: Date;
-}
-
 
 // reviews/{lockId}：消費者對已取餐的鎖定打分，公開可讀，見 firestore.rules
 export interface Review {

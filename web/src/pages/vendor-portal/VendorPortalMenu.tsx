@@ -242,7 +242,7 @@ export default function VendorPortalMenu() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">點選含有的過敏原成分，將顯示於消費者菜單頁面。</p>
             </div>
-            <ImageUploadField label="品項圖片" value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
+            <ImageUploadField label="品項圖片" vendorId={VENDOR_ID} value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>

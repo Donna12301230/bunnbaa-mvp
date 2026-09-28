@@ -4,17 +4,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/lib/firebase";
 
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string;
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string;
+// 圖片存 Firebase Storage 的 vendors/{vendorId}/ 底下；storage.rules 依
+// vendors/{vendorId}.owner_uid 限定只有店主能寫，並限制 image/* 且 ≤ 5MB。
+const MAX_BYTES = 5 * 1024 * 1024;
 
 interface Props {
   label: string;
+  vendorId: string | undefined;
   value: string;
   onChange: (url: string) => void;
 }
 
-export function ImageUploadField({ label, value, onChange }: Props) {
+export function ImageUploadField({ label, vendorId, value, onChange }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -23,17 +27,13 @@ export function ImageUploadField({ label, value, onChange }: Props) {
     if (!file) return;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("upload_preset", UPLOAD_PRESET);
-
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-        { method: "POST", body: formData }
-      );
-      if (!res.ok) throw new Error("上傳失敗，請確認 Cloudinary 設定");
-      const data = await res.json();
-      onChange(data.secure_url as string);
+      if (!vendorId) throw new Error("這個帳號還沒綁定商家，請聯絡平台");
+      if (!file.type.startsWith("image/")) throw new Error("只能上傳圖片檔");
+      if (file.size > MAX_BYTES) throw new Error("圖片不能超過 5MB");
+      const ext = file.name.includes(".") ? file.name.split(".").pop() : "img";
+      const fileRef = ref(storage, `vendors/${vendorId}/${crypto.randomUUID()}.${ext}`);
+      await uploadBytes(fileRef, file, { contentType: file.type });
+      onChange(await getDownloadURL(fileRef));
     } catch (err: any) {
       toast({ variant: "destructive", title: "上傳失敗", description: err.message });
     } finally {
@@ -72,7 +72,7 @@ export function ImageUploadField({ label, value, onChange }: Props) {
           variant="outline"
           size="sm"
           className="flex-shrink-0 gap-1"
-          disabled={uploading}
+          disabled={uploading || !vendorId}
           onClick={() => fileInputRef.current?.click()}
         >
           <Upload className="w-4 h-4" />

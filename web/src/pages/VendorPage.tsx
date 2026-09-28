@@ -9,8 +9,9 @@ import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { tr } from "@/lib/i18n";
+import { tagEn } from "@/types";
 
-const OTHER_CATEGORY = "其他";
 
 function categoryAnchorId(category: string) {
   return `category-${encodeURIComponent(category)}`;
@@ -53,7 +54,7 @@ export default function VendorPage() {
   const categories = useMemo(() => {
     const groups = new Map<string, MenuItem[]>();
     for (const item of items) {
-      const cat = item.category?.trim() || OTHER_CATEGORY;
+      const cat = item.category?.trim() || tr("其他", "Other");
       if (!groups.has(cat)) groups.set(cat, []);
       groups.get(cat)!.push(item);
     }
@@ -68,9 +69,9 @@ export default function VendorPage() {
     return (
       <EmptyState
         icon={<Store size={32} />}
-        title="找不到這個商家"
-        description="可能已停止營業，或連結有誤。"
-        action={<Button variant="outline" asChild><Link href="/vendors">回商家清單</Link></Button>}
+        title={tr("找不到這個商家", "Vendor not found")}
+        description={tr("可能已停止營業，或連結有誤。", "It may have closed, or the link is wrong.")}
+        action={<Button variant="outline" asChild><Link href="/vendors">{tr("回商家清單", "Back to vendors")}</Link></Button>}
       />
     );
   }
@@ -78,7 +79,7 @@ export default function VendorPage() {
   return (
     <div className="space-y-6">
       <Link href="/vendors" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="w-4 h-4" /> 回商家清單
+        <ArrowLeft className="w-4 h-4" /> {tr("回商家清單", "Back to vendors")}
       </Link>
 
       <div className="bg-white rounded-xl border border-border p-5">
@@ -110,11 +111,11 @@ export default function VendorPage() {
       </div>
 
       <div>
-        <h2 className="text-lg font-bold mb-3">品項</h2>
+        <h2 className="text-lg font-bold mb-3">{tr("品項", "Menu")}</h2>
         {itemsLoading ? (
           <SkeletonBlocks count={2} height={96} className="grid grid-cols-1 sm:grid-cols-2 gap-3" />
         ) : items.length === 0 ? (
-          <EmptyState size="compact" icon={<UtensilsCrossed size={32} />} title="這家商家目前沒有上架品項" />
+          <EmptyState size="compact" icon={<UtensilsCrossed size={32} />} title={tr("這家商家目前沒有上架品項", "This vendor has no items available right now")} />
         ) : (
           <>
             {categories.length > 1 && (
@@ -164,7 +165,7 @@ export default function VendorPage() {
                           <div className="flex flex-wrap gap-1 mt-2">
                             {item.dietary_tags.map((tag) => (
                               <span key={tag} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                {tag}
+                                {tr(tag, tagEn(tag))}
                               </span>
                             ))}
                           </div>

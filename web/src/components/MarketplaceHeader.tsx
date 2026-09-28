@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
-  Search, MapPin, Globe, User, ChevronDown, ClipboardList, Repeat,
+  Search, Globe, User, ChevronDown, ClipboardList, Repeat,
   CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart, House,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,12 +17,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import AreaPicker from "@/components/AreaPicker";
+import { setLang, useI18n } from "@/lib/i18n";
 
 // 抽自 HomePage 的共用頂部列——依 UI草圖(Main/Marketplace/MyBookings 三頁共用同一組
 // 導覽)統一給三頁用:預購餐點(計畫方案首頁)／轉讓市集／我的餐點。也給
 // CustomerLayout(/vendors、/vendor/:id、/item/:id)用,取代原本另一套 Navbar.tsx,
 // 讓商家瀏覽動線跟其他分頁共用同一顆導覽列。
-// 搜尋框、地址／語言選單目前仍是靜態外觀(沿用原本 HomePage 的做法,尚未接功能)。
+// 搜尋框目前仍是靜態外觀。地區選單(AreaPicker)2026-09-28 改成台灣縣市＋鄉鎮市區篩選,
+// 選擇存在 lib/location.ts,首頁／商家列表／轉讓市集依店家地址過濾。
 //
 // 2026-09-21:「我的餐點」(原「我的商品」)這個分頁只給一般使用者看,是消費端
 // 查看自己鎖定紀錄的地方(/my-bookings);廠商登入時這個分頁位置換成「接受端」
@@ -52,22 +55,23 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
   const { count: cartCount } = useCart();
   const [searchInput, setSearchInput] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { t, lang } = useI18n();
 
   const logoutMutation = useMutation({
     mutationFn: () => logout(),
     onError: (err: Error) => {
-      toast({ variant: "destructive", title: "登出失敗", description: err.message });
+      toast({ variant: "destructive", title: t("登出失敗", "Sign-out failed"), description: err.message });
     },
   });
 
   const navItems: NavItem[] = [
-    { tab: "landing", href: "/landing", label: "首頁", icon: House },
-    { tab: "plans", href: "/home", label: "預購餐點", icon: ClipboardList },
-    { tab: "transfer", href: "/marketplace", label: "轉讓市集", icon: Repeat },
+    { tab: "landing", href: "/landing", label: t("首頁", "Home"), icon: House },
+    { tab: "plans", href: "/home", label: t("預購餐點", "Pre-order"), icon: ClipboardList },
+    { tab: "transfer", href: "/marketplace", label: t("轉讓市集", "Transfers"), icon: Repeat },
     isVendor
-      ? { tab: "bookings", href: "/lock/vendor/redeem", label: "核對取餐", icon: QrCode }
-      : { tab: "bookings", href: "/my-bookings", label: "我的餐點", icon: CalendarDays },
-    { tab: "vendors", href: "/vendors", label: "商家", icon: Store },
+      ? { tab: "bookings", href: "/lock/vendor/redeem", label: t("核對取餐", "Redeem"), icon: QrCode }
+      : { tab: "bookings", href: "/my-bookings", label: t("我的餐點", "My meals"), icon: CalendarDays },
+    { tab: "vendors", href: "/vendors", label: t("商家", "Vendors"), icon: Store },
   ];
 
   function go(href: string) {
@@ -83,7 +87,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           size="icon"
           onClick={() => setMobileNavOpen(true)}
           className="md:hidden shrink-0 w-10 h-10 -ml-1.5 text-muted-foreground [&_svg]:size-5"
-          aria-label="開啟導覽選單"
+          aria-label={t("開啟導覽選單", "Open navigation menu")}
         >
           <Menu />
         </Button>
@@ -117,29 +121,38 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
             type="search"
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
-            placeholder="搜尋餐廳、料理或菜餚"
-            aria-label="搜尋餐廳、料理或菜餚"
+            placeholder={t("搜尋餐廳、料理或菜餚", "Search restaurants, cuisines or dishes")}
+            aria-label={t("搜尋餐廳、料理或菜餚", "Search restaurants, cuisines or dishes")}
             className="h-10 pl-9"
           />
         </div>
 
         <div className="flex items-center gap-2 md:gap-4 shrink-0 ml-auto text-sm">
-          <button type="button" className="hidden lg:flex items-center gap-1 text-muted-foreground hover:text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <MapPin className="w-4 h-4" />
-            <span>新地址 選擇地址</span>
-          </button>
-          <button type="button" className="hidden sm:flex items-center gap-1 text-muted-foreground hover:text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <Globe className="w-4 h-4" />
-            <span>ZH</span>
-            <ChevronDown className="w-3 h-3" />
-          </button>
+          <AreaPicker className="hidden lg:flex" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="hidden sm:flex items-center gap-1 text-muted-foreground hover:text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={t("切換語言", "Change language")}
+              >
+                <Globe className="w-4 h-4" />
+                <span>{lang === "en" ? "EN" : "中"}</span>
+                <ChevronDown className="w-3 h-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-32">
+              <DropdownMenuItem onClick={() => setLang("zh")} className={lang === "zh" ? "font-semibold" : undefined}>中文</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLang("en")} className={lang === "en" ? "font-semibold" : undefined}>English</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate("/cart")}
             className="relative w-10 h-10 text-muted-foreground [&_svg]:size-5"
-            aria-label={`購物車${cartCount > 0 ? `，${cartCount} 項商品` : ""}`}
+            aria-label={cartCount > 0 ? t(`購物車，${cartCount} 項商品`, `Cart, ${cartCount} items`) : t("購物車", "Cart")}
           >
             <ShoppingCart />
             {cartCount > 0 && (
@@ -151,7 +164,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
 
           {!user ? (
             <Button size="sm"  onClick={() => navigate("/login")}>
-              登入 / 註冊
+              {t("登入 / 註冊", "Sign in / Sign up")}
             </Button>
           ) : (
             <DropdownMenu>
@@ -164,16 +177,16 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem onClick={() => navigate("/profile")}>
-                  <User className="w-4 h-4 mr-2" /> 會員中心
+                  <User className="w-4 h-4 mr-2" /> {t("會員中心", "My account")}
                 </DropdownMenuItem>
                 {isVendor && (
                   <DropdownMenuItem onClick={() => navigate("/vendor-portal/dashboard")}>
-                    <Store className="w-4 h-4 mr-2" /> 廠商後台
+                    <Store className="w-4 h-4 mr-2" /> {t("廠商後台", "Vendor portal")}
                   </DropdownMenuItem>
                 )}
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => navigate("/admin/vendors")}>
-                    <ShieldCheck className="w-4 h-4 mr-2" /> 管理後台
+                    <ShieldCheck className="w-4 h-4 mr-2" /> {t("管理後台", "Admin")}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
@@ -182,7 +195,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
                 >
-                  <LogOut className="w-4 h-4 mr-2" /> 登出
+                  <LogOut className="w-4 h-4 mr-2" /> {t("登出", "Sign out")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -214,7 +227,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                 onClick={() => go("/cart")}
                 className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-foreground hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <ShoppingCart className="w-4 h-4" /> 購物車
+                <ShoppingCart className="w-4 h-4" /> {t("購物車", "Cart")}
                 {cartCount > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center">
                     {cartCount > 99 ? "99+" : cartCount}
@@ -222,11 +235,18 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                 )}
               </button>
             </SheetClose>
+            <div className="px-3 py-3 text-sm flex items-center justify-between gap-2">
+              <AreaPicker />
+              <div className="flex gap-1" role="group" aria-label={t("切換語言", "Change language")}>
+                <Button size="sm" variant={lang === "zh" ? "secondary" : "ghost"} onClick={() => setLang("zh")}>中</Button>
+                <Button size="sm" variant={lang === "en" ? "secondary" : "ghost"} onClick={() => setLang("en")}>EN</Button>
+              </div>
+            </div>
           </nav>
           {!user && (
             <div className="p-3 border-t border-border">
               <Button className="w-full" onClick={() => go("/login")}>
-                登入 / 註冊
+                {t("登入 / 註冊", "Sign in / Sign up")}
               </Button>
             </div>
           )}

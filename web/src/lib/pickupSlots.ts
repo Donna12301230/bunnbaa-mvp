@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import type { BusinessHour, Vendor } from "@/types";
 
 // 取餐時段——跟 functions/src/pricing.js 是同一套規則（伺服器會再驗證一次），
@@ -36,10 +37,10 @@ export function vendorWindows(vendor: ScheduleSource): string[] {
 
 /** 這天店家有沒有休息：特定公休日，或每週營業時段裡那天沒開。 */
 export function vendorClosedReason(vendor: ScheduleSource, pickupDate: string): string | null {
-  if (vendor?.holidays?.includes(pickupDate)) return "這天是店家公休日";
+  if (vendor?.holidays?.includes(pickupDate)) return tr("這天是店家公休日", "The vendor is closed on this day");
   const weekday = new Date(`${pickupDate}T00:00:00`).getDay();
   const hours: BusinessHour | undefined = vendor?.business_hours?.find((h) => h.weekday === weekday);
-  if (hours && !hours.open) return "店家這天沒有營業";
+  if (hours && !hours.open) return tr("店家這天沒有營業", "The vendor isn't open on this day");
   return null;
 }
 

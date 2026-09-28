@@ -1,9 +1,7 @@
+import { tr } from "@/lib/i18n";
 import { useState } from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs } from "firebase/firestore";
 import { MapPin, Phone, Store } from "lucide-react";
-import { db } from "@/lib/firebase";
 import { isClean } from "@/lib/searchFilter";
 import type { Vendor } from "@/types";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
@@ -11,6 +9,7 @@ import { EmptyState } from "@/components/ds";
 import CustomerLayout from "@/components/CustomerLayout";
 import PageHero, { HeroSearch } from "@/components/PageHero";
 import { useVendors } from "@/hooks/useVendors";
+import { areaLabel, setSelectedArea, useSelectedArea, vendorInArea } from "@/lib/location";
 
 // 商家清單頁 — 消費者瀏覽所有上架商家。真實 vendors collection 沒有
 // isApproved/isActive 這兩個欄位，用 status !== 'disabled' 頂替。
@@ -21,26 +20,35 @@ export default function VendorListPage() {
 
   // 不雅字詞當作沒輸入搜尋字串處理，不特別跳錯誤訊息。
   const effectiveSearch = isClean(search) ? search : "";
+  const area = useSelectedArea();
   const filtered = vendors.filter(
-    (v) => v.name.includes(effectiveSearch) || (v.description ?? "").includes(effectiveSearch)
+    (v) =>
+      vendorInArea(v, area) &&
+      (v.name.includes(effectiveSearch) || (v.description ?? "").includes(effectiveSearch))
   );
 
   return (
     <CustomerLayout
       hero={
-        <PageHero title="商家" description="選一家商家看看他們的預購品項。">
-          <HeroSearch id="vendorSearch" label="搜尋商家" value={search} onChange={setSearch} placeholder="搜尋商家名稱或介紹" />
+        <PageHero title={tr("商家", "Vendors")} description={tr("選一家商家看看他們的預購品項。", "Pick a vendor to see what you can pre-order.")}>
+          <HeroSearch id="vendorSearch" label={tr("搜尋商家", "Search vendors")} value={search} onChange={setSearch} placeholder={tr("搜尋商家名稱或介紹", "Search by name or description")} />
         </PageHero>
       }
     >
       <div className="space-y-4">
+        {area && (
+          <p className="text-sm text-muted-foreground">
+            {tr(`只顯示 ${areaLabel(area)} 的店家・`, `Showing vendors in ${areaLabel(area)} · `)}
+            <button type="button" className="text-primary underline" onClick={() => setSelectedArea(null)}>{tr("顯示全部地區", "Show all areas")}</button>
+          </p>
+        )}
         {isLoading ? (
           <SkeletonBlocks count={3} height={160} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" />
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<Store size={32} />}
-            title={search ? "找不到符合的商家" : "目前還沒有合作商家"}
-            description={search ? "換個關鍵字試試看。" : "新商家上架後會出現在這裡。"}
+            title={search || area ? tr("找不到符合的商家", "No matching vendors") : tr("目前還沒有合作商家", "No partner vendors yet")}
+            description={search || area ? tr("換個關鍵字或地區試試看。", "Try a different keyword or area.") : tr("新商家上架後會出現在這裡。", "New vendors will show up here.")}
           />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

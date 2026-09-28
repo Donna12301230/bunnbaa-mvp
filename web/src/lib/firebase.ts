@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
 
 // Fill these in from your Firebase project settings, or load from
 // import.meta.env (Vite) if you prefer environment-based config.
@@ -18,6 +19,7 @@ export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const functions = getFunctions(app, "asia-east1");
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 // Point at local emulators during development.
 // Set VITE_USE_EMULATORS=true in a .env.local to enable.
@@ -25,6 +27,7 @@ export const auth = getAuth(app);
 if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true") {
   connectFirestoreEmulator(db, "localhost", 8080);
   connectFunctionsEmulator(functions, "localhost", 5001);
+  connectStorageEmulator(storage, "localhost", 9199);
   // disableWarnings: 關掉 Firebase Auth SDK 預設會在畫面底部注入的
   // 「Running in emulator mode. Do not use with production credentials.」
   // 警示橫幅（純 UI 提示，不影響 emulator 連線本身）。

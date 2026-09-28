@@ -90,7 +90,7 @@ service cloud.firestore {
                         && request.resource.data.get('slot_capacity', 0) is int
                         && request.resource.data.get('slot_capacity', 0) >= 0
                         && request.resource.data.get('slot_capacity', 0) <= 10000
-                        // Cloudinary secure_url from ImageUploadField; https only so it
+                        // Firebase Storage download URL from ImageUploadField; https only so it
                         // can't carry a javascript:/data: URL into the storefront <img>.
                         && request.resource.data.get('cover_image', '') is string
                         && request.resource.data.get('cover_image', '').size() <= 500

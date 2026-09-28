@@ -1,3 +1,4 @@
+import { tr } from '@/lib/i18n';
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cx } from '../_shared/cx';
@@ -99,7 +100,7 @@ export function Tag({
           className="bb-tag__remove"
           onClick={onRemove}
           disabled={disabled}
-          aria-label={`移除 ${typeof children === 'string' ? children : ''}`.trim()}
+          aria-label={tr(`移除 ${typeof children === 'string' ? children : ''}`, `Remove ${typeof children === 'string' ? children : ''}`).trim()}
         >
           <X size={14} aria-hidden="true" />
         </button>

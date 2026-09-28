@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { QRCodeSVG } from "qrcode.react";
 
 interface Props {
@@ -16,9 +17,9 @@ export default function LockQRCode({ lockId, vendorId }: Props) {
         <QRCodeSVG value={payload} size={140} level="M" />
       </div>
       <div>
-        <div className="faint">取餐編號</div>
+        <div className="faint">{tr("取餐編號", "Pickup code")}</div>
         <div className="lock-code">{shortCode}</div>
-        <div className="faint">出示 QR Code 或報這組編號給商家核對</div>
+        <div className="faint">{tr("出示 QR Code 或報這組編號給商家核對", "Show this QR code or read out the code to the vendor")}</div>
       </div>
     </div>
   );

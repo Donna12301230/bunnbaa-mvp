@@ -672,13 +672,17 @@ async function seedPlatformConfig(writer) {
   });
   console.log("Seeded platform_config/growth");
 
-  // Landing 頁「近期活動」。icon 是前端 EVENT_ICONS 的 key（sparkle／calendar／
+  // Landing 頁「近期活動」（*_en 是英文版文案，選填）。icon 是前端 EVENT_ICONS 的 key（sparkle／calendar／
   // repeat／store／ticket／bell）；active: false 可以先下架不刪除。
   const events = [
-    { id: "growth-draw", date_label: "每月 1 日", title: "成長獎勵抽獎", body: "合作店家營收達標就解鎖，最高抽中整份 0 元。", icon: "sparkle", href: "/home" },
-    { id: "exam-early-bird", date_label: "期中考週", title: "考前便當早鳥加碼", body: "考試週提前預約，讀書不用再排隊買午餐。", icon: "calendar", href: "/home" },
-    { id: "transfer-market", date_label: "隨時進行", title: "同學轉讓市集", body: "臨時有事？把餐點轉給需要的人，不浪費一份。", icon: "repeat", href: "/marketplace" },
-    { id: "vendor-recruit", date_label: "新店家進駐", title: "合作店家招募中", body: "餐廳、咖啡廳都能加入，提前掌握備餐數量。", icon: "store", href: "/vendors" },
+    { id: "growth-draw", date_label: "每月 1 日", title: "成長獎勵抽獎", body: "合作店家營收達標就解鎖，最高抽中整份 0 元。", icon: "sparkle", href: "/home",
+      date_label_en: "1st of every month", title_en: "Growth reward draw", body_en: "Unlocked when a partner vendor hits its revenue goal — win up to a free meal." },
+    { id: "exam-early-bird", date_label: "期中考週", title: "考前便當早鳥加碼", body: "考試週提前預約，讀書不用再排隊買午餐。", icon: "calendar", href: "/home",
+      date_label_en: "Midterm week", title_en: "Exam-week early-bird boost", body_en: "Book ahead during exams and skip the lunch queue." },
+    { id: "transfer-market", date_label: "隨時進行", title: "同學轉讓市集", body: "臨時有事？把餐點轉給需要的人，不浪費一份。", icon: "repeat", href: "/marketplace",
+      date_label_en: "Ongoing", title_en: "Classmate transfer market", body_en: "Something came up? Pass your meal to someone who needs it — nothing wasted." },
+    { id: "vendor-recruit", date_label: "新店家進駐", title: "合作店家招募中", body: "餐廳、咖啡廳都能加入，提前掌握備餐數量。", icon: "store", href: "/vendors",
+      date_label_en: "New vendors", title_en: "Now recruiting partner vendors", body_en: "Restaurants and cafés welcome — know how much to prep in advance." },
   ];
   for (const [i, { id, ...event }] of events.entries()) {
     await writer.set(db.collection("landing_events").doc(id), { ...event, sort_order: i + 1, active: true });

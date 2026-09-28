@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
 import { DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, slotLabel as toSlotLabel, todayStr } from "@/lib/pickupSlots";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
+import { tr } from "@/lib/i18n";
 
 // 購物車頁面。
 // UIUX 檢視後新增:原本 MenuItemPage「加入購物車」只會彈 toast,useCart 把品項存進
@@ -91,7 +92,7 @@ export default function CartPage() {
       clearCart();
       window.location.href = paymentUrl;
     } catch (err) {
-      toast({ title: "前往付款失敗", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("前往付款失敗", "Couldn't start payment"), description: (err as Error).message, variant: "destructive" });
       setCheckingOut(false);
     }
   }
@@ -101,29 +102,29 @@ export default function CartPage() {
       <MarketplaceHeader />
 
       <div className="max-w-2xl mx-auto px-4 md:px-6 py-6 space-y-4">
-        <h1 className="text-2xl font-bold">購物車</h1>
+        <h1 className="text-2xl font-bold">{tr("購物車", "Cart")}</h1>
 
         {items.length === 0 ? (
           <div className="bg-white rounded-xl border border-border shadow-sm">
             <EmptyState
               icon={<ShoppingCart size={32} />}
-              title="購物車還是空的"
-              description="逛逛附近的商家，提前預約享早鳥價。"
-              action={<Button onClick={() => navigate("/vendors")}>去逛逛商家</Button>}
+              title={tr("購物車還是空的", "Your cart is empty")}
+              description={tr("逛逛附近的商家，提前預約享早鳥價。", "Browse nearby vendors and book early for early-bird prices.")}
+              action={<Button onClick={() => navigate("/vendors")}>{tr("去逛逛商家", "Browse vendors")}</Button>}
             />
           </div>
         ) : (
           <>
             {vendor && (
               <p className="text-sm text-muted-foreground">
-                來自 <span className="font-semibold text-foreground">{vendor.name}</span>
-                ・一次只能跟一家商家預購
+                {tr("來自 ", "From ")}<span className="font-semibold text-foreground">{vendor.name}</span>
+                {tr("・一次只能跟一家商家預購", " · you can pre-order from one vendor at a time")}
               </p>
             )}
 
             <div className="bg-white rounded-xl border border-border p-4 space-y-3">
               <h2 className="text-sm font-semibold flex items-center gap-1.5">
-                <CalendarDays className="w-4 h-4 text-orange-500" /> 取餐日期與時段
+                <CalendarDays className="w-4 h-4 text-orange-500" /> {tr("取餐日期與時段", "Pickup date & time")}
               </h2>
               <PickupPicker
                 date={pickup.date}
@@ -133,7 +134,7 @@ export default function CartPage() {
                 uid={user?.id}
                 vendor={vendor}
               />
-              <p className="text-xs text-muted-foreground">早鳥優惠：{discountPercent > 0 ? tierLabel : "此日期沒有早鳥折扣"}</p>
+              <p className="text-xs text-muted-foreground">{tr("早鳥優惠：", "Early bird: ")}{discountPercent > 0 ? tierLabel : tr("此日期沒有早鳥折扣", "no early-bird discount for this date")}</p>
             </div>
 
             <div className="bg-white rounded-xl border border-border divide-y divide-border">
@@ -144,7 +145,7 @@ export default function CartPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm">{menuItem.name}</p>
-                    {note && <p className="text-xs text-muted-foreground mt-0.5">備註：{note}</p>}
+                    {note && <p className="text-xs text-muted-foreground mt-0.5">{tr("備註：", "Note: ")}{note}</p>}
                     <p className="text-sm font-bold text-orange-600 mt-1">
                       NT${unitPrice}
                       {unitPrice < menuItem.price && (
@@ -158,7 +159,7 @@ export default function CartPage() {
                       size="icon"
                       className="h-8 w-8 text-muted-foreground hover:bg-red-50 hover:text-red-600"
                       onClick={() => removeItem(menuItem.id, note)}
-                      aria-label={`移除 ${menuItem.name}`}
+                      aria-label={tr(`移除 ${menuItem.name}`, `Remove ${menuItem.name}`)}
                     >
                       <Trash2 />
                     </Button>
@@ -168,7 +169,7 @@ export default function CartPage() {
                         size="icon"
                         className="h-8 w-8 rounded-full"
                         onClick={() => updateQuantity(menuItem.id, note, quantity - 1)}
-                        aria-label="減少數量"
+                        aria-label={tr("減少數量", "Decrease quantity")}
                       >
                         <Minus />
                       </Button>
@@ -178,7 +179,7 @@ export default function CartPage() {
                         size="icon"
                         className="h-8 w-8 rounded-full"
                         onClick={() => updateQuantity(menuItem.id, note, quantity + 1)}
-                        aria-label="增加數量"
+                        aria-label={tr("增加數量", "Increase quantity")}
                       >
                         <Plus />
                       </Button>
@@ -193,49 +194,49 @@ export default function CartPage() {
               size="sm"
               className="h-auto px-0 text-muted-foreground hover:text-red-600"
               onClick={async () => {
-                if (await confirm({ title: "要清空購物車嗎？", description: "購物車內的餐點都會被移除。", confirmLabel: "清空購物車", destructive: true })) clearCart();
+                if (await confirm({ title: tr("要清空購物車嗎？", "Clear your cart?"), description: tr("購物車內的餐點都會被移除。", "All items will be removed."), confirmLabel: tr("清空購物車", "Clear cart"), destructive: true })) clearCart();
               }}
             >
-              清空購物車
+              {tr("清空購物車", "Clear cart")}
             </Button>
 
             <div className="bg-white rounded-xl border border-border p-4 space-y-3">
-              <h2 className="text-sm font-semibold">訂單明細</h2>
+              <h2 className="text-sm font-semibold">{tr("訂單明細", "Order summary")}</h2>
               <dl className="text-sm space-y-1.5">
                 <div className="flex justify-between gap-3">
-                  <dt className="text-muted-foreground">商家</dt>
+                  <dt className="text-muted-foreground">{tr("商家", "Vendor")}</dt>
                   <dd className="text-right">{vendor?.name ?? "—"}</dd>
                 </div>
                 {vendor?.address && (
                   <div className="flex justify-between gap-3">
-                    <dt className="text-muted-foreground flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> 取餐地點</dt>
+                    <dt className="text-muted-foreground flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {tr("取餐地點", "Pickup location")}</dt>
                     <dd className="text-right">{vendor.address}</dd>
                   </div>
                 )}
                 <div className="flex justify-between gap-3">
-                  <dt className="text-muted-foreground">取餐時間</dt>
+                  <dt className="text-muted-foreground">{tr("取餐時間", "Pickup time")}</dt>
                   <dd className="text-right font-medium">{pickup.date}・{slotLabel}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <dt className="text-muted-foreground">原價小計</dt>
+                  <dt className="text-muted-foreground">{tr("原價小計", "Subtotal")}</dt>
                   <dd className="text-right">NT${total}</dd>
                 </div>
                 {total > discountedTotal && (
                   <div className="flex justify-between gap-3 text-green-700">
-                    <dt>早鳥折扣</dt>
+                    <dt>{tr("早鳥折扣", "Early-bird discount")}</dt>
                     <dd className="text-right">−NT${total - discountedTotal}</dd>
                   </div>
                 )}
               </dl>
               <div className="flex items-center justify-between text-base font-bold pt-2 border-t border-border">
-                <span>總計</span>
+                <span>{tr("總計", "Total")}</span>
                 <span className="text-orange-600">NT${discountedTotal}</span>
               </div>
               {!canCheckout && (
                 <p className="text-xs text-red-600">
                   {selectedSlot?.remaining != null && selectedSlot.remaining > 0
-                    ? `這個時段只剩 ${selectedSlot.remaining} 份，請減少數量或改選其他時段。`
-                    : "請先選一個可以預約的取餐日期與時段。"}
+                    ? tr(`這個時段只剩 ${selectedSlot.remaining} 份，請減少數量或改選其他時段。`, `Only ${selectedSlot.remaining} left in this slot. Reduce the quantity or pick another time.`)
+                    : tr("請先選一個可以預約的取餐日期與時段。", "Please choose an available pickup date and time.")}
                 </p>
               )}
               <Button
@@ -243,7 +244,7 @@ export default function CartPage() {
                 onClick={handleCheckout}
                 disabled={checkingOut || !canCheckout}
               >
-                {checkingOut ? "前往付款中…" : "送出預購並付款"}
+                {checkingOut ? tr("前往付款中…", "Redirecting to payment…") : tr("送出預購並付款", "Place order & pay")}
               </Button>
             </div>
           </>

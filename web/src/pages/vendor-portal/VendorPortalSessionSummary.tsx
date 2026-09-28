@@ -1,285 +1,130 @@
-import { useState } from "react";
-import { useParams, useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { mockGetSessionSummary, mockUpdatePreOrderStatus } from "@/lib/mockData";
-import VendorPortalLayout from "@/components/VendorPortalLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, CalendarDays, Clock, MapPin, Users, ShoppingBag, Banknote, CheckCircle2, Circle, CalendarX, ClipboardList } from "lucide-react";
+import { useMemo } from "react";
+import { Link, useParams } from "wouter";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
-import { STATUS_MAP } from "@/lib/statusMap";
-import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { ArrowLeft, Banknote, CheckCircle2, ClipboardList, Clock, ShoppingBag } from "lucide-react";
+import VendorPortalLayout from "@/components/VendorPortalLayout";
+import LockOrderRow from "@/components/LockOrderRow";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ds";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { useVendorLocks } from "@/hooks/useVendorLocks";
+import { DONE_STATUSES, PENDING_STATUSES } from "@/lib/lockOutcome";
+import { slotLabel } from "@/lib/pickupSlots";
 
-// Ported from BunnBaa Parse_Ref's client/src/pages/vendor/session-summary.tsx.
-// TODO(firebase): mockGetSessionSummary/mockUpdatePreOrderStatus stand in for
-// the Parse.Query("OrderSession")/PreOrder/PreOrderItem aggregation and
-// Parse.Object.save() — swap for Firestore once the backend is wired up.
+// 時段明細：2026-09-28 改用真實 locks。網址參數是「取餐日__時段」（見
+// VendorPortalSessions 的 slotKey），列出這個時段的備料彙總與每筆訂單，
+// 可以直接確認取餐／登記未取餐。
+function parseSlot(raw: string | undefined): { date: string; window: string } | null {
+  if (!raw) return null;
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // 已經是解碼過的字串
+  }
+  const [date, window] = decoded.split("__");
+  return date && window ? { date, window } : null;
+}
+
 export default function VendorPortalSessionSummary() {
-  const params = useParams<{ sessionId: string }>();
-  const [, navigate] = useLocation();
-  const { toast } = useToast();
-  const sessionId = params.sessionId;
-  const [, setDeliveredIds] = useState<Set<string>>(new Set());
+  const slot = parseSlot(useParams<{ sessionId: string }>().sessionId);
+  const { locks, loading } = useVendorLocks(500);
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["sessionSummary", sessionId],
-    queryFn: async () => {
-      const result = await mockGetSessionSummary(sessionId);
-      if (!result) throw new Error("找不到此時段資料");
-      return result;
-    },
-    enabled: !!sessionId,
-    retry: false,
-  });
+  const slotLocks = useMemo(
+    () => (slot ? locks.filter((l) => l.pickup_date === slot.date && l.pickup_window === slot.window) : []),
+    [locks, slot?.date, slot?.window]
+  );
+  const active = slotLocks.filter((l) => l.status !== "no_show");
+  const pending = slotLocks.filter((l) => PENDING_STATUSES.has(l.status)).length;
+  const done = slotLocks.filter((l) => DONE_STATUSES.has(l.status)).length;
+  const revenue = slotLocks.reduce((sum, l) => sum + (l.locked_price || 0), 0);
 
-  const updateOrderMutation = useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: string; status: "confirmed" | "completed" }) => mockUpdatePreOrderStatus(orderId, status),
-    onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["sessionSummary", sessionId] });
-      if (vars.status === "completed") {
-        setDeliveredIds(prev => new Set(Array.from(prev).concat(vars.orderId)));
-        toast({ title: "已標記取餐完成" });
-      } else {
-        toast({ title: "狀態已更新" });
-      }
-    },
-    onError: (err: Error) => toast({ variant: "destructive", title: "更新失敗", description: err.message }),
-  });
+  // 備料彙總：計畫型品名「A方案・第1/5天」合併成同一道
+  const items = useMemo(() => {
+    const byName = new Map<string, number>();
+    for (const l of active) {
+      const name = l.item_name.split("・第")[0];
+      byName.set(name, (byName.get(name) ?? 0) + 1);
+    }
+    return [...byName.entries()].sort((a, b) => b[1] - a[1]);
+  }, [active]);
 
-  if (isLoading) {
+  const back = (
+    <Link href="/vendor-portal/sessions">
+      <Button variant="ghost" size="sm" className="mb-3"><ArrowLeft className="w-4 h-4 mr-1" /> 回訂餐時段</Button>
+    </Link>
+  );
+
+  if (!slot) {
     return (
       <VendorPortalLayout>
-        <SkeletonBlocks count={3} height={96} className="space-y-3" />
+        {back}
+        <EmptyState icon={<ClipboardList size={32} />} title="找不到這個時段" />
       </VendorPortalLayout>
     );
   }
-
-  if (error || !data) {
-    return (
-      <VendorPortalLayout>
-        <EmptyState
-          icon={<CalendarX size={32} />}
-          title="找不到此時段資料"
-          description="時段可能已被刪除，或連結有誤。"
-          action={<Button variant="outline" onClick={() => navigate("/vendor-portal/sessions")}>返回時段管理</Button>}
-        />
-      </VendorPortalLayout>
-    );
-  }
-
-  const completedCount = data.customerOrders.filter(o => o.status === "completed").length;
-  const confirmedOrCompleted = data.customerOrders.filter(o => ["confirmed", "completed"].includes(o.status));
 
   return (
     <VendorPortalLayout>
-      <Button variant="ghost" size="sm" className="-ml-1 mb-3" onClick={() => navigate("/vendor-portal/sessions")}>
-        <ArrowLeft className="w-4 h-4 mr-1" /> 返回時段管理
-      </Button>
+      {back}
+      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+        <Clock className="w-5 h-5 text-orange-500" />
+        {format(new Date(`${slot.date}T00:00:00`), "M/d (EEE)", { locale: zhTW })} {slotLabel(slot.window)}
+      </h2>
 
-      {/* 時段資訊標頭 */}
-      <div className="mb-5">
-        <h2 className="text-xl font-bold mb-1">統整訂購單</h2>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <CalendarDays className="w-3.5 h-3.5" />
-            {format(data.sessionDate, "yyyy/MM/dd (EEE)", { locale: zhTW })}
-          </span>
-          <span className="flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" /> 取餐 {data.pickupTime}
-          </span>
-          <span className="flex items-center gap-1">
-            <MapPin className="w-3.5 h-3.5" /> {data.pickupLocation}
-          </span>
-        </div>
-        {data.note && <p className="text-xs italic text-muted-foreground mt-1">備註：{data.note}</p>}
-      </div>
+      {loading ? (
+        <SkeletonBlocks count={3} height={96} className="space-y-3" />
+      ) : (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card><CardContent className="pt-4 pb-3 text-center">
+              <ShoppingBag className="w-4 h-4 mx-auto mb-1 text-orange-500" />
+              <div className="text-2xl font-bold">{active.length}</div>
+              <div className="text-xs text-muted-foreground">訂購份數</div>
+            </CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3 text-center">
+              <Clock className="w-4 h-4 mx-auto mb-1 text-orange-500" />
+              <div className="text-2xl font-bold text-orange-600">{pending}</div>
+              <div className="text-xs text-muted-foreground">待取餐</div>
+            </CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3 text-center">
+              <CheckCircle2 className="w-4 h-4 mx-auto mb-1 text-orange-500" />
+              <div className="text-2xl font-bold text-green-600">{done}</div>
+              <div className="text-xs text-muted-foreground">已取餐</div>
+            </CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3 text-center">
+              <Banknote className="w-4 h-4 mx-auto mb-1 text-orange-500" />
+              <div className="text-2xl font-bold">{revenue.toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">預付金額 (NT$)</div>
+            </CardContent></Card>
+          </div>
 
-      {/* 統計卡片 */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        <Card>
-          <CardContent className="pt-3 pb-3 text-center">
-            <Users className="w-4 h-4 mx-auto mb-1 text-orange-500" />
-            <div className="text-2xl font-bold">{data.totalOrders}</div>
-            <div className="text-xs text-muted-foreground">訂單數</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-3 text-center">
-            <ShoppingBag className="w-4 h-4 mx-auto mb-1 text-orange-500" />
-            <div className="text-2xl font-bold">{data.totalItems}</div>
-            <div className="text-xs text-muted-foreground">品項數量</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-3 text-center">
-            <Banknote className="w-4 h-4 mx-auto mb-1 text-orange-500" />
-            <div className="text-2xl font-bold text-orange-600">{data.totalAmount}</div>
-            <div className="text-xs text-muted-foreground">應收總額</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="items">
-        <TabsList className="mb-4">
-          <TabsTrigger value="items">菜色彙總</TabsTrigger>
-          <TabsTrigger value="customers">顧客清單 ({data.totalOrders})</TabsTrigger>
-          <TabsTrigger value="delivery">
-            發餐清單
-            {completedCount > 0 && (
-              <span className="ml-1.5 text-xs bg-green-500 text-white rounded-full px-1.5">
-                {completedCount}/{data.totalOrders}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        {/* 菜色彙總 Tab */}
-        <TabsContent value="items">
-          {data.itemAggregates.length === 0 ? (
-            <EmptyState size="compact" icon={<ClipboardList size={32} />} title="這個時段尚無訂單" />
-          ) : (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground">各品項訂購數量</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-0 divide-y divide-border">
-                {data.itemAggregates.map(item => (
-                  <div key={item.name} className="flex items-center justify-between py-2.5">
-                    <div>
-                      <div className="font-medium text-sm">{item.name}</div>
-                      <div className="text-xs text-muted-foreground">NT$ {item.unitPrice} / 份</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-lg text-orange-600">× {item.quantity}</div>
-                      <div className="text-xs text-muted-foreground">NT$ {item.unitPrice * item.quantity}</div>
-                    </div>
-                  </div>
-                ))}
-                <div className="flex justify-between pt-3 font-semibold text-sm">
-                  <span>合計</span>
-                  <span className="text-orange-600">NT$ {data.totalAmount}</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* 顧客清單 Tab */}
-        <TabsContent value="customers">
-          {data.customerOrders.length === 0 ? (
-            <EmptyState size="compact" icon={<ClipboardList size={32} />} title="這個時段尚無訂單" />
-          ) : (
-            <div className="space-y-3">
-              {data.customerOrders.map(order => {
-                const st = STATUS_MAP[order.status] ?? STATUS_MAP.pending;
-                return (
-                  <Card key={order.orderId}>
-                    <CardHeader className="pb-2 flex flex-row items-start justify-between">
-                      <div>
-                        <div className="font-semibold text-sm">{order.customerName}</div>
-                        {order.department && (
-                          <div className="text-xs text-muted-foreground">{order.department}</div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.color}`}>
-                          {st.label}
-                        </span>
-                        {order.status === "pending" && (
-                          <Button
-                            size="sm"
-                            className="h-6 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2"
-                            onClick={() => updateOrderMutation.mutate({ orderId: order.orderId, status: "confirmed" })}
-                          >
-                            確認
-                          </Button>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="text-sm space-y-1">
-                      {order.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-muted-foreground">
-                          <span>{item.name}{item.note ? <span className="text-xs ml-1">({item.note})</span> : ""}</span>
-                          <span>× {item.quantity}　NT$ {item.unitPrice * item.quantity}</span>
-                        </div>
-                      ))}
-                      <Separator className="my-1" />
-                      <div className="flex justify-between font-semibold">
-                        <span>應付</span>
-                        <span className="text-orange-600">NT$ {order.finalAmount}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* 發餐清單 Tab */}
-        <TabsContent value="delivery">
-          <p className="text-xs text-muted-foreground mb-3">
-            點擊「已取餐」標記顧客已領取便當並完成付款。
-          </p>
-          {confirmedOrCompleted.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">沒有已確認的訂單可發餐</p>
-          ) : (
-            <div className="space-y-2">
-              {confirmedOrCompleted.map(order => {
-                const isDone = order.status === "completed";
-                return (
-                  <div
-                    key={order.orderId}
-                    className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${
-                      isDone ? "bg-green-50 border-green-200" : "bg-white border-border"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {isDone
-                        ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                        : <Circle className="w-5 h-5 text-gray-400 shrink-0" />
-                      }
-                      <div>
-                        <div className={`font-medium text-sm ${isDone ? "line-through text-muted-foreground" : ""}`}>
-                          {order.customerName}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {order.items.map(i => `${i.name}×${i.quantity}`).join("、")}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-semibold text-orange-600">NT$ {order.finalAmount}</span>
-                      {!isDone && (
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs bg-green-500 hover:bg-green-600 text-white"
-                          disabled={updateOrderMutation.isPending}
-                          onClick={() => updateOrderMutation.mutate({ orderId: order.orderId, status: "completed" })}
-                        >
-                          已取餐
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {confirmedOrCompleted.length > 0 && (
-                <div className="pt-2 text-right text-sm text-muted-foreground">
-                  已完成 {completedCount} / {confirmedOrCompleted.length} 筆
-                </div>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-base">備料彙總</CardTitle></CardHeader>
+            <CardContent>
+              {items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">這個時段還沒有訂單。</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {items.map(([name, qty]) => (
+                    <li key={name} className="flex justify-between py-1.5 text-sm">
+                      <span>{name}</span><span className="font-semibold">× {qty}</span>
+                    </li>
+                  ))}
+                </ul>
               )}
+            </CardContent>
+          </Card>
+
+          {slotLocks.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {slotLocks.map((l) => <LockOrderRow key={l.id} lock={l} showDate={false} />)}
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </VendorPortalLayout>
   );
 }

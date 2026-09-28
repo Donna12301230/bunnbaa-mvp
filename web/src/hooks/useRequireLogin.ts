@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -14,7 +15,7 @@ export function useRequireLogin() {
   return function requireLogin(): boolean {
     if (isAuthenticated) return true;
     if (!isLoading) {
-      toast({ title: "請先登入", description: "登入後才能預購、下單或轉讓餐點。" });
+      toast({ title: tr("請先登入", "Please sign in"), description: tr("登入後才能預購、下單或轉讓餐點。", "Sign in to pre-order, check out or transfer meals.") });
       navigate("/login");
     }
     return false;

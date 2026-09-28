@@ -1,3 +1,4 @@
+import { tr, useI18n } from "@/lib/i18n";
 import { lazy, Suspense } from "react";
 import { Switch, Route, Link, Router, Redirect } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
@@ -47,8 +48,8 @@ const LandingPage = lazy(() => import("./pages/LandingPage"));
 function NotFound() {
   return (
     <div style={{ padding: 40, textAlign: "center" }}>
-      <p>找不到這個頁面。</p>
-      <Link href="/">回首頁</Link>
+      <p>{tr("找不到這個頁面。", "Page not found.")}</p>
+      <Link href="/">{tr("回首頁", "Home")}</Link>
     </div>
   );
 }
@@ -65,12 +66,14 @@ function RootGate() {
 }
 
 export default function App() {
+  // 切換語言時整個路由樹重新掛載，元件裡用 tr() 組的字串（toast、狀態標籤、錯誤訊息）才會一起換
+  const { lang } = useI18n();
   return (
     <QueryClientProvider client={queryClient}>
       {/* 設計系統 tokens 限定在 .bb-theme 之內；包住全站，頁面才能直接使用 @/components/ds */}
       <SiteThemeRoot>
       <ConfirmProvider>
-      <Router hook={useHashLocation}>
+      <Router hook={useHashLocation} key={lang}>
         <Switch>
           {/* 根路徑：未登入 = 登入頁，已登入 = 首頁（與 bunnbaa.com 行為一致） */}
           <Route path="/">

@@ -1,3 +1,4 @@
+import { tr } from '@/lib/i18n';
 import { LoaderCircle } from 'lucide-react';
 import { cx } from '../_shared/cx';
 import './Spinner.css';
@@ -10,7 +11,7 @@ export interface SpinnerProps {
   className?: string;
 }
 
-export function Spinner({ size = 20, label = '載入中', className }: SpinnerProps) {
+export function Spinner({ size = 20, label = tr('載入中', 'Loading'), className }: SpinnerProps) {
   return (
     <span className={cx('bb-spinner-wrap', className)} role={label ? 'status' : undefined}>
       <LoaderCircle className="bb-spinner" size={size} aria-hidden="true" />

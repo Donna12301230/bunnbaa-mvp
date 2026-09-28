@@ -1,3 +1,4 @@
+import { tr } from '@/lib/i18n';
 import { useState, type HTMLAttributes } from 'react';
 import { cx } from '../_shared/cx';
 import './Avatar.css';
@@ -16,7 +17,8 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   loading?: boolean;
 }
 
-const STATUS_LABEL = { online: '在線', busy: '忙碌', offline: '離線' } as const;
+const statusLabel = (status: 'online' | 'busy' | 'offline') =>
+  ({ online: tr('在線', 'Online'), busy: tr('忙碌', 'Busy'), offline: tr('離線', 'Offline') })[status];
 
 /** 中文名取最後兩字（「王小明」→「小明」），英文取前兩個單字字首。 */
 export function getInitials(name: string): string {
@@ -40,7 +42,7 @@ export function Avatar({ src, name, size = 'md', status, loading = false, classN
   return (
     <span
       role="img"
-      aria-label={status ? `${name}（${STATUS_LABEL[status]}）` : name}
+      aria-label={status ? `${name}（${statusLabel(status)}）` : name}
       aria-busy={loading || undefined}
       {...rest}
       className={cx('bb-avatar', `bb-avatar--${size}`, loading && 'is-loading', className)}

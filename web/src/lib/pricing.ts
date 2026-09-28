@@ -1,17 +1,17 @@
-// 早鳥階梯定價——對應 HomePage.tsx 側欄「早鳥預約折扣」顯示的三個階梯（純前端
-// 靜態文字，沒有任何地方真的算過折扣）。這裡補上實際算折扣/鎖定價的邏輯，讓
-// 顯示的階梯跟下單時算出來的價格是同一套規則。
+import { tr } from "@/lib/i18n";
+
+// 早鳥階梯定價——HomePage 側欄「早鳥預約折扣」、Landing 文案、下單算價都讀這一份，
+// 顯示的階梯跟算出來的價格是同一套規則（伺服器 functions/src/pricing.js 另有一份，要一起改）。
 export interface EarlyBirdTier {
   minDays: number; // 距離取餐日的天數，下限（含）
   maxDays: number; // 上限（含）
   discountPercent: number; // 折扣百分比，例：5 代表 95 折
-  label: string;
 }
 
 export const EARLY_BIRD_TIERS: EarlyBirdTier[] = [
-  { minDays: 0, maxDays: 1, discountPercent: 5, label: "今日／明日．95折" },
-  { minDays: 2, maxDays: 13, discountPercent: 20, label: "提前 2–13 天．8折" },
-  { minDays: 14, maxDays: 30, discountPercent: 30, label: "提前 14–30 天．7折" },
+  { minDays: 0, maxDays: 1, discountPercent: 5 },
+  { minDays: 2, maxDays: 13, discountPercent: 20 },
+  { minDays: 14, maxDays: 30, discountPercent: 30 },
 ];
 
 // 取餐日跟「今天」之間差幾天，四捨五入到整天；已過期或就是今天算 0 天。
@@ -36,5 +36,21 @@ export function applyEarlyBirdPrice(
   const tier = earlyBirdTierFor(pickupDate, today);
   const discountPercent = tier?.discountPercent ?? 0;
   const lockedPrice = Math.round(originalPrice * (1 - discountPercent / 100));
-  return { discountPercent, lockedPrice, tierLabel: tier?.label ?? "已超過早鳥折扣天數" };
+  return {
+    discountPercent,
+    lockedPrice,
+    tierLabel: tier ? `${tierRangeText(tier)}．${discountText(tier.discountPercent)}` : tr("已超過早鳥折扣天數", "Beyond the early-bird window"),
+  };
+}
+
+/** 折扣文字：中文「95折／8折」，英文「5% off」 */
+export function discountText(discountPercent: number): string {
+  const paid = 100 - discountPercent;
+  return tr(`${paid % 10 === 0 ? paid / 10 : paid}折`, `${discountPercent}% off`);
+}
+
+/** 階梯的天數範圍文字，例：「提前 2–13 天」「2–13 days ahead」 */
+export function tierRangeText(tier: EarlyBirdTier): string {
+  if (tier.minDays === 0) return tr("預約今天／明天", "Today / tomorrow");
+  return tr(`提前 ${tier.minDays}–${tier.maxDays} 天`, `${tier.minDays}–${tier.maxDays} days ahead`);
 }

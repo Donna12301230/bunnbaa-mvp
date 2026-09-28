@@ -20,20 +20,13 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import QrScannerDialog from "@/components/QrScannerDialog";
+import { LOCK_STATUS_STYLE } from "@/lib/lockOutcome";
 
 const noShowSchema = z.object({
   note: z.string().trim().min(2, "請簡短描述狀況（至少 2 個字），這會餵給校準報告的落差模式分析"),
 });
 type NoShowForm = z.infer<typeof noShowSchema>;
 
-const LOCK_STATUS_STYLE: Record<string, { label: string; className: string }> = {
-  locked: { label: "已鎖定", className: "bg-orange-100 text-orange-700" },
-  for_resale: { label: "轉賣中", className: "bg-amber-100 text-amber-800" },
-  for_gift: { label: "贈送中", className: "bg-pink-100 text-pink-700" },
-  fulfilled: { label: "已完成取餐", className: "bg-green-100 text-green-700" },
-  resold_and_fulfilled: { label: "已由轉賣對象完成取餐", className: "bg-green-100 text-green-700" },
-  no_show: { label: "已登記未取餐", className: "bg-red-100 text-red-700" },
-};
 
 function formatDateLabel(dateStr: string): string {
   try {

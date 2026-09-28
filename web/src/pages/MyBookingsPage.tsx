@@ -6,6 +6,8 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2, Star } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
+import { getLang, tr } from "@/lib/i18n";
+import { enUS } from "date-fns/locale";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import PageHero from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
@@ -42,13 +44,17 @@ import { Link } from "wouter";
 //   - 「計畫型」（訂閱制多日方案）完全沒有真實資料模型（Firestore 沒有 plan
 //     collection），這次不補假資料，只顯示單點型的真實紀錄
 
-const STATUS_STYLE: Record<string, { label: string; className: string }> = {
-  locked: { label: "已鎖定", className: "bg-orange-100 text-orange-700" },
-  for_resale: { label: "轉賣中", className: "bg-amber-100 text-amber-800" },
-  for_gift: { label: "贈送中", className: "bg-blue-100 text-blue-700" },
-  fulfilled: { label: "已取餐", className: "bg-green-100 text-green-700" },
-  resold_and_fulfilled: { label: "已由轉賣對象取餐", className: "bg-green-100 text-green-700" },
-  no_show: { label: "已登記未取餐", className: "bg-red-100 text-red-700" },
+// 消費者視角的狀態文字（跟商家端 LOCK_STATUS_STYLE 用詞不同），render 時依語言組
+const statusStyle = (status: string): { label: string; className: string } => {
+  const map: Record<string, { label: string; className: string }> = {
+    locked: { label: tr("已鎖定", "Locked"), className: "bg-orange-100 text-orange-700" },
+    for_resale: { label: tr("轉賣中", "For resale"), className: "bg-amber-100 text-amber-800" },
+    for_gift: { label: tr("贈送中", "Being gifted"), className: "bg-blue-100 text-blue-700" },
+    fulfilled: { label: tr("已取餐", "Picked up"), className: "bg-green-100 text-green-700" },
+    resold_and_fulfilled: { label: tr("已由轉賣對象取餐", "Picked up by new owner"), className: "bg-green-100 text-green-700" },
+    no_show: { label: tr("已登記未取餐", "No-show"), className: "bg-red-100 text-red-700" },
+  };
+  return map[status] ?? { label: status, className: "bg-gray-100 text-gray-700" };
 };
 
 const FEEDBACK_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled", "no_show"]);
@@ -57,7 +63,9 @@ const REVIEW_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled"]);
 
 function formatDateLabel(dateStr: string): string {
   try {
-    return format(new Date(`${dateStr}T00:00:00`), "M/d（EEE）", { locale: zhTW });
+    return getLang() === "en"
+      ? format(new Date(`${dateStr}T00:00:00`), "EEE, M/d", { locale: enUS })
+      : format(new Date(`${dateStr}T00:00:00`), "M/d（EEE）", { locale: zhTW });
   } catch {
     return dateStr;
   }
@@ -73,9 +81,9 @@ function pickupWindowEnd(pickupDate: string, pickupWindow: string): Date | null 
 
 function formatCountdown(deadline: Date, now: number): string {
   const diffMin = Math.round((deadline.getTime() - now) / 60000);
-  if (diffMin <= 0) return "已逾期";
-  if (diffMin < 60) return `${diffMin} 分後截止`;
-  return `${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`;
+  if (diffMin <= 0) return tr("已逾期", "Expired");
+  if (diffMin < 60) return tr(`${diffMin} 分後截止`, `Ends in ${diffMin} min`);
+  return tr(`${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`, `Ends in ${Math.floor(diffMin / 60)} h ${diffMin % 60} min`);
 }
 
 // Local-date (not UTC) helpers for the calendar grid — pickup_date strings
@@ -99,7 +107,8 @@ function addDays(d: Date, n: number): Date {
   return copy;
 }
 
-const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
+const weekdayLabels = () =>
+  getLang() === "en" ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["日", "一", "二", "三", "四", "五", "六"];
 
 export default function MyBookingsPage() {
   const { toast } = useToast();
@@ -202,9 +211,9 @@ export default function MyBookingsPage() {
     setBusyId(lock.id);
     try {
       await updateDoc(doc(db, "locks", lock.id), { status: "for_gift" });
-      toast({ title: "已轉為贈送模式", description: "把下面出現的連結私下傳給朋友即可。" });
+      toast({ title: tr("已轉為贈送模式", "Ready to gift"), description: tr("把下面出現的連結私下傳給朋友即可。", "Send the link below to your friend.") });
     } catch (err) {
-      toast({ title: "贈送失敗", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("贈送失敗", "Couldn't gift it"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setBusyId(null);
     }
@@ -218,9 +227,9 @@ export default function MyBookingsPage() {
         status: "for_resale",
         ...(deadline ? { resale_deadline: Timestamp.fromDate(deadline) } : {}),
       });
-      toast({ title: "已上架轉讓市集" });
+      toast({ title: tr("已上架轉讓市集", "Listed on the transfer market") });
     } catch (err) {
-      toast({ title: "上架失敗", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("上架失敗", "Couldn't list it"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setBusyId(null);
     }
@@ -230,9 +239,9 @@ export default function MyBookingsPage() {
     setBusyId(lock.id);
     try {
       await updateDoc(doc(db, "locks", lock.id), { status: "locked" });
-      toast({ title: lock.status === "for_gift" ? "已取消贈送" : "已取消轉讓" });
+      toast({ title: lock.status === "for_gift" ? tr("已取消贈送", "Gift cancelled") : tr("已取消轉讓", "Transfer cancelled") });
     } catch (err) {
-      toast({ title: "取消失敗", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("取消失敗", "Couldn't cancel"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setBusyId(null);
     }
@@ -265,7 +274,7 @@ export default function MyBookingsPage() {
       }
       setFeedbackOpen((prev) => ({ ...prev, [lock.id]: false }));
     } catch (err) {
-      toast({ title: "送出回饋失敗", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("送出回饋失敗", "Couldn't send feedback"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setBusyId(null);
     }
@@ -278,14 +287,14 @@ export default function MyBookingsPage() {
   async function copyLink(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      toast({ title: "已複製連結" });
+      toast({ title: tr("已複製連結", "Link copied") });
     } catch {
-      toast({ title: "複製失敗，請手動選取連結", variant: "destructive" });
+      toast({ title: tr("複製失敗，請手動選取連結", "Couldn't copy — please select the link manually"), variant: "destructive" });
     }
   }
 
   function renderLockCard(lock: Lock) {
-    const statusInfo = STATUS_STYLE[lock.status] ?? { label: lock.status, className: "bg-gray-100 text-gray-700" };
+    const statusInfo = statusStyle(lock.status);
     const isBusy = busyId === lock.id;
     const deadline = lock.status === "for_resale" ? pickupWindowEnd(lock.pickup_date, lock.pickup_window) : null;
     const canFeedback = FEEDBACK_ELIGIBLE.has(lock.status);
@@ -299,7 +308,7 @@ export default function MyBookingsPage() {
                       </Badge>
                       <h3 className="text-h3 leading-snug">{lock.item_name}</h3>
                       <p className="text-body-sm text-muted-foreground">
-                        {formatDateLabel(lock.pickup_date)}・{lock.pickup_window} 取餐・${lock.locked_price}
+                        {formatDateLabel(lock.pickup_date)}・{lock.pickup_window} {tr("取餐", "pickup")}・${lock.locked_price}
                       </p>
 
                       {lock.status === "locked" && (
@@ -310,30 +319,30 @@ export default function MyBookingsPage() {
                                 type="button"
                                 onClick={() => setZoomedLock(lock)}
                                 className="relative rounded-md ring-offset-2 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
-                                aria-label="放大顯示核銷 QR Code"
+                                aria-label={tr("放大顯示核銷 QR Code", "Enlarge pickup QR code")}
                               >
                                 <QRCodeSVG value={JSON.stringify({ lockId: lock.id, vendorId: lock.vendor_id })} size={120} level="M" />
                                 <span className="absolute -bottom-1 -right-1 bg-card border border-border rounded-full p-1 shadow-sm">
                                   <Maximize2 size={12} />
                                 </span>
                               </button>
-                              <span className="text-body-sm font-bold">取餐編號 {lock.id.slice(-8).toUpperCase()}</span>
-                              <span className="text-caption text-muted-foreground">點擊 QR Code 可放大，請於取餐時向店員出示</span>
+                              <span className="text-body-sm font-bold">{tr("取餐編號", "Pickup code")} {lock.id.slice(-8).toUpperCase()}</span>
+                              <span className="text-caption text-muted-foreground">{tr("點擊 QR Code 可放大，請於取餐時向店員出示", "Tap the QR code to enlarge it and show it to staff at pickup")}</span>
                               <Button variant="link" size="sm" onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: false }))}>
-                                收起
+                                {tr("收起", "Hide")}
                               </Button>
                             </div>
                           ) : (
                             <Button size="sm" onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: true }))}>
-                              <QrCode /> 使用（顯示取餐碼）
+                              <QrCode /> {tr("使用（顯示取餐碼）", "Use (show pickup code)")}
                             </Button>
                           )}
                           <div className="flex gap-2">
                             <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => handleGift(lock)}>
-                              <Gift /> 贈送
+                              <Gift /> {tr("贈送", "Gift")}
                             </Button>
                             <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => handleResell(lock)}>
-                              <Repeat /> 交易
+                              <Repeat /> {tr("交易", "Transfer")}
                             </Button>
                           </div>
                         </div>
@@ -341,15 +350,15 @@ export default function MyBookingsPage() {
 
                       {lock.status === "for_gift" && (
                         <div className="flex flex-col gap-1.5 pt-1">
-                          <p className="text-caption text-muted-foreground">把這組連結私下傳給朋友，對方打開就能收下：</p>
+                          <p className="text-caption text-muted-foreground">{tr("把這組連結私下傳給朋友，對方打開就能收下：", "Send this link to a friend — they can accept it by opening it:")}</p>
                           <div className="flex items-center gap-1.5">
-                            <Input readOnly value={giftLinkFor(lock.id)} aria-label="贈送連結" className="flex-1 truncate" />
-                            <Button variant="outline" size="icon" className="shrink-0" aria-label="複製連結" onClick={() => copyLink(giftLinkFor(lock.id))}>
+                            <Input readOnly value={giftLinkFor(lock.id)} aria-label={tr("贈送連結", "Gift link")} className="flex-1 truncate" />
+                            <Button variant="outline" size="icon" className="shrink-0" aria-label={tr("複製連結", "Copy link")} onClick={() => copyLink(giftLinkFor(lock.id))}>
                               <Copy />
                             </Button>
                           </div>
                           <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-600" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
-                            取消贈送
+                            {tr("取消贈送", "Cancel gift")}
                           </Button>
                         </div>
                       )}
@@ -357,10 +366,10 @@ export default function MyBookingsPage() {
                       {lock.status === "for_resale" && (
                         <div className="flex flex-col gap-1.5 pt-1">
                           <p className="text-caption text-muted-foreground">
-                            {deadline ? formatCountdown(deadline, now) : "等待有人接手"}・已上架到轉讓市集
+                            {deadline ? formatCountdown(deadline, now) : tr("等待有人接手", "Waiting for someone to take it")}{tr("・已上架到轉讓市集", " · listed on the transfer market")}
                           </p>
                           <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-600" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
-                            取消轉讓
+                            {tr("取消轉讓", "Cancel transfer")}
                           </Button>
                         </div>
                       )}
@@ -368,23 +377,23 @@ export default function MyBookingsPage() {
                       {canFeedback && (
                         <>
                           {hasFeedback && (
-                            <p className="text-caption text-muted-foreground pt-1">已回饋：「{lock.consumer_feedback}」</p>
+                            <p className="text-caption text-muted-foreground pt-1">{tr("已回饋：", "Your feedback: ")}「{lock.consumer_feedback}」</p>
                           )}
                           {reviewedIds.has(lock.id) && (
-                            <p className="text-caption text-muted-foreground">已評分，謝謝！</p>
+                            <p className="text-caption text-muted-foreground">{tr("已評分，謝謝！", "Thanks for rating!")}</p>
                           )}
                           {(!hasFeedback || canReview) && (
                             feedbackOpen[lock.id] ? (
                               <div className="flex flex-col gap-1.5 pt-1">
                                 {canReview && (
-                                  <div className="flex items-center gap-1" role="radiogroup" aria-label="評分">
+                                  <div className="flex items-center gap-1" role="radiogroup" aria-label={tr("評分", "Rating")}>
                                     {[1, 2, 3, 4, 5].map((n) => (
                                       <button
                                         key={n}
                                         type="button"
                                         role="radio"
                                         aria-checked={ratingDraft[lock.id] === n}
-                                        aria-label={`${n} 星`}
+                                        aria-label={tr(`${n} 星`, `${n} star${n > 1 ? "s" : ""}`)}
                                         onClick={() => setRatingDraft((prev) => ({ ...prev, [lock.id]: n }))}
                                         className="p-0.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                       >
@@ -397,8 +406,8 @@ export default function MyBookingsPage() {
                                   <Input
                                     value={feedbackDraft[lock.id] || ""}
                                     onChange={(e) => setFeedbackDraft((prev) => ({ ...prev, [lock.id]: e.target.value }))}
-                                    placeholder="這餐的心得…（送出後無法修改）"
-                                    aria-label="用餐回饋"
+                                    placeholder={tr("這餐的心得…（送出後無法修改）", "How was it? (can't be edited later)")}
+                                    aria-label={tr("用餐回饋", "Meal feedback")}
                                     maxLength={280}
                                   />
                                 )}
@@ -409,7 +418,7 @@ export default function MyBookingsPage() {
                                       checked={!!publicComment[lock.id]}
                                       onChange={(e) => setPublicComment((prev) => ({ ...prev, [lock.id]: e.target.checked }))}
                                     />
-                                    心得也公開顯示在評價區（只顯示系所，不顯示姓名）
+                                    {tr("心得也公開顯示在評價區（只顯示系所，不顯示姓名）", "Also show my comment publicly in reviews (department only, no name)")}
                                   </label>
                                 )}
                                 <Button
@@ -417,12 +426,12 @@ export default function MyBookingsPage() {
                                   disabled={isBusy || !((feedbackDraft[lock.id] || "").trim() || (canReview && ratingDraft[lock.id]))}
                                   onClick={() => handleSubmitFeedback(lock)}
                                 >
-                                  送出
+                                  {tr("送出", "Submit")}
                                 </Button>
                               </div>
                             ) : (
                               <Button variant="outline" size="sm" onClick={() => setFeedbackOpen((prev) => ({ ...prev, [lock.id]: true }))}>
-                                {canReview ? (hasFeedback ? "給這餐評分" : "評分／留下回饋") : "留下回饋"}
+                                {canReview ? (hasFeedback ? tr("給這餐評分", "Rate this meal") : tr("評分／留下回饋", "Rate / leave feedback")) : tr("留下回饋", "Leave feedback")}
                               </Button>
                             )
                           )}
@@ -436,30 +445,30 @@ export default function MyBookingsPage() {
     <div className="min-h-screen bg-gray-50">
       <MarketplaceHeader active="bookings" />
 
-      <PageHero title="我的餐點" description="週曆上點一筆訂單看詳情、使用取餐碼或轉讓／贈送。" />
+      <PageHero title={tr("我的餐點", "My meals")} description={tr("週曆上點一筆訂單看詳情、使用取餐碼或轉讓／贈送。", "Tap an order on the calendar to see details, show your pickup code, or transfer / gift it.")} />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         {!authLoading && !uid ? (
           <EmptyState
             icon={<ClipboardList size={32} />}
-            title="請先登入"
-            description="登入後就能看到你預購的餐點。"
-            action={<Button asChild><Link href="/login">前往登入</Link></Button>}
+            title={tr("請先登入", "Please sign in")}
+            description={tr("登入後就能看到你預購的餐點。", "Sign in to see the meals you've pre-ordered.")}
+            action={<Button asChild><Link href="/login">{tr("前往登入", "Sign in")}</Link></Button>}
           />
         ) : loading ? (
           <SkeletonBlocks count={3} height={160} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" />
         ) : locks.length === 0 ? (
           <EmptyState
             icon={<ClipboardList size={32} />}
-            title="還沒有預約紀錄"
-            description="到「預購餐點」鎖一份餐點，隔天就不用排隊。"
-            action={<Button asChild><Link href="/home">去預約餐點</Link></Button>}
+            title={tr("還沒有預約紀錄", "No bookings yet")}
+            description={tr("到「預購餐點」鎖一份餐點，隔天就不用排隊。", "Lock in a meal under Pre-order and skip tomorrow's queue.")}
+            action={<Button asChild><Link href="/home">{tr("去預約餐點", "Pre-order a meal")}</Link></Button>}
           />
         ) : (
           <>
             <div className="space-y-1">
               <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-muted-foreground">
-                {WEEKDAY_LABELS.map((label) => (
+                {weekdayLabels().map((label) => (
                   <div key={label}>{label}</div>
                 ))}
               </div>
@@ -478,7 +487,7 @@ export default function MyBookingsPage() {
                       >
                         <span className="text-micro font-semibold text-muted-foreground">{day.getDate()}</span>
                         {dayLocks.map((lock) => {
-                          const statusInfo = STATUS_STYLE[lock.status] ?? { label: lock.status, className: "bg-gray-100 text-gray-700" };
+                          const statusInfo = statusStyle(lock.status);
                           return (
                             <button
                               key={lock.id}
@@ -507,7 +516,7 @@ export default function MyBookingsPage() {
 
       <Dialog open={!!zoomedLock} onOpenChange={(open) => !open && setZoomedLock(null)}>
         <DialogContent className="max-w-xs flex flex-col items-center gap-3 py-8">
-          <DialogTitle className="text-center">取餐核銷碼</DialogTitle>
+          <DialogTitle className="text-center">{tr("取餐核銷碼", "Pickup code")}</DialogTitle>
           {zoomedLock && (
             <>
               <div className="bg-white p-4 rounded-lg">
@@ -518,7 +527,7 @@ export default function MyBookingsPage() {
                 />
               </div>
               <span className="text-h3 font-bold tracking-wide">{zoomedLock.id.slice(-8).toUpperCase()}</span>
-              <span className="text-caption text-muted-foreground text-center">請將畫面出示給店員核對，核對後即完成取餐</span>
+              <span className="text-caption text-muted-foreground text-center">{tr("請將畫面出示給店員核對，核對後即完成取餐", "Show this screen to staff — once they check it, your pickup is done")}</span>
             </>
           )}
         </DialogContent>

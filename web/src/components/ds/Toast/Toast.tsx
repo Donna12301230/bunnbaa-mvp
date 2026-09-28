@@ -1,3 +1,4 @@
+import { tr } from '@/lib/i18n';
 import {
   createContext,
   useCallback,
@@ -88,7 +89,7 @@ export function Toast({
         </button>
       )}
       {onClose && (
-        <button type="button" className="bb-toast__close" onClick={onClose} aria-label="關閉通知">
+        <button type="button" className="bb-toast__close" onClick={onClose} aria-label={tr('關閉通知', 'Dismiss notification')}>
           <X size={16} aria-hidden="true" />
         </button>
       )}

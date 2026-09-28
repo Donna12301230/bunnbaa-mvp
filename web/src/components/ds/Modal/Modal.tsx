@@ -1,3 +1,4 @@
+import { tr } from '@/lib/i18n';
 import { useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cx } from '../_shared/cx';
@@ -88,7 +89,7 @@ export function Modal({
                 className="bb-modal__close"
                 onClick={safeClose}
                 disabled={loading}
-                aria-label="關閉"
+                aria-label={tr('關閉', 'Close')}
               >
                 <X size={20} aria-hidden="true" />
               </button>

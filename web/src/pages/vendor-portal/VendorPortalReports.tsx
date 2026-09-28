@@ -3,14 +3,15 @@ import { collection, limit, onSnapshot, query, where } from "firebase/firestore"
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import type { AccuracyReport } from "@/types";
-import { useQuery } from "@tanstack/react-query";
-import { mockGetMyVendor, mockGetVendorReportStats, type MockReportStats } from "@/lib/mockData";
+import { useVendorLocks } from "@/hooks/useVendorLocks";
+import { addDaysStr, todayStr } from "@/lib/pickupSlots";
+import { DONE_STATUSES } from "@/lib/lockOutcome";
+import type { Lock } from "@/types";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Banknote, ShoppingBag, TrendingUp, Users, TableProperties, Sparkles } from "lucide-react";
+import { Banknote, ShoppingBag, TrendingUp, Users, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -60,11 +61,47 @@ function ItemRankList({ items }: { items: { name: string; qty: number; revenue: 
   );
 }
 
+interface ReportStats {
+  totalRevenue: number;
+  totalOrders: number;
+  avgOrder: number;
+  completedOrders: number;
+  revenueByDate: { date: string; revenue: number }[];
+  topItems: { name: string; qty: number; revenue: number }[];
+}
+
+const REPORT_DAYS = 15;
+
+// 以取餐日落在最近 REPORT_DAYS 天（含今天）的鎖定計算；鎖定是全額預付，未取餐也算收入。
+function computeStats(locks: Lock[]): ReportStats | null {
+  const end = todayStr();
+  const start = addDaysStr(end, -(REPORT_DAYS - 1));
+  const rows = locks.filter((l) => l.pickup_date >= start && l.pickup_date <= end);
+  if (rows.length === 0) return null;
+  const totalRevenue = rows.reduce((sum, l) => sum + (l.locked_price || 0), 0);
+  const byDate = new Map<string, number>();
+  for (let d = start; d <= end; d = addDaysStr(d, 1)) byDate.set(d, 0);
+  const byItem = new Map<string, { qty: number; revenue: number }>();
+  for (const l of rows) {
+    byDate.set(l.pickup_date, (byDate.get(l.pickup_date) ?? 0) + (l.locked_price || 0));
+    const name = l.item_name.split("・第")[0]; // 計畫型「A方案・第1/5天」併成同一項
+    const item = byItem.get(name) ?? { qty: 0, revenue: 0 };
+    item.qty += 1;
+    item.revenue += l.locked_price || 0;
+    byItem.set(name, item);
+  }
+  return {
+    totalRevenue,
+    totalOrders: rows.length,
+    avgOrder: Math.round(totalRevenue / rows.length),
+    completedOrders: rows.filter((l) => DONE_STATUSES.has(l.status)).length,
+    revenueByDate: [...byDate].map(([date, revenue]) => ({ date: `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`, revenue })),
+    topItems: [...byItem].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.qty - a.qty).slice(0, 10),
+  };
+}
+
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/reports.tsx.
-// TODO(firebase): mockGetVendorReportStats aggregates mockData.ts's
-// mockPreOrders/mockTableOrders instead of Parse.Query("PreOrder"/"TableOrder"
-// /"PreOrderItem"/"TableOrderItem") — swap for a real Firestore aggregation
-// once the backend is wired up.
+// 2026-09-28 改用真實 locks（原本分「預約／現場」兩組 mock，TODO §7 決定不做現場點餐）。
 export default function VendorPortalReports() {
   const { user } = useAuth();
   const [whatifDraft, setWhatifDraft] = useState("");
@@ -105,26 +142,11 @@ export default function VendorPortalReports() {
     }
   }
 
-  const { data: myVendor } = useQuery({
-    queryKey: ["myVendor", user?.id],
-    queryFn: async () => mockGetMyVendor(),
-    enabled: !!user,
-  });
-
-  const { data: preStats, isLoading: loadingPre } = useQuery({
-    queryKey: ["vendorReports-pre", myVendor?.id],
-    queryFn: async () => myVendor ? mockGetVendorReportStats(myVendor.id, "pre") : null,
-    enabled: !!myVendor,
-  });
-
-  const { data: tableStats, isLoading: loadingTable } = useQuery({
-    queryKey: ["vendorReports-table", myVendor?.id],
-    queryFn: async () => myVendor ? mockGetVendorReportStats(myVendor.id, "table") : null,
-    enabled: !!myVendor,
-  });
+  const { locks, loading: loadingStats } = useVendorLocks(500);
+  const stats = computeStats(locks);
 
   function StatCards({ stats, colorClass = "text-orange-600" }: {
-    stats: MockReportStats;
+    stats: ReportStats;
     colorClass?: string;
   }) {
     return (
@@ -229,74 +251,31 @@ export default function VendorPortalReports() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="pre">
-        <TabsList className="mb-5">
-          <TabsTrigger value="pre" className="flex items-center gap-1.5">
-            <ShoppingBag className="w-3.5 h-3.5" /> 預約訂單
-          </TabsTrigger>
-          <TabsTrigger value="table" className="flex items-center gap-1.5">
-            <TableProperties className="w-3.5 h-3.5" /> 現場訂單
-          </TabsTrigger>
-        </TabsList>
-
-        {/* 預約訂單報表 */}
-        <TabsContent value="pre">
-          {loadingPre ? (
-            <SkeletonBlocks count={3} height={128} className="space-y-3" />
-          ) : !preStats ? (
-            <EmptyState icon={<TrendingUp size={32} />} title="尚無預約訂單資料" />
-          ) : (
-            <div className="space-y-5">
-              <StatCards stats={preStats} />
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">每日收入（最近 15 天）</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <RevenueChart data={preStats.revenueByDate} />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">熱銷品項 Top 10</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ItemRankList items={preStats.topItems} />
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* 現場訂單報表 */}
-        <TabsContent value="table">
-          {loadingTable ? (
-            <SkeletonBlocks count={3} height={128} className="space-y-3" />
-          ) : !tableStats ? (
-            <EmptyState icon={<TableProperties size={32} />} title="尚無現場訂單資料" />
-          ) : (
-            <div className="space-y-5">
-              <StatCards stats={tableStats} colorClass="text-blue-600" />
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">每日收入（最近 15 天）</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <RevenueChart data={tableStats.revenueByDate} />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">熱銷品項 Top 10</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ItemRankList items={tableStats.topItems} />
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+      {loadingStats ? (
+        <SkeletonBlocks count={3} height={128} className="space-y-3" />
+      ) : !stats ? (
+        <EmptyState icon={<TrendingUp size={32} />} title={`最近 ${REPORT_DAYS} 天沒有訂單`} />
+      ) : (
+        <div className="space-y-5">
+          <StatCards stats={stats} />
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">每日收入（最近 {REPORT_DAYS} 天，依取餐日）</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RevenueChart data={stats.revenueByDate} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">熱銷品項 Top 10</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ItemRankList items={stats.topItems} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </VendorPortalLayout>
   );
 }

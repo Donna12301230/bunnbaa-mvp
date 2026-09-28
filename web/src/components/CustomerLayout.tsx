@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { ReactNode } from "react";
 import MarketplaceHeader from "./MarketplaceHeader";
 
@@ -15,9 +16,9 @@ export default function CustomerLayout({ children, hero }: { children: ReactNode
         {children}
       </main>
       <footer className="text-center text-xs text-muted-foreground py-4 border-t bg-white">
-        <a href="mailto:herzbaa@gmail.com" className="hover:text-orange-600 hover:underline">聯絡客服</a>
+        <a href="mailto:herzbaa@gmail.com" className="hover:text-orange-600 hover:underline">{tr("聯絡客服", "Contact support")}</a>
         <span className="mx-2">·</span>
-        © 2026 赫滋與羊國際藝術有限公司
+        © 2026 {tr("赫滋與羊國際藝術有限公司", "Herz & Baa International Arts Co., Ltd.")}
       </footer>
     </div>
   );

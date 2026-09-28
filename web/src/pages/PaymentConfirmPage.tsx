@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
 import { httpsCallable } from "firebase/functions";
@@ -28,7 +29,7 @@ export default function PaymentConfirmPage() {
   useEffect(() => {
     if (!orderId) {
       setStatus("error");
-      setErrorMessage("缺少訂單編號，無法確認付款");
+      setErrorMessage(tr("缺少訂單編號，無法確認付款", "Missing order ID — can't confirm the payment"));
       return;
     }
 
@@ -39,7 +40,7 @@ export default function PaymentConfirmPage() {
       unsub();
       if (!user || user.isAnonymous) {
         setStatus("error");
-        setErrorMessage("登入狀態已失效，請重新登入後到「我的餐點」確認，或聯絡客服");
+        setErrorMessage(tr("登入狀態已失效，請重新登入後到「我的餐點」確認，或聯絡客服", "Your session has expired. Sign in again and check My meals, or contact support"));
         return;
       }
       setStatus("confirming");
@@ -82,29 +83,29 @@ export default function PaymentConfirmPage() {
 
   return (
     <div className="page">
-      <div className="kicker">BunnBaa · 付款確認</div>
+      <div className="kicker">BunnBaa · {tr("付款確認", "Payment")}</div>
       {(status === "waiting-auth" || status === "confirming") && (
         <div className="card">
-          <p className="muted">確認付款中…</p>
+          <p className="muted">{tr("確認付款中…", "Confirming payment…")}</p>
         </div>
       )}
       {status === "done" && locks.length > 0 && (
         <div className="card">
-          <h2>付款成功！</h2>
+          <h2>{tr("付款成功！", "Payment successful!")}</h2>
           {locks.map(({ id, vendorId }) => (
             <LockQRCode key={id} lockId={id} vendorId={vendorId} />
           ))}
           <p className="muted" style={{ marginTop: 12 }}>
-            <Link href="/my-locks">查看我的訂單</Link>
+            <Link href="/my-locks">{tr("查看我的訂單", "View my orders")}</Link>
           </p>
         </div>
       )}
       {status === "error" && (
         <div className="card">
-          <h2>付款確認失敗</h2>
+          <h2>{tr("付款確認失敗", "Payment confirmation failed")}</h2>
           <p className="muted">{errorMessage}</p>
           <p className="muted">
-            <Link href="/my-locks">查看我的訂單</Link>
+            <Link href="/my-locks">{tr("查看我的訂單", "View my orders")}</Link>
           </p>
         </div>
       )}

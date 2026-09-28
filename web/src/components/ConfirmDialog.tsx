@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import {
   Dialog,
@@ -51,7 +52,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => close(false)}>
-              {options?.cancelLabel ?? "取消"}
+              {options?.cancelLabel ?? tr("取消", "Cancel")}
             </Button>
             <Button variant={options?.destructive ? "destructive" : "default"} onClick={() => close(true)}>
               {options?.confirmLabel}
