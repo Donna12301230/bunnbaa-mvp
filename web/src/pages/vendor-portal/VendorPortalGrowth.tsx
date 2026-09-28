@@ -4,6 +4,7 @@ import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, Ticket, Sparkles } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
 import { EmptyState } from "@/components/ds";
 
 // 對應 UI草圖 VendorDashboard.dc.html「成長獎勵」分頁——全新機制，之前的雛型
@@ -14,20 +15,19 @@ import { EmptyState } from "@/components/ds";
 // 2026-09-22 接上真實資料：
 //   - 累積營收：即時加總這個商家的 payouts.amount（跟 payouts 共用 vendor_id
 //     索引），不用另外存一個累計欄位怕跟實際撥款對不上
-//   - 門檻：平台固定政策（20萬/100萬），不是每個商家可調整的資料，寫死常數
+//   - 門檻：平台層級設定，讀 platform_config/growth（跟 Functions drawGrowthReward／
+//     syncGrowthUnlock 同一份），只有管理員能改
 //   - 0 元券庫存／開獎紀錄：真的讀 growth_rewards/{vendorId}、draws
 //     collection——這兩個都只由 Cloud Function `drawGrowthReward` 寫（機率
 //     計算不能信任 client），程式碼在 functions/src/index.js，但因為 Blaze
 //     還沒升級，還沒有機會在正式站被呼叫過，這頁目前大概率會一直看到
 //     「尚無資料」直到有人在 emulator 或正式站抽過獎
-const VENDOR_ID = "cafe-renheya-demo";
 
-const MILESTONES = [
-  { id: "tier1", label: "20 萬門檻・單抽", threshold: 200000 },
-  { id: "tier2", label: "100 萬門檻・十連抽", threshold: 1000000 },
-];
-
-const DEFAULT_VOUCHER_TOTAL = 10;
+interface Milestone {
+  id: string;
+  label: string;
+  threshold: number;
+}
 
 const TIER_STYLE: Record<number, { bg: string; color: string; label: string }> = {
   80: { bg: "bg-amber-50", color: "text-amber-700", label: "8折" },
@@ -46,29 +46,43 @@ interface DrawRecord {
 }
 
 export default function VendorPortalGrowth() {
+  // 商家後台只讓 role=vendor 進來，vendorId 是登入店主綁定的商家
+  const VENDOR_ID = useAuth().user?.vendorId;
   const [cumulativeRevenue, setCumulativeRevenue] = useState(0);
-  const [voucherRemaining, setVoucherRemaining] = useState(DEFAULT_VOUCHER_TOTAL);
-  const [voucherTotal, setVoucherTotal] = useState(DEFAULT_VOUCHER_TOTAL);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [defaultVoucherTotal, setDefaultVoucherTotal] = useState(0);
+  const [reward, setReward] = useState<{ voucher_remaining?: number; voucher_total?: number }>({});
+  const voucherTotal = reward.voucher_total ?? defaultVoucherTotal;
+  const voucherRemaining = reward.voucher_remaining ?? voucherTotal;
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "platform_config", "growth"), (snap) => {
+      const data = snap.data() ?? {};
+      setMilestones([...((data.milestones as Milestone[] | undefined) ?? [])].sort((a, b) => a.threshold - b.threshold));
+      setDefaultVoucherTotal(typeof data.voucher_total === "number" ? data.voucher_total : 0);
+    });
+    return () => unsub();
+  }, []);
   const [drawHistory, setDrawHistory] = useState<DrawRecord[]>([]);
 
   useEffect(() => {
+    if (!VENDOR_ID) return;
     const unsub = onSnapshot(query(collection(db, "payouts"), where("vendor_id", "==", VENDOR_ID)), (snap) => {
       setCumulativeRevenue(snap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0));
     });
     return () => unsub();
-  }, []);
+  }, [VENDOR_ID]);
 
   useEffect(() => {
+    if (!VENDOR_ID) return;
     const unsub = onSnapshot(doc(db, "growth_rewards", VENDOR_ID), (snap) => {
-      if (snap.exists()) {
-        setVoucherRemaining(snap.data().voucher_remaining ?? DEFAULT_VOUCHER_TOTAL);
-        setVoucherTotal(snap.data().voucher_total ?? DEFAULT_VOUCHER_TOTAL);
-      }
+      setReward(snap.data() ?? {});
     });
     return () => unsub();
-  }, []);
+  }, [VENDOR_ID]);
 
   useEffect(() => {
+    if (!VENDOR_ID) return;
     // 單一 equality（vendor_id），不加 orderBy，避免另外要求新複合索引，排序
     // 交給前端做——同 VendorPortalPrep/TransferMarketPage 的慣例。
     const unsub = onSnapshot(query(collection(db, "draws"), where("vendor_id", "==", VENDOR_ID)), (snap) => {
@@ -77,7 +91,7 @@ export default function VendorPortalGrowth() {
       setDrawHistory(rows.slice(0, 20));
     });
     return () => unsub();
-  }, []);
+  }, [VENDOR_ID]);
 
   return (
     <VendorPortalLayout>
@@ -95,7 +109,10 @@ export default function VendorPortalGrowth() {
             <CardTitle className="text-base">門檻進度</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            {MILESTONES.map(m => {
+            {milestones.length === 0 && (
+              <p className="text-sm text-muted-foreground">平台尚未設定成長獎勵門檻。</p>
+            )}
+            {milestones.map(m => {
               const achieved = cumulativeRevenue >= m.threshold;
               const pct = Math.min(100, Math.round((cumulativeRevenue / m.threshold) * 100));
               return (

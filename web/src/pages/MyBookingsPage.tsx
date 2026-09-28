@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, limit, onSnapshot, query, Timestamp, updateDoc, where } from "firebase/firestore";
+import { collection, doc, documentId, getDocs, limit, onSnapshot, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2 } from "lucide-react";
+import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2, Star } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import PageHero from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,8 @@ const STATUS_STYLE: Record<string, { label: string; className: string }> = {
 };
 
 const FEEDBACK_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled", "no_show"]);
+// 有實際拿到餐的才能評分（reviews，公開）；no_show 只能留私下回饋給商家校準
+const REVIEW_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled"]);
 
 function formatDateLabel(dateStr: string): string {
   try {
@@ -110,6 +113,9 @@ export default function MyBookingsPage() {
   const [zoomedLock, setZoomedLock] = useState<Lock | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState<Record<string, boolean>>({});
   const [feedbackDraft, setFeedbackDraft] = useState<Record<string, string>>({});
+  const [ratingDraft, setRatingDraft] = useState<Record<string, number>>({});
+  const [publicComment, setPublicComment] = useState<Record<string, boolean>>({});
+  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -125,6 +131,28 @@ export default function MyBookingsPage() {
     );
     return () => unsub();
   }, [uid]);
+
+  // 哪些已取餐的鎖定已經評過分（reviews 的 doc id＝lock id），documentId in 一次最多 30 筆
+  const reviewableIds = useMemo(
+    () => locks.filter((l) => REVIEW_ELIGIBLE.has(l.status)).map((l) => l.id).sort().join(","),
+    [locks]
+  );
+  useEffect(() => {
+    const ids = reviewableIds ? reviewableIds.split(",") : [];
+    if (ids.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const found = new Set<string>();
+      for (let i = 0; i < ids.length; i += 30) {
+        const snap = await getDocs(query(collection(db, "reviews"), where(documentId(), "in", ids.slice(i, i + 30))));
+        snap.docs.forEach((d) => found.add(d.id));
+      }
+      if (!cancelled) setReviewedIds(found);
+    })().catch((err) => console.error("讀取評分紀錄失敗", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [reviewableIds]);
 
   // 轉賣逾時倒數是前端算的，固定重算才會即時更新顯示。
   useEffect(() => {
@@ -210,12 +238,31 @@ export default function MyBookingsPage() {
     }
   }
 
+  // 心得（consumer_feedback，只給商家校準用）跟星等（reviews，公開）一起送；
+  // 勾選「公開心得」才會把心得文字一起寫進 reviews。
   async function handleSubmitFeedback(lock: Lock) {
     const text = (feedbackDraft[lock.id] || "").trim();
-    if (!text) return;
+    const rating = ratingDraft[lock.id];
+    const canReview = REVIEW_ELIGIBLE.has(lock.status) && !reviewedIds.has(lock.id);
+    if (!text && !(canReview && rating)) return;
     setBusyId(lock.id);
     try {
-      await updateDoc(doc(db, "locks", lock.id), { consumer_feedback: text });
+      if (text && !lock.consumer_feedback) {
+        await updateDoc(doc(db, "locks", lock.id), { consumer_feedback: text });
+      }
+      if (canReview && rating) {
+        await setDoc(doc(db, "reviews", lock.id), {
+          vendor_id: lock.vendor_id,
+          meal_plan_id: lock.meal_plan_id ?? null,
+          item_name: lock.item_name,
+          rating,
+          comment: publicComment[lock.id] && !lock.consumer_feedback ? text.slice(0, 280) : "",
+          reviewer_label: user?.department ? `${user.department} 同學`.slice(0, 30) : "BunnBaa 同學",
+          created_at: serverTimestamp(),
+        });
+        setReviewedIds((prev) => new Set(prev).add(lock.id));
+        queryClient.invalidateQueries({ queryKey: ["reviews"] });
+      }
       setFeedbackOpen((prev) => ({ ...prev, [lock.id]: false }));
     } catch (err) {
       toast({ title: "送出回饋失敗", description: (err as Error).message, variant: "destructive" });
@@ -243,6 +290,7 @@ export default function MyBookingsPage() {
     const deadline = lock.status === "for_resale" ? pickupWindowEnd(lock.pickup_date, lock.pickup_window) : null;
     const canFeedback = FEEDBACK_ELIGIBLE.has(lock.status);
     const hasFeedback = !!lock.consumer_feedback;
+    const canReview = REVIEW_ELIGIBLE.has(lock.status) && !reviewedIds.has(lock.id);
 
     return (
       <article className="bg-card border border-border rounded-lg shadow-sm p-4 flex flex-col gap-2 max-w-sm">
@@ -318,26 +366,67 @@ export default function MyBookingsPage() {
                       )}
 
                       {canFeedback && (
-                        hasFeedback ? (
-                          <p className="text-caption text-muted-foreground pt-1">已回饋：「{lock.consumer_feedback}」</p>
-                        ) : feedbackOpen[lock.id] ? (
-                          <div className="flex flex-col gap-1.5 pt-1">
-                            <Input
-                              value={feedbackDraft[lock.id] || ""}
-                              onChange={(e) => setFeedbackDraft((prev) => ({ ...prev, [lock.id]: e.target.value }))}
-                              placeholder="這餐的心得…（送出後無法修改）"
-                              aria-label="用餐回饋"
-                              maxLength={280}
-                            />
-                            <Button size="sm" disabled={isBusy || !(feedbackDraft[lock.id] || "").trim()} onClick={() => handleSubmitFeedback(lock)}>
-                              送出回饋
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button variant="outline" size="sm" onClick={() => setFeedbackOpen((prev) => ({ ...prev, [lock.id]: true }))}>
-                            留下回饋
-                          </Button>
-                        )
+                        <>
+                          {hasFeedback && (
+                            <p className="text-caption text-muted-foreground pt-1">已回饋：「{lock.consumer_feedback}」</p>
+                          )}
+                          {reviewedIds.has(lock.id) && (
+                            <p className="text-caption text-muted-foreground">已評分，謝謝！</p>
+                          )}
+                          {(!hasFeedback || canReview) && (
+                            feedbackOpen[lock.id] ? (
+                              <div className="flex flex-col gap-1.5 pt-1">
+                                {canReview && (
+                                  <div className="flex items-center gap-1" role="radiogroup" aria-label="評分">
+                                    {[1, 2, 3, 4, 5].map((n) => (
+                                      <button
+                                        key={n}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={ratingDraft[lock.id] === n}
+                                        aria-label={`${n} 星`}
+                                        onClick={() => setRatingDraft((prev) => ({ ...prev, [lock.id]: n }))}
+                                        className="p-0.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                      >
+                                        <Star className={`w-5 h-5 ${n <= (ratingDraft[lock.id] ?? 0) ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                {!hasFeedback && (
+                                  <Input
+                                    value={feedbackDraft[lock.id] || ""}
+                                    onChange={(e) => setFeedbackDraft((prev) => ({ ...prev, [lock.id]: e.target.value }))}
+                                    placeholder="這餐的心得…（送出後無法修改）"
+                                    aria-label="用餐回饋"
+                                    maxLength={280}
+                                  />
+                                )}
+                                {canReview && !hasFeedback && (
+                                  <label className="flex items-center gap-1.5 text-caption text-muted-foreground">
+                                    <input
+                                      type="checkbox"
+                                      checked={!!publicComment[lock.id]}
+                                      onChange={(e) => setPublicComment((prev) => ({ ...prev, [lock.id]: e.target.checked }))}
+                                    />
+                                    心得也公開顯示在評價區（只顯示系所，不顯示姓名）
+                                  </label>
+                                )}
+                                <Button
+                                  size="sm"
+                                  disabled={isBusy || !((feedbackDraft[lock.id] || "").trim() || (canReview && ratingDraft[lock.id]))}
+                                  onClick={() => handleSubmitFeedback(lock)}
+                                >
+                                  送出
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button variant="outline" size="sm" onClick={() => setFeedbackOpen((prev) => ({ ...prev, [lock.id]: true }))}>
+                                {canReview ? (hasFeedback ? "給這餐評分" : "評分／留下回饋") : "留下回饋"}
+                              </Button>
+                            )
+                          )}
+                        </>
                       )}
       </article>
     );

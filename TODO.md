@@ -112,6 +112,41 @@
   - (c) 連消費者端畫面一起從零設計開發，規模最大
 - ~~**商家訂閱平台**~~ 2026-09-24 已接真 Firestore（`web/src/lib/subscription.ts`）：狀態存在 `vendors/{id}.subscription_*`，到期（`subscription_end_date` 已過）整個廠商後台擋住；商家只能自助「申請取消」「到期前撤回」（`firestore.rules` 限定這兩種轉換）；**沒有訂閱金流**，續約由管理員確認收款後在 `/admin/vendors` 按「續約 30 天」（寫 `admin_audit_logs`）。新核准的商家自動首月免費試用。正式站既有商家沒有訂閱欄位＝「尚未設定」，不擋也不能自助操作，要管理員按一次續約才開始計期。之後要自動扣款再接 LINE Pay 定期付款
 
+### 8. 寫死資料盤點（2026-09-28 盤點，依序處理）
+
+**部署順序（全部還沒部署、沒在瀏覽器點過，只過了 `tsc`＋`vite build`＋rules 在 emulator 編譯）**：
+1. `firebase deploy --only firestore:rules`（新增 `reviews`／`platform_config`／`landing_events`，`vendors` 店主可寫 `cover_image`）
+2. 正式站補設定資料：`node scripts/seed.js --config-only`（只寫 `platform_config/growth`＋`landing_events`，不動其他資料）
+3. `firebase deploy --only functions`（成長門檻讀設定、計畫 locks 加 `meal_plan_id`）
+4. `cd web && npm run build` 後 `firebase deploy --only hosting`
+- 驗證：第二家店綁店主後，用那家帳號看商家後台各頁都只看到自己的資料；`/my-bookings` 已取餐的餐點打分 → 首頁計畫評分、Landing 評價出現；同一筆再評一次要被擋
+
+**A. 寫死商家 ID `cafe-renheya-demo`**（資料是真的，但不論誰登入都只看得到仁和雅；第二家店綁店主就會露餡）→ 改讀登入者綁定的 `user.vendorId`。2026-09-28 程式碼完成（`tsc`＋`vite build` 過），**還沒部署、沒在瀏覽器點過**
+- [V] 商家後台：`VendorPortalMenu.tsx`（菜單管理，別家店主會改到仁和雅的菜單）、`VendorPortalPrep.tsx`（今日備料）、`VendorPortalGrowth.tsx`（成長獎勵）
+- [V] `/lock/vendor`：`VendorDashboard.tsx`（校準報告）改讀綁定商家，管理員沒綁商家時多一個下拉選單挑商家；`/lock/vendor/redeem`：拿掉退回仁和雅
+- [V] 消費端：`HomePage.tsx` 抽獎改列出所有已解鎖（`growth_rewards.unlocked_milestones` 含 tier1）的店家，每家各一顆「抽一次」；首頁轉讓區與 `TransferMarketPage.tsx` 改列所有商家（只用 `status` 單一等值查詢，不用新索引），卡片加上店名。三頁共用的商家清單抽成 `hooks/useVendors.ts`
+- [V] `ConsumerLockPage.tsx`（`/lock` Demo 頁）：商家、品名、原價 160 寫死，改讀 `menu_items/cafe-renheya-demo-item-1`（這頁本來就是單店 Demo，商家 ID 保留）
+
+**B. 整頁假資料（讀寫 `web/src/lib/mockData.ts`）**
+- [V] 總覽 `VendorPortalDashboard.tsx`：改讀真實 `locks`／`menu_items`（今日待取餐／今日已取餐／近期訂單數／菜單數＋今日各取餐時段份數）
+- [V] 店家設定 `VendorPortalSettings.tsx`：封面圖改存 `vendors/{id}.cover_image`，商家列表／商家頁會顯示。**`firestore.rules` 有改（店主可寫 `cover_image`，限 https 網址），要部署 rules**
+- [ ] 店家設定的桌位 QR 仍存 mock：QR 連到的 `/menu/:id` 根本沒有這頁，屬於 §7「現場點餐」待決策
+- [V] 舊版掃碼核銷 `/vendor-portal/scan`：刪掉 `VendorPortalScan.tsx`，路由改導向 `/lock/vendor/redeem`
+- [V] 統計報表的「校準洞察」卡（寫死準確率＋假的 AI 回答）改讀真實 `accuracy_reports`＋呼叫 `askCalibrationScenario`
+- [ ] 訂餐時段 `VendorPortalSessions.tsx`、時段彙整 `VendorPortalSessionSummary.tsx`、訂單管理 `VendorPortalOrders.tsx`、統計報表的營收圖表 `VendorPortalReports.tsx`：屬於 §7「揪團預購場次」待決策，決定前先不動
+- [V] 刪掉 `mockData.ts` 裡已沒人用的 mock（計畫方案、轉讓、單點卡片、解封申訴、總覽、掃碼、菜單、校準報告）
+
+**C. 畫面寫死或假功能**
+- [V] `HomePage.tsx` 預約日曆：預設今天起 7 天（最多 31 天），篩選「期間內有開放取餐」的推薦品項與計畫、取餐日在期間內的轉讓；排序改成相關性／最快可取餐／價格低到高／評分高到低（草圖的「距離」沒有位置資料所以拿掉）
+- [V] `LandingPage.tsx` 招牌餐點改讀上架中的 `menu_items`，依分類分頁（最多 5 類、每類 4 道），有圖片就顯示圖片
+- [V] 新增評分機制 `reviews/{lockId}`（`firestore.rules` 驗證：只有持有人、只限已取餐、一筆只能評一次、公開可讀）：`/my-bookings` 已取餐的餐點可打 1–5 星，心得勾選公開才會寫進去，署名只顯示「系所＋同學」
+- [V] `LandingPage.tsx` 同學評價改讀 `reviews`（有公開心得、4 星以上），沒有就整段不顯示
+- [V] `LandingPage.tsx` 近期活動改讀 `landing_events`（公開可讀、管理員可寫，目前沒有後台編輯頁，要改內容到 Firestore Console）；「早鳥最高 7 折／最早 30 天」改從 `lib/pricing` 算；頁尾取餐時段改列各店家設定的時段
+- [ ] `MarketplaceHeader.tsx`：地址／語言選單只是靜態外觀——**沒有資料可以讀**：平台是自取、沒有外送地址；語言要先有翻譯（i18n）。要做需要先決定功能（例如「地址」改成選校區篩店家），暫不處理
+- [V] 成長獎勵門檻改存 `platform_config/growth`（`milestones`＋`voucher_total`），商家後台與 `drawGrowthReward`／`syncGrowthUnlock` 讀同一份；文件不存在時 Functions 退回原本預設值。順手修掉 `growth_rewards` 文件只有 `unlocked_milestones` 時 `voucher_remaining` 變 `NaN` 的問題
+- [V] 計畫卡評分改讀 `reviews` 平均（顯示則數），沒人評過顯示「尚無評分」；`meal_plans.rating` 從型別與 seed 拿掉（正式站舊文件還留著這個欄位，不影響）。`createPlanLinePayReservation` 產生的 locks 新增 `meal_plan_id`，**之前加入的計畫沒有這個欄位，評分只算進店家平均、不會算進方案平均**
+- 刻意寫死、不用改：管理員白名單 `lib/adminAuth.ts`、早鳥級距 `lib/pricing.ts`、預設取餐時段 `lib/pickupSlots.ts`
+
 ---
 
 ## 📌 環境備忘（新機器／新 session 開工前先看）

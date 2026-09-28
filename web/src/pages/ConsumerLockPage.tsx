@@ -12,7 +12,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { db, auth, functions } from "../lib/firebase";
 import { useRequireLogin } from "../hooks/useRequireLogin";
-import type { Lock, Vendor } from "../types";
+import type { Lock, MenuItem, Vendor } from "../types";
 import LockQRCode from "../components/LockQRCode";
 import { applyEarlyBirdPrice } from "../lib/pricing";
 import { nextAvailablePickup } from "@/lib/pickupSlots";
@@ -20,11 +20,10 @@ import { takeOverLock } from "@/lib/transfers";
 import { toast } from "../hooks/use-toast";
 import { Gift } from "lucide-react";
 
+// 這頁是單店單品的 Demo（demo 影片用），商家與品項 id 固定；品名、原價讀
+// menu_items/cafe-renheya-demo-item-1（伺服器結帳也是用那筆重算價格）。
 const VENDOR_ID = "cafe-renheya-demo";
-const ITEM_NAME = "招牌鮭魚御飯糰便當";
-// 跟 menu_items/cafe-renheya-demo-item-1 的原價一致（伺服器用那筆重算價格，這裡只是顯示）
 const MENU_ITEM_ID = `${VENDOR_ID}-item-1`;
-const ORIGINAL_PRICE = 160;
 
 // Mirrors functions/src/index.js's pickupWindowStart, but for the window's
 // end — used as the resale_deadline after which anyone may free-claim.
@@ -44,6 +43,7 @@ function pickupWindowEnd(pickupDate: string, pickupWindow: string): Date | null 
  */
 export default function ConsumerLockPage() {
   const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [menuItem, setMenuItem] = useState<MenuItem | null>(null);
   const [locking, setLocking] = useState(false);
   const [myLock, setMyLock] = useState<Lock | null>(null);
   const [reselling, setReselling] = useState(false);
@@ -60,11 +60,18 @@ export default function ConsumerLockPage() {
   // 這頁沒有時段選擇，固定訂最近一個還能訂的時段（完整選擇在首頁／購物車）
   // 店家 30 天內都不開放時退回今天第一個預設時段，送出後由伺服器擋下並顯示原因
   const nextPickup = nextAvailablePickup(vendor) ?? { date: new Date().toLocaleDateString("en-CA"), window: "11:30-12:00" };
-  const todayPricing = applyEarlyBirdPrice(ORIGINAL_PRICE, nextPickup.date);
+  const todayPricing = menuItem ? applyEarlyBirdPrice(menuItem.price, nextPickup.date) : null;
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "vendors", VENDOR_ID), (snap) => {
       if (snap.exists()) setVendor({ id: snap.id, ...(snap.data() as any) });
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "menu_items", MENU_ITEM_ID), (snap) => {
+      setMenuItem(snap.exists() ? ({ id: snap.id, ...(snap.data() as any) } as MenuItem) : null);
     });
     return () => unsub();
   }, []);
@@ -247,7 +254,7 @@ export default function ConsumerLockPage() {
           <div className="row">
             <div>
               <h2>{vendor.name} {vendor.verified && <span className="badge">認證商家</span>}</h2>
-              <div className="muted">{ITEM_NAME} · {nextPickup.window} 取餐</div>
+              <div className="muted">{menuItem?.name ?? "—"} · {nextPickup.window} 取餐</div>
             </div>
             <span className="badge">
               近期履約穩定度：
@@ -259,12 +266,16 @@ export default function ConsumerLockPage() {
 
       <div className="card tinted">
         <div className="row">
-          <div>
-            <div style={{ textDecoration: "line-through", color: "var(--faint)" }}>NT${ORIGINAL_PRICE}</div>
-            <div className="stat">NT${todayPricing.lockedPrice}</div>
-            <div className="muted">{todayPricing.tierLabel} · 取餐 {nextPickup.date} {nextPickup.window} · 全額預付，鎖定後直接歸商家</div>
-          </div>
-          <button onClick={handleLock} disabled={locking || !!myLock}>
+          {menuItem && todayPricing ? (
+            <div>
+              <div style={{ textDecoration: "line-through", color: "var(--faint)" }}>NT${menuItem.price}</div>
+              <div className="stat">NT${todayPricing.lockedPrice}</div>
+              <div className="muted">{todayPricing.tierLabel} · 取餐 {nextPickup.date} {nextPickup.window} · 全額預付，鎖定後直接歸商家</div>
+            </div>
+          ) : (
+            <div className="muted">載入品項中…</div>
+          )}
+          <button onClick={handleLock} disabled={locking || !!myLock || !menuItem}>
             {myLock ? "已鎖定" : locking ? "處理中…" : "鎖定這份"}
           </button>
         </div>

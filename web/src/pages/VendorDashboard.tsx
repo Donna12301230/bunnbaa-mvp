@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { collection, getDocs, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../lib/firebase";
 import type { AccuracyReport, Payout } from "../types";
-
-const VENDOR_ID = "cafe-renheya-demo";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * Spec ref: tech doc v6 §4.1 (calibration report), §4.1a (what-if follow-up).
@@ -14,6 +13,11 @@ const VENDOR_ID = "cafe-renheya-demo";
  * history the scheduled report used.
  */
 export default function VendorDashboard() {
+  // 店主看自己綁定的商家；管理員沒有綁定商家，改用下拉選單挑要看哪一家
+  const { user, isAdmin } = useAuth();
+  const [vendorOptions, setVendorOptions] = useState<{ id: string; name: string }[]>([]);
+  const [pickedVendorId, setPickedVendorId] = useState<string>();
+  const VENDOR_ID = user?.vendorId ?? (isAdmin ? pickedVendorId ?? vendorOptions[0]?.id : undefined);
   const [report, setReport] = useState<AccuracyReport | null>(null);
   const [question, setQuestion] = useState("");
   const [scenarioAnswer, setScenarioAnswer] = useState<string | null>(null);
@@ -23,6 +27,17 @@ export default function VendorDashboard() {
   const [settling, setSettling] = useState(false);
 
   useEffect(() => {
+    if (!isAdmin) return;
+    getDocs(collection(db, "vendors")).then((snap) => {
+      setVendorOptions(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id })));
+    });
+  }, [isAdmin]);
+
+  useEffect(() => {
+    // 換商家時先清掉上一家的報告，避免新商家沒有報告時還顯示舊的
+    setReport(null);
+    setScenarioAnswer(null);
+    if (!VENDOR_ID) return;
     // Single equality (no orderBy) so this doesn't need its own composite
     // index — firestore.indexes.json only declares vendor_id+created_at for
     // locks/payouts. At pilot scale (one report/day for one vendor) sorting
@@ -35,9 +50,10 @@ export default function VendorDashboard() {
       setReport(docs[0]);
     });
     return () => unsub();
-  }, []);
+  }, [VENDOR_ID]);
 
   useEffect(() => {
+    if (!VENDOR_ID) return;
     const q = query(
       collection(db, "payouts"),
       where("vendor_id", "==", VENDOR_ID),
@@ -48,7 +64,7 @@ export default function VendorDashboard() {
       setPayouts(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
     });
     return () => unsub();
-  }, []);
+  }, [VENDOR_ID]);
 
   async function handleSettleNow() {
     setSettling(true);
@@ -89,7 +105,24 @@ export default function VendorDashboard() {
       <div className="kicker">BunnBaa · 商家後台</div>
       <h1>預測校準報告</h1>
 
-      {!report && (
+      {isAdmin && !user?.vendorId && vendorOptions.length > 0 && (
+        <div className="card">
+          <label className="muted" htmlFor="vendor-scope">檢視商家（管理員）</label>{" "}
+          <select id="vendor-scope" value={VENDOR_ID} onChange={(e) => setPickedVendorId(e.target.value)}>
+            {vendorOptions.map((v) => (
+              <option key={v.id} value={v.id}>{v.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {!VENDOR_ID && !isAdmin && (
+        <div className="card">
+          <p className="muted">這個帳號還沒綁定商家，請先到平台申請成為合作店家。</p>
+        </div>
+      )}
+
+      {VENDOR_ID && !report && (
         <div className="card">
           <p className="muted">尚無報告。先執行 scripts/seed.js 產生情境資料，再點下方按鈕產生第一份報告。</p>
           <button onClick={handleTriggerNow} disabled={triggering}>

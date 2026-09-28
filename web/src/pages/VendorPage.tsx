@@ -83,9 +83,13 @@ export default function VendorPage() {
 
       <div className="bg-white rounded-xl border border-border p-5">
         <div className="flex flex-col sm:flex-row gap-4">
-          <div className="w-full sm:w-32 h-32 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center shrink-0">
-            <Store className="h-12 w-12 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
-          </div>
+          {vendor.cover_image ? (
+            <img src={vendor.cover_image} alt="" className="w-full sm:w-32 h-32 rounded-lg object-cover shrink-0" />
+          ) : (
+            <div className="w-full sm:w-32 h-32 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center shrink-0">
+              <Store className="h-12 w-12 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+            </div>
+          )}
           <div className="min-w-0">
             <h1 className="text-xl font-bold mb-1">{vendor.name}</h1>
             {vendor.description && <p className="text-sm text-muted-foreground mb-3">{vendor.description}</p>}

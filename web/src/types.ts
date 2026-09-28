@@ -9,6 +9,7 @@ export interface Vendor {
   description?: string;
   address?: string;
   phone?: string;
+  cover_image?: string; // 店家封面圖（Cloudinary https 網址），店主在店家設定頁上傳
   owner_uid?: string | null; // 平台審核後綁定的真實 Firebase Auth uid，只有 admin 能寫
   // 商家訂閱，見 lib/subscription.ts；舊資料可能沒有這些欄位
   subscription_status?: "trial" | "active" | "cancelled" | "expired";
@@ -43,7 +44,6 @@ export interface MealPlan {
   name: string;
   description: string;
   price_per_meal: number;
-  rating: number;
   fastest_booking: string;
   days: number; // 供餐天數，加入計畫時會生成這麼多筆 locks
   created_at: unknown; // Firestore Timestamp
@@ -86,6 +86,7 @@ export interface Lock {
   // 之前前端直寫的舊資料是「vendor_id-meal_plans id」。
   plan_id?: string;
   plan_label?: string;
+  meal_plan_id?: string; // meal_plans 的 id，2026-09-28 之後加入的計畫才有
 }
 
 export interface Payout {
@@ -253,3 +254,15 @@ export interface OrderSessionData {
   createdAt: Date;
 }
 
+
+// reviews/{lockId}：消費者對已取餐的鎖定打分，公開可讀，見 firestore.rules
+export interface Review {
+  id: string; // = lock id
+  vendor_id: string;
+  meal_plan_id: string | null;
+  item_name: string;
+  rating: number; // 1–5
+  comment: string; // 空字串＝不公開心得
+  reviewer_label: string;
+  created_at: unknown; // Firestore Timestamp
+}

@@ -10,22 +10,14 @@ import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 import CustomerLayout from "@/components/CustomerLayout";
 import PageHero, { HeroSearch } from "@/components/PageHero";
+import { useVendors } from "@/hooks/useVendors";
 
 // 商家清單頁 — 消費者瀏覽所有上架商家。真實 vendors collection 沒有
 // isApproved/isActive 這兩個欄位，用 status !== 'disabled' 頂替。
 export default function VendorListPage() {
   const [search, setSearch] = useState("");
 
-  const { data: vendors = [], isLoading } = useQuery({
-    queryKey: ["vendors"],
-    queryFn: async () => {
-      const snap = await getDocs(collection(db, "vendors"));
-      return snap.docs
-        .map((d) => ({ id: d.id, ...(d.data() as any) }) as Vendor)
-        .filter((v) => v.status !== "disabled");
-    },
-    staleTime: 15 * 60 * 1000,
-  });
+  const { data: vendors = [], isLoading } = useVendors();
 
   // 不雅字詞當作沒輸入搜尋字串處理，不特別跳錯誤訊息。
   const effectiveSearch = isClean(search) ? search : "";
@@ -58,9 +50,13 @@ export default function VendorListPage() {
                 href={`/vendor/${vendor.id}`}
                 className="block bg-white rounded-xl border border-border p-4 shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               >
-                <div className="w-full h-28 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center mb-3">
-                  <Store className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
-                </div>
+                {vendor.cover_image ? (
+                  <img src={vendor.cover_image} alt="" className="w-full h-28 rounded-lg object-cover mb-3" />
+                ) : (
+                  <div className="w-full h-28 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center mb-3">
+                    <Store className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                  </div>
+                )}
                 <h3 className="font-semibold mb-1 truncate">{vendor.name}</h3>
                 {vendor.description && (
                   <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{vendor.description}</p>

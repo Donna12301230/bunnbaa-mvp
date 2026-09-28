@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -18,13 +18,14 @@ import MarketplaceHeader from "@/components/MarketplaceHeader";
 import GrowthRewardTicker from "@/components/GrowthRewardTicker";
 import { auth, db, functions } from "@/lib/firebase";
 import type { Vendor, MenuItem, MealPlan, Lock } from "@/types";
+import { summarizeRatings, useReviews } from "@/hooks/useReviews";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
-import { DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, openWindowsOn, planPickupDates, slotLabel, todayStr, vendorClosedReason } from "@/lib/pickupSlots";
+import { addDaysStr, DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, openWindowsOn, planPickupDates, slotLabel, todayStr, vendorClosedReason } from "@/lib/pickupSlots";
 import PickupPicker from "@/components/PickupPicker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { useVendors } from "@/hooks/useVendors";
 
-const GROWTH_VENDOR_ID = "cafe-renheya-demo";
 const BANNED_HINT = "您的帳號因多次未取餐已被限制下單，請至會員中心提交解封申訴";
 const GROWTH_TIER_LABEL: Record<number, string> = { 80: "8折", 60: "6折", 50: "5折", 30: "3折", 10: "1折", 0: "整份 0 元" };
 
@@ -39,24 +40,30 @@ function formatResaleCountdown(deadline: Date, now: number): string {
 }
 
 // 首頁模板 — 對應 UI草圖的 Main.dc.html（現在是合併版：原本 PlanSchedule.dc.html
-// 的「合作店家與計畫」已經整段併進 Main，這裡也已經做過）。地址／語言選單目前
-// 只是靜態外觀（見 MarketplaceHeader）。
+// 的「合作店家與計畫」已經整段併進 Main，這裡也已經做過）。
+// 排序只保留有資料能算的：草圖的「距離」沒有位置資料所以拿掉，「最快送達」改成
+// 最快可取餐日（平台是自取不外送），評分讀 reviews 的店家平均。
 const SORT_OPTIONS = [
   { id: "relevance", label: "相關性" },
-  { id: "fastest", label: "最快送達" },
-  { id: "distance", label: "距離" },
-  { id: "rating", label: "評分" },
+  { id: "earliest", label: "最快可取餐" },
+  { id: "price", label: "價格低到高" },
+  { id: "rating", label: "評分高到低" },
 ] as const;
+type SortId = (typeof SORT_OPTIONS)[number]["id"];
+
+// 預約日曆最多看 31 天，跟取餐日選擇的上限（30 天內）一致
+const MAX_RANGE_DAYS = 31;
 
 
 export default function HomePage() {
   const { toast } = useToast();
   const { isOrderBanned } = useAuth();
-  const [startDate, setStartDate] = useState("2026-09-22");
-  const [endDate, setEndDate] = useState("2026-09-26");
+  // 預約日曆：篩選「這段期間有開放取餐」的店家／品項／計畫，以及取餐日在期間內的轉讓
+  const [startDate, setStartDate] = useState(() => todayStr());
+  const [endDate, setEndDate] = useState(() => addDaysStr(todayStr(), 6));
   const [pickupDate, setPickupDate] = useState(() => nextAvailablePickup()?.date ?? todayStr());
   const [pickupWindow, setPickupWindow] = useState(() => nextAvailablePickup()?.window ?? DEFAULT_PICKUP_WINDOWS[0]);
-  const [selectedSort, setSelectedSort] = useState<string>("relevance");
+  const [selectedSort, setSelectedSort] = useState<SortId>("relevance");
   const [waiverAck, setWaiverAck] = useState<Record<string, boolean>>({});
   const [lockingMealId, setLockingMealId] = useState<string | null>(null);
   const [lockDialogItem, setLockDialogItem] = useState<{ item: MenuItem; vendor: Vendor } | null>(null);
@@ -68,8 +75,8 @@ export default function HomePage() {
   const [planWindow, setPlanWindow] = useState("");
   const [planAck, setPlanAck] = useState(false);
   const [joiningPlan, setJoiningPlan] = useState(false);
-  const [growthUnlocked, setGrowthUnlocked] = useState(false);
-  const [drawing, setDrawing] = useState(false);
+  const [growthUnlockedIds, setGrowthUnlockedIds] = useState<string[]>([]);
+  const [drawingVendorId, setDrawingVendorId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
@@ -79,42 +86,37 @@ export default function HomePage() {
   // payouts（營收金額）只有管理員／店主能讀，消費者端改讀公開的
   // growth_rewards.unlocked_milestones——撥款結算時由 Functions syncGrowthUnlock 更新，
   // 只寫達到哪些門檻，不寫金額。真正能不能抽還是 drawGrowthReward 伺服器端再驗一次。
+  // 每家商家一份 growth_rewards/{vendorId}，列出所有已達 tier1 的商家。
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "growth_rewards", GROWTH_VENDOR_ID), (snap) => {
-      const unlocked: string[] = snap.data()?.unlocked_milestones ?? [];
-      setGrowthUnlocked(unlocked.includes("tier1"));
+    const unsub = onSnapshot(collection(db, "growth_rewards"), (snap) => {
+      setGrowthUnlockedIds(
+        snap.docs
+          .filter((d) => ((d.data().unlocked_milestones as string[] | undefined) ?? []).includes("tier1"))
+          .map((d) => d.id)
+      );
     });
     return () => unsub();
   }, []);
 
-  async function handleDrawGrowthReward() {
+  async function handleDrawGrowthReward(vendorId: string) {
     if (!requireLogin()) return;
-    setDrawing(true);
+    setDrawingVendorId(vendorId);
     try {
       const fn = httpsCallable(functions, "drawGrowthReward");
-      const result = await fn({ vendor_id: GROWTH_VENDOR_ID });
+      const result = await fn({ vendor_id: vendorId });
       const pricePercent = (result.data as { price_percent: number }).price_percent;
       const label = GROWTH_TIER_LABEL[pricePercent] ?? `${pricePercent}%`;
       toast({ title: "抽獎結果", description: `恭喜抽中 ${label}！` });
     } catch (err) {
       toast({ title: "抽獎失敗", description: (err as Error).message, variant: "destructive" });
     } finally {
-      setDrawing(false);
+      setDrawingVendorId(null);
     }
   }
 
   // 真實商家清單，「今日推薦鎖定方案」跟「合作店家與計畫」都要用（各自的
   // 品項/方案是分開的子集合查詢，商家本身只查一次）。
-  const { data: vendors = [] } = useQuery({
-    queryKey: ["vendors"],
-    queryFn: async () => {
-      const snap = await getDocs(collection(db, "vendors"));
-      return snap.docs
-        .map((d) => ({ id: d.id, ...(d.data() as any) }) as Vendor)
-        .filter((v) => v.status !== "disabled");
-    },
-    staleTime: 15 * 60 * 1000,
-  });
+  const { data: vendors = [] } = useVendors();
 
   // 今日推薦鎖定方案（單點型）——真實 menu_items，早鳥折扣依 pickupDate 現算
   // （跟左側「早鳥預約折扣」說明欄位同一套 web/src/lib/pricing.ts 規則）。
@@ -159,19 +161,59 @@ export default function HomePage() {
     return () => clearInterval(t);
   }, []);
 
+  // 所有商家的轉讓中鎖定。只用 status 單一等值（自動索引），排序交給前端，
+  // 不另外要求 status+created_at 複合索引；firestore.rules 也要求查詢帶 status 才能公開讀。
   const { data: transfers = [] } = useQuery({
     queryKey: ["homeTransferPreview"],
     queryFn: async () => {
       const snap = await getDocs(
-        query(collection(db, "locks"), where("vendor_id", "==", GROWTH_VENDOR_ID), where("status", "==", "for_resale"), orderBy("created_at", "desc"), limit(50))
+        query(collection(db, "locks"), where("status", "==", "for_resale"), limit(200))
       );
       return snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }) as Lock)
-        .filter((l) => l.status === "for_resale")
+        .map((d) => ({ id: d.id, ...d.data() }) as Lock & { created_at?: { toMillis?: () => number } })
+        .sort((a, b) => (b.created_at?.toMillis?.() ?? 0) - (a.created_at?.toMillis?.() ?? 0))
         .slice(0, 6);
     },
     staleTime: 2 * 60 * 1000,
   });
+
+  const { data: reviews = [] } = useReviews();
+  const vendorRatings = useMemo(() => summarizeRatings(reviews, (r) => r.vendor_id), [reviews]);
+  const planRatings = useMemo(() => summarizeRatings(reviews, (r) => r.meal_plan_id), [reviews]);
+
+  const rangeDates = useMemo(() => {
+    if (!startDate || !endDate || endDate < startDate) return [];
+    const dates: string[] = [];
+    for (let d = startDate; d <= endDate && dates.length < MAX_RANGE_DAYS; d = addDaysStr(d, 1)) dates.push(d);
+    return dates;
+  }, [startDate, endDate]);
+  const rangeInvalid = rangeDates.length === 0;
+  const openInRange = (vendor: Vendor) => rangeDates.some((d) => openWindowsOn(vendor, d).length > 0);
+
+  const sortedMealCards = useMemo(() => {
+    const cards = lockMealCards.filter(({ vendor }) => openInRange(vendor));
+    const earliest = (v: Vendor) => nextAvailablePickup(v)?.date ?? "9999-12-31";
+    const rating = (v: Vendor) => vendorRatings.get(v.id)?.average ?? -1;
+    if (selectedSort === "earliest") cards.sort((a, b) => earliest(a.vendor).localeCompare(earliest(b.vendor)));
+    if (selectedSort === "price") cards.sort((a, b) => applyEarlyBirdPrice(a.item.price, pickupDate).lockedPrice - applyEarlyBirdPrice(b.item.price, pickupDate).lockedPrice);
+    if (selectedSort === "rating") cards.sort((a, b) => rating(b.vendor) - rating(a.vendor));
+    return cards;
+  }, [lockMealCards, rangeDates, selectedSort, vendorRatings, pickupDate]);
+
+  const visiblePlanGroups = useMemo(() => {
+    const groups = vendorPlanGroups.filter((g) => {
+      const vendor = vendors.find((v) => v.id === g.vendorId);
+      return vendor ? openInRange(vendor) : false;
+    });
+    if (selectedSort === "rating") {
+      groups.sort((a, b) => (vendorRatings.get(b.vendorId)?.average ?? -1) - (vendorRatings.get(a.vendorId)?.average ?? -1));
+    }
+    return groups;
+  }, [vendorPlanGroups, vendors, rangeDates, selectedSort, vendorRatings]);
+
+  const visibleTransfers = rangeInvalid
+    ? transfers
+    : transfers.filter((t) => t.pickup_date >= rangeDates[0] && t.pickup_date <= rangeDates[rangeDates.length - 1]);
 
   async function handleLockMeal(item: MenuItem, vendor: Vendor) {
     if (!requireLogin() || !uid) return;
@@ -249,24 +291,30 @@ export default function HomePage() {
               <CalendarDays className="w-4 h-4 text-primary" /> 預約日曆
             </h3>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">開始日期</label>
+              <label className="text-xs text-muted-foreground block mb-1" htmlFor="home-range-start">開始日期</label>
               <Input
+                id="home-range-start"
                 type="date"
                 value={startDate}
+                min={todayStr()}
                 onChange={e => setStartDate(e.target.value)}
                 className="h-10"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">結束日期</label>
+              <label className="text-xs text-muted-foreground block mb-1" htmlFor="home-range-end">結束日期</label>
               <Input
+                id="home-range-end"
                 type="date"
                 value={endDate}
+                min={startDate}
                 onChange={e => setEndDate(e.target.value)}
                 className="h-10"
               />
             </div>
-            <p className="text-xs text-center text-muted-foreground pt-1 border-t border-border">最快下週一供餐</p>
+            <p className="text-xs text-center text-muted-foreground pt-1 border-t border-border">
+              {rangeInvalid ? "結束日期要在開始日期之後" : "只顯示這段期間有開放取餐的店家與轉讓"}
+            </p>
           </div>
 
           <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
@@ -316,20 +364,24 @@ export default function HomePage() {
             <h3 className="text-sm font-semibold flex items-center gap-1.5">
               <Trophy className="w-4 h-4 text-primary" /> 成長獎勵抽獎
             </h3>
-            {growthUnlocked ? (
+            {growthUnlockedIds.length > 0 ? (
               <>
-                <p className="text-xs text-muted-foreground">校園咖啡廳已解鎖抽獎，手氣好可以抽到整份 0 元！</p>
-                <Button
-                  size="sm"
-                  className="w-full"
-                  disabled={drawing}
-                  onClick={handleDrawGrowthReward}
-                >
-                  {drawing ? "抽獎中…" : "抽一次"}
-                </Button>
+                <p className="text-xs text-muted-foreground">以下店家已解鎖抽獎，手氣好可以抽到整份 0 元！</p>
+                {growthUnlockedIds.map((vendorId) => (
+                  <div key={vendorId} className="flex items-center gap-2">
+                    <span className="flex-1 text-sm truncate">{vendors.find((v) => v.id === vendorId)?.name ?? "合作店家"}</span>
+                    <Button
+                      size="sm"
+                      disabled={drawingVendorId !== null}
+                      onClick={() => handleDrawGrowthReward(vendorId)}
+                    >
+                      {drawingVendorId === vendorId ? "抽獎中…" : "抽一次"}
+                    </Button>
+                  </div>
+                ))}
               </>
             ) : (
-              <p className="text-xs text-muted-foreground">校園咖啡廳累積合作營收還沒達到解鎖門檻，尚無法抽獎。</p>
+              <p className="text-xs text-muted-foreground">合作店家累積營收還沒達到解鎖門檻，尚無法抽獎。</p>
             )}
           </div>
 
@@ -370,7 +422,10 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {lockMealCards.map(({ item, vendor }) => {
+              {sortedMealCards.length === 0 && (
+                <p className="text-sm text-muted-foreground md:col-span-3">這段期間沒有開放預購的品項，試著調整左側的預約日曆。</p>
+              )}
+              {sortedMealCards.map(({ item, vendor }) => {
                 const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
                 return (
                   <article key={item.id} className="bg-card rounded-2xl border border-ink overflow-hidden flex flex-col">
@@ -540,7 +595,10 @@ export default function HomePage() {
           <section>
             <h3 className="font-heading text-2xl font-semibold mb-3">合作店家與計畫</h3>
             <div className="space-y-4">
-              {vendorPlanGroups.map(group => (
+              {visiblePlanGroups.length === 0 && (
+                <p className="text-sm text-muted-foreground">這段期間沒有開放取餐的合作店家計畫。</p>
+              )}
+              {visiblePlanGroups.map(group => (
                 <div key={group.vendorId} className="bg-accent rounded-3xl border border-ink p-5 grid grid-cols-1 md:grid-cols-[220px_1fr_1fr] gap-4">
                   {/* 店家資訊 */}
                   <Link href={`/vendor/${group.vendorId}`} className="flex md:flex-col gap-3 hover:opacity-90">
@@ -552,9 +610,14 @@ export default function HomePage() {
                       {group.plans.map(p => (
                         <div key={p.id} className="flex items-center gap-1 text-xs text-muted-foreground">
                           <span className="truncate">{p.label}：{p.name}</span>
-                          <span className="flex items-center gap-0.5 text-amber-500 shrink-0">
-                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {p.rating}
-                          </span>
+                          {planRatings.get(p.id) ? (
+                            <span className="flex items-center gap-0.5 text-amber-500 shrink-0">
+                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {planRatings.get(p.id)!.average}
+                              <span className="text-muted-foreground">（{planRatings.get(p.id)!.count}）</span>
+                            </span>
+                          ) : (
+                            <span className="shrink-0">尚無評分</span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -600,7 +663,10 @@ export default function HomePage() {
             </div>
 
             <div className="flex gap-3 overflow-x-auto pb-1">
-              {transfers.map(t => (
+              {visibleTransfers.length === 0 && (
+                <p className="text-sm text-muted-foreground">這段期間目前沒有同學轉讓的餐點。</p>
+              )}
+              {visibleTransfers.map(t => (
                 <div key={t.id} className="shrink-0 w-64 bg-card text-foreground rounded-2xl p-3 border border-ink">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-6 h-6 rounded-full bg-secondary border border-ink flex items-center justify-center shrink-0">

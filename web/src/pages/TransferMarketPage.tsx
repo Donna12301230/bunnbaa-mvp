@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
+import { collection, doc, limit, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
@@ -12,6 +12,7 @@ import { auth, db, functions } from "@/lib/firebase";
 import { isClean } from "@/lib/searchFilter";
 import { takeOverLock } from "@/lib/transfers";
 import type { Lock } from "@/types";
+import { useVendors } from "@/hooks/useVendors";
 import { EmptyState, Tag } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { Link } from "wouter";
@@ -21,15 +22,14 @@ import { Link } from "wouter";
 //   - 「我要接手」呼叫 claimResoldLock（functions/src/index.js，正式站要等 Blaze）
 //   - 「免費領取」是純 client-side 規則（firestore.rules：for_resale 且
 //     resale_deadline 已過，任何登入用戶可直接 updateDoc），不用排程
-//   - 沿用同一組 vendor_id + created_at 索引，篩選 for_resale 交給前端做，
-//     避免另外要求新的複合索引（跟 VendorRedeemPage/VendorPortalPrep 同慣例）
+//   - 列出所有商家的轉讓，只用 status 單一等值查詢（自動索引），排序交給前端，
+//     避免另外要求新的複合索引
 // 「取消轉讓」2026-09-22 補上 firestore.rules 規則（owner 可以把還沒被接手的
 // for_resale 改回 locked），「我的轉讓」現在是真的可以取消。已被接手的項目靠
 // locks.transferred_from_uids（接手時由 claimResoldLock／firestore.rules 強制寫入
 // 原持有人）查回來，原持有人也保有讀取權限。
 // 轉賣價格由買家雙方私下議定、平台不經手，所以這裡不顯示「轉讓價」，只顯示
 // 原鎖定價（locked_price）。
-const VENDOR_ID = "cafe-renheya-demo";
 
 function millisOf(ts: unknown): number {
   return (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
@@ -53,6 +53,8 @@ export default function TransferMarketPage() {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const { data: vendors = [] } = useVendors();
+  const vendorName = (id: string) => vendors.find((v) => v.id === id)?.name;
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
@@ -62,17 +64,16 @@ export default function TransferMarketPage() {
   useEffect(() => {
     // 只查轉賣中的：locks 只有 for_resale／for_gift 是公開可讀（firestore.rules），
     // 查詢條件要讓規則能證明每一筆都符合，不然整個查詢會被拒絕
-    const q = query(
-      collection(db, "locks"),
-      where("vendor_id", "==", VENDOR_ID),
-      where("status", "==", "for_resale"),
-      orderBy("created_at", "desc"),
-      limit(200)
-    );
+    // 所有商家一起列；只用 status 單一等值（自動索引），排序交給前端
+    const q = query(collection(db, "locks"), where("status", "==", "for_resale"), limit(200));
     const unsub = onSnapshot(
       q,
       (snap) => {
-        setLocks(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock));
+        setLocks(
+          snap.docs
+            .map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock)
+            .sort((a, b) => millisOf(b.created_at) - millisOf(a.created_at))
+        );
         setLoading(false);
       },
       () => setLoading(false)
@@ -94,7 +95,7 @@ export default function TransferMarketPage() {
         const rows = snap.docs
           .map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock)
           // 接手後又轉回自己手上的，算在自己的項目，不算已被接手
-          .filter((l) => l.vendor_id === VENDOR_ID && l.buyer_uid !== uid)
+          .filter((l) => l.buyer_uid !== uid)
           .sort((a, b) => millisOf(b.created_at) - millisOf(a.created_at));
         setHandedOver(rows);
       },
@@ -228,7 +229,7 @@ export default function TransferMarketPage() {
                       <div className="flex flex-col gap-2.5 p-4 flex-1">
                         <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
+                          <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                         </div>
                         <div className="flex items-center justify-between mt-auto pt-1.5">
                           <span className="text-lg font-extrabold">${item.locked_price}</span>
@@ -268,7 +269,7 @@ export default function TransferMarketPage() {
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
                       <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
+                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-1.5">
                         <div>
@@ -315,7 +316,7 @@ export default function TransferMarketPage() {
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
                       <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
+                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-1.5">
                         <span className="text-lg font-extrabold">${item.locked_price}</span>
@@ -355,7 +356,7 @@ export default function TransferMarketPage() {
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
                       <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
+                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                       </div>
                     </div>
                   </article>

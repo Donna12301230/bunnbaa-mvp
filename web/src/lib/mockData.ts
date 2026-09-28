@@ -77,37 +77,6 @@ export const mockMenuItems: MenuItemData[] = [
   { id: "item-6", name: "手工厚蛋三明治", description: "現煎厚蛋、生菜、火腿", price: 55, isAvailable: true, category: "早餐", allergens: ["蛋", "奶"], dietaryTags: ["葷食"], vendorId: "vendor-3", createdAt: new Date("2026-03-02") },
 ];
 
-interface MockBanAppeal {
-  id: string;
-  userId: string;
-  username: string;
-  displayName: string;
-  reason: string;
-  status: "pending" | "approved" | "rejected";
-  adminNote?: string;
-  createdAt: Date;
-}
-
-export const mockBanAppeals: MockBanAppeal[] = [
-  {
-    id: "appeal-1",
-    userId: "mock-user42",
-    username: "student42",
-    displayName: "陳同學",
-    reason: "當天臨時生病無法取餐，已提前私訊店家告知",
-    status: "pending",
-    createdAt: new Date("2026-03-10"),
-  },
-];
-
-// ── Mock "cloud function" mutations (Parse.Cloud.run stand-ins) ────────────
-export function mockProcessBanAppeal(appealId: string, approved: boolean) {
-  const appeal = mockBanAppeals.find(a => a.id === appealId);
-  if (appeal) {
-    appeal.status = approved ? "approved" : "rejected";
-  }
-}
-
 export interface MockReportStats {
   totalRevenue: number;
   totalOrders: number;
@@ -211,66 +180,6 @@ export function mockToggleSessionStatus(id: string) {
   if (session) session.status = session.status === "open" ? "closed" : "open";
 }
 
-export function mockSaveMenuItem(
-  form: { id?: string | null; name: string; description: string; price: number; category: string; isAvailable: boolean; image?: string; allergens: string[]; dietaryTags: string[] },
-  vendorId: string,
-): MenuItemData {
-  if (form.id) {
-    const existing = mockMenuItems.find(i => i.id === form.id);
-    if (existing) {
-      Object.assign(existing, { ...form, image: form.image || undefined });
-      return existing;
-    }
-  }
-  const created: MenuItemData = {
-    id: "item-" + Math.random().toString(36).slice(2, 9),
-    name: form.name,
-    description: form.description,
-    price: form.price,
-    category: form.category,
-    isAvailable: form.isAvailable,
-    image: form.image || undefined,
-    allergens: form.allergens,
-    dietaryTags: form.dietaryTags,
-    vendorId,
-    createdAt: new Date(),
-  };
-  mockMenuItems.push(created);
-  return created;
-}
-
-export function mockDeleteMenuItem(id: string) {
-  const idx = mockMenuItems.findIndex(i => i.id === id);
-  if (idx >= 0) mockMenuItems.splice(idx, 1);
-}
-
-interface MockVendorDashboard {
-  vendorName: string;
-  pendingOrders: number;
-  totalOrders: number;
-  menuCount: number;
-  tablePending: number;
-  todaySessions: { id: string; pickupTime: string; pickupLocation: string; status: string; orderCount: number }[];
-}
-
-export async function mockGetVendorDashboard(): Promise<MockVendorDashboard> {
-  const vendor = mockVendors[0];
-  return {
-    vendorName: vendor?.name ?? "我的店家",
-    pendingOrders: mockPreOrders.filter(o => o.status === "pending").length,
-    totalOrders: mockPreOrders.length,
-    menuCount: mockMenuItems.filter(i => i.vendorId === vendor?.id).length,
-    tablePending: mockTableOrders.filter(o => o.status === "pending").length,
-    todaySessions: mockOrderSessions.map(s => ({
-      id: s.id,
-      pickupTime: s.pickupTime,
-      pickupLocation: s.pickupLocation,
-      status: s.status,
-      orderCount: mockPreOrders.filter(o => o.sessionId === s.id).length,
-    })),
-  };
-}
-
 export const mockOrderSessions: OrderSessionData[] = [
   {
     id: "session-1",
@@ -307,15 +216,6 @@ export const mockPreOrders: PreOrderData[] = [
 ];
 
 export const mockTableOrders: TableOrderData[] = [];
-
-export function mockFindPreOrderByCode(code: string, vendorId: string): PreOrderData | undefined {
-  const suffix = code.trim().toUpperCase().slice(-8);
-  return mockPreOrders.find(o =>
-    o.vendorId === vendorId &&
-    (o.status === "confirmed" || o.status === "pending") &&
-    o.id.slice(-8).toUpperCase() === suffix,
-  );
-}
 
 export function mockUpdatePreOrderStatus(orderId: string, status: PreOrderData["status"]) {
   const order = mockPreOrders.find(o => o.id === orderId);
@@ -437,113 +337,3 @@ export async function mockMarkNoPickup(_orderId: string): Promise<{ orderBanned:
   // repeated no-shows — the mock always reports "not banned".
   return { orderBanned: false };
 }
-
-export function mockCompletePreOrder(orderId: string) {
-  const order = mockPreOrders.find(o => o.id === orderId);
-  if (order) {
-    order.status = "completed";
-    order.paymentStatus = "paid";
-  }
-}
-
-interface MockAccuracyReport {
-  accuracy_rate: number;
-  error_range: string;
-  explanation: string;
-  pattern_note: string;
-  disclaimer: string;
-}
-
-export const mockAccuracyReport: MockAccuracyReport = {
-  accuracy_rate: 0.86,
-  error_range: "±8 份",
-  explanation: "近 14 天的實際取餐量與預估量差距落在可接受範圍內。",
-  pattern_note: "週五午餐時段常低估約 10%，可考慮提高備料量。",
-  disclaimer: "本報告由 AI 產生，僅供參考，實際備料仍請以店家判斷為準。",
-};
-
-// ── 首頁「計畫方案」模板用的假資料（訂閱式計畫餐 + 轉讓市集） ──────────────
-interface MealPlanTransfer {
-  id: string;
-  sellerName: string;
-  planName: string;
-  daysLeftLabel: string;
-  originalPrice: number;
-  resalePrice: number;
-  location: string;
-}
-
-export const mockMealPlanTransfers: MealPlanTransfer[] = [
-  { id: "t1", sellerName: "王同學", planName: "健康輕食週計畫（剩5天）", daysLeftLabel: "1天後截止", originalPrice: 600, resalePrice: 450, location: "台中公益店" },
-  { id: "t2", sellerName: "陳同學", planName: "健康特惠週省計畫", daysLeftLabel: "1天後截止", originalPrice: 600, resalePrice: 450, location: "台中公益店" },
-  { id: "t3", sellerName: "林同學", planName: "增肌蛋白餐計畫（剩3天）", daysLeftLabel: "2天後截止", originalPrice: 700, resalePrice: 520, location: "嘉義東區店" },
-  { id: "t4", sellerName: "黃同學", planName: "低卡輕食計畫（剩6天）", daysLeftLabel: "3天後截止", originalPrice: 650, resalePrice: 480, location: "嘉義西區店" },
-];
-
-export interface MealPlanOption {
-  id: string;
-  label: string; // "A方案" / "B方案"
-  name: string;
-  description: string;
-  pricePerMeal: number;
-  rating: number;
-  fastestBooking: string;
-  days: number; // 供餐天數，用來決定「預約加入計畫」要生成幾筆 locks
-}
-
-export interface VendorMealPlanGroup {
-  vendorId: string;
-  vendorName: string;
-  vendorImage?: string;
-  plans: MealPlanOption[];
-}
-
-export const mockVendorMealPlans: VendorMealPlanGroup[] = [
-  {
-    vendorId: "vendor-1",
-    vendorName: "一頭牛日式燒肉",
-    plans: [
-      { id: "p1", label: "A方案", name: "減脂健身餐 (5天)", description: "每日午餐、附贈無糖茶", pricePerMeal: 150, rating: 4.8, fastestBooking: "下週一", days: 5 },
-      { id: "p2", label: "B方案", name: "增肌蛋白餐 (7天)", description: "每日午餐、附贈蛋白餐食蛋白飯", pricePerMeal: 150, rating: 4.7, fastestBooking: "下週一", days: 7 },
-    ],
-  },
-  {
-    vendorId: "vendor-2",
-    vendorName: "王媽媽便當",
-    plans: [
-      { id: "p3", label: "A方案", name: "家常均衡餐 (5天)", description: "每日午餐、附贈溫豆漿", pricePerMeal: 140, rating: 4.6, fastestBooking: "下週二", days: 5 },
-      { id: "p4", label: "B方案", name: "高蛋白便當餐 (7天)", description: "每日午餐、附贈黑豆漿", pricePerMeal: 160, rating: 4.5, fastestBooking: "下週二", days: 7 },
-    ],
-  },
-  {
-    vendorId: "vendor-3",
-    vendorName: "阿嘉炸雞排",
-    plans: [
-      { id: "p5", label: "A方案", name: "酥脆雞排餐 (5天)", description: "每日午餐、附贈紅茶", pricePerMeal: 130, rating: 4.4, fastestBooking: "下週三", days: 5 },
-      { id: "p6", label: "B方案", name: "雙拼炸物餐 (7天)", description: "每日午餐、附贈綠茶", pricePerMeal: 155, rating: 4.3, fastestBooking: "下週三", days: 7 },
-    ],
-  },
-];
-
-
-
-// ── 首頁「今日推薦鎖定方案」用的假資料（UI草圖 Main.dc.html 新增的單點型卡片區） ──
-// TODO(firebase): 這組卡片目前純前端示意（勾選消保法同意欄位才能按「立即預付
-// 鎖定」），沒有寫入 Firestore。真正端到端接 locks collection 的單一品項示範在
-// pages/ConsumerLockPage.tsx（掛在 /lock，demo 影片用），之後要把這裡串成真的，
-// 可以照那個檔案的 handleLock() 模式擴充成多品項版本。
-interface LockMealOption {
-  id: string;
-  title: string;
-  time: string;
-  original: number;
-  price: number;
-  photoFrom: string;
-  photoTo: string;
-}
-
-export const mockLockMeals: LockMealOption[] = [
-  { id: "lm1", title: "舒肥雞胸溫沙拉餐盒", time: "12:00–12:30", original: 150, price: 120, photoFrom: "from-green-100", photoTo: "to-green-50" },
-  { id: "lm2", title: "塔香牛肉藜麥碗", time: "11:30–12:00", original: 160, price: 128, photoFrom: "from-orange-100", photoTo: "to-amber-100" },
-  { id: "lm3", title: "地中海鮪魚酪梨碗", time: "12:30–13:00", original: 145, price: 116, photoFrom: "from-yellow-100", photoTo: "to-amber-50" },
-];

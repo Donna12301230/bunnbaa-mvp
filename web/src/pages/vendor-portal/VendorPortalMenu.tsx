@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where,
+  addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where,
 } from "firebase/firestore";
-import { onAuthStateChanged, type User } from "firebase/auth";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,8 +15,9 @@ import { Plus, Pencil, Trash2, UtensilsCrossed } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
-import { auth, db } from "@/lib/firebase";
-import type { MenuItem, Vendor } from "@/types";
+import { db } from "@/lib/firebase";
+import { useMyVendor } from "@/hooks/useMyVendor";
+import type { MenuItem } from "@/types";
 import { ALLERGEN_LIST, DIETARY_TAGS } from "@/types";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
@@ -25,36 +25,17 @@ import { EmptyState, Switch, Tag } from "@/components/ds";
 
 const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[] };
 
-// Same "one hardcoded real vendor" convention as VendorPortalGrowth.tsx /
-// VendorPortalPrep.tsx — there's no owner_uid-based per-user vendor
-// resolution built yet (see TODO.md「商家帳號綁定」). Unlike those two
-// read-only pages, this one writes, so it also guards against the day
-// someone binds owner_uid without also building that resolution: if the
-// bound owner doesn't match whoever's signed in, writes are blocked with
-// an explicit message instead of silently succeeding against the wrong
-// vendor's real menu.
-const VENDOR_ID = "cafe-renheya-demo";
-
 export default function VendorPortalMenu() {
   const { toast } = useToast();
   const confirm = useConfirm();
-  const [authUser, setAuthUser] = useState<User | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, setAuthUser);
-    return () => unsub();
-  }, []);
-
-  const { data: myVendor } = useQuery({
-    queryKey: ["myVendor", VENDOR_ID],
-    queryFn: async () => {
-      const snap = await getDoc(doc(db, "vendors", VENDOR_ID));
-      return snap.exists() ? ({ id: snap.id, ...snap.data() } as Vendor) : null;
-    },
-  });
+  // 登入店主綁定（vendors/{id}.owner_uid）的商家；寫入權限由 firestore.rules 的
+  // isVendorOwner 把關，這裡不另外檢查。
+  const { data: myVendor } = useMyVendor();
+  const VENDOR_ID = myVendor?.id;
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["vendorMenu", VENDOR_ID],
@@ -64,18 +45,12 @@ export default function VendorPortalMenu() {
         .map((d) => ({ id: d.id, ...d.data() }) as MenuItem)
         .sort((a, b) => a.category.localeCompare(b.category));
     },
+    enabled: !!VENDOR_ID,
   });
-
-  function assertCanWrite() {
-    if (myVendor?.owner_uid && myVendor.owner_uid !== authUser?.uid) {
-      throw new Error("此帳號未綁定至這個商家");
-    }
-  }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!myVendor) throw new Error("找不到店家資料");
-      assertCanWrite();
+      if (!myVendor) throw new Error("這個帳號還沒綁定商家，請聯絡平台");
       const data = {
         vendor_id: myVendor.id,
         name: form.name,
@@ -110,7 +85,6 @@ export default function VendorPortalMenu() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      assertCanWrite();
       await deleteDoc(doc(db, "menu_items", id));
     },
     onSuccess: () => {

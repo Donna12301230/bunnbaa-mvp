@@ -21,9 +21,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import QrScannerDialog from "@/components/QrScannerDialog";
 
-// 沒綁定商家的帳號（例如 emulator 下的 admin）退回 demo 商家
-const DEMO_VENDOR_ID = "cafe-renheya-demo";
-
 const noShowSchema = z.object({
   note: z.string().trim().min(2, "請簡短描述狀況（至少 2 個字），這會餵給校準報告的落差模式分析"),
 });
@@ -70,7 +67,8 @@ function formatDateLabel(dateStr: string): string {
  */
 export default function VendorRedeemPage() {
   const { user } = useAuth();
-  const VENDOR_ID = user?.vendorId ?? DEMO_VENDOR_ID;
+  // VendorPortalLayout 只讓 role=vendor 進來，vendorId 是登入店主綁定的商家
+  const VENDOR_ID = user?.vendorId;
   const [code, setCode] = useState("");
   const [foundLock, setFoundLock] = useState<Lock | null>(null);
   const [searchError, setSearchError] = useState("");
@@ -92,6 +90,7 @@ export default function VendorRedeemPage() {
   // 「取餐總覽」日曆格用——跟下面 handleSearch() 重用同一組 vendor_id +
   // created_at 索引，即時監聽（onSnapshot）這樣核對完馬上就會從格子裡反映出新狀態。
   useEffect(() => {
+    if (!VENDOR_ID) return;
     const q = query(
       collection(db, "locks"),
       where("vendor_id", "==", VENDOR_ID),

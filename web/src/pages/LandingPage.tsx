@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import {
   ArrowRight, BellRing, CakeSlice, CalendarClock, ChevronLeft, ChevronRight, Clock, Coffee,
   CookingPot, Croissant, Info, Mail, MapPin, Repeat, Salad, Sandwich, ShieldCheck, Soup,
-  Sparkle, Star, Store, Ticket, Wheat,
+  Sparkle, Star, Store, Ticket,
 } from "lucide-react";
 import {
   AnimatedNumber, Badge, Button, IconBox, Input, Tabs, ToastProvider, useToast,
 } from "@/components/ds";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { db } from "@/lib/firebase";
-import type { Vendor } from "@/types";
+import type { MenuItem, Vendor } from "@/types";
+import { EARLY_BIRD_TIERS } from "@/lib/pricing";
+import { useReviews } from "@/hooks/useReviews";
+import { slotLabel, vendorWindows } from "@/lib/pickupSlots";
 import "./LandingPage.css";
+import { useVendors } from "@/hooks/useVendors";
 
 /**
  * 品牌形象頁（#/landing）
@@ -45,50 +49,35 @@ const FEATURES = [
   { icon: <BellRing />, title: "準時提醒取餐", body: "取餐時段開始前推播通知，排隊時間留給自己。" },
 ];
 
-// 示意菜單：分類與品項僅供版面呈現，上線前改接 menu_items
-const MENU: Record<string, { name: string; desc: string; price: number; icon: ReactNode; popular?: boolean }[]> = {
-  rice: [
-    { name: "阿嬤滷肉飯套餐", desc: "手切滷肉、半熟蛋、當日時蔬兩樣。", price: 110, icon: <CookingPot />, popular: true },
-    { name: "日式照燒雞腿飯", desc: "去骨雞腿煎到微焦，淋上自製照燒醬。", price: 135, icon: <Soup /> },
-    { name: "三杯杏鮑菇燴飯", desc: "九層塔香氣十足的蔬食選擇。", price: 105, icon: <Salad /> },
-    { name: "咖哩豬排飯", desc: "慢燉 6 小時的日式咖哩配厚切豬排。", price: 145, icon: <CookingPot /> },
-  ],
-  noodle: [
-    { name: "紅燒牛肉麵", desc: "牛腱與牛筋各半，湯頭濃而不膩。", price: 160, icon: <Soup />, popular: true },
-    { name: "麻醬涼麵", desc: "芝麻醬加蒜泥，附一碗味噌湯。", price: 80, icon: <Wheat /> },
-    { name: "鍋燒意麵", desc: "蝦、蛤蜊、魚板，熱湯現煮。", price: 95, icon: <Soup /> },
-    { name: "蔥油拌麵", desc: "手工細麵拌上酥香蔥油。", price: 70, icon: <Wheat /> },
-  ],
-  light: [
-    { name: "烤雞胸凱薩沙拉", desc: "舒肥雞胸、蘿蔓、帕瑪森起司。", price: 150, icon: <Salad />, popular: true },
-    { name: "總匯三明治", desc: "火腿、蛋、起司三層，附薯餅。", price: 85, icon: <Sandwich /> },
-    { name: "可頌早午餐盤", desc: "奶油可頌、炒蛋、優格水果杯。", price: 120, icon: <Croissant /> },
-    { name: "鮪魚蛋捲餅", desc: "全麥餅皮，份量剛好不負擔。", price: 75, icon: <Sandwich /> },
-  ],
-  drink: [
-    { name: "經典拿鐵", desc: "單一產區咖啡豆配鮮乳。", price: 70, icon: <Coffee />, popular: true },
-    { name: "焙茶歐蕾", desc: "焙茶香氣溫潤，微甜。", price: 65, icon: <Coffee /> },
-    { name: "手沖單品", desc: "每週輪替產區，詢問店員當週豆單。", price: 90, icon: <Coffee /> },
-    { name: "巴斯克乳酪蛋糕", desc: "焦香表面、綿密內餡，每日限量。", price: 95, icon: <CakeSlice /> },
-  ],
+// 早鳥最高折扣（提前 14–30 天），跟 lib/pricing 同一套級距與四捨五入
+const BEST_EARLY_BIRD = Math.max(...EARLY_BIRD_TIERS.map((t) => t.discountPercent));
+const earlyBird = (price: number) => Math.round(price * (1 - BEST_EARLY_BIRD / 100));
+const MENU_TAB_LIMIT = 5;
+const MENU_ITEMS_PER_TAB = 4;
+
+// 最早可提前預約天數＝早鳥級距的最大天數（lib/pricing）
+const MAX_ADVANCE_DAYS = Math.max(...EARLY_BIRD_TIERS.map((t) => t.maxDays));
+
+// 近期活動讀 landing_events（管理員在 Firestore 維護），icon 存成字串 key
+const EVENT_ICONS: Record<string, ReactNode> = {
+  sparkle: <Sparkle />,
+  calendar: <CalendarClock />,
+  repeat: <Repeat />,
+  store: <Store />,
+  ticket: <Ticket />,
+  bell: <BellRing />,
 };
 
-const MENU_TABS = [
-  { value: "rice", label: "飯類" },
-  { value: "noodle", label: "麵食" },
-  { value: "light", label: "輕食" },
-  { value: "drink", label: "飲品甜點" },
-];
-
-// 提前 14–30 天的早鳥價（與 lib/pricing 的 7 折級距一致），僅做展示
-const earlyBird = (price: number) => Math.round(price * 0.7);
-
-const EVENTS = [
-  { date: "每月 1 日", title: "成長獎勵抽獎", body: "合作店家營收達標就解鎖，最高抽中整份 0 元。", icon: <Sparkle />, href: "/home" },
-  { date: "期中考週", title: "考前便當早鳥加碼", body: "考試週提前預約，讀書不用再排隊買午餐。", icon: <CalendarClock />, href: "/home" },
-  { date: "隨時進行", title: "同學轉讓市集", body: "臨時有事？把餐點轉給需要的人，不浪費一份。", icon: <Repeat />, href: "/marketplace" },
-  { date: "新店家進駐", title: "合作店家招募中", body: "餐廳、咖啡廳都能加入，提前掌握備餐數量。", icon: <Store />, href: "/vendors" },
-];
+interface LandingEvent {
+  id: string;
+  date_label: string;
+  title: string;
+  body: string;
+  href: string;
+  icon?: string;
+  sort_order?: number;
+  active?: boolean;
+}
 
 const GALLERY: { shape: "arch" | "circle" | "rounded"; icon: ReactNode }[] = [
   { shape: "rounded", icon: <Soup /> },
@@ -99,14 +88,9 @@ const GALLERY: { shape: "arch" | "circle" | "rounded"; icon: ReactNode }[] = [
   { shape: "arch", icon: <Sandwich /> },
 ];
 
-// 示意評價：上線前請換成真實使用者回饋
-const REVIEWS = [
-  { quote: "以前午休一半時間都在排隊，現在前一天鎖好，下課直接拿了就走，還比現場買便宜。", name: "林同學", role: "資管系 大三" },
-  { quote: "那天臨時要補課，直接轉讓給室友，錢沒浪費、飯也沒浪費，這個設計真的很貼心。", name: "陳同學", role: "外文系 大二" },
-  { quote: "取餐前會收到提醒，對我這種很容易忘記的人超有用。", name: "黃同學", role: "電機所 碩一" },
-];
+// 同學評價：讀 reviews 裡有公開心得、4 星以上的最近幾則
+const REVIEW_LIMIT = 5;
 
-const TIME_SLOTS = ["11:30–12:00", "12:00–12:30", "12:30–13:00"];
 
 /** 進入視窗才觸發的數字滾動（AnimatedNumber 從 0 滾到目標值）。 */
 function StatNumber({ value, suffix }: { value: number; suffix?: string }) {
@@ -192,23 +176,50 @@ function Newsletter() {
 }
 
 function LandingContent() {
-  const [tab, setTab] = useState("rice");
+  // 招牌餐點：真實 menu_items（上架中），依 category 分頁，品項最多的分類排前面
+  const { data: menuItems = [] } = useQuery({
+    queryKey: ["landingMenu"],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "menu_items"), where("is_available", "==", true)));
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as MenuItem);
+    },
+    staleTime: 15 * 60 * 1000,
+  });
+  const menuByCategory = new Map<string, MenuItem[]>();
+  for (const item of menuItems) {
+    const key = item.category || "其他";
+    menuByCategory.set(key, [...(menuByCategory.get(key) ?? []), item]);
+  }
+  const menuTabs = [...menuByCategory.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, MENU_TAB_LIMIT)
+    .map(([category], i) => ({ value: `c${i}`, label: category }));
+  const [tabState, setTab] = useState("c0");
+  const tab = menuTabs.some((t) => t.value === tabState) ? tabState : "c0";
+  const tabDishes = menuByCategory.get(menuTabs.find((t) => t.value === tab)?.label ?? "")?.slice(0, MENU_ITEMS_PER_TAB) ?? [];
   const events = useScroller();
   const [review, setReview] = useState(0);
 
   // 合作店家：真實 vendors（與首頁共用 queryKey），取前 3 間
-  const { data: vendors = [], isLoading: vendorsLoading } = useQuery({
-    queryKey: ["vendors"],
+  const { data: vendors = [], isLoading: vendorsLoading } = useVendors();
+
+  const { data: landingEvents = [] } = useQuery({
+    queryKey: ["landingEvents"],
     queryFn: async () => {
-      const snap = await getDocs(collection(db, "vendors"));
+      const snap = await getDocs(query(collection(db, "landing_events"), orderBy("sort_order")));
       return snap.docs
-        .map((d) => ({ id: d.id, ...(d.data() as any) }) as Vendor)
-        .filter((v) => v.status !== "disabled");
+        .map((d) => ({ id: d.id, ...d.data() }) as LandingEvent)
+        .filter((e) => e.active !== false);
     },
     staleTime: 15 * 60 * 1000,
   });
 
-  const r = REVIEWS[review];
+  // 頁尾取餐時段：所有合作店家設定的時段聯集（商家後台店家設定頁維護）
+  const pickupWindows = [...new Set(vendors.flatMap((v) => vendorWindows(v)))].sort();
+
+  const { data: allReviews = [] } = useReviews();
+  const reviews = allReviews.filter((x) => x.comment.trim() && x.rating >= 4).slice(0, REVIEW_LIMIT);
+  const r = reviews.length > 0 ? reviews[review % reviews.length] : null;
 
   return (
     <div className="bb-landing">
@@ -301,22 +312,25 @@ function LandingContent() {
           <div className="lp-menu">
             <IconBox size="lg" className="lp-center-block"><Soup /></IconBox>
             <h2 id="lp-menu-title" className="lp-h2 lp-center">大家最愛的招牌餐點</h2>
-            <div className="lp-menu__tabs">
-              <Tabs items={MENU_TABS} value={tab} onValueChange={setTab} idPrefix="lp-menu" aria-label="餐點分類" />
-            </div>
+            {menuTabs.length > 0 && (
+              <div className="lp-menu__tabs">
+                <Tabs items={menuTabs} value={tab} onValueChange={setTab} idPrefix="lp-menu" aria-label="餐點分類" />
+              </div>
+            )}
             <ul
               className="lp-menu__list"
               role="tabpanel"
               id={`lp-menu-panel-${tab}`}
               aria-labelledby={`lp-menu-tab-${tab}`}
             >
-              {MENU[tab].map((m) => (
-                <li key={m.name} className="lp-dish">
-                  <span className="lp-dish__thumb" aria-hidden="true">{m.icon}</span>
-                  {m.popular && <Badge tone="brand" variant="solid" size="sm" shape="pill" className="lp-dish__badge">人氣</Badge>}
+              {tabDishes.map((m) => (
+                <li key={m.id} className="lp-dish">
+                  <span className="lp-dish__thumb" aria-hidden="true">
+                    {m.image ? <img src={m.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} /> : <Soup />}
+                  </span>
                   <div className="lp-dish__text">
                     <h3 className="lp-h4">{m.name}</h3>
-                    <p className="lp-muted">{m.desc}</p>
+                    <p className="lp-muted">{m.description}</p>
                   </div>
                   <div className="lp-dish__price">
                     <span className="lp-strike">${m.price}</span>
@@ -325,6 +339,7 @@ function LandingContent() {
                 </li>
               ))}
             </ul>
+            {menuItems.length === 0 && <p className="lp-muted lp-center">合作店家的餐點即將上架。</p>}
             <p className="lp-note lp-center">價格為提前 14–30 天的早鳥 7 折價；實際品項與價格以各店家菜單為準。</p>
           </div>
         </section>
@@ -339,23 +354,23 @@ function LandingContent() {
             </div>
           </div>
           <div className="lp-scroller" ref={events.ref}>
-            {EVENTS.map((e) => (
-              <article key={e.title} className="lp-event">
+            {landingEvents.map((e) => (
+              <article key={e.id} className="lp-event">
                 <div className="lp-event__body">
-                  <p className="lp-caption">{e.date}</p>
+                  <p className="lp-caption">{e.date_label}</p>
                   <h3 className="lp-h3">{e.title}</h3>
                   <p className="lp-muted">{e.body}</p>
                   <LinkButton href={e.href} variant="secondary" size="sm" rightIcon={<ArrowRight />}>查看活動</LinkButton>
                 </div>
-                <div className="lp-event__visual" aria-hidden="true">{e.icon}</div>
+                <div className="lp-event__visual" aria-hidden="true">{EVENT_ICONS[e.icon ?? ""] ?? <Sparkle />}</div>
               </article>
             ))}
           </div>
 
           <dl className="lp-container lp-stats">
-            <div className="lp-stat"><dt>早鳥折扣最高</dt><dd><StatNumber value={7} suffix=" 折" /></dd></div>
+            <div className="lp-stat"><dt>早鳥折扣最高</dt><dd><StatNumber value={(100 - BEST_EARLY_BIRD) / 10} suffix=" 折" /></dd></div>
             <div className="lp-stat"><dt>未出餐加贈回饋金</dt><dd><StatNumber value={20} suffix=" 點" /></dd></div>
-            <div className="lp-stat"><dt>最早可提前預約</dt><dd><StatNumber value={30} suffix=" 天" /></dd></div>
+            <div className="lp-stat"><dt>最早可提前預約</dt><dd><StatNumber value={MAX_ADVANCE_DAYS} suffix=" 天" /></dd></div>
           </dl>
         </section>
 
@@ -368,21 +383,26 @@ function LandingContent() {
           </div>
         </div>
 
-        {/* ── 評價 ── */}
-        <section className="lp-section lp-container lp-reviews" aria-labelledby="lp-reviews-title" aria-roledescription="輪播">
-          <h2 id="lp-reviews-title" className="sr-only">使用者評價</h2>
-          <div className="lp-stars" aria-label="5 顆星">
-            {Array.from({ length: 5 }, (_, i) => <Star key={i} aria-hidden="true" />)}
-          </div>
-          <div className="lp-reviews__row">
-            <Button variant="outline" iconOnly aria-label="上一則評價" className="lp-round" onClick={() => setReview((review + REVIEWS.length - 1) % REVIEWS.length)}><ChevronLeft /></Button>
-            <figure className="lp-quote" aria-live="polite">
-              <blockquote>{r.quote}</blockquote>
-              <figcaption><strong>{r.name}</strong><span>{r.role}</span></figcaption>
-            </figure>
-            <Button variant="outline" iconOnly aria-label="下一則評價" className="lp-round" onClick={() => setReview((review + 1) % REVIEWS.length)}><ChevronRight /></Button>
-          </div>
-        </section>
+        {/* ── 評價（沒有公開評價時整段不顯示） ── */}
+        {r && (
+          <section className="lp-section lp-container lp-reviews" aria-labelledby="lp-reviews-title" aria-roledescription="輪播">
+            <h2 id="lp-reviews-title" className="sr-only">使用者評價</h2>
+            <div className="lp-stars" aria-label={`${r.rating} 顆星`}>
+              {Array.from({ length: r.rating }, (_, i) => <Star key={i} aria-hidden="true" />)}
+            </div>
+            <div className="lp-reviews__row">
+              <Button variant="outline" iconOnly aria-label="上一則評價" className="lp-round" disabled={reviews.length < 2} onClick={() => setReview((review + reviews.length - 1) % reviews.length)}><ChevronLeft /></Button>
+              <figure className="lp-quote" aria-live="polite">
+                <blockquote>{r.comment}</blockquote>
+                <figcaption>
+                  <strong>{r.reviewer_label}</strong>
+                  <span>{[vendors.find((v) => v.id === r.vendor_id)?.name, r.item_name].filter(Boolean).join("・")}</span>
+                </figcaption>
+              </figure>
+              <Button variant="outline" iconOnly aria-label="下一則評價" className="lp-round" disabled={reviews.length < 2} onClick={() => setReview((review + 1) % reviews.length)}><ChevronRight /></Button>
+            </div>
+          </section>
+        )}
 
         {/* ── 合作店家 ── */}
         <section className="lp-section lp-container" aria-labelledby="lp-stores-title">
@@ -419,8 +439,8 @@ function LandingContent() {
           <div>
             <h2 className="lp-h4"><Clock aria-hidden="true" className="lp-inline-icon" /> 取餐時段</h2>
             <ul className="lp-muted lp-footer__hours">
-              {TIME_SLOTS.map((t) => <li key={t}>週一至週五 {t}</li>)}
-              <li>實際時段依各店家公告，國定假日可能調整。</li>
+              {pickupWindows.map((t) => <li key={t}>{slotLabel(t)}</li>)}
+              <li>實際時段與公休日依各店家設定。</li>
             </ul>
           </div>
           <p className="lp-caption">© {new Date().getFullYear()} BunnBaa 飯飽・越早訂，越開心。</p>

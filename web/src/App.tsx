@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route, Link, Router } from "wouter";
+import { Switch, Route, Link, Router, Redirect } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -37,7 +37,6 @@ import VendorPortalOrders from "./pages/vendor-portal/VendorPortalOrders";
 import VendorPortalPrep from "./pages/vendor-portal/VendorPortalPrep";
 import VendorPortalGrowth from "./pages/vendor-portal/VendorPortalGrowth";
 import VendorPortalReports from "./pages/vendor-portal/VendorPortalReports";
-import VendorPortalScan from "./pages/vendor-portal/VendorPortalScan";
 import VendorPortalSessions from "./pages/vendor-portal/VendorPortalSessions";
 import VendorPortalSessionSummary from "./pages/vendor-portal/VendorPortalSessionSummary";
 import VendorPortalSettings from "./pages/vendor-portal/VendorPortalSettings";
@@ -163,8 +162,9 @@ export default function App() {
           <Route path="/vendor-portal/growth">
             <MarketplacePage><VendorPortalGrowth /></MarketplacePage>
           </Route>
+          {/* 舊版 mock 掃碼頁，已由真的核對取餐頁取代，保留路徑避免舊連結 404 */}
           <Route path="/vendor-portal/scan">
-            <MarketplacePage><VendorPortalScan /></MarketplacePage>
+            <Redirect to="/lock/vendor/redeem" replace />
           </Route>
           <Route path="/vendor-portal/sessions/:sessionId/summary">
             <MarketplacePage><VendorPortalSessionSummary /></MarketplacePage>

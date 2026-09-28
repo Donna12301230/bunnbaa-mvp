@@ -74,7 +74,7 @@ service cloud.firestore {
                     || (isVendorOwner(vendorId)
                         && request.resource.data.diff(resource.data).affectedKeys()
                              .hasOnly(['description', 'address', 'phone', 'pickup_windows',
-                                       'business_hours', 'holidays', 'slot_capacity'])
+                                       'business_hours', 'holidays', 'slot_capacity', 'cover_image'])
                         && request.resource.data.get('description', '') is string
                         && request.resource.data.get('description', '').size() <= 500
                         && request.resource.data.get('address', '') is string
@@ -89,7 +89,12 @@ service cloud.firestore {
                         && request.resource.data.get('holidays', []).size() <= 100
                         && request.resource.data.get('slot_capacity', 0) is int
                         && request.resource.data.get('slot_capacity', 0) >= 0
-                        && request.resource.data.get('slot_capacity', 0) <= 10000);
+                        && request.resource.data.get('slot_capacity', 0) <= 10000
+                        // Cloudinary secure_url from ImageUploadField; https only so it
+                        // can't carry a javascript:/data: URL into the storefront <img>.
+                        && request.resource.data.get('cover_image', '') is string
+                        && request.resource.data.get('cover_image', '').size() <= 500
+                        && request.resource.data.get('cover_image', '').matches('^$|^https://.*'));
     }
 
     // Booked meals per vendor + pickup date + window (capacity), written only
@@ -247,6 +252,47 @@ service cloud.firestore {
     match /growth_rewards/{vendorId} {
       allow read: if true;
       allow write: if false;
+    }
+
+    // reviews/{lockId}: 消費者對已取餐的一筆鎖定打 1–5 星（可附公開心得），一筆鎖定
+    // 只能評一次（doc id＝lock id，create 不能覆寫既有文件，也沒有 update）。公開可讀：
+    // 計畫方案平均分數、Landing 同學評價都讀這裡；不存 buyer_uid，reviewer_label 是
+    // 前端組的「系所＋同學」。vendor_id／meal_plan_id／item_name 必須跟那筆 lock 一致。
+    function reviewableLock(lockId) {
+      let lock = get(/databases/$(database)/documents/locks/$(lockId)).data;
+      return lock.buyer_uid == request.auth.uid
+        && lock.status in ['fulfilled', 'resold_and_fulfilled']
+        && request.resource.data.vendor_id == lock.vendor_id
+        && request.resource.data.meal_plan_id == lock.get('meal_plan_id', null)
+        && request.resource.data.item_name == lock.item_name;
+    }
+    match /reviews/{lockId} {
+      allow read: if true;
+      allow create: if isSignedInUser()
+                    && request.resource.data.keys().hasOnly(['vendor_id', 'meal_plan_id', 'item_name', 'rating', 'comment', 'reviewer_label', 'created_at'])
+                    && request.resource.data.rating is int
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5
+                    && request.resource.data.comment is string
+                    && request.resource.data.comment.size() <= 280
+                    && request.resource.data.reviewer_label is string
+                    && request.resource.data.reviewer_label.size() <= 30
+                    && request.resource.data.created_at == request.time
+                    && reviewableLock(lockId);
+      allow delete: if isAdmin();
+    }
+
+    // platform_config: 平台層級設定（成長獎勵門檻 growth、Landing 活動卡片以外的
+    // 固定參數）。公開可讀，前端和 Functions 讀同一份；只有管理員能改。
+    match /platform_config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // landing_events: Landing 頁「近期活動」卡片，公開可讀、只有管理員能改。
+    match /landing_events/{eventId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // draws: 開獎紀錄，同樣只由 drawGrowthReward 寫。公開可讀，理由同上——內容只有

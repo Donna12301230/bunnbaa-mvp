@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { collection, limit, onSnapshot, query, where } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/lib/firebase";
+import type { AccuracyReport } from "@/types";
 import { useQuery } from "@tanstack/react-query";
-import { mockGetMyVendor, mockGetVendorReportStats, mockAccuracyReport, type MockReportStats } from "@/lib/mockData";
+import { mockGetMyVendor, mockGetVendorReportStats, type MockReportStats } from "@/lib/mockData";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -66,16 +70,39 @@ export default function VendorPortalReports() {
   const [whatifDraft, setWhatifDraft] = useState("");
   const [whatifAnswer, setWhatifAnswer] = useState("");
 
-  // TODO(firebase): 對應 UI草圖 VendorDashboard.dc.html「收益及未來備料趨勢」分頁
-  // 的「校準洞察」追問。/lock/vendor（legacy pages/VendorDashboard.tsx）已經有
-  // 真的串 Gemini（askCalibrationScenario Cloud Function），這裡先用 local
-  // state 示意，之後要接的話直接沿用那支 Function 即可。
-  function handleAskWhatif() {
+  // 對應 UI草圖 VendorDashboard.dc.html「收益及未來備料趨勢」分頁的「校準洞察」。
+  // 2026-09-28 改接真實資料：最新一份 accuracy_reports（dailyCalibration 產生）＋
+  // askCalibrationScenario 追問，跟 /lock/vendor（pages/VendorDashboard.tsx）同一套。
+  const VENDOR_ID = user?.vendorId;
+  const [report, setReport] = useState<AccuracyReport | null>(null);
+  const [asking, setAsking] = useState(false);
+
+  useEffect(() => {
+    if (!VENDOR_ID) return;
+    // 單一等值不加 orderBy，避免另外要求複合索引，最新一份在前端挑
+    const q = query(collection(db, "accuracy_reports"), where("vendor_id", "==", VENDOR_ID), limit(50));
+    const unsub = onSnapshot(q, (snap) => {
+      const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as AccuracyReport & { generated_at?: { toMillis?: () => number } });
+      docs.sort((a, b) => (b.generated_at?.toMillis?.() ?? 0) - (a.generated_at?.toMillis?.() ?? 0));
+      setReport(docs[0] ?? null);
+    });
+    return () => unsub();
+  }, [VENDOR_ID]);
+
+  async function handleAskWhatif() {
     const q = whatifDraft.trim();
-    if (!q) return;
-    setWhatifAnswer(
-      "根據過去的落差模式，調整後預估履約缺口會落在現行誤差區間的上緣附近，仍以雨天午餐時段風險最高，建議觀察下週雨天數再評估。（示意畫面：實際回覆需串接 askCalibrationScenario）"
-    );
+    if (!q || !VENDOR_ID) return;
+    setAsking(true);
+    setWhatifAnswer("");
+    try {
+      const fn = httpsCallable(functions, "askCalibrationScenario");
+      const res = await fn({ vendor_id: VENDOR_ID, question: q });
+      setWhatifAnswer((res.data as { scenario_answer: string }).scenario_answer);
+    } catch (err) {
+      setWhatifAnswer(`追問失敗：${(err as Error).message}`);
+    } finally {
+      setAsking(false);
+    }
   }
 
   const { data: myVendor } = useQuery({
@@ -167,17 +194,23 @@ export default function VendorPortalReports() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-gray-50 rounded-lg p-3 text-center">
-              <p className="text-xl font-bold text-orange-600">{Math.round(mockAccuracyReport.accuracy_rate * 100)}%</p>
-              <p className="text-xs text-muted-foreground">目前預測準確率</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3 text-center">
-              <p className="text-xl font-bold">{mockAccuracyReport.error_range}</p>
-              <p className="text-xs text-muted-foreground">近期誤差區間</p>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">{mockAccuracyReport.pattern_note}</p>
+          {report ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-orange-600">{Math.round(report.accuracy_rate * 100)}%</p>
+                  <p className="text-xs text-muted-foreground">目前預測準確率</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold">{report.error_range}</p>
+                  <p className="text-xs text-muted-foreground">近期誤差區間</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">{report.pattern_note}</p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">尚無校準報告——每天由系統自動產生，累積幾天的取餐紀錄後就會出現。</p>
+          )}
           <div className="flex gap-2">
             <Input
               value={whatifDraft}
@@ -185,7 +218,7 @@ export default function VendorPortalReports() {
               placeholder="例如：如果把鎖定量目標調高 10%，缺口大概會怎麼變化？"
               className="text-sm"
             />
-            <Button size="sm" onClick={handleAskWhatif} disabled={!whatifDraft.trim()}>送出</Button>
+            <Button size="sm" onClick={handleAskWhatif} disabled={!whatifDraft.trim() || !report || asking}>{asking ? "分析中…" : "送出"}</Button>
           </div>
           {whatifAnswer && (
             <div className="bg-amber-50 rounded-lg p-3 text-sm text-amber-900 space-y-1">

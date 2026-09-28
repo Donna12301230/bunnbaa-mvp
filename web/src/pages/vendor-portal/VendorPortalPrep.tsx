@@ -5,6 +5,7 @@ import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChefHat } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
 import type { Lock } from "@/types";
 import { EmptyState } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
@@ -15,8 +16,6 @@ import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 //
 // 跟 VendorRedeemPage.tsx「取餐總覽」共用同一套 vendor_id + created_at 索引
 // （避免另外要求新的複合索引），今日份數用 pickup_date 在前端過濾+分組。
-const VENDOR_ID = "cafe-renheya-demo";
-
 // 已解決/取消的狀態不算今日還要備的份數
 const EXCLUDED_STATUSES = new Set(["fulfilled", "resold_and_fulfilled", "no_show"]);
 
@@ -26,10 +25,13 @@ interface PrepSlot {
 }
 
 export default function VendorPortalPrep() {
+  // 商家後台只讓 role=vendor 進來，vendorId 是登入店主綁定的商家
+  const VENDOR_ID = useAuth().user?.vendorId;
   const [locks, setLocks] = useState<Lock[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!VENDOR_ID) return;
     const q = query(
       collection(db, "locks"),
       where("vendor_id", "==", VENDOR_ID),
@@ -45,7 +47,7 @@ export default function VendorPortalPrep() {
       () => setLoading(false)
     );
     return () => unsub();
-  }, []);
+  }, [VENDOR_ID]);
 
   const prepSlots = useMemo<PrepSlot[]>(() => {
     const todayStr = format(new Date(), "yyyy-MM-dd");

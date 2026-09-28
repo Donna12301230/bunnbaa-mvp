@@ -596,6 +596,8 @@ exports.createPlanLinePayReservation = onCall({ region: "asia-east1" }, async (r
     locked_price: price,
     plan_id: orderId,
     plan_label: planLabel,
+    // 哪一個 meal_plans 方案，評分（reviews）靠這個彙總出方案平均分數
+    meal_plan_id: planId,
   }));
   await assertSlotsHaveRoom(lockDrafts, vendorCache);
   const amount = price * plan.days;
@@ -982,12 +984,25 @@ const GROWTH_REWARD_TIERS = [
   { price_percent: 0, weight: 3 },
 ];
 
-const GROWTH_REWARD_MILESTONES = [
-  { id: "tier1", label: "20 萬門檻・單抽", threshold: 200000 },
-  { id: "tier2", label: "100 萬門檻・十連抽", threshold: 1000000 },
-];
+// 門檻與 0 元券預設張數存在 platform_config/growth（公開可讀、只有管理員能改，
+// 商家後台成長獎勵頁也讀同一份）。文件還沒建立時退回這組預設值，伺服器照樣能算。
+const DEFAULT_GROWTH_CONFIG = {
+  milestones: [
+    { id: "tier1", label: "20 萬門檻・單抽", threshold: 200000 },
+    { id: "tier2", label: "100 萬門檻・十連抽", threshold: 1000000 },
+  ],
+  voucher_total: 10,
+};
 
-const DEFAULT_VOUCHER_TOTAL = 10;
+async function loadGrowthConfig() {
+  const snap = await db.collection("platform_config").doc("growth").get();
+  const data = snap.exists ? snap.data() : {};
+  const milestones = Array.isArray(data.milestones) && data.milestones.length > 0
+    ? [...data.milestones].sort((a, b) => a.threshold - b.threshold)
+    : DEFAULT_GROWTH_CONFIG.milestones;
+  const voucherTotal = Number.isInteger(data.voucher_total) ? data.voucher_total : DEFAULT_GROWTH_CONFIG.voucher_total;
+  return { milestones, voucherTotal };
+}
 
 function pickWeightedTier() {
   const totalWeight = GROWTH_REWARD_TIERS.reduce((sum, t) => sum + t.weight, 0);
@@ -1015,7 +1030,8 @@ async function vendorCumulativeRevenue(vendorId) {
  */
 async function syncGrowthUnlock(vendorId) {
   const revenue = await vendorCumulativeRevenue(vendorId);
-  const unlocked = GROWTH_REWARD_MILESTONES.filter((m) => revenue >= m.threshold).map((m) => m.id);
+  const { milestones } = await loadGrowthConfig();
+  const unlocked = milestones.filter((m) => revenue >= m.threshold).map((m) => m.id);
   await db.collection("growth_rewards").doc(vendorId).set({ unlocked_milestones: unlocked }, { merge: true });
   return unlocked;
 }
@@ -1026,15 +1042,16 @@ exports.drawGrowthReward = onCall({ region: "asia-east1" }, async (request) => {
   if (!vendorId) throw new HttpsError("invalid-argument", "vendor_id is required");
 
   const cumulativeRevenue = await vendorCumulativeRevenue(vendorId);
-  if (cumulativeRevenue < GROWTH_REWARD_MILESTONES[0].threshold) {
+  const { milestones, voucherTotal: defaultVoucherTotal } = await loadGrowthConfig();
+  if (cumulativeRevenue < milestones[0].threshold) {
     throw new HttpsError("failed-precondition", "This vendor hasn't unlocked draws yet.");
   }
 
   const rewardRef = db.collection("growth_rewards").doc(vendorId);
   const pricePercent = await db.runTransaction(async (tx) => {
     const snap = await tx.get(rewardRef);
-    const voucherRemaining = snap.exists ? snap.data().voucher_remaining : DEFAULT_VOUCHER_TOTAL;
-    const voucherTotal = snap.exists ? snap.data().voucher_total : DEFAULT_VOUCHER_TOTAL;
+    const voucherRemaining = snap.exists ? snap.data().voucher_remaining ?? defaultVoucherTotal : defaultVoucherTotal;
+    const voucherTotal = snap.exists ? snap.data().voucher_total ?? defaultVoucherTotal : defaultVoucherTotal;
 
     let tier = pickWeightedTier();
     // 0 元券見底後自動降級為保底 1 折券，六級機制照樣運作，只是拿不到整份免費。

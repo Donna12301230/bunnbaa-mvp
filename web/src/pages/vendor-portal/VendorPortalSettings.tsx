@@ -120,7 +120,9 @@ function SubscriptionUndoCancelButton({ vendor }: { vendor: Vendor }) {
 // 2026-09-25：簡介／地址／電話／營業日／公休日／取餐時段／份數上限改讀寫真實
 // vendors/{id}（firestore.rules 限定店主只能改這幾個欄位，店名只有管理員能改），
 // 消費端取餐時段選擇跟結帳驗證都照這裡的設定（lib/pickupSlots.ts、functions/src/pricing.js）。
-// TODO(firebase): 封面圖／桌位仍讀寫 mockData.ts。
+// 封面圖 2026-09-28 改存 vendors/{id}.cover_image。
+// TODO(firebase): 桌位（現場點餐 QR）仍讀寫 mockData.ts——屬於 TODO §7 待決策的現場點餐，
+// QR 連到的 /menu/:id 目前也沒有這個頁面。
 export default function VendorPortalSettings() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -143,11 +145,6 @@ export default function VendorPortalSettings() {
     enabled: !!user,
   });
 
-  useEffect(() => {
-    if (!myVendor) return;
-    setCoverImage(myVendor.coverImage ?? "");
-  }, [myVendor]);
-
   const tables: string[] = myVendor?.tables ?? [];
   const { data: realVendor, isLoading: realVendorLoading } = useMyVendor();
 
@@ -157,6 +154,7 @@ export default function VendorPortalSettings() {
     setDescription(realVendor.description ?? "");
     setAddress(realVendor.address ?? "");
     setPhone(realVendor.phone ?? "");
+    setCoverImage(realVendor.cover_image ?? "");
     setHolidays(realVendor.holidays ?? []);
     const bh = realVendor.business_hours;
     setBusinessHours(bh && bh.length === 7 ? bh : DEFAULT_BH);
@@ -184,9 +182,8 @@ export default function VendorPortalSettings() {
         holidays,
         pickup_windows: [...pickupWindows].sort(),
         slot_capacity: capacity,
+        cover_image: coverImage,
       });
-      // 封面圖還沒有真實欄位，照舊存在 mock
-      if (myVendor) await mockSaveVendorSettings(myVendor.id, { coverImage: coverImage || undefined });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: myVendorDocKey(realVendor?.id) });
