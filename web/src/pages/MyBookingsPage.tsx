@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2, Star } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
-import { getLang, tr } from "@/lib/i18n";
+import { getLang, tr, loc } from "@/lib/i18n";
 import { enUS } from "date-fns/locale";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import PageHero from "@/components/PageHero";
@@ -306,7 +306,7 @@ export default function MyBookingsPage() {
                       <Badge variant="muted" className={`self-start ${statusInfo.className}`}>
                         {statusInfo.label}
                       </Badge>
-                      <h3 className="text-h3 leading-snug">{lock.item_name}</h3>
+                      <h3 className="text-h3 leading-snug">{loc(lock, "item_name")}</h3>
                       <p className="text-body-sm text-muted-foreground">
                         {formatDateLabel(lock.pickup_date)}・{lock.pickup_window} {tr("取餐", "pickup")}・${lock.locked_price}
                       </p>
@@ -496,9 +496,9 @@ export default function MyBookingsPage() {
                               className={`text-left text-micro leading-tight rounded-sm px-1.5 py-1 truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${statusInfo.className} ${
                                 expandedId === lock.id ? "ring-2 ring-primary" : ""
                               }`}
-                              title={lock.item_name}
+                              title={loc(lock, "item_name")}
                             >
-                              {lock.item_name}
+                              {loc(lock, "item_name")}
                             </button>
                           );
                         })}

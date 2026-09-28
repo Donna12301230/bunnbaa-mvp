@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useMemo, useState } from "react";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import LockOrderRow from "@/components/LockOrderRow";
@@ -13,11 +14,12 @@ import type { Lock } from "@/types";
 // 訂單管理：2026-09-28 改用真實 locks（原本是 Parse 雛型的預約單／現場單 mock，
 // TODO §7 決定不做揪團預購與現場點餐）。依狀態分頁，可用取餐編號或品名搜尋，
 // 還沒取餐的可以直接確認取餐／登記未取餐。
-const TABS = [
-  { value: "pending", label: "待取餐", match: (l: Lock) => PENDING_STATUSES.has(l.status) },
-  { value: "done", label: "已完成", match: (l: Lock) => DONE_STATUSES.has(l.status) },
-  { value: "no_show", label: "未取餐", match: (l: Lock) => l.status === "no_show" },
-  { value: "all", label: "全部", match: () => true },
+// 用函式包起來，每次 render 依目前語言組標籤
+const tabs = () => [
+  { value: "pending", label: tr("待取餐", "To pick up"), match: (l: Lock) => PENDING_STATUSES.has(l.status) },
+  { value: "done", label: tr("已完成", "Done"), match: (l: Lock) => DONE_STATUSES.has(l.status) },
+  { value: "no_show", label: tr("未取餐", "No-show"), match: (l: Lock) => l.status === "no_show" },
+  { value: "all", label: tr("全部", "All"), match: () => true },
 ] as const;
 
 export default function VendorPortalOrders() {
@@ -38,10 +40,10 @@ export default function VendorPortalOrders() {
   return (
     <VendorPortalLayout>
       <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
-        <ClipboardList className="w-5 h-5 text-orange-500" /> 訂單管理
+        <ClipboardList className="w-5 h-5 text-orange-500" /> {tr("訂單管理", "Orders")}
       </h2>
       <p className="text-sm text-muted-foreground mb-4">
-        消費者預付鎖定的訂單{truncated ? "（只列最近 500 筆）" : ""}。
+        {tr("消費者預付鎖定的訂單", "Meals customers have prepaid and locked")}{truncated ? tr("（只列最近 500 筆）", " (latest 500 only)") : ""}{tr("。", ".")}
       </p>
 
       <div className="relative mb-4 max-w-sm">
@@ -49,8 +51,8 @@ export default function VendorPortalOrders() {
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="取餐編號末 8 碼或品名"
-          aria-label="搜尋訂單"
+          placeholder={tr("取餐編號末 8 碼或品名", "Pickup code or item name")}
+          aria-label={tr("搜尋訂單", "Search orders")}
           className="pl-9"
         />
       </div>
@@ -60,18 +62,18 @@ export default function VendorPortalOrders() {
       ) : (
         <Tabs defaultValue="pending">
           <TabsList className="mb-4">
-            {TABS.map((t) => (
+            {tabs().map((t) => (
               <TabsTrigger key={t.value} value={t.value}>
                 {t.label}（{filtered.filter(t.match).length}）
               </TabsTrigger>
             ))}
           </TabsList>
-          {TABS.map((t) => {
+          {tabs().map((t) => {
             const rows = filtered.filter(t.match);
             return (
               <TabsContent key={t.value} value={t.value}>
                 {rows.length === 0 ? (
-                  <EmptyState size="compact" icon={<ClipboardList size={32} />} title="沒有符合的訂單" />
+                  <EmptyState size="compact" icon={<ClipboardList size={32} />} title={tr("沒有符合的訂單", "No matching orders")} />
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {rows.map((l) => <LockOrderRow key={l.id} lock={l} />)}

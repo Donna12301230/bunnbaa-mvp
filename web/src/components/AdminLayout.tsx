@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings } from "lucide-react";
@@ -8,12 +9,13 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
-const navItems = [
-  { href: "/admin/vendors", label: "廠商管理", icon: Store },
-  { href: "/admin/appeals", label: "解封申訴", icon: ShieldAlert },
-  { href: "/admin/locks", label: "訂單總覽", icon: ClipboardList },
-  { href: "/admin/payouts", label: "撥款總覽", icon: Wallet },
-  { href: "/admin/settings", label: "系統設定", icon: Settings },
+// 用函式包起來，每次 render 依目前語言組標籤
+const navItems = () => [
+  { href: "/admin/vendors", label: tr("廠商管理", "Vendors"), icon: Store },
+  { href: "/admin/appeals", label: tr("解封申訴", "Appeals"), icon: ShieldAlert },
+  { href: "/admin/locks", label: tr("訂單總覽", "Orders"), icon: ClipboardList },
+  { href: "/admin/payouts", label: tr("撥款總覽", "Payouts"), icon: Wallet },
+  { href: "/admin/settings", label: tr("系統設定", "Settings"), icon: Settings },
 ];
 
 // Sidebar/top-bar layout for the platform admin backend, styled to match
@@ -27,8 +29,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     if (!isLoading && !isAdmin) {
       toast(
         user
-          ? { variant: "destructive", title: "沒有權限瀏覽此頁面", description: "此頁面僅限平台管理員帳號使用，目前登入的帳號權限不足。" }
-          : { variant: "destructive", title: "請先登入 / 註冊帳號", description: "此頁面僅限平台管理員使用，請先登入平台管理員帳號。" }
+          ? { variant: "destructive", title: tr("沒有權限瀏覽此頁面", "You don't have access to this page"), description: tr("此頁面僅限平台管理員帳號使用，目前登入的帳號權限不足。", "This page is for platform admins only.") }
+          : { variant: "destructive", title: tr("請先登入 / 註冊帳號", "Please sign in or sign up"), description: tr("此頁面僅限平台管理員使用，請先登入平台管理員帳號。", "This page is for platform admins only. Please sign in with an admin account.") }
       );
       navigate("/");
     }
@@ -55,7 +57,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <img src="/飯飽wordR.png" alt="飯飽BunnBaa" className="h-7" />
         </div>
         <Link href="/home" className="flex items-center text-sm text-sidebar-primary opacity-80 hover:opacity-100">
-          <ArrowLeft className="w-4 h-4 mr-1" /> 回首頁
+          <ArrowLeft className="w-4 h-4 mr-1" /> {tr("回首頁", "Home")}
         </Link>
       </div>
 
@@ -63,7 +65,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         {/* Sidebar */}
         <aside className="w-48 min-h-[calc(100vh-3rem)] bg-white border-r border-border p-3 hidden md:flex flex-col">
           <nav className="space-y-1 flex-1">
-            {navItems.map(({ href, label, icon: Icon }) => (
+            {navItems().map(({ href, label, icon: Icon }) => (
               <Link key={href} href={href}>
                 <div className={cn(
                   "flex items-center space-x-2 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors",
@@ -86,7 +88,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         {/* Mobile bottom nav */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border flex md:hidden z-50">
-          {navItems.map(({ href, label, icon: Icon }) => (
+          {navItems().map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} className="flex-1">
               <div className={cn(
                 "relative flex flex-col items-center py-2 text-xs",

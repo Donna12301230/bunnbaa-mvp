@@ -1,4 +1,4 @@
-import { httpsCallable } from "firebase/functions";
+import { httpsCallable } from "@/lib/callable";
 import { functions } from "@/lib/firebase";
 import type { Lock } from "@/types";
 import { tr } from "@/lib/i18n";

@@ -1,5 +1,7 @@
 import { tr, useI18n } from "@/lib/i18n";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Switch, Route, Link, Router, Redirect } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -58,6 +60,21 @@ function MarketplacePage({ children }: { children: React.ReactNode }) {
   return <div className="font-sans antialiased bg-background text-foreground">{children}</div>;
 }
 
+// 登入中的使用者把介面語言存進 users/{uid}.lang，排程推播（取餐提醒）才知道要用哪種語言。
+// 只有跟已存的不同時才寫；失敗不影響使用（下次切換或登入再試）。
+function useSyncUserLang(lang: "zh" | "en") {
+  const { user } = useAuth();
+  // 記住這次登入期間最後寫進去的值（user.lang 是登入當下讀的，寫完不會自己更新）
+  const saved = useRef<{ uid: string; lang?: string } | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    if (saved.current?.uid !== user.id) saved.current = { uid: user.id, lang: user.lang };
+    if (saved.current.lang === lang) return;
+    saved.current.lang = lang;
+    setDoc(doc(db, "users", user.id), { lang }, { merge: true }).catch((err) => console.warn("儲存語言設定失敗", err));
+  }, [user?.id, user?.lang, lang]);
+}
+
 // 根路徑跟來源專案一致：未登入顯示登入頁、已登入顯示首頁
 function RootGate() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -68,6 +85,7 @@ function RootGate() {
 export default function App() {
   // 切換語言時整個路由樹重新掛載，元件裡用 tr() 組的字串（toast、狀態標籤、錯誤訊息）才會一起換
   const { lang } = useI18n();
+  useSyncUserLang(lang);
   return (
     <QueryClientProvider client={queryClient}>
       {/* 設計系統 tokens 限定在 .bb-theme 之內；包住全站，頁面才能直接使用 @/components/ds */}

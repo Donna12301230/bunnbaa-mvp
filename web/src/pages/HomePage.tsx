@@ -7,7 +7,7 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { useAuth } from "@/hooks/useAuth";
-import { httpsCallable } from "firebase/functions";
+import { httpsCallable } from "@/lib/callable";
 import {
   Clock, CalendarDays, Rocket, Star, User, MapPin, Trophy,
   ShieldCheck, Bell, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store, UtensilsCrossed } from "lucide-react";
@@ -21,7 +21,7 @@ import type { Vendor, MenuItem, MealPlan, Lock } from "@/types";
 import { summarizeRatings, useReviews } from "@/hooks/useReviews";
 import { areaLabel, setSelectedArea, useSelectedArea, vendorInArea } from "@/lib/location";
 import { applyEarlyBirdPrice, discountText, EARLY_BIRD_TIERS, tierRangeText } from "@/lib/pricing";
-import { tr, useI18n } from "@/lib/i18n";
+import { tr, useI18n, loc } from "@/lib/i18n";
 import { addDaysStr, DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, openWindowsOn, planPickupDates, slotLabel, todayStr, vendorClosedReason } from "@/lib/pickupSlots";
 import PickupPicker from "@/components/PickupPicker";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -158,11 +158,11 @@ export default function HomePage() {
   const { data: vendorPlanGroups = [] } = useQuery({
     queryKey: ["vendorMealPlans", vendors.map((v) => v.id).join(",")],
     queryFn: async () => {
-      const groups: { vendorId: string; vendorName: string; plans: MealPlan[] }[] = [];
+      const groups: { vendorId: string; vendor: Vendor; plans: MealPlan[] }[] = [];
       for (const v of vendors) {
         const snap = await getDocs(query(collection(db, "meal_plans"), where("vendor_id", "==", v.id)));
         const plans = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as MealPlan);
-        if (plans.length > 0) groups.push({ vendorId: v.id, vendorName: v.name, plans });
+        if (plans.length > 0) groups.push({ vendorId: v.id, vendor: v, plans });
       }
       return groups;
     },
@@ -392,7 +392,7 @@ export default function HomePage() {
                 <p className="text-xs text-muted-foreground">{t("以下店家已解鎖抽獎，手氣好可以抽到整份 0 元！", "These vendors have unlocked the draw — you could win a free meal!")}</p>
                 {growthUnlockedIds.map((vendorId) => (
                   <div key={vendorId} className="flex items-center gap-2">
-                    <span className="flex-1 text-sm truncate">{vendors.find((v) => v.id === vendorId)?.name ?? t("合作店家", "Partner vendor")}</span>
+                    <span className="flex-1 text-sm truncate">{loc(vendors.find((v) => v.id === vendorId), "name") || t("合作店家", "Partner vendor")}</span>
                     <Button
                       size="sm"
                       disabled={drawingVendorId !== null}
@@ -467,8 +467,8 @@ export default function HomePage() {
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
                       <div>
-                        <h4 className="font-heading text-h3 leading-snug">{item.name}</h4>
-                        <p className="text-xs text-muted-foreground font-semibold mt-0.5">{vendor.name}・{t("取餐時段：", "Pickup: ")}{pickupDate}（{pickupWindow}）</p>
+                        <h4 className="font-heading text-h3 leading-snug">{loc(item, "name")}</h4>
+                        <p className="text-xs text-muted-foreground font-semibold mt-0.5">{loc(vendor, "name")}・{t("取餐時段：", "Pickup: ")}{pickupDate}（{pickupWindow}）</p>
                       </div>
 
                       <div className="flex items-center justify-between mt-auto pt-1">
@@ -501,10 +501,10 @@ export default function HomePage() {
                 return (
                   <>
                     <DialogHeader>
-                      <DialogTitle>{item.name}</DialogTitle>
+                      <DialogTitle>{loc(item, "name")}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3 py-1">
-                      <p className="text-sm text-muted-foreground">{vendor.name}・{t("取餐時段：", "Pickup: ")}{pickupDate}（{pickupWindow}）・${lockedPrice}</p>
+                      <p className="text-sm text-muted-foreground">{loc(vendor, "name")}・{t("取餐時段：", "Pickup: ")}{pickupDate}（{pickupWindow}）・${lockedPrice}</p>
 
                       <div className="flex gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
                         <Star className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5 fill-amber-500" />
@@ -558,11 +558,11 @@ export default function HomePage() {
                 return (
                   <>
                     <DialogHeader>
-                      <DialogTitle>{plan.label}：{plan.name}</DialogTitle>
+                      <DialogTitle>{loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3 py-1">
                       <p className="text-sm text-muted-foreground">
-                        {vendor.name}・NT$ {plan.price_per_meal} × {plan.days} {t("餐", "meals")} = <strong className="text-foreground">NT$ {plan.price_per_meal * plan.days}</strong>
+                        {loc(vendor, "name")}・NT$ {plan.price_per_meal} × {plan.days} {t("餐", "meals")} = <strong className="text-foreground">NT$ {plan.price_per_meal * plan.days}</strong>
                       </p>
                       <div>
                         <p className="text-xs font-semibold mb-2">{t("第一天取餐日期與每天的取餐時段", "First pickup date and daily pickup time")}</p>
@@ -629,10 +629,10 @@ export default function HomePage() {
                       <Store className="h-8 w-8 text-secondary-foreground/70" strokeWidth={1.75} aria-hidden="true" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-heading text-h3 mb-1 truncate">{group.vendorName}</p>
+                      <p className="font-heading text-h3 mb-1 truncate">{loc(group.vendor, "name")}</p>
                       {group.plans.map(p => (
                         <div key={p.id} className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <span className="truncate">{p.label}：{p.name}</span>
+                          <span className="truncate">{loc(p, "label")}{t("：", ": ")}{loc(p, "name")}</span>
                           {planRatings.get(p.id) ? (
                             <span className="flex items-center gap-0.5 text-amber-500 shrink-0">
                               <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {planRatings.get(p.id)!.average}
@@ -649,11 +649,11 @@ export default function HomePage() {
                   {/* 方案卡片 */}
                   {group.plans.map(plan => (
                     <div key={plan.id} className="bg-card rounded-2xl border border-ink p-4 flex flex-col">
-                      <p className="font-heading text-base font-semibold mb-0.5">{plan.label}：{plan.name}</p>
-                      <p className="text-xs text-muted-foreground mb-3">{plan.description}</p>
+                      <p className="font-heading text-base font-semibold mb-0.5">{loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}</p>
+                      <p className="text-xs text-muted-foreground mb-3">{loc(plan, "description")}</p>
                       <p className="font-heading text-lg font-semibold mb-2">{t(`NT$ ${plan.price_per_meal} / 餐起`, `From NT$ ${plan.price_per_meal} / meal`)}</p>
                       <span className="inline-block w-fit text-xs bg-secondary text-secondary-foreground border border-ink px-2.5 py-0.5 rounded-full mb-3">
-                        {t("最快履約：", "Starts: ")}{plan.fastest_booking}
+                        {t("最快履約：", "Starts: ")}{loc(plan, "fastest_booking")}
                       </span>
                       <Button className="mt-auto w-full text-sm" onClick={() => openPlanDialog(group.vendorId, plan)}>
                         {t("預約加入計畫", "Join this plan")}
@@ -697,7 +697,7 @@ export default function HomePage() {
                     </div>
                     <span className="text-xs font-medium truncate">{t(`使用者 ${tr_.buyer_uid.slice(-6)} 轉讓`, `Transferred by user ${tr_.buyer_uid.slice(-6)}`)}</span>
                   </div>
-                  <p className="text-sm font-semibold line-clamp-1 mb-2">{tr_.item_name}</p>
+                  <p className="text-sm font-semibold line-clamp-1 mb-2">{loc(tr_, "item_name")}</p>
                   <div className="flex items-baseline gap-1.5 mb-1">
                     <span className="font-heading text-base font-semibold">{t("轉讓價", "Price")} ${tr_.locked_price}</span>
                   </div>
@@ -706,7 +706,7 @@ export default function HomePage() {
                       <Clock className="w-3 h-3" />
                       {(tr_ as any).resale_deadline?.toDate ? formatResaleCountdown((tr_ as any).resale_deadline.toDate(), now) : "—"}
                     </span>
-                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {vendors.find((v) => v.id === tr_.vendor_id)?.name ?? "—"}</span>
+                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {loc(vendors.find((v) => v.id === tr_.vendor_id), "name") || "—"}</span>
                   </div>
                 </div>
               ))}

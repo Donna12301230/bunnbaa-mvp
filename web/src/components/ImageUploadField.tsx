@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,15 +28,15 @@ export function ImageUploadField({ label, vendorId, value, onChange }: Props) {
     if (!file) return;
     setUploading(true);
     try {
-      if (!vendorId) throw new Error("這個帳號還沒綁定商家，請聯絡平台");
-      if (!file.type.startsWith("image/")) throw new Error("只能上傳圖片檔");
-      if (file.size > MAX_BYTES) throw new Error("圖片不能超過 5MB");
+      if (!vendorId) throw new Error(tr("這個帳號還沒綁定商家，請聯絡平台", "This account isn't linked to a vendor yet. Please contact the platform"));
+      if (!file.type.startsWith("image/")) throw new Error(tr("只能上傳圖片檔", "Only image files can be uploaded"));
+      if (file.size > MAX_BYTES) throw new Error(tr("圖片不能超過 5MB", "Images must be 5 MB or smaller"));
       const ext = file.name.includes(".") ? file.name.split(".").pop() : "img";
       const fileRef = ref(storage, `vendors/${vendorId}/${crypto.randomUUID()}.${ext}`);
       await uploadBytes(fileRef, file, { contentType: file.type });
       onChange(await getDownloadURL(fileRef));
     } catch (err: any) {
-      toast({ variant: "destructive", title: "上傳失敗", description: err.message });
+      toast({ variant: "destructive", title: tr("上傳失敗", "Upload failed"), description: err.message });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -47,13 +48,13 @@ export function ImageUploadField({ label, vendorId, value, onChange }: Props) {
       <Label>{label}</Label>
       {value && (
         <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-gray-50">
-          <img src={value} alt="品項圖片預覽" className="w-full h-full object-cover" />
+          <img src={value} alt={tr("圖片預覽", "Image preview")} className="w-full h-full object-cover" />
           <Button
             type="button"
             variant="ghost"
             size="icon"
             className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full bg-surface-dark/70 text-white hover:bg-surface-dark/90 hover:text-white [&_svg]:size-3.5"
-            aria-label="移除圖片"
+            aria-label={tr("移除圖片", "Remove image")}
             onClick={() => onChange("")}
           >
             <X />
@@ -64,7 +65,7 @@ export function ImageUploadField({ label, vendorId, value, onChange }: Props) {
         <Input
           value={value}
           onChange={e => onChange(e.target.value)}
-          placeholder="https://... 或點右側按鈕上傳"
+          placeholder={tr("https://... 或點右側按鈕上傳", "https://... or upload with the button")}
           className="text-sm"
         />
         <Button
@@ -76,7 +77,7 @@ export function ImageUploadField({ label, vendorId, value, onChange }: Props) {
           onClick={() => fileInputRef.current?.click()}
         >
           <Upload className="w-4 h-4" />
-          {uploading ? "上傳中..." : "上傳"}
+          {uploading ? tr("上傳中...", "Uploading...") : tr("上傳", "Upload")}
         </Button>
       </div>
       <input

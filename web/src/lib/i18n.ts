@@ -48,6 +48,30 @@ export function tr(zh: string, en: string): string {
   return current === "en" ? en : zh;
 }
 
+/**
+ * 資料庫內容的在地化欄位：英文介面優先讀 `${field}_en`（Functions 用 Gemini 自動翻的），
+ * 沒有就顯示原本的中文。例：loc(vendor, "name")、loc(lock, "item_name")。
+ */
+export function loc<T extends object>(obj: T | null | undefined, field: keyof T & string): string {
+  if (!obj) return "";
+  const zh = (obj as Record<string, unknown>)[field];
+  if (current === "en") {
+    const en = (obj as Record<string, unknown>)[`${field}_en`];
+    if (typeof en === "string" && en.trim()) return en;
+  }
+  return typeof zh === "string" ? zh : "";
+}
+
+/** 計畫型訂單的品名去掉「・第1/5天」／「 · Day 1/5」，彙總時同一個方案併成一項 */
+export function planBaseName(itemName: string): string {
+  return itemName.split("・第")[0].split(" · Day ")[0];
+}
+
+/** date-fns 的 locale（依目前語言） */
+export function dateLocale() {
+  return current === "en" ? enUS : zhTW;
+}
+
 export function useI18n() {
   const lang = useSyncExternalStore(
     (fn) => {

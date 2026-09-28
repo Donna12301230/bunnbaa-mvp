@@ -115,10 +115,11 @@
 ### 8. 寫死資料盤點（2026-09-28 盤點，依序處理）
 
 **部署順序（全部還沒部署、沒在瀏覽器點過，只過了 `tsc`＋`vite build`＋rules 在 emulator 編譯）**：
-1. `firebase deploy --only firestore:rules`（新增 `reviews`／`platform_config`／`landing_events`，`vendors` 店主可寫 `cover_image`）
+1. `firebase deploy --only firestore:rules`（新增 `reviews`／`platform_config`／`landing_events`，`vendors` 店主可寫 `cover_image`，`users` 本人可寫 `lang`）
 2. 正式站補設定資料：`node scripts/seed.js --config-only`（只寫 `platform_config/growth`＋`landing_events`，不動其他資料）
-3. `firebase deploy --only functions`（成長門檻讀設定、計畫 locks 加 `meal_plan_id`）
+3. `firebase deploy --only functions`（成長門檻讀設定、計畫 locks 加 `meal_plan_id`、錯誤訊息依語言、新增自動翻譯觸發器與 `translateAllContent`）——前端呼叫格式有變（多帶 `lang`），**Functions 與 hosting 要一起部署**
 4. `cd web && npm run build` 後 `firebase deploy --only hosting`
+5. 管理後台 → 系統設定 →「補翻既有資料」
 - 驗證：第二家店綁店主後，用那家帳號看商家後台各頁都只看到自己的資料；`/my-bookings` 已取餐的餐點打分 → 首頁計畫評分、Landing 評價出現；同一筆再評一次要被擋
 
 **A. 寫死商家 ID `cafe-renheya-demo`**（資料是真的，但不論誰登入都只看得到仁和雅；第二家店綁店主就會露餡）→ 改讀登入者綁定的 `user.vendorId`。2026-09-28 程式碼完成（`tsc`＋`vite build` 過），**還沒部署、沒在瀏覽器點過**
@@ -148,7 +149,14 @@
 - [V] `MarketplaceHeader.tsx` 地址選單：改成「臺灣縣市＋鄉鎮市區」（22 縣市／368 鄉鎮市區，`constants/taiwanDistricts.ts`），選擇記在這台裝置（`lib/location.ts`），首頁（品項／計畫／轉讓）、商家列表、轉讓市集依店家地址篩選（台／臺視為相同；沒填地址的店家在選了地區後不會出現）
 - [V] `MarketplaceHeader.tsx` 語言選單：2026-09-28 決定做**英文版**，同日完成**消費端**：頂部列「中／EN」切換（手機選單也有），選擇記在這台裝置。做法是 `lib/i18n.ts`，中英字串並排寫在元件裡 `tr("預購餐點", "Pre-order")`；`App.tsx` 用語言當 Router 的 `key`，切換時整頁重新掛載，所以 toast／錯誤訊息／狀態標籤都會一起換。已翻：頂部列、地區選單、Landing（含 `landing_events` 的 `*_en` 欄位）、首頁、商家列表／商家頁／品項頁、購物車、轉讓市集、我的餐點、我的鎖定、登入／註冊（會員與廠商須知另外寫了英文版，`components/TermsNotices.tsx`，改條款要兩邊一起改）、會員中心、付款結果頁、`/lock` Demo 頁、設計系統元件的無障礙標籤；過敏原／飲食標籤照固定對照表翻（`types.ts` `tagEn`）。本機 `vite preview` 實測中英切換正常
   - 順手修：首頁轉讓卡片店名原本寫死「仁和雅咖啡」、早鳥折扣說明欄寫死 95／8／7 折（改讀 `lib/pricing`）、Landing hero 範例票券寫死的滷肉飯（改成第一道真實餐點）；付款取消頁的返回連結從 `/lock` 改成 `/home`
-- [ ] **英文版還沒翻的**：① 商家後台（`vendor-portal/*`、核對取餐、QR 掃碼、校準報告）與管理後台（`admin/*`）；② **Cloud Functions 回的錯誤訊息**（額滿、公休、封鎖等）仍是中文——要做的話前端呼叫時帶 `lang`，Functions 依語言回訊息；③ 資料庫內容（店名、菜名、簡介、方案名稱、AI 折扣說明）照原文顯示，不翻
+- [V] **英文版補完（2026-09-28）**：商家後台（總覽、訂餐時段／明細、核對取餐＋QR 掃碼、菜單、訂單、備料、報表、成長獎勵、店家設定、`/lock/vendor` 校準報告）與管理後台（廠商、申訴、訂單、撥款、系統設定）全部加上中英切換；日期格式也跟著語言（`lib/i18n.ts` 的 `dateLocale()`）。成長門檻標籤在 `platform_config/growth.milestones[].label_en`
+- [V] **Cloud Functions 錯誤訊息依語言回傳**：前端所有 callable 改用 `web/src/lib/callable.ts`（自動在 data 帶 `lang`），Functions 端 `functions/src/i18n.js` 用 AsyncLocalStorage 記住每個請求的語言（同一實例會並行處理多個請求，不能用全域變數），`onCall` 統一包 `withLang`；額滿、公休、封鎖、LINE Pay 失敗等訊息都有英文。**要部署 Functions 才會生效**，沒部署前英文介面遇到伺服器錯誤仍顯示中文
+- [V] **資料庫內容英文版（2026-09-28，用 Gemini 自動翻）**：`functions/src/translate.js`＋Firestore 觸發器 `translateVendor`／`translateMenuItem`／`translateMealPlan`，店家（店名、簡介）、菜單（名稱、說明、分類）、計畫方案（標籤、名稱、說明、最快履約）新增或修改時自動寫入 `*_en` 欄位；記下翻譯時的原文 `i18n_src`，原文沒變就不重翻（觸發器寫回英文會再觸發自己，靠這個停下來）。地址不翻（地區篩選和找店都要中文）。下單時訂單帶 `item_name_en`；AI 折扣說明帶 `discount_explanation_en`；校準報告帶 `explanation_en`／`pattern_note_en`；what-if 追問依介面語言回答。前端用 `loc(obj, "name")` 讀（英文介面優先 `*_en`，沒有就中文）。emulator 實測：寫入菜單約 8 秒產生英文、觸發器自我觸發 7ms 結束不重翻、只改價格不重翻
+- [V] **取餐提醒推播依語言**：前端把介面語言存進 `users/{uid}.lang`（`firestore.rules` 允許本人寫 `lang`，限 zh／en），`pickupReminders` 依此送中文或英文，英文用 `item_name_en`
+- [ ] **部署後要做一次**：管理後台 → 系統設定 →「補翻既有資料」（`translateAllContent`），把功能上線前的店家、菜單、方案、既有訂單品名翻成英文；Gemini 忙線（503）時會有失敗筆數，再按一次只會補失敗的
+- [V] 評價（心得、品名、系所署名）與抽獎紀錄的品名也自動翻（觸發器 `translateReview`／`translateDraw`，補翻按鈕一併處理），Landing 評價、抽獎跑馬燈、商家成長獎勵頁讀英文
+- [V] 商家可以手動修改英文：菜單編輯視窗、店家設定的「英文簡介」。手動改過的欄位把 `i18n_src` 設成目前中文，自動翻譯就不會蓋掉；清空＝交回自動翻譯；只改中文沒改英文＝照常重翻。`firestore.rules` 讓店主可寫 `description_en`／`i18n_src`（`i18n_src.name` 不能動，店名英文仍只有管理員／自動翻譯）
+- 已知限制：店名英文與計畫方案的英文目前只能靠自動翻譯（沒有編輯介面，要改到 Firestore Console 改 `name_en` 並把 `i18n_src.name` 設成目前中文店名）
 - [V] 成長獎勵門檻改存 `platform_config/growth`（`milestones`＋`voucher_total`），商家後台與 `drawGrowthReward`／`syncGrowthUnlock` 讀同一份；文件不存在時 Functions 退回原本預設值。順手修掉 `growth_rewards` 文件只有 `unlocked_milestones` 時 `voucher_remaining` 變 `NaN` 的問題
 - [V] 計畫卡評分改讀 `reviews` 平均（顯示則數），沒人評過顯示「尚無評分」；`meal_plans.rating` 從型別與 seed 拿掉（正式站舊文件還留著這個欄位，不影響）。`createPlanLinePayReservation` 產生的 locks 新增 `meal_plan_id`，**之前加入的計畫沒有這個欄位，評分只算進店家平均、不會算進方案平均**
 - 刻意寫死、不用改：管理員白名單 `lib/adminAuth.ts`、早鳥級距 `lib/pricing.ts`、預設取餐時段 `lib/pickupSlots.ts`

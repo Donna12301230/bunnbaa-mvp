@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
 import { CalendarDays, MapPin, Minus, Plus, ShoppingCart, Trash2, UtensilsCrossed } from "lucide-react";
-import { httpsCallable } from "firebase/functions";
+import { httpsCallable } from "@/lib/callable";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
 import { DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, slotLabel as toSlotLabel, todayStr } from "@/lib/pickupSlots";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
-import { tr } from "@/lib/i18n";
+import { tr, loc } from "@/lib/i18n";
 
 // 購物車頁面。
 // UIUX 檢視後新增:原本 MenuItemPage「加入購物車」只會彈 toast,useCart 把品項存進
@@ -117,7 +117,7 @@ export default function CartPage() {
           <>
             {vendor && (
               <p className="text-sm text-muted-foreground">
-                {tr("來自 ", "From ")}<span className="font-semibold text-foreground">{vendor.name}</span>
+                {tr("來自 ", "From ")}<span className="font-semibold text-foreground">{loc(vendor, "name")}</span>
                 {tr("・一次只能跟一家商家預購", " · you can pre-order from one vendor at a time")}
               </p>
             )}
@@ -144,7 +144,7 @@ export default function CartPage() {
                     <UtensilsCrossed className="h-6 w-6 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm">{menuItem.name}</p>
+                    <p className="font-semibold text-sm">{loc(menuItem, "name")}</p>
                     {note && <p className="text-xs text-muted-foreground mt-0.5">{tr("備註：", "Note: ")}{note}</p>}
                     <p className="text-sm font-bold text-orange-600 mt-1">
                       NT${unitPrice}
@@ -205,7 +205,7 @@ export default function CartPage() {
               <dl className="text-sm space-y-1.5">
                 <div className="flex justify-between gap-3">
                   <dt className="text-muted-foreground">{tr("商家", "Vendor")}</dt>
-                  <dd className="text-right">{vendor?.name ?? "—"}</dd>
+                  <dd className="text-right">{loc(vendor, "name") || "—"}</dd>
                 </div>
                 {vendor?.address && (
                   <div className="flex justify-between gap-3">

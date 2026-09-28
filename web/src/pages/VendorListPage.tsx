@@ -1,4 +1,4 @@
-import { tr } from "@/lib/i18n";
+import { tr, loc } from "@/lib/i18n";
 import { useState } from "react";
 import { Link } from "wouter";
 import { MapPin, Phone, Store } from "lucide-react";
@@ -24,7 +24,7 @@ export default function VendorListPage() {
   const filtered = vendors.filter(
     (v) =>
       vendorInArea(v, area) &&
-      (v.name.includes(effectiveSearch) || (v.description ?? "").includes(effectiveSearch))
+      [v.name, v.description, v.name_en, v.description_en].some((text) => (text ?? "").toLowerCase().includes(effectiveSearch.toLowerCase()))
   );
 
   return (
@@ -65,9 +65,9 @@ export default function VendorListPage() {
                     <Store className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                   </div>
                 )}
-                <h3 className="font-semibold mb-1 truncate">{vendor.name}</h3>
+                <h3 className="font-semibold mb-1 truncate">{loc(vendor, "name")}</h3>
                 {vendor.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{vendor.description}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{loc(vendor, "description")}</p>
                 )}
                 {vendor.address && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">

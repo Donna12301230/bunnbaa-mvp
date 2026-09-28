@@ -6,6 +6,8 @@
 // otherwise a tampered request could lock a meal at any price it likes.
 // Keep the tiers and slots in sync with the web copies by hand.
 
+const { t } = require("./i18n");
+
 const EARLY_BIRD_TIERS = [
   { minDays: 0, maxDays: 1, discountPercent: 5 },
   { minDays: 2, maxDays: 13, discountPercent: 20 },
@@ -53,27 +55,27 @@ function daysBetween(fromDate, toDate) {
  */
 function validatePickup(pickupDate, pickupWindow, vendor, now = new Date()) {
   if (typeof pickupDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(pickupDate)) {
-    return "取餐日期格式不正確";
+    return t("取餐日期格式不正確", "Invalid pickup date");
   }
   const windows = vendorWindows(vendor);
   if (!windows.includes(pickupWindow)) {
-    return `「${vendor?.name ?? "這家店"}」沒有 ${pickupWindow} 這個取餐時段`;
+    return t(`「${vendor?.name ?? "這家店"}」沒有 ${pickupWindow} 這個取餐時段`, `${vendor?.name ?? "This vendor"} doesn't offer the ${pickupWindow} pickup time`);
   }
   if (Array.isArray(vendor?.holidays) && vendor.holidays.includes(pickupDate)) {
-    return `「${vendor?.name ?? "這家店"}」${pickupDate} 公休`;
+    return t(`「${vendor?.name ?? "這家店"}」${pickupDate} 公休`, `${vendor?.name ?? "This vendor"} is closed on ${pickupDate}`);
   }
   const weekday = new Date(`${pickupDate}T00:00:00Z`).getUTCDay();
   const hours = Array.isArray(vendor?.business_hours) ? vendor.business_hours.find((h) => h?.weekday === weekday) : null;
   if (hours && hours.open === false) {
-    return `「${vendor?.name ?? "這家店"}」${pickupDate} 沒有營業`;
+    return t(`「${vendor?.name ?? "這家店"}」${pickupDate} 沒有營業`, `${vendor?.name ?? "This vendor"} isn't open on ${pickupDate}`);
   }
   const days = daysBetween(taipeiToday(), pickupDate);
   if (Number.isNaN(days) || days < 0 || days > MAX_ADVANCE_DAYS) {
-    return `取餐日期只能選今天到 ${MAX_ADVANCE_DAYS} 天後`;
+    return t(`取餐日期只能選今天到 ${MAX_ADVANCE_DAYS} 天後`, `Pickup must be between today and ${MAX_ADVANCE_DAYS} days from now`);
   }
   const start = new Date(`${pickupDate}T${pickupWindow.split("-")[0]}:00+08:00`);
   if (start.getTime() <= now.getTime()) {
-    return "這個取餐時段已經開始，請改選其他時段";
+    return t("這個取餐時段已經開始，請改選其他時段", "That pickup time has already started. Please choose another.");
   }
   return null;
 }
@@ -96,7 +98,7 @@ function planPickupDates(startDate, pickupWindow, vendor, days, now = new Date()
   const dates = [];
   for (let date = startDate; dates.length < days; date = addDays(date, 1)) {
     if (daysBetween(taipeiToday(), date) > MAX_ADVANCE_DAYS) {
-      return { problem: `從 ${startDate} 起 ${MAX_ADVANCE_DAYS} 天內湊不滿 ${days} 個營業日，請提早開始日期` };
+      return { problem: t(`從 ${startDate} 起 ${MAX_ADVANCE_DAYS} 天內湊不滿 ${days} 個營業日，請提早開始日期`, `There aren't ${days} open days within ${MAX_ADVANCE_DAYS} days of ${startDate}. Please start earlier.`) };
     }
     if (!validatePickup(date, pickupWindow, vendor, now)) dates.push(date);
   }

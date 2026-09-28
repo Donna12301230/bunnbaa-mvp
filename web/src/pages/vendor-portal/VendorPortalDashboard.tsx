@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMyVendor } from "@/hooks/useMyVendor";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { zhTW } from "date-fns/locale";
+import { dateLocale, tr } from "@/lib/i18n";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { db } from "@/lib/firebase";
 import { todayStr } from "@/lib/pickupSlots";
@@ -81,7 +81,7 @@ export default function VendorPortalDashboard() {
   return (
     <VendorPortalLayout>
       <h2 className="text-xl font-bold mb-4">
-        {myVendor?.name ? `${myVendor.name} — 總覽` : "廠商總覽"}
+        {myVendor?.name ? `${myVendor.name} — ${tr("總覽", "Overview")}` : tr("廠商總覽", "Vendor overview")}
       </h2>
 
       {/* 統計卡片 */}
@@ -92,7 +92,7 @@ export default function VendorPortalDashboard() {
           <Card>
             <CardHeader className="pb-1">
               <CardTitle className="text-xs text-muted-foreground flex items-center gap-1">
-                <ClipboardList className="w-3.5 h-3.5" /> 今日待取餐
+                <ClipboardList className="w-3.5 h-3.5" /> {tr("今日待取餐", "Awaiting pickup today")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -102,7 +102,7 @@ export default function VendorPortalDashboard() {
           <Card>
             <CardHeader className="pb-1">
               <CardTitle className="text-xs text-muted-foreground flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> 今日已取餐
+                <CheckCircle2 className="w-3.5 h-3.5" /> {tr("今日已取餐", "Picked up today")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -112,7 +112,7 @@ export default function VendorPortalDashboard() {
           <Card>
             <CardHeader className="pb-1">
               <CardTitle className="text-xs text-muted-foreground flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5" /> 近期訂單數
+                <TrendingUp className="w-3.5 h-3.5" /> {tr("近期訂單數", "Recent orders")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -122,7 +122,7 @@ export default function VendorPortalDashboard() {
           <Card>
             <CardHeader className="pb-1">
               <CardTitle className="text-xs text-muted-foreground flex items-center gap-1">
-                <UtensilsCrossed className="w-3.5 h-3.5" /> 菜單項目
+                <UtensilsCrossed className="w-3.5 h-3.5" /> {tr("菜單項目", "Menu items")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -137,11 +137,11 @@ export default function VendorPortalDashboard() {
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-orange-500" />
-            今日取餐時段（{format(new Date(), "M/d (EEE)", { locale: zhTW })}）
+            {tr("今日取餐時段", "Today's pickups")}（{format(new Date(), "M/d (EEE)", { locale: dateLocale() })}）
           </CardTitle>
           <Link href="/lock/vendor/redeem">
             <Button variant="ghost" size="sm" className="text-xs h-7">
-              核對取餐 <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+              {tr("核對取餐", "Redeem")} <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
             </Button>
           </Link>
         </CardHeader>
@@ -149,10 +149,10 @@ export default function VendorPortalDashboard() {
           {todayWindows.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground text-sm">
               <CalendarDays className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              今日沒有取餐訂單
+              {tr("今日沒有取餐訂單", "No pickups today")}
               <div className="mt-2">
                 <Link href="/vendor-portal/settings">
-                  <Button size="sm" variant="outline" className="text-xs">設定取餐時段</Button>
+                  <Button size="sm" variant="outline" className="text-xs">{tr("設定取餐時段", "Set pickup times")}</Button>
                 </Link>
               </div>
             </div>
@@ -166,11 +166,11 @@ export default function VendorPortalDashboard() {
                       {window}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-orange-600">{row.total} 份</span>
+                      <span className="text-sm font-medium text-orange-600">{row.total} {tr("份", "meals")}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                         row.pending > 0 ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
                       }`}>
-                        {row.pending > 0 ? `待取 ${row.pending}` : "已全部取餐"}
+                        {row.pending > 0 ? tr(`待取 ${row.pending}`, `${row.pending} to pick up`) : tr("已全部取餐", "All picked up")}
                       </span>
                       <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
                     </div>

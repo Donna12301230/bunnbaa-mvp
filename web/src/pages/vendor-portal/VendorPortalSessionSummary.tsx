@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useParams } from "wouter";
 import { format } from "date-fns";
-import { zhTW } from "date-fns/locale";
+import { dateLocale, tr, loc, planBaseName } from "@/lib/i18n";
 import { ArrowLeft, Banknote, CheckCircle2, ClipboardList, Clock, ShoppingBag } from "lucide-react";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import LockOrderRow from "@/components/LockOrderRow";
@@ -45,7 +45,7 @@ export default function VendorPortalSessionSummary() {
   const items = useMemo(() => {
     const byName = new Map<string, number>();
     for (const l of active) {
-      const name = l.item_name.split("・第")[0];
+      const name = planBaseName(loc(l, "item_name"));
       byName.set(name, (byName.get(name) ?? 0) + 1);
     }
     return [...byName.entries()].sort((a, b) => b[1] - a[1]);
@@ -53,7 +53,7 @@ export default function VendorPortalSessionSummary() {
 
   const back = (
     <Link href="/vendor-portal/sessions">
-      <Button variant="ghost" size="sm" className="mb-3"><ArrowLeft className="w-4 h-4 mr-1" /> 回訂餐時段</Button>
+      <Button variant="ghost" size="sm" className="mb-3"><ArrowLeft className="w-4 h-4 mr-1" /> {tr("回訂餐時段", "Back to slots")}</Button>
     </Link>
   );
 
@@ -61,7 +61,7 @@ export default function VendorPortalSessionSummary() {
     return (
       <VendorPortalLayout>
         {back}
-        <EmptyState icon={<ClipboardList size={32} />} title="找不到這個時段" />
+        <EmptyState icon={<ClipboardList size={32} />} title={tr("找不到這個時段", "Slot not found")} />
       </VendorPortalLayout>
     );
   }
@@ -71,7 +71,7 @@ export default function VendorPortalSessionSummary() {
       {back}
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
         <Clock className="w-5 h-5 text-orange-500" />
-        {format(new Date(`${slot.date}T00:00:00`), "M/d (EEE)", { locale: zhTW })} {slotLabel(slot.window)}
+        {format(new Date(`${slot.date}T00:00:00`), "M/d (EEE)", { locale: dateLocale() })} {slotLabel(slot.window)}
       </h2>
 
       {loading ? (
@@ -82,30 +82,30 @@ export default function VendorPortalSessionSummary() {
             <Card><CardContent className="pt-4 pb-3 text-center">
               <ShoppingBag className="w-4 h-4 mx-auto mb-1 text-orange-500" />
               <div className="text-2xl font-bold">{active.length}</div>
-              <div className="text-xs text-muted-foreground">訂購份數</div>
+              <div className="text-xs text-muted-foreground">{tr("訂購份數", "Meals ordered")}</div>
             </CardContent></Card>
             <Card><CardContent className="pt-4 pb-3 text-center">
               <Clock className="w-4 h-4 mx-auto mb-1 text-orange-500" />
               <div className="text-2xl font-bold text-orange-600">{pending}</div>
-              <div className="text-xs text-muted-foreground">待取餐</div>
+              <div className="text-xs text-muted-foreground">{tr("待取餐", "To pick up")}</div>
             </CardContent></Card>
             <Card><CardContent className="pt-4 pb-3 text-center">
               <CheckCircle2 className="w-4 h-4 mx-auto mb-1 text-orange-500" />
               <div className="text-2xl font-bold text-green-600">{done}</div>
-              <div className="text-xs text-muted-foreground">已取餐</div>
+              <div className="text-xs text-muted-foreground">{tr("已取餐", "Picked up")}</div>
             </CardContent></Card>
             <Card><CardContent className="pt-4 pb-3 text-center">
               <Banknote className="w-4 h-4 mx-auto mb-1 text-orange-500" />
               <div className="text-2xl font-bold">{revenue.toLocaleString()}</div>
-              <div className="text-xs text-muted-foreground">預付金額 (NT$)</div>
+              <div className="text-xs text-muted-foreground">{tr("預付金額 (NT$)", "Prepaid (NT$)")}</div>
             </CardContent></Card>
           </div>
 
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base">備料彙總</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base">{tr("備料彙總", "Prep summary")}</CardTitle></CardHeader>
             <CardContent>
               {items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">這個時段還沒有訂單。</p>
+                <p className="text-sm text-muted-foreground">{tr("這個時段還沒有訂單。", "No orders for this slot yet.")}</p>
               ) : (
                 <ul className="divide-y divide-border">
                   {items.map(([name, qty]) => (

@@ -665,8 +665,8 @@ async function seedMealPlans(writer) {
 async function seedPlatformConfig(writer) {
   await writer.set(db.collection("platform_config").doc("growth"), {
     milestones: [
-      { id: "tier1", label: "20 萬門檻・單抽", threshold: 200000 },
-      { id: "tier2", label: "100 萬門檻・十連抽", threshold: 1000000 },
+      { id: "tier1", label: "20 萬門檻・單抽", label_en: "NT$200k · single draw", threshold: 200000 },
+      { id: "tier2", label: "100 萬門檻・十連抽", label_en: "NT$1M · ten draws", threshold: 1000000 },
     ],
     voucher_total: 10,
   });

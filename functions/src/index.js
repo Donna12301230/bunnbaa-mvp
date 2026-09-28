@@ -1,6 +1,10 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentCreated, onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onCall: rawOnCall, HttpsError } = require("firebase-functions/v2/https");
+const { withLang, t } = require("./i18n");
+
+// 所有 callable 都包 withLang：handler 內（含 pricing.js）的 t() 依前端送來的 data.lang 回中文或英文
+const onCall = (opts, handler) => rawOnCall(opts, withLang(handler));
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
@@ -12,6 +16,7 @@ const { generateVendorCalibrationReport } = require("./vendorCalibration");
 const { generateDiscountExplanation } = require("./consumerExplanation");
 const { requestPayment, confirmPayment } = require("./linePay");
 const { validatePickup, planPickupDates, applyEarlyBirdPrice, vendorSlotCapacity } = require("./pricing");
+const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./translate");
 
 // ISO 27001 A.5.15/A.8.3: privileged and cost-bearing callables fail closed in
 // deployed environments. Callers must be a platform admin, or (for anything
@@ -51,7 +56,10 @@ async function assertNotBanned(uid) {
   if (snap.exists && snap.data().orderBanned) {
     throw new HttpsError(
       "permission-denied",
-      "您的帳號因多次未取餐已被限制下單，請至會員中心提交解封申訴"
+      t(
+        "您的帳號因多次未取餐已被限制下單，請至會員中心提交解封申訴",
+        "Your account can't place orders after repeated no-shows. Please submit an appeal from My account."
+      )
     );
   }
 }
@@ -125,11 +133,20 @@ async function runCalibrationForVendor(vendorId) {
   }
 
   const report = await generateVendorCalibrationReport({ history });
+  // 英文介面用的譯文；翻譯失敗不影響報告本身
+  let english = {};
+  try {
+    const [explanationEn, patternNoteEn] = await translateTexts([report.explanation ?? "", report.pattern_note ?? ""]);
+    english = { explanation_en: explanationEn, pattern_note_en: patternNoteEn };
+  } catch (err) {
+    logger.warn(`Couldn't translate calibration report for vendor ${vendorId}`, err);
+  }
 
   const docRef = await db.collection("accuracy_reports").add({
     vendor_id: vendorId,
     horizon: "daily",
     ...report,
+    ...english,
     generated_at: FieldValue.serverTimestamp(),
   });
 
@@ -330,10 +347,10 @@ async function loadOrderableMenuItem(menuItemId, vendorCache) {
   if (!snap.exists) throw new HttpsError("not-found", `No menu item ${menuItemId}`);
   const item = snap.data();
   if (item.is_available === false) {
-    throw new HttpsError("failed-precondition", `「${item.name}」目前暫停供應`);
+    throw new HttpsError("failed-precondition", t(`「${item.name}」目前暫停供應`, `${item.name} is currently unavailable`));
   }
   if (typeof item.price !== "number" || item.price <= 0) {
-    throw new HttpsError("failed-precondition", `「${item.name}」沒有設定價格`);
+    throw new HttpsError("failed-precondition", t(`「${item.name}」沒有設定價格`, `${item.name} has no price set`));
   }
   const vendor = await assertVendorExists(item.vendor_id, vendorCache);
   return { item, vendor };
@@ -367,7 +384,8 @@ function groupDraftsBySlot(drafts) {
   return [...groups.values()];
 }
 
-const SOLD_OUT_DURING_PAYMENT = "你選的取餐時段在付款期間額滿了，這筆沒有扣款，請重新選擇時段下單";
+const soldOutDuringPayment = () =>
+  t("你選的取餐時段在付款期間額滿了，這筆沒有扣款，請重新選擇時段下單", "Your pickup slot filled up during payment. You weren't charged — please choose another slot.");
 
 // Early, non-binding check at reservation time so a buyer doesn't go all the
 // way to LINE Pay for a full slot. The binding check is in confirmLinePayPayment.
@@ -380,10 +398,12 @@ async function assertSlotsHaveRoom(drafts, vendorCache) {
     const booked = snap.exists ? snap.data().count ?? 0 : 0;
     if (booked + g.count > capacity) {
       const left = Math.max(0, capacity - booked);
-      const where = `「${vendor?.name ?? "這家店"}」${g.pickupDate} ${g.pickupWindow}`;
+      const where = t(`「${vendor?.name ?? "這家店"}」${g.pickupDate} ${g.pickupWindow}`, `${vendor?.name ?? "This vendor"} on ${g.pickupDate} ${g.pickupWindow}`);
       throw new HttpsError(
         "resource-exhausted",
-        left > 0 ? `${where} 只剩 ${left} 份，請減少數量或改選其他時段` : `${where} 已額滿，請改選其他時段`
+        left > 0
+          ? t(`${where} 只剩 ${left} 份，請減少數量或改選其他時段`, `${where} has only ${left} left. Reduce the quantity or choose another slot.`)
+          : t(`${where} 已額滿，請改選其他時段`, `${where} is full. Please choose another slot.`)
       );
     }
   }
@@ -433,7 +453,7 @@ exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (reque
     });
   } catch (err) {
     logger.error("LINE Pay request failed", err);
-    throw new HttpsError("internal", "LINE Pay 付款請求失敗，請稍後再試");
+    throw new HttpsError("internal", t("LINE Pay 付款請求失敗，請稍後再試", "The LINE Pay request failed. Please try again later."));
   }
 
   await intentRef.set({
@@ -447,6 +467,7 @@ exports.createLinePayReservation = onCall({ region: "asia-east1" }, async (reque
       {
         vendor_id: vendorId,
         item_name: itemName,
+        item_name_en: item.name_en ?? null,
         pickup_window: pickupWindow,
         pickup_date: pickupDate,
         discount_percent: discountPercent,
@@ -502,6 +523,7 @@ exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (r
       lockDrafts.push({
         vendor_id: menuItem.vendor_id,
         item_name: menuItem.name,
+        item_name_en: menuItem.name_en ?? null,
         pickup_window: pickupWindow,
         pickup_date: pickupDate,
         discount_percent: discountPercent,
@@ -531,7 +553,7 @@ exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (r
     });
   } catch (err) {
     logger.error("LINE Pay cart request failed", err);
-    throw new HttpsError("internal", "LINE Pay 付款請求失敗，請稍後再試");
+    throw new HttpsError("internal", t("LINE Pay 付款請求失敗，請稍後再試", "The LINE Pay request failed. Please try again later."));
   }
 
   await intentRef.set({
@@ -568,20 +590,21 @@ exports.createPlanLinePayReservation = onCall({ region: "asia-east1" }, async (r
   if (!planSnap.exists) throw new HttpsError("not-found", `No meal plan ${planId}`);
   const plan = planSnap.data();
   if (!Number.isInteger(plan.days) || plan.days <= 0 || plan.days > MAX_CART_UNITS) {
-    throw new HttpsError("failed-precondition", `「${plan.name}」的供餐天數設定有誤`);
+    throw new HttpsError("failed-precondition", t(`「${plan.name}」的供餐天數設定有誤`, `${plan.name} has an invalid number of days`));
   }
   if (typeof plan.price_per_meal !== "number" || plan.price_per_meal <= 0) {
-    throw new HttpsError("failed-precondition", `「${plan.name}」沒有設定價格`);
+    throw new HttpsError("failed-precondition", t(`「${plan.name}」沒有設定價格`, `${plan.name} has no price set`));
   }
   const vendorCache = new Map();
   const vendor = await assertVendorExists(plan.vendor_id, vendorCache);
   if (vendor.status === "disabled") {
-    throw new HttpsError("failed-precondition", `「${vendor.name ?? "這家店"}」目前暫停營業`);
+    throw new HttpsError("failed-precondition", t(`「${vendor.name ?? "這家店"}」目前暫停營業`, `${vendor.name ?? "This vendor"} is temporarily closed`));
   }
   const { dates, problem } = planPickupDates(startDate, pickupWindow, vendor, plan.days);
   if (problem) throw new HttpsError("invalid-argument", problem);
 
   const planLabel = `${plan.label}：${plan.name}`;
+  const planLabelEn = plan.name_en ? `${plan.label_en || plan.label}: ${plan.name_en}` : null;
   const price = plan.price_per_meal;
   const appBaseUrl = process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
   const intentRef = db.collection("payment_intents").doc();
@@ -589,6 +612,7 @@ exports.createPlanLinePayReservation = onCall({ region: "asia-east1" }, async (r
   const lockDrafts = dates.map((date, i) => ({
     vendor_id: plan.vendor_id,
     item_name: `${planLabel}・第${i + 1}/${plan.days}天`,
+    item_name_en: planLabelEn ? `${planLabelEn} · Day ${i + 1}/${plan.days}` : null,
     pickup_window: pickupWindow,
     pickup_date: date,
     discount_percent: 0,
@@ -613,7 +637,7 @@ exports.createPlanLinePayReservation = onCall({ region: "asia-east1" }, async (r
     });
   } catch (err) {
     logger.error("LINE Pay plan request failed", err);
-    throw new HttpsError("internal", "LINE Pay 付款請求失敗，請稍後再試");
+    throw new HttpsError("internal", t("LINE Pay 付款請求失敗，請稍後再試", "The LINE Pay request failed. Please try again later."));
   }
 
   await intentRef.set({
@@ -648,7 +672,7 @@ exports.confirmLinePayPayment =onCall({ region: "asia-east1" }, async (request) 
     return { lock_ids: intent.lock_ids };
   }
   if (intent.status === "sold_out") {
-    throw new HttpsError("resource-exhausted", SOLD_OUT_DURING_PAYMENT);
+    throw new HttpsError("resource-exhausted", soldOutDuringPayment());
   }
   if (intent.status !== "pending") {
     throw new HttpsError("failed-precondition", `This payment is ${intent.status}, not pending`);
@@ -661,7 +685,7 @@ exports.confirmLinePayPayment =onCall({ region: "asia-east1" }, async (request) 
   const soldOut = await db.runTransaction(async (tx) => {
     const fresh = await tx.get(intentRef);
     if (fresh.data().status !== "pending") {
-      throw new HttpsError("failed-precondition", "這筆付款正在處理中，請稍候重新整理");
+      throw new HttpsError("failed-precondition", t("這筆付款正在處理中，請稍候重新整理", "This payment is still being processed. Please refresh in a moment."));
     }
     const vendorSnaps = await Promise.all(slots.map((g) => tx.get(db.collection("vendors").doc(g.vendorId))));
     const counterSnaps = await Promise.all(counterRefs.map((ref) => tx.get(ref)));
@@ -686,7 +710,7 @@ exports.confirmLinePayPayment =onCall({ region: "asia-east1" }, async (request) 
     tx.update(intentRef, { status: "confirming" });
     return false;
   });
-  if (soldOut) throw new HttpsError("resource-exhausted", SOLD_OUT_DURING_PAYMENT);
+  if (soldOut) throw new HttpsError("resource-exhausted", soldOutDuringPayment());
 
   // 2) Capture the payment. On failure give the reserved meals back and let
   //    the buyer retry the same order.
@@ -698,7 +722,7 @@ exports.confirmLinePayPayment =onCall({ region: "asia-east1" }, async (request) 
     slots.forEach((g, i) => rollback.update(counterRefs[i], { count: FieldValue.increment(-g.count) }));
     rollback.update(intentRef, { status: "pending" });
     await rollback.commit().catch((e) => logger.error("Capacity rollback failed", e));
-    throw new HttpsError("internal", "LINE Pay 付款確認失敗，請稍後再試或聯絡客服");
+    throw new HttpsError("internal", t("LINE Pay 付款確認失敗，請稍後再試或聯絡客服", "LINE Pay couldn't confirm the payment. Please try again later or contact support."));
   }
 
   const batch = db.batch();
@@ -820,6 +844,13 @@ exports.askCalibrationScenario = onCall({ region: "asia-east1" }, async (request
   }
 
   const report = await generateVendorCalibrationReport({ history, scenarioQuestion: question });
+  if (request.data?.lang === "en" && report.scenario_answer) {
+    try {
+      [report.scenario_answer] = await translateTexts([report.scenario_answer]);
+    } catch (err) {
+      logger.warn("Couldn't translate scenario answer", err);
+    }
+  }
   // Not persisted by default — this is a lightweight, ad-hoc follow-up.
   // Persist to a `scenario_queries` subcollection if you want an audit trail.
   return report;
@@ -869,6 +900,14 @@ exports.onLockCreated = onDocumentCreated(
     let explanation;
     if (cached.exists) {
       explanation = cached.data();
+      if (typeof explanation.explanation_text_en !== "string") {
+        try {
+          [explanation.explanation_text_en] = await translateTexts([explanation.explanation_text]);
+          await cacheRef.update({ explanation_text_en: explanation.explanation_text_en });
+        } catch (err) {
+          logger.warn(`Couldn't translate cached explanation ${key}`, err);
+        }
+      }
     } else {
       explanation = await generateDiscountExplanation({
         discountPercent: lock.discount_percent,
@@ -878,13 +917,21 @@ exports.onLockCreated = onDocumentCreated(
         // number to the consumer-facing agent.
         vendorReliabilityTone: vendor.reliability_tone || "new",
       });
+      try {
+        [explanation.explanation_text_en] = await translateTexts([explanation.explanation_text]);
+      } catch (err) {
+        logger.warn(`Couldn't translate explanation ${key}`, err);
+      }
       await cacheRef.set({
         ...explanation,
         generated_at: FieldValue.serverTimestamp(),
       });
     }
 
-    await lockRef.update({ discount_explanation: explanation.explanation_text });
+    await lockRef.update({
+      discount_explanation: explanation.explanation_text,
+      discount_explanation_en: explanation.explanation_text_en ?? null,
+    });
   }
 );
 
@@ -929,13 +976,20 @@ async function sendPickupReminders() {
     const fcmToken = tokenSnap.exists ? tokenSnap.data().fcm_token : null;
     if (!fcmToken) continue;
 
+    const userSnap = await db.collection("users").doc(lock.buyer_uid).get();
+    const en = userSnap.exists && userSnap.data().lang === "en";
     try {
       await admin.messaging().send({
         token: fcmToken,
-        notification: {
-          title: "取餐時間快到了",
-          body: `${lock.item_name} 預計 ${lock.pickup_window} 取餐，別忘記囉！`,
-        },
+        notification: en
+          ? {
+              title: "Pickup time is coming up",
+              body: `${lock.item_name_en || lock.item_name} — pickup at ${lock.pickup_window}. Don't forget!`,
+            }
+          : {
+              title: "取餐時間快到了",
+              body: `${lock.item_name} 預計 ${lock.pickup_window} 取餐，別忘記囉！`,
+            },
       });
       await doc.ref.update({ reminder_sent: true });
       sent++;
@@ -988,8 +1042,8 @@ const GROWTH_REWARD_TIERS = [
 // 商家後台成長獎勵頁也讀同一份）。文件還沒建立時退回這組預設值，伺服器照樣能算。
 const DEFAULT_GROWTH_CONFIG = {
   milestones: [
-    { id: "tier1", label: "20 萬門檻・單抽", threshold: 200000 },
-    { id: "tier2", label: "100 萬門檻・十連抽", threshold: 1000000 },
+    { id: "tier1", label: "20 萬門檻・單抽", label_en: "NT$200k · single draw", threshold: 200000 },
+    { id: "tier2", label: "100 萬門檻・十連抽", label_en: "NT$1M · ten draws", threshold: 1000000 },
   ],
   voucher_total: 10,
 };
@@ -1076,4 +1130,88 @@ exports.drawGrowthReward = onCall({ region: "asia-east1" }, async (request) => {
   });
 
   return { price_percent: pricePercent };
+});
+
+/* ------------------------------------------------------------------ *
+ * 6. English copies of database content (translate.js) — vendors,
+ *    menu items and meal plans get *_en fields whenever their Chinese
+ *    text changes. Writing *_en re-fires the trigger; translationPatch
+ *    compares against i18n_src and returns null, so it stops there.
+ * ------------------------------------------------------------------ */
+
+async function translateDoc(ref, data, collection) {
+  const patch = await translationPatch(data, TRANSLATED_FIELDS[collection]);
+  if (patch) await ref.set(patch, { merge: true });
+  return !!patch;
+}
+
+function translationTrigger(collection) {
+  return onDocumentWritten({ document: `${collection}/{docId}`, region: "asia-east1" }, async (event) => {
+    const after = event.data?.after;
+    if (!after?.exists) return;
+    try {
+      await translateDoc(after.ref, after.data(), collection);
+    } catch (err) {
+      // 翻譯失敗不影響原本的寫入；英文介面會先顯示中文，下次改內容或管理員補翻時再試
+      logger.warn(`Translation failed for ${collection}/${after.id}`, err);
+    }
+  });
+}
+
+exports.translateVendor = translationTrigger("vendors");
+exports.translateMenuItem = translationTrigger("menu_items");
+exports.translateMealPlan = translationTrigger("meal_plans");
+exports.translateReview = translationTrigger("reviews");
+exports.translateDraw = translationTrigger("draws");
+
+/**
+ * Admin backfill: translate every existing vendor / menu item / meal plan /
+ * review / draw,
+ * then fill item_name_en on existing locks (distinct names translated once).
+ * Triggers only fire on new writes, so data from before this feature needs this.
+ */
+exports.translateAllContent = onCall({ region: "asia-east1", timeoutSeconds: 540 }, async (request) => {
+  assertAdminOrEmulator(request);
+  const counts = { vendors: 0, menu_items: 0, meal_plans: 0, reviews: 0, draws: 0, locks: 0, failed: 0 };
+  for (const collection of Object.keys(TRANSLATED_FIELDS)) {
+    const snap = await db.collection(collection).get();
+    for (const doc of snap.docs) {
+      try {
+        if (await translateDoc(doc.ref, doc.data(), collection)) counts[collection]++;
+      } catch (err) {
+        counts.failed++;
+        logger.warn(`Backfill translation failed for ${collection}/${doc.id}`, err);
+      }
+    }
+  }
+
+  const lockSnap = await db.collection("locks").get();
+  const missing = lockSnap.docs.filter((d) => typeof d.data().item_name_en !== "string" && d.data().item_name);
+  const names = [...new Set(missing.map((d) => d.data().item_name))];
+  const english = new Map();
+  for (let i = 0; i < names.length; i += 40) {
+    const chunk = names.slice(i, i + 40);
+    try {
+      const out = await translateTexts(chunk);
+      chunk.forEach((name, j) => english.set(name, out[j]));
+    } catch (err) {
+      counts.failed += chunk.length;
+      logger.warn("Backfill translation failed for lock item names", err);
+    }
+  }
+  let batch = db.batch();
+  let pending = 0;
+  for (const doc of missing) {
+    const en = english.get(doc.data().item_name);
+    if (!en) continue;
+    batch.update(doc.ref, { item_name_en: en });
+    counts.locks++;
+    if (++pending === 400) {
+      await batch.commit();
+      batch = db.batch();
+      pending = 0;
+    }
+  }
+  if (pending) await batch.commit();
+  return counts;
 });

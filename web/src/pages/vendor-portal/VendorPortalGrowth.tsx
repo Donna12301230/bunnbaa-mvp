@@ -1,3 +1,5 @@
+import { discountText } from "@/lib/pricing";
+import { tr } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
@@ -26,22 +28,27 @@ import { EmptyState } from "@/components/ds";
 interface Milestone {
   id: string;
   label: string;
+  label_en?: string;
   threshold: number;
 }
 
-const TIER_STYLE: Record<number, { bg: string; color: string; label: string }> = {
-  80: { bg: "bg-amber-50", color: "text-amber-700", label: "8折" },
-  60: { bg: "bg-amber-50", color: "text-amber-700", label: "6折" },
-  50: { bg: "bg-blue-50", color: "text-blue-700", label: "5折" },
-  30: { bg: "bg-purple-50", color: "text-purple-700", label: "3折" },
-  10: { bg: "bg-orange-50", color: "text-orange-700", label: "1折" },
-  0: { bg: "bg-yellow-100", color: "text-yellow-800", label: "0元整份" },
+// price_percent＝要付原價的幾 %；標籤依語言組（8 折＝20% off）
+const TIER_STYLE: Record<number, { bg: string; color: string }> = {
+  80: { bg: "bg-amber-50", color: "text-amber-700" },
+  60: { bg: "bg-amber-50", color: "text-amber-700" },
+  50: { bg: "bg-blue-50", color: "text-blue-700" },
+  30: { bg: "bg-purple-50", color: "text-purple-700" },
+  10: { bg: "bg-orange-50", color: "text-orange-700" },
+  0: { bg: "bg-yellow-100", color: "text-yellow-800" },
 };
+const tierLabel = (pricePercent: number) =>
+  pricePercent === 0 ? tr("0元整份", "Free meal") : discountText(100 - pricePercent);
 
 interface DrawRecord {
   id: string;
   price_percent: number;
   item_name?: string | null;
+  item_name_en?: string;
   created_at?: { toDate?: () => Date };
 }
 
@@ -96,21 +103,21 @@ export default function VendorPortalGrowth() {
   return (
     <VendorPortalLayout>
       <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
-        <Trophy className="w-5 h-5 text-orange-500" /> 成長獎勵
+        <Trophy className="w-5 h-5 text-orange-500" /> {tr("成長獎勵", "Growth rewards")}
       </h2>
       <p className="text-sm text-muted-foreground mb-5">
-        累積合作營收達門檻，解鎖消費者端抽獎機制；獎項是折扣券或整份免費，鼓勵消費者持續回購。
+        {tr("累積合作營收達門檻，解鎖消費者端抽獎機制；獎項是折扣券或整份免費，鼓勵消費者持續回購。", "Reach a revenue threshold to unlock a prize draw for customers — prizes are discount vouchers or free meals that keep them coming back.")}
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* 門檻進度 */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">門檻進度</CardTitle>
+            <CardTitle className="text-base">{tr("門檻進度", "Progress")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             {milestones.length === 0 && (
-              <p className="text-sm text-muted-foreground">平台尚未設定成長獎勵門檻。</p>
+              <p className="text-sm text-muted-foreground">{tr("平台尚未設定成長獎勵門檻。", "The platform hasn't set growth thresholds yet.")}</p>
             )}
             {milestones.map(m => {
               const achieved = cumulativeRevenue >= m.threshold;
@@ -119,10 +126,10 @@ export default function VendorPortalGrowth() {
                 <div key={m.id}>
                   <div className="flex items-center justify-between mb-1.5 text-sm">
                     <span className="flex items-center gap-1.5 font-medium">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" /> {m.label}
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" /> {tr(m.label, m.label_en ?? m.label)}
                     </span>
                     {achieved ? (
-                      <span className="text-xs font-bold text-green-700">已達成</span>
+                      <span className="text-xs font-bold text-green-700">{tr("已達成", "Reached")}</span>
                     ) : (
                       <span className="text-xs font-semibold text-muted-foreground">
                         ${cumulativeRevenue.toLocaleString()} / ${m.threshold.toLocaleString()}
@@ -137,7 +144,7 @@ export default function VendorPortalGrowth() {
                   </div>
                   {!achieved && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      還差 ${(m.threshold - cumulativeRevenue).toLocaleString()} 解鎖
+                      {tr(`還差 $${(m.threshold - cumulativeRevenue).toLocaleString()} 解鎖`, `$${(m.threshold - cumulativeRevenue).toLocaleString()} to unlock`)}
                     </p>
                   )}
                 </div>
@@ -150,15 +157,15 @@ export default function VendorPortalGrowth() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-1.5">
-              <Ticket className="w-4 h-4 text-orange-500" /> 0 元券庫存
+              <Ticket className="w-4 h-4 text-orange-500" /> {tr("0 元券庫存", "Free-meal vouchers")}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-2">剩餘 {voucherRemaining} / {voucherTotal}</p>
+            <p className="text-sm text-muted-foreground mb-2">{tr("剩餘", "Remaining")} {voucherRemaining} / {voucherTotal}</p>
             <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
               <div className="h-full rounded-full bg-yellow-500" style={{ width: `${(voucherRemaining / voucherTotal) * 100}%` }} />
             </div>
-            <p className="text-xs text-muted-foreground">見底後將自動降級為 1 折券，仍保留六級保底機制</p>
+            <p className="text-xs text-muted-foreground">{tr("見底後將自動降級為 1 折券，仍保留六級保底機制", "When they run out, winners get a 90%-off voucher instead; all six tiers still apply")}</p>
           </CardContent>
         </Card>
       </div>
@@ -166,20 +173,20 @@ export default function VendorPortalGrowth() {
       {/* 歷史開獎名單 */}
       <Card className="mt-4">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">歷史開獎名單</CardTitle>
+          <CardTitle className="text-base">{tr("歷史開獎名單", "Draw history")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {drawHistory.length === 0 ? (
-            <EmptyState size="compact" icon={<Trophy size={32} />} title="尚無開獎紀錄" />
+            <EmptyState size="compact" icon={<Trophy size={32} />} title={tr("尚無開獎紀錄", "No draws yet")} />
           ) : (
             <>
               <div className="grid grid-cols-3 gap-2 px-6 py-2 text-xs font-semibold text-muted-foreground border-b border-border">
-                <span>日期</span>
-                <span>抽中等級</span>
-                <span>品項</span>
+                <span>{tr("日期", "Date")}</span>
+                <span>{tr("抽中等級", "Prize")}</span>
+                <span>{tr("品項", "Item")}</span>
               </div>
               {drawHistory.map(d => {
-                const style = TIER_STYLE[d.price_percent] ?? { bg: "bg-gray-100", color: "text-gray-600", label: `${d.price_percent}%` };
+                const style = { ...(TIER_STYLE[d.price_percent] ?? { bg: "bg-gray-100", color: "text-gray-600" }), label: tierLabel(d.price_percent) };
                 const date = d.created_at?.toDate?.();
                 return (
                   <div key={d.id} className="grid grid-cols-3 gap-2 px-6 py-3 text-sm border-b border-border last:border-0 items-center">
@@ -189,7 +196,7 @@ export default function VendorPortalGrowth() {
                         {style.label}
                       </span>
                     </span>
-                    <span className="text-muted-foreground truncate">{d.item_name ?? "—"}</span>
+                    <span className="text-muted-foreground truncate">{tr(d.item_name ?? "—", d.item_name_en || d.item_name || "—")}</span>
                   </div>
                 );
               })}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, query, updateDoc, where } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
+import { httpsCallable } from "@/lib/callable";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { Clock, MapPin, UtensilsCrossed, Repeat } from "lucide-react";
@@ -14,7 +14,7 @@ import { takeOverLock } from "@/lib/transfers";
 import type { Lock } from "@/types";
 import { useVendors } from "@/hooks/useVendors";
 import { useSelectedArea, vendorInArea } from "@/lib/location";
-import { tr } from "@/lib/i18n";
+import { tr, loc } from "@/lib/i18n";
 import { EmptyState, Tag } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { Link } from "wouter";
@@ -56,7 +56,7 @@ export default function TransferMarketPage() {
   const [now, setNow] = useState(() => Date.now());
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const { data: vendors = [] } = useVendors();
-  const vendorName = (id: string) => vendors.find((v) => v.id === id)?.name;
+  const vendorName = (id: string) => loc(vendors.find((v) => v.id === id), "name");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
@@ -128,7 +128,7 @@ export default function TransferMarketPage() {
           l.status === "for_resale" &&
           l.buyer_uid !== uid &&
           (!area || vendorInArea(vendors.find((v) => v.id === l.vendor_id), area)) &&
-          (!searchLower || l.item_name.toLowerCase().includes(searchLower))
+          (!searchLower || l.item_name.toLowerCase().includes(searchLower) || (l.item_name_en ?? "").toLowerCase().includes(searchLower))
       ),
     [locks, uid, searchLower, area, vendors]
   );
@@ -231,7 +231,7 @@ export default function TransferMarketPage() {
                         )}
                       </div>
                       <div className="flex flex-col gap-2.5 p-4 flex-1">
-                        <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
+                        <h3 className="text-body font-bold leading-snug">{loc(item, "item_name")}</h3>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                         </div>
@@ -271,7 +271,7 @@ export default function TransferMarketPage() {
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
+                      <h3 className="text-body font-bold leading-snug">{loc(item, "item_name")}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                       </div>
@@ -318,7 +318,7 @@ export default function TransferMarketPage() {
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
+                      <h3 className="text-body font-bold leading-snug">{loc(item, "item_name")}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                       </div>
@@ -358,7 +358,7 @@ export default function TransferMarketPage() {
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
+                      <h3 className="text-body font-bold leading-snug">{loc(item, "item_name")}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                       </div>

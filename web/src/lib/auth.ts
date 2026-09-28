@@ -68,6 +68,7 @@ async function resolveProfile(u: User): Promise<UserProfile> {
     department?: string;
     orderBanned?: boolean;
     noPickupCount?: number;
+    lang?: "zh" | "en";
   } = {};
   try {
     const snap = await getDoc(doc(db, "users", u.uid));
@@ -89,6 +90,7 @@ async function resolveProfile(u: User): Promise<UserProfile> {
     vendorId,
     orderBanned: extra.orderBanned || false,
     noPickupCount: extra.noPickupCount || 0,
+    lang: extra.lang,
   };
 }
 

@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { CameraOff } from "lucide-react";
@@ -51,7 +52,7 @@ export default function QrScannerDialog({ open, onOpenChange, onScan }: Props) {
 
     (async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError("這個瀏覽器無法使用相機（需要 HTTPS），請改用下方手動輸入取餐編號。");
+        setError(tr("這個瀏覽器無法使用相機（需要 HTTPS），請改用下方手動輸入取餐編號。", "This browser can't use the camera (HTTPS required). Enter the pickup code manually below."));
         return;
       }
       try {
@@ -72,10 +73,10 @@ export default function QrScannerDialog({ open, onOpenChange, onScan }: Props) {
         const name = (err as DOMException)?.name;
         setError(
           name === "NotAllowedError"
-            ? "相機權限被拒絕，請到瀏覽器設定允許使用相機，或改用手動輸入取餐編號。"
+            ? tr("相機權限被拒絕，請到瀏覽器設定允許使用相機，或改用手動輸入取餐編號。", "Camera access was denied. Allow it in your browser settings, or enter the pickup code manually.")
             : name === "NotFoundError"
-              ? "找不到可用的相機，請改用手動輸入取餐編號。"
-              : "無法開啟相機，請改用手動輸入取餐編號。"
+              ? tr("找不到可用的相機，請改用手動輸入取餐編號。", "No camera found. Enter the pickup code manually.")
+              : tr("無法開啟相機，請改用手動輸入取餐編號。", "Couldn't open the camera. Enter the pickup code manually.")
         );
       }
     })();
@@ -91,8 +92,8 @@ export default function QrScannerDialog({ open, onOpenChange, onScan }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>掃描取餐 QR Code</DialogTitle>
-          <DialogDescription>請顧客打開「我的商品」→「使用」，把 QR Code 對準框內</DialogDescription>
+          <DialogTitle>{tr("掃描取餐 QR Code", "Scan pickup QR code")}</DialogTitle>
+          <DialogDescription>{tr("請顧客打開「我的餐點」→「使用」，把 QR Code 對準框內", "Ask the customer to open My meals → Use, then point the QR code at the frame")}</DialogDescription>
         </DialogHeader>
         {error ? (
           <div className="flex flex-col items-center gap-2 rounded-lg bg-muted p-6 text-center text-sm text-muted-foreground">

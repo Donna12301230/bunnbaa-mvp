@@ -1,6 +1,7 @@
+import { tr, loc } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { collection, getDocs, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
+import { httpsCallable } from "@/lib/callable";
 import { db, functions } from "../lib/firebase";
 import type { AccuracyReport, Payout } from "../types";
 import { useAuth } from "@/hooks/useAuth";
@@ -102,12 +103,12 @@ export default function VendorDashboard() {
 
   return (
     <div className="page">
-      <div className="kicker">BunnBaa · 商家後台</div>
-      <h1>預測校準報告</h1>
+      <div className="kicker">BunnBaa · {tr("商家後台", "Vendor portal")}</div>
+      <h1>{tr("預測校準報告", "Forecast calibration report")}</h1>
 
       {isAdmin && !user?.vendorId && vendorOptions.length > 0 && (
         <div className="card">
-          <label className="muted" htmlFor="vendor-scope">檢視商家（管理員）</label>{" "}
+          <label className="muted" htmlFor="vendor-scope">{tr("檢視商家（管理員）", "Vendor (admin view)")}</label>{" "}
           <select id="vendor-scope" value={VENDOR_ID} onChange={(e) => setPickedVendorId(e.target.value)}>
             {vendorOptions.map((v) => (
               <option key={v.id} value={v.id}>{v.name}</option>
@@ -118,15 +119,15 @@ export default function VendorDashboard() {
 
       {!VENDOR_ID && !isAdmin && (
         <div className="card">
-          <p className="muted">這個帳號還沒綁定商家，請先到平台申請成為合作店家。</p>
+          <p className="muted">{tr("這個帳號還沒綁定商家，請先到平台申請成為合作店家。", "This account isn't linked to a vendor yet. Apply to become a partner vendor first.")}</p>
         </div>
       )}
 
       {VENDOR_ID && !report && (
         <div className="card">
-          <p className="muted">尚無報告。先執行 scripts/seed.js 產生情境資料，再點下方按鈕產生第一份報告。</p>
+          <p className="muted">{tr("尚無報告。累積幾天的取餐紀錄後，點下方按鈕產生第一份報告。", "No report yet. Once there are a few days of pickups, generate the first report below.")}</p>
           <button onClick={handleTriggerNow} disabled={triggering}>
-            {triggering ? "產生中…" : "立即產生報告"}
+            {triggering ? tr("產生中…", "Generating…") : tr("立即產生報告", "Generate report")}
           </button>
         </div>
       )}
@@ -137,36 +138,36 @@ export default function VendorDashboard() {
             <div className="row">
               <div>
                 <div className="stat">{Math.round(report.accuracy_rate * 100)}%</div>
-                <div className="muted">目前預測準確率 · 誤差區間 {report.error_range}</div>
+                <div className="muted">{tr("目前預測準確率 · 誤差區間", "Current forecast accuracy · error range")} {report.error_range}</div>
               </div>
               <button className="secondary" onClick={handleTriggerNow} disabled={triggering}>
-                {triggering ? "更新中…" : "重新計算"}
+                {triggering ? tr("更新中…", "Updating…") : tr("重新計算", "Recalculate")}
               </button>
             </div>
           </div>
 
           <div className="card">
-            <h2>說明</h2>
-            <p className="muted">{report.explanation}</p>
+            <h2>{tr("說明", "Explanation")}</h2>
+            <p className="muted">{loc(report, "explanation")}</p>
           </div>
 
           <div className="card">
-            <h2>落差模式</h2>
-            <p className="muted">{report.pattern_note}</p>
+            <h2>{tr("落差模式", "Gap patterns")}</h2>
+            <p className="muted">{loc(report, "pattern_note")}</p>
           </div>
 
           <div className="card">
-            <h2>追問情境</h2>
-            <p className="faint">例如：「如果這次我把鎖定量目標調高 10%，履約缺口大概會怎麼變化？」</p>
+            <h2>{tr("追問情境", "Ask a what-if")}</h2>
+            <p className="faint">{tr("例如：「如果這次我把鎖定量目標調高 10%，履約缺口大概會怎麼變化？」", "e.g. \"If I raise my locking target by 10%, how would the fulfilment gap change?\"")}</p>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <input
                 type="text"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="輸入你的問題…"
+                placeholder={tr("輸入你的問題…", "Type your question…")}
               />
               <button onClick={handleAsk} disabled={asking || !question.trim()}>
-                {asking ? "思考中…" : "詢問"}
+                {asking ? tr("思考中…", "Thinking…") : tr("詢問", "Ask")}
               </button>
             </div>
             {scenarioAnswer && <p className="muted" style={{ marginTop: 12 }}>{scenarioAnswer}</p>}
@@ -176,29 +177,29 @@ export default function VendorDashboard() {
         </>
       )}
 
-      <h1 style={{ marginTop: 32 }}>撥款</h1>
+      <h1 style={{ marginTop: 32 }}>{tr("撥款", "Payouts")}</h1>
       <div className="card">
         <div className="row">
           <p className="muted" style={{ margin: 0 }}>
-            平台代收後全額撥款，不抽成。目前還沒接 LINE Pay／綠界撥款 API，先以對帳單匯出的方式結算。
+            {tr("平台代收後全額撥款，不抽成。目前還沒接 LINE Pay／綠界撥款 API，先以對帳單匯出的方式結算。", "The platform collects payment and pays out in full with no commission. Payout APIs aren't connected yet, so settlements are exported as statements.")}
           </p>
           <button className="secondary" onClick={handleSettleNow} disabled={settling}>
-            {settling ? "結算中…" : "立即結算"}
+            {settling ? tr("結算中…", "Settling…") : tr("立即結算", "Settle now")}
           </button>
         </div>
       </div>
 
       {payouts.length === 0 ? (
-        <p className="faint">尚無撥款紀錄。</p>
+        <p className="faint">{tr("尚無撥款紀錄。", "No payouts yet.")}</p>
       ) : (
         payouts.map((p) => (
           <div key={p.id} className="card">
             <div className="row">
               <div>
                 <div className="stat">NT${p.amount}</div>
-                <div className="muted">{p.lock_count} 筆已履約訂單</div>
+                <div className="muted">{tr(`${p.lock_count} 筆已履約訂單`, `${p.lock_count} fulfilled orders`)}</div>
               </div>
-              <span className="badge">待人工對帳匯出</span>
+              <span className="badge">{tr("待人工對帳匯出", "Awaiting manual export")}</span>
             </div>
           </div>
         ))

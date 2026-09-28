@@ -1,4 +1,4 @@
-import { tr } from "@/lib/i18n";
+import { tr, loc } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import {
   collection,
@@ -10,7 +10,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
+import { httpsCallable } from "@/lib/callable";
 import { db, auth, functions } from "../lib/firebase";
 import { useRequireLogin } from "../hooks/useRequireLogin";
 import type { Lock, MenuItem, Vendor } from "../types";
@@ -254,8 +254,8 @@ export default function ConsumerLockPage() {
         <div className="card">
           <div className="row">
             <div>
-              <h2>{vendor.name} {vendor.verified && <span className="badge">{tr("認證商家", "Verified")}</span>}</h2>
-              <div className="muted">{menuItem?.name ?? "—"} · {nextPickup.window} {tr("取餐", "pickup")}</div>
+              <h2>{loc(vendor, "name")} {vendor.verified && <span className="badge">{tr("認證商家", "Verified")}</span>}</h2>
+              <div className="muted">{loc(menuItem, "name") || "—"} · {nextPickup.window} {tr("取餐", "pickup")}</div>
             </div>
             <span className="badge">
               {tr("近期履約穩定度：", "Recent reliability: ")}
@@ -292,7 +292,7 @@ export default function ConsumerLockPage() {
         <div className="card">
           <h2>{tr("為什麼是這個折扣？", "Why this discount?")}</h2>
           {myLock.discount_explanation ? (
-            <p className="muted">{myLock.discount_explanation}</p>
+            <p className="muted">{loc(myLock, "discount_explanation")}</p>
           ) : (
             <p className="faint">{tr("產生說明中…", "Generating explanation…")}</p>
           )}
@@ -348,7 +348,7 @@ export default function ConsumerLockPage() {
             return (
               <div key={lock.id} className="row" style={{ marginBottom: 8 }}>
                 <div>
-                  <div>{lock.item_name}</div>
+                  <div>{loc(lock, "item_name")}</div>
                   <div className="muted">
                     {lock.pickup_window} {tr("取餐", "pickup")} · {expired ? tr("已逾時・開放 $0 元領取", "Expired · free to claim") : `NT$${lock.locked_price}`}
                   </div>

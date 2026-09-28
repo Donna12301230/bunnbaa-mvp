@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -11,14 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ClipboardList } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-const STATUS_LABELS: Record<LockStatus, string> = {
-  locked: "鎖定中",
-  for_resale: "轉賣中",
-  for_gift: "贈送中",
-  resold_and_fulfilled: "已轉賣完成取餐",
-  fulfilled: "已完成取餐",
-  no_show: "未取餐",
-};
+// 用函式包起來，每次 render 依目前語言組標籤
+const statusLabels = (): Record<LockStatus, string> => ({
+  locked: tr("鎖定中", "Locked"),
+  for_resale: tr("轉賣中", "For resale"),
+  for_gift: tr("贈送中", "Being gifted"),
+  resold_and_fulfilled: tr("已轉賣完成取餐", "Picked up by new owner"),
+  fulfilled: tr("已完成取餐", "Picked up"),
+  no_show: tr("未取餐", "No-show"),
+});
 
 /**
  * Real Firestore data (the `/lock` legacy-ui pre-order flow's `locks`
@@ -64,7 +66,7 @@ function LocksContent() {
   async function overrideStatus(lock: Lock, status: LockStatus) {
     let no_show_note: string | undefined;
     if (status === "no_show") {
-      no_show_note = window.prompt("未取餐備註（給校準報告分析用，可留空）") ?? undefined;
+      no_show_note = window.prompt(tr("未取餐備註（給校準報告分析用，可留空）", "No-show note (for the calibration report, optional)")) ?? undefined;
     }
     setActingId(lock.id);
     try {
@@ -87,7 +89,7 @@ function LocksContent() {
       });
       await batch.commit();
     } catch (err) {
-      toast({ variant: "destructive", title: "操作失敗", description: (err as Error).message });
+      toast({ variant: "destructive", title: tr("操作失敗", "Action failed"), description: (err as Error).message });
     } finally {
       setActingId(null);
     }
@@ -97,18 +99,18 @@ function LocksContent() {
     <>
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LockStatus | "all")}>
-          <SelectTrigger className="sm:w-48" aria-label="篩選狀態"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="sm:w-48" aria-label={tr("篩選狀態", "Filter by status")}><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">全部狀態</SelectItem>
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
+            <SelectItem value="all">{tr("全部狀態", "All statuses")}</SelectItem>
+            {Object.entries(statusLabels()).map(([value, label]) => (
               <SelectItem key={value} value={value}>{label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={vendorFilter} onValueChange={setVendorFilter}>
-          <SelectTrigger className="sm:w-48" aria-label="篩選商家"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="sm:w-48" aria-label={tr("篩選商家", "Filter by vendor")}><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">全部商家</SelectItem>
+            <SelectItem value="all">{tr("全部商家", "All vendors")}</SelectItem>
             {Object.values(vendors).map((v) => (
               <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
             ))}
@@ -119,7 +121,7 @@ function LocksContent() {
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>沒有符合條件的訂單</p>
+          <p>{tr("沒有符合條件的訂單", "No matching orders")}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -134,7 +136,7 @@ function LocksContent() {
                   <p className="text-xs text-muted-foreground">#{lock.id.slice(-8).toUpperCase()}</p>
                 </div>
                 <Badge className="bg-orange-100 text-orange-800 border-0 shrink-0">
-                  {STATUS_LABELS[lock.status]}
+                  {statusLabels()[lock.status]}
                 </Badge>
               </div>
 
@@ -142,25 +144,25 @@ function LocksContent() {
                 {lock.status !== "fulfilled" && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
                     onClick={() => overrideStatus(lock, "fulfilled")}>
-                    標記已完成取餐
+                    {tr("標記已完成取餐", "Mark picked up")}
                   </Button>
                 )}
                 {lock.status !== "resold_and_fulfilled" && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
                     onClick={() => overrideStatus(lock, "resold_and_fulfilled")}>
-                    標記轉賣完成取餐
+                    {tr("標記轉賣完成取餐", "Mark picked up by new owner")}
                   </Button>
                 )}
                 {lock.status !== "no_show" && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
                     onClick={() => overrideStatus(lock, "no_show")}>
-                    標記未取餐
+                    {tr("標記未取餐", "Mark no-show")}
                   </Button>
                 )}
                 {lock.status !== "locked" && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
                     onClick={() => overrideStatus(lock, "locked")}>
-                    退回鎖定中
+                    {tr("退回鎖定中", "Revert to locked")}
                   </Button>
                 )}
               </div>
@@ -175,7 +177,7 @@ function LocksContent() {
 export default function AdminLocksPage() {
   return (
     <AdminLayout>
-      <h2 className="text-lg font-bold mb-3">訂單總覽</h2>
+      <h2 className="text-lg font-bold mb-3">{tr("訂單總覽", "All orders")}</h2>
       <RequireRealAdmin>
         <LocksContent />
       </RequireRealAdmin>

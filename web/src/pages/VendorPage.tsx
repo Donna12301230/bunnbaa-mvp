@@ -9,7 +9,7 @@ import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { tr } from "@/lib/i18n";
+import { tr, loc } from "@/lib/i18n";
 import { tagEn } from "@/types";
 
 
@@ -54,7 +54,7 @@ export default function VendorPage() {
   const categories = useMemo(() => {
     const groups = new Map<string, MenuItem[]>();
     for (const item of items) {
-      const cat = item.category?.trim() || tr("其他", "Other");
+      const cat = loc(item, "category").trim() || tr("其他", "Other");
       if (!groups.has(cat)) groups.set(cat, []);
       groups.get(cat)!.push(item);
     }
@@ -92,8 +92,8 @@ export default function VendorPage() {
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="text-xl font-bold mb-1">{vendor.name}</h1>
-            {vendor.description && <p className="text-sm text-muted-foreground mb-3">{vendor.description}</p>}
+            <h1 className="text-xl font-bold mb-1">{loc(vendor, "name")}</h1>
+            {vendor.description && <p className="text-sm text-muted-foreground mb-3">{loc(vendor, "description")}</p>}
             <div className="flex flex-col gap-1 text-sm text-muted-foreground">
               {vendor.address && (
                 <span className="flex items-center gap-1.5">
@@ -156,8 +156,8 @@ export default function VendorPage() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <h3 className="font-semibold text-sm mb-0.5 truncate">{item.name}</h3>
-                            <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
+                            <h3 className="font-semibold text-sm mb-0.5 truncate">{loc(item, "name")}</h3>
+                            <p className="text-xs text-muted-foreground line-clamp-2">{loc(item, "description")}</p>
                           </div>
                           <span className="text-sm font-bold text-orange-600 shrink-0">NT${item.price}</span>
                         </div>

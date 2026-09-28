@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
@@ -120,11 +121,11 @@ export default function AdminVendorsPage() {
     onSuccess: (_, vars) => {
       invalidate();
       toast({
-        title: vars.approved ? "已核准並綁定商家" : "已拒絕申請",
-        description: vars.approved ? "對方重新整理或重新登入後就會看到廠商後台。" : undefined,
+        title: vars.approved ? tr("已核准並綁定商家", "Approved and linked") : tr("已拒絕申請", "Application rejected"),
+        description: vars.approved ? tr("對方重新整理或重新登入後就會看到廠商後台。", "They'll see the vendor portal after refreshing or signing in again.") : undefined,
       });
     },
-    onError: (err: Error) => toast({ variant: "destructive", title: "操作失敗", description: err.message }),
+    onError: (err: Error) => toast({ variant: "destructive", title: tr("操作失敗", "Action failed"), description: err.message }),
   });
 
   const unbindMutation = useMutation({
@@ -136,34 +137,34 @@ export default function AdminVendorsPage() {
     },
     onSuccess: () => {
       invalidate();
-      toast({ title: "已解除綁定" });
+      toast({ title: tr("已解除綁定", "Unlinked") });
     },
-    onError: (err: Error) => toast({ variant: "destructive", title: "操作失敗", description: err.message }),
+    onError: (err: Error) => toast({ variant: "destructive", title: tr("操作失敗", "Action failed"), description: err.message }),
   });
 
   const renewMutation = useMutation({
     mutationFn: (vendor: Vendor) => adminRenewSubscription(vendor),
     onSuccess: (newEnd, vendor) => {
       invalidate();
-      toast({ title: `已為「${vendor.name}」續約`, description: `新的到期日：${newEnd.toLocaleDateString("zh-TW")}` });
+      toast({ title: tr(`已為「${vendor.name}」續約`, `Renewed ${vendor.name}`), description: tr(`新的到期日：${newEnd.toLocaleDateString("zh-TW")}`, `New end date: ${newEnd.toLocaleDateString("en-US")}`) });
     },
-    onError: (err: Error) => toast({ variant: "destructive", title: "操作失敗", description: err.message }),
+    onError: (err: Error) => toast({ variant: "destructive", title: tr("操作失敗", "Action failed"), description: err.message }),
   });
 
   async function handleRenew(vendor: Vendor) {
     const ok = await confirm({
-      title: `確認已收到「${vendor.name}」的月費？`,
-      description: "會把訂閱延長 30 天（從目前到期日或今天起算，取較晚者），並恢復正常使用。",
-      confirmLabel: "續約 30 天",
+      title: tr(`確認已收到「${vendor.name}」的月費？`, `Confirm you received ${vendor.name}'s monthly fee?`),
+      description: tr("會把訂閱延長 30 天（從目前到期日或今天起算，取較晚者），並恢復正常使用。", "This extends the subscription by 30 days (from the current end date or today, whichever is later) and restores access."),
+      confirmLabel: tr("續約 30 天", "Renew 30 days"),
     });
     if (ok) renewMutation.mutate(vendor);
   }
 
   async function handleUnbind(vendor: Vendor) {
     const ok = await confirm({
-      title: `解除「${vendor.name}」的帳號綁定？`,
-      description: "解除後原本的商家帳號就進不了廠商後台，也看不到撥款與校準報告。",
-      confirmLabel: "解除綁定",
+      title: tr(`解除「${vendor.name}」的帳號綁定？`, `Unlink the account for ${vendor.name}?`),
+      description: tr("解除後原本的商家帳號就進不了廠商後台，也看不到撥款與校準報告。", "The vendor account will lose access to the vendor portal, payouts and calibration reports."),
+      confirmLabel: tr("解除綁定", "Unlink"),
       destructive: true,
     });
     if (ok) unbindMutation.mutate(vendor);
@@ -171,13 +172,13 @@ export default function AdminVendorsPage() {
 
   return (
     <AdminLayout>
-      <h2 className="text-lg font-bold mb-3">待審核的廠商申請 ({applications.length})</h2>
+      <h2 className="text-lg font-bold mb-3">{tr("待審核的廠商申請", "Pending vendor applications")} ({applications.length})</h2>
       {loadingApps ? (
         <SkeletonBlocks count={2} height={96} className="space-y-3 mb-8" />
       ) : applications.length === 0 ? (
         <div className="text-center py-10 mb-8 text-muted-foreground bg-white rounded-xl border border-border">
           <Store className="w-10 h-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">目前沒有待審核的申請</p>
+          <p className="text-sm">{tr("目前沒有待審核的申請", "No pending applications")}</p>
         </div>
       ) : (
         <div className="space-y-3 mb-8">
@@ -190,20 +191,20 @@ export default function AdminVendorsPage() {
                     {app.email}{app.phone ? ` · ${app.phone}` : ""}
                   </div>
                 </div>
-                <Badge className="bg-yellow-100 text-yellow-800 border-0">待審核</Badge>
+                <Badge className="bg-yellow-100 text-yellow-800 border-0">{tr("待審核", "Pending")}</Badge>
               </CardHeader>
               <CardContent className="text-sm flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
                 <Select
                   value={targetByApp[app.id] ?? NEW_VENDOR}
                   onValueChange={(v) => setTargetByApp((prev) => ({ ...prev, [app.id]: v }))}
                 >
-                  <SelectTrigger className="sm:w-64 h-8 text-xs" aria-label="核准後綁定到">
+                  <SelectTrigger className="sm:w-64 h-8 text-xs" aria-label={tr("核准後綁定到", "Link to after approval")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NEW_VENDOR}>建立新商家「{app.store_name}」</SelectItem>
+                    <SelectItem value={NEW_VENDOR}>{tr(`建立新商家「${app.store_name}」`, `Create new vendor "${app.store_name}"`)}</SelectItem>
                     {unboundVendors.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>綁定到既有商家：{v.name}</SelectItem>
+                      <SelectItem key={v.id} value={v.id}>{tr("綁定到既有商家：", "Link to existing vendor: ")}{v.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -214,7 +215,7 @@ export default function AdminVendorsPage() {
                     disabled={decideMutation.isPending}
                     onClick={() => decideMutation.mutate({ app, approved: true })}
                   >
-                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> 核准
+                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> {tr("核准", "Approve")}
                   </Button>
                   <Button
                     size="sm"
@@ -223,7 +224,7 @@ export default function AdminVendorsPage() {
                     disabled={decideMutation.isPending}
                     onClick={() => decideMutation.mutate({ app, approved: false })}
                   >
-                    <XCircle className="w-3.5 h-3.5 mr-1" /> 拒絕
+                    <XCircle className="w-3.5 h-3.5 mr-1" /> {tr("拒絕", "Reject")}
                   </Button>
                 </div>
               </CardContent>
@@ -232,7 +233,7 @@ export default function AdminVendorsPage() {
         </div>
       )}
 
-      <h2 className="text-lg font-bold mb-3">所有商家 ({vendors.length})</h2>
+      <h2 className="text-lg font-bold mb-3">{tr("所有商家", "All vendors")} ({vendors.length})</h2>
       {loadingVendors ? (
         <SkeletonBlocks count={3} height={72} className="space-y-3" />
       ) : (
@@ -243,7 +244,7 @@ export default function AdminVendorsPage() {
                 <div className="min-w-0">
                   <div className="font-semibold truncate">{vendor.name}</div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {vendor.id}{vendor.status === "disabled" ? " · 已停用" : ""}
+                    {vendor.id}{vendor.status === "disabled" ? tr(" · 已停用", " · disabled") : ""}
                   </div>
                   <SubscriptionLine vendor={vendor} />
                 </div>
@@ -255,11 +256,11 @@ export default function AdminVendorsPage() {
                     disabled={renewMutation.isPending}
                     onClick={() => handleRenew(vendor)}
                   >
-                    <CalendarPlus className="w-3.5 h-3.5 mr-1" /> 續約 30 天
+                    <CalendarPlus className="w-3.5 h-3.5 mr-1" /> {tr("續約 30 天", "Renew 30 days")}
                   </Button>
                   {vendor.owner_uid ? (
                     <>
-                      <Badge className="bg-green-100 text-green-800 border-0">已綁定帳號</Badge>
+                      <Badge className="bg-green-100 text-green-800 border-0">{tr("已綁定帳號", "Account linked")}</Badge>
                       <Button
                         size="sm"
                         variant="outline"
@@ -267,11 +268,11 @@ export default function AdminVendorsPage() {
                         disabled={unbindMutation.isPending}
                         onClick={() => handleUnbind(vendor)}
                       >
-                        <Link2Off className="w-3.5 h-3.5 mr-1" /> 解除
+                        <Link2Off className="w-3.5 h-3.5 mr-1" /> {tr("解除", "Unlink")}
                       </Button>
                     </>
                   ) : (
-                    <Badge className="bg-gray-100 text-gray-600 border-0">未綁定</Badge>
+                    <Badge className="bg-gray-100 text-gray-600 border-0">{tr("未綁定", "Not linked")}</Badge>
                   )}
                 </div>
               </CardContent>
@@ -283,20 +284,21 @@ export default function AdminVendorsPage() {
   );
 }
 
-const SUB_LABEL: Record<string, string> = {
-  trial: "試用中",
-  active: "訂閱中",
-  cancelled: "已申請取消",
-  expired: "已到期（後台已暫停）",
-};
+const subLabel = (status: string) =>
+  ({
+    trial: tr("試用中", "Trial"),
+    active: tr("訂閱中", "Active"),
+    cancelled: tr("已申請取消", "Cancelling"),
+    expired: tr("已到期（後台已暫停）", "Expired (portal paused)"),
+  } as Record<string, string>)[status] ?? status;
 
 function SubscriptionLine({ vendor }: { vendor: Vendor }) {
   const sub = getSubscriptionState(vendor);
-  if (sub.unset) return <div className="text-xs text-muted-foreground">訂閱：尚未設定</div>;
+  if (sub.unset) return <div className="text-xs text-muted-foreground">{tr("訂閱：尚未設定", "Subscription: not set")}</div>;
   return (
     <div className={`text-xs ${sub.blocked ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
-      訂閱：{SUB_LABEL[sub.status]}
-      {sub.endDate ? `，到期 ${sub.endDate.toLocaleDateString("zh-TW")}` : ""}
+      {tr("訂閱：", "Subscription: ")}{subLabel(sub.status)}
+      {sub.endDate ? tr(`，到期 ${sub.endDate.toLocaleDateString("zh-TW")}`, `, ends ${sub.endDate.toLocaleDateString("en-US")}`) : ""}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -24,7 +25,7 @@ function RealSignInForm({ title, description }: { title: string; description: st
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch {
-      setError("登入失敗，請確認帳號密碼是否正確。");
+      setError(tr("登入失敗，請確認帳號密碼是否正確。", "Sign-in failed. Please check your email and password."));
     } finally {
       setSubmitting(false);
     }
@@ -48,14 +49,14 @@ function RealSignInForm({ title, description }: { title: string; description: st
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="密碼"
+          placeholder={tr("密碼", "Password")}
           autoComplete="current-password"
           required
-          aria-label="密碼"
+          aria-label={tr("密碼", "Password")}
         />
         {error && <p role="alert" className="text-caption text-red-600">{error}</p>}
         <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? "登入中…" : "登入"}
+          {submitting ? tr("登入中…", "Signing in…") : tr("登入", "Sign in")}
         </Button>
       </form>
     </div>
@@ -65,13 +66,13 @@ function RealSignInForm({ title, description }: { title: string; description: st
 export default function RequireRealAdmin({ children }: { children: ReactNode }) {
   const { isAdmin, loading } = useAdminUser();
 
-  if (loading) return <p className="text-sm text-muted-foreground">確認登入狀態中…</p>;
+  if (loading) return <p className="text-sm text-muted-foreground">{tr("確認登入狀態中…", "Checking sign-in…")}</p>;
   if (isAdmin) return <>{children}</>;
 
   return (
     <RealSignInForm
-      title="這裡動到真實資料庫"
-      description="請用真實管理員帳號（Firebase Auth）登入，跟平台登入頁的帳號是分開的。"
+      title={tr("這裡動到真實資料庫", "This touches the live database")}
+      description={tr("請用真實管理員帳號（Firebase Auth）登入，跟平台登入頁的帳號是分開的。", "Sign in with a real admin account (Firebase Auth).")}
     />
   );
 }
@@ -84,13 +85,13 @@ export default function RequireRealAdmin({ children }: { children: ReactNode }) 
 export function RequireVendorSignIn({ children }: { children: ReactNode }) {
   const { user, loading } = useAdminUser();
 
-  if (loading) return <p className="text-sm text-muted-foreground">確認登入狀態中…</p>;
+  if (loading) return <p className="text-sm text-muted-foreground">{tr("確認登入狀態中…", "Checking sign-in…")}</p>;
   if (user && !user.isAnonymous) return <>{children}</>;
 
   return (
     <RealSignInForm
-      title="商家登入"
-      description="這裡有撥款與履約資料，請用商家帳號登入（帳號由平台管理員建立並綁定商家）。"
+      title={tr("商家登入", "Vendor sign-in")}
+      description={tr("這裡有撥款與履約資料，請用商家帳號登入（帳號由平台管理員建立並綁定商家）。", "This page has payout and fulfilment data. Sign in with your vendor account (created and linked by a platform admin).")}
     />
   );
 }

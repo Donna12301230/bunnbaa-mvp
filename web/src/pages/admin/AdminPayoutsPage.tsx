@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -41,23 +42,23 @@ function PayoutsContent() {
       <Card className="p-5 mb-4 bg-orange-50 border-orange-100">
         <div className="text-2xl font-bold text-orange-600">NT${totalAmount}</div>
         <p className="text-sm text-muted-foreground mt-1">
-          近 {payouts.length} 筆撥款紀錄加總 · 全額撥款商家，平台不抽成
+          {tr(`近 ${payouts.length} 筆撥款紀錄加總 · 全額撥款商家，平台不抽成`, `Total of the latest ${payouts.length} payouts · paid to vendors in full, no commission`)}
         </p>
       </Card>
 
       {payouts.length === 0 ? (
-        <EmptyState icon={<Wallet size={32} />} title="尚無撥款紀錄" description="商家完成取餐核銷後，撥款會出現在這裡。" />
+        <EmptyState icon={<Wallet size={32} />} title={tr("尚無撥款紀錄", "No payouts yet")} description={tr("商家完成取餐核銷後，撥款會出現在這裡。", "Payouts appear here after vendors redeem pickups.")} />
       ) : (
         <div className="space-y-3">
           {payouts.map((p) => (
             <Card key={p.id} className="p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-sm">{vendors[p.vendor_id]?.name ?? p.vendor_id}</h3>
-                <p className="text-xs text-muted-foreground">{p.lock_count} 筆已履約訂單</p>
+                <p className="text-xs text-muted-foreground">{tr(`${p.lock_count} 筆已履約訂單`, `${p.lock_count} fulfilled orders`)}</p>
               </div>
               <div className="text-right">
                 <div className="font-bold text-orange-600">NT${p.amount}</div>
-                <Badge className="bg-gray-100 text-gray-600 border-0 mt-1">待人工對帳匯出</Badge>
+                <Badge className="bg-gray-100 text-gray-600 border-0 mt-1">{tr("待人工對帳匯出", "Awaiting manual export")}</Badge>
               </div>
             </Card>
           ))}
@@ -70,7 +71,7 @@ function PayoutsContent() {
 export default function AdminPayoutsPage() {
   return (
     <AdminLayout>
-      <h2 className="text-lg font-bold mb-3">撥款總覽</h2>
+      <h2 className="text-lg font-bold mb-3">{tr("撥款總覽", "Payouts")}</h2>
       <RequireRealAdmin>
         <PayoutsContent />
       </RequireRealAdmin>

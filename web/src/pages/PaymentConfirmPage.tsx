@@ -1,7 +1,7 @@
 import { tr } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
-import { httpsCallable } from "firebase/functions";
+import { httpsCallable } from "@/lib/callable";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, functions } from "../lib/firebase";

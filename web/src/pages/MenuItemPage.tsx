@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 import { Input } from "@/components/ui/input";
-import { tr } from "@/lib/i18n";
+import { tr, loc } from "@/lib/i18n";
 import { tagEn } from "@/types";
 
 // 商品詳情頁。
@@ -65,7 +65,7 @@ export default function MenuItemPage() {
       });
     }
     for (let i = 0; i < qty; i++) addItem(item!, item!.vendor_id, note.trim());
-    toast({ title: tr("已加入購物車", "Added to cart"), description: `${item!.name} x${qty}` });
+    toast({ title: tr("已加入購物車", "Added to cart"), description: `${loc(item, "name")} x${qty}` });
   }
 
   return (
@@ -74,7 +74,7 @@ export default function MenuItemPage() {
         href={`/vendor/${item.vendor_id}`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="w-4 h-4" /> {vendor?.name ?? tr("回商家頁", "Back to vendor")}
+        <ArrowLeft className="w-4 h-4" /> {loc(vendor, "name") || tr("回商家頁", "Back to vendor")}
       </Link>
 
       <div className="bg-white rounded-xl border border-border overflow-hidden">
@@ -83,8 +83,8 @@ export default function MenuItemPage() {
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <h1 className="text-xl font-bold mb-1">{item.name}</h1>
-            <p className="text-sm text-muted-foreground">{item.description}</p>
+            <h1 className="text-xl font-bold mb-1">{loc(item, "name")}</h1>
+            <p className="text-sm text-muted-foreground">{loc(item, "description")}</p>
           </div>
 
           <div className="text-2xl font-bold text-orange-600">NT${item.price}</div>

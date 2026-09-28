@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { addDays, format, startOfWeek } from "date-fns";
-import { zhTW } from "date-fns/locale";
+import { dateLocale, tr } from "@/lib/i18n";
 import { CalendarDays, ChevronLeft, ChevronRight, Settings } from "lucide-react";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Button } from "@/components/ui/button";
@@ -49,20 +49,20 @@ export default function VendorPortalSessions() {
     <VendorPortalLayout>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
-          <CalendarDays className="w-5 h-5 text-orange-500" /> 訂餐時段
+          <CalendarDays className="w-5 h-5 text-orange-500" /> {tr("訂餐時段", "Pickup slots")}
         </h2>
         <Link href="/vendor-portal/settings">
-          <Button variant="outline" size="sm"><Settings className="w-4 h-4 mr-1" /> 調整時段／公休／份數上限</Button>
+          <Button variant="outline" size="sm"><Settings className="w-4 h-4 mr-1" /> {tr("調整時段／公休／份數上限", "Edit times / closures / limits")}</Button>
         </Link>
       </div>
 
       <div className="flex items-center gap-2 mb-3">
-        <Button variant="outline" size="icon" aria-label="上一週" onClick={() => setWeekOffset((w) => w - 1)}><ChevronLeft /></Button>
+        <Button variant="outline" size="icon" aria-label={tr("上一週", "Previous week")} onClick={() => setWeekOffset((w) => w - 1)}><ChevronLeft /></Button>
         <span className="text-sm font-medium">
-          {format(weekStart, "M/d", { locale: zhTW })} – {format(addDays(weekStart, 6), "M/d", { locale: zhTW })}
+          {format(weekStart, "M/d", { locale: dateLocale() })} – {format(addDays(weekStart, 6), "M/d", { locale: dateLocale() })}
         </span>
-        <Button variant="outline" size="icon" aria-label="下一週" onClick={() => setWeekOffset((w) => w + 1)}><ChevronRight /></Button>
-        {weekOffset !== 0 && <Button variant="ghost" size="sm" onClick={() => setWeekOffset(0)}>本週</Button>}
+        <Button variant="outline" size="icon" aria-label={tr("下一週", "Next week")} onClick={() => setWeekOffset((w) => w + 1)}><ChevronRight /></Button>
+        {weekOffset !== 0 && <Button variant="ghost" size="sm" onClick={() => setWeekOffset(0)}>{tr("本週", "This week")}</Button>}
       </div>
 
       {loading || !vendor ? (
@@ -73,7 +73,7 @@ export default function VendorPortalSessions() {
             <div className="border-b border-border" />
             {weekDates.map((d) => (
               <div key={d} className="border-b border-l border-border p-2 text-center text-xs font-semibold">
-                {format(new Date(`${d}T00:00:00`), "M/d (EEE)", { locale: zhTW })}
+                {format(new Date(`${d}T00:00:00`), "M/d (EEE)", { locale: dateLocale() })}
               </div>
             ))}
             {windows.map((w) => (
@@ -83,15 +83,15 @@ export default function VendorPortalSessions() {
                   const closed = vendorClosedReason(vendor, d);
                   const row = counts.get(`${d}__${w}`);
                   if (closed && !row) {
-                    return <div key={d} className="border-b border-l border-border bg-gray-50 p-2 text-caption text-muted-foreground text-center">公休</div>;
+                    return <div key={d} className="border-b border-l border-border bg-gray-50 p-2 text-caption text-muted-foreground text-center">{tr("公休", "Closed")}</div>;
                   }
                   return (
                     <Link key={d} href={`/vendor-portal/sessions/${slotKey(d, w)}/summary`}>
                       <div className="border-b border-l border-border p-2 text-center cursor-pointer hover:bg-orange-50 h-full">
-                        <div className="text-sm font-bold">{row?.total ?? 0} 份</div>
-                        {row && row.pending > 0 && <div className="text-caption text-orange-600">待取 {row.pending}</div>}
+                        <div className="text-sm font-bold">{row?.total ?? 0} {tr("份", "meals")}</div>
+                        {row && row.pending > 0 && <div className="text-caption text-orange-600">{tr("待取", "To pick up")} {row.pending}</div>}
                         {capacity !== null && (
-                          <div className="text-caption text-muted-foreground">剩 {Math.max(0, capacity - (row?.total ?? 0))}</div>
+                          <div className="text-caption text-muted-foreground">{tr("剩", "Left:")} {Math.max(0, capacity - (row?.total ?? 0))}</div>
                         )}
                       </div>
                     </Link>
@@ -103,7 +103,7 @@ export default function VendorPortalSessions() {
         </div>
       )}
       <p className="text-xs text-muted-foreground mt-2">
-        份數以最近 500 筆訂單計算；剩餘份數以店家設定的「每個時段份數上限」扣掉已訂份數，結帳時伺服器會再檢查一次。
+        {tr("份數以最近 500 筆訂單計算；剩餘份數以店家設定的「每個時段份數上限」扣掉已訂份數，結帳時伺服器會再檢查一次。", "Counts use the latest 500 orders. Remaining = your per-slot limit minus booked meals; the server checks again at checkout.")}
       </p>
     </VendorPortalLayout>
   );

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { collection, limit, onSnapshot, query, where } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
+import { httpsCallable } from "@/lib/callable";
 import { db, functions } from "@/lib/firebase";
 import type { AccuracyReport } from "@/types";
 import { useVendorLocks } from "@/hooks/useVendorLocks";
 import { addDaysStr, todayStr } from "@/lib/pickupSlots";
 import { DONE_STATUSES } from "@/lib/lockOutcome";
+import { tr, loc, planBaseName } from "@/lib/i18n";
 import type { Lock } from "@/types";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +32,7 @@ const COLORS = [
 const AXIS_TICK = { fontSize: 12, fill: "var(--muted-foreground)" };
 
 function ItemRankList({ items }: { items: { name: string; qty: number; revenue: number }[] }) {
-  if (items.length === 0) return <EmptyState size="compact" icon={<ShoppingBag size={32} />} title="這段期間沒有銷售紀錄" />;
+  if (items.length === 0) return <EmptyState size="compact" icon={<ShoppingBag size={32} />} title={tr("這段期間沒有銷售紀錄", "No sales in this period")} />;
   const maxQty = items[0].qty;
   return (
     <div className="space-y-2">
@@ -44,7 +45,7 @@ function ItemRankList({ items }: { items: { name: string; qty: number; revenue: 
               <div className="flex justify-between items-center mb-0.5">
                 <span className="text-sm font-medium truncate">{item.name}</span>
                 <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                  {item.qty} 份 · NT$ {item.revenue.toLocaleString()}
+                  {item.qty} {tr("份", "meals")} · NT$ {item.revenue.toLocaleString()}
                 </span>
               </div>
               <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -84,7 +85,7 @@ function computeStats(locks: Lock[]): ReportStats | null {
   const byItem = new Map<string, { qty: number; revenue: number }>();
   for (const l of rows) {
     byDate.set(l.pickup_date, (byDate.get(l.pickup_date) ?? 0) + (l.locked_price || 0));
-    const name = l.item_name.split("・第")[0]; // 計畫型「A方案・第1/5天」併成同一項
+    const name = planBaseName(loc(l, "item_name")); // 計畫型「A方案・第1/5天」併成同一項
     const item = byItem.get(name) ?? { qty: 0, revenue: 0 };
     item.qty += 1;
     item.revenue += l.locked_price || 0;
@@ -136,7 +137,7 @@ export default function VendorPortalReports() {
       const res = await fn({ vendor_id: VENDOR_ID, question: q });
       setWhatifAnswer((res.data as { scenario_answer: string }).scenario_answer);
     } catch (err) {
-      setWhatifAnswer(`追問失敗：${(err as Error).message}`);
+      setWhatifAnswer(tr(`追問失敗：${(err as Error).message}`, `Couldn't get an answer: ${(err as Error).message}`));
     } finally {
       setAsking(false);
     }
@@ -155,28 +156,28 @@ export default function VendorPortalReports() {
           <CardContent className="pt-4 pb-3 text-center">
             <Banknote className="w-4 h-4 mx-auto mb-1 text-orange-500" />
             <div className={`text-2xl font-bold ${colorClass}`}>{stats.totalRevenue.toLocaleString()}</div>
-            <div className="text-xs text-muted-foreground">累計收入 (NT$)</div>
+            <div className="text-xs text-muted-foreground">{tr("累計收入 (NT$)", "Revenue (NT$)")}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <ShoppingBag className="w-4 h-4 mx-auto mb-1 text-orange-500" />
             <div className="text-2xl font-bold">{stats.totalOrders}</div>
-            <div className="text-xs text-muted-foreground">總訂單數</div>
+            <div className="text-xs text-muted-foreground">{tr("總訂單數", "Orders")}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <TrendingUp className="w-4 h-4 mx-auto mb-1 text-orange-500" />
             <div className="text-2xl font-bold">{stats.avgOrder}</div>
-            <div className="text-xs text-muted-foreground">平均訂單 (NT$)</div>
+            <div className="text-xs text-muted-foreground">{tr("平均訂單 (NT$)", "Avg. order (NT$)")}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <Users className="w-4 h-4 mx-auto mb-1 text-orange-500" />
             <div className="text-2xl font-bold text-green-600">{stats.completedOrders}</div>
-            <div className="text-xs text-muted-foreground">已完成</div>
+            <div className="text-xs text-muted-foreground">{tr("已完成", "Picked up")}</div>
           </CardContent>
         </Card>
       </div>
@@ -184,14 +185,14 @@ export default function VendorPortalReports() {
   }
 
   function RevenueChart({ data }: { data: { date: string; revenue: number }[] }) {
-    if (data.length === 0) return <EmptyState size="compact" icon={<TrendingUp size={32} />} title="這段期間沒有營收紀錄" />;
+    if (data.length === 0) return <EmptyState size="compact" icon={<TrendingUp size={32} />} title={tr("這段期間沒有營收紀錄", "No revenue in this period")} />;
     return (
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
           <XAxis dataKey="date" tick={AXIS_TICK} />
           <YAxis tick={AXIS_TICK} />
-          <Tooltip formatter={(v: number) => [`NT$ ${v}`, "收入"]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+          <Tooltip formatter={(v: number) => [`NT$ ${v}`, tr("收入", "Revenue")]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
           <Bar dataKey="revenue" radius={[4, 4, 0, 0]} fill="var(--chart-1)" />
         </BarChart>
       </ResponsiveContainer>
@@ -201,7 +202,7 @@ export default function VendorPortalReports() {
   return (
     <VendorPortalLayout>
       <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
-        <TrendingUp className="w-5 h-5 text-orange-500" /> 訂單統計報表
+        <TrendingUp className="w-5 h-5 text-orange-500" /> {tr("訂單統計報表", "Order reports")}
       </h2>
 
       {/* 校準洞察（對應 UI草圖「收益及未來備料趨勢」分頁；同一份 Gemini 校準報告
@@ -210,9 +211,9 @@ export default function VendorPortalReports() {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between flex-wrap gap-1">
             <CardTitle className="text-base flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-orange-500" /> 校準洞察
+              <Sparkles className="w-4 h-4 text-orange-500" /> {tr("校準洞察", "Calibration insights")}
             </CardTitle>
-            <span className="text-xs text-muted-foreground">僅供參考・非備貨建議</span>
+            <span className="text-xs text-muted-foreground">{tr("僅供參考・非備貨建議", "For reference only — not prep advice")}</span>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -221,31 +222,31 @@ export default function VendorPortalReports() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gray-50 rounded-lg p-3 text-center">
                   <p className="text-xl font-bold text-orange-600">{Math.round(report.accuracy_rate * 100)}%</p>
-                  <p className="text-xs text-muted-foreground">目前預測準確率</p>
+                  <p className="text-xs text-muted-foreground">{tr("目前預測準確率", "Current forecast accuracy")}</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-3 text-center">
                   <p className="text-xl font-bold">{report.error_range}</p>
-                  <p className="text-xs text-muted-foreground">近期誤差區間</p>
+                  <p className="text-xs text-muted-foreground">{tr("近期誤差區間", "Recent error range")}</p>
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground">{report.pattern_note}</p>
+              <p className="text-sm text-muted-foreground">{loc(report, "pattern_note")}</p>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">尚無校準報告——每天由系統自動產生，累積幾天的取餐紀錄後就會出現。</p>
+            <p className="text-sm text-muted-foreground">{tr("尚無校準報告——每天由系統自動產生，累積幾天的取餐紀錄後就會出現。", "No calibration report yet — one is generated daily once there are a few days of pickups.")}</p>
           )}
           <div className="flex gap-2">
             <Input
               value={whatifDraft}
               onChange={e => setWhatifDraft(e.target.value)}
-              placeholder="例如：如果把鎖定量目標調高 10%，缺口大概會怎麼變化？"
+              placeholder={tr("例如：如果把鎖定量目標調高 10%，缺口大概會怎麼變化？", "e.g. If I raise my locking target by 10%, how would the gap change?")}
               className="text-sm"
             />
-            <Button size="sm" onClick={handleAskWhatif} disabled={!whatifDraft.trim() || !report || asking}>{asking ? "分析中…" : "送出"}</Button>
+            <Button size="sm" onClick={handleAskWhatif} disabled={!whatifDraft.trim() || !report || asking}>{asking ? tr("分析中…", "Analysing…") : tr("送出", "Ask")}</Button>
           </div>
           {whatifAnswer && (
             <div className="bg-amber-50 rounded-lg p-3 text-sm text-amber-900 space-y-1">
               <p>{whatifAnswer}</p>
-              <p className="text-xs text-amber-700">此為情境式參考答案，非備貨建議，最終決定權在商家</p>
+              <p className="text-xs text-amber-700">{tr("此為情境式參考答案，非備貨建議，最終決定權在商家", "A scenario-based answer for reference only — not prep advice; the decision is yours")}</p>
             </div>
           )}
         </CardContent>
@@ -254,13 +255,13 @@ export default function VendorPortalReports() {
       {loadingStats ? (
         <SkeletonBlocks count={3} height={128} className="space-y-3" />
       ) : !stats ? (
-        <EmptyState icon={<TrendingUp size={32} />} title={`最近 ${REPORT_DAYS} 天沒有訂單`} />
+        <EmptyState icon={<TrendingUp size={32} />} title={tr(`最近 ${REPORT_DAYS} 天沒有訂單`, `No orders in the last ${REPORT_DAYS} days`)} />
       ) : (
         <div className="space-y-5">
           <StatCards stats={stats} />
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">每日收入（最近 {REPORT_DAYS} 天，依取餐日）</CardTitle>
+              <CardTitle className="text-base">{tr(`每日收入（最近 ${REPORT_DAYS} 天，依取餐日）`, `Daily revenue (last ${REPORT_DAYS} days, by pickup date)`)}</CardTitle>
             </CardHeader>
             <CardContent>
               <RevenueChart data={stats.revenueByDate} />
@@ -268,7 +269,7 @@ export default function VendorPortalReports() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">熱銷品項 Top 10</CardTitle>
+              <CardTitle className="text-base">{tr("熱銷品項 Top 10", "Top 10 items")}</CardTitle>
             </CardHeader>
             <CardContent>
               <ItemRankList items={stats.topItems} />

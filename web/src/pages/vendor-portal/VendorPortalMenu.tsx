@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where,
+  addDoc, collection, deleteDoc, deleteField, doc, getDocs, query, updateDoc, where,
 } from "firebase/firestore";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,12 +18,37 @@ import { queryClient } from "@/lib/queryClient";
 import { db } from "@/lib/firebase";
 import { useMyVendor } from "@/hooks/useMyVendor";
 import type { MenuItem } from "@/types";
-import { ALLERGEN_LIST, DIETARY_TAGS } from "@/types";
+import { ALLERGEN_LIST, DIETARY_TAGS, tagEn } from "@/types";
+import { tr } from "@/lib/i18n";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState, Switch, Tag } from "@/components/ds";
 
-const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[] };
+const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
+
+// 英文名稱／說明：Functions 會自動翻（translateMenuItem），商家也可以手動改。
+// 手動改過的欄位把 i18n_src 設成目前的中文，觸發器就認定「已翻過」不會蓋掉；
+// 清空＝交回自動翻譯（刪掉英文與 i18n_src，觸發器會重翻）；
+// 英文沒動、只改中文＝照常由觸發器重新自動翻譯。
+function englishOverrides(
+  form: { name: string; description: string; nameEn: string; descriptionEn: string },
+  original: MenuItem | null
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [field, en] of [["name", form.nameEn], ["description", form.descriptionEn]] as const) {
+    const before = (original?.[`${field}_en`] as string | undefined) ?? "";
+    const value = en.trim();
+    if (value === before.trim()) continue;
+    if (value) {
+      out[`${field}_en`] = value;
+      out[`i18n_src.${field}`] = form[field];
+    } else if (original) {
+      out[`${field}_en`] = deleteField();
+      out[`i18n_src.${field}`] = deleteField();
+    }
+  }
+  return out;
+}
 
 export default function VendorPortalMenu() {
   const { toast } = useToast();
@@ -50,7 +75,7 @@ export default function VendorPortalMenu() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!myVendor) throw new Error("這個帳號還沒綁定商家，請聯絡平台");
+      if (!myVendor) throw new Error(tr("這個帳號還沒綁定商家，請聯絡平台", "This account isn't linked to a vendor yet. Please contact the platform"));
       const data = {
         vendor_id: myVendor.id,
         name: form.name,
@@ -62,10 +87,19 @@ export default function VendorPortalMenu() {
         allergens: form.allergens,
         dietary_tags: form.dietaryTags,
       };
+      const original = editId ? items.find((i) => i.id === editId) ?? null : null;
+      const english = englishOverrides(form, original);
       if (editId) {
-        await updateDoc(doc(db, "menu_items", editId), data);
+        await updateDoc(doc(db, "menu_items", editId), { ...data, ...english });
       } else {
-        await addDoc(collection(db, "menu_items"), { ...data, created_at: new Date() });
+        // 新品項：updateDoc 的「i18n_src.name」點路徑寫法在 addDoc 不適用，改成巢狀物件
+        const src: Record<string, string> = {};
+        const extra: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(english)) {
+          if (key.startsWith("i18n_src.")) src[key.slice("i18n_src.".length)] = value as string;
+          else extra[key] = value;
+        }
+        await addDoc(collection(db, "menu_items"), { ...data, ...extra, ...(Object.keys(src).length ? { i18n_src: src } : {}), created_at: new Date() });
       }
     },
     onSuccess: () => {
@@ -73,13 +107,13 @@ export default function VendorPortalMenu() {
       setDialogOpen(false);
       setEditId(null);
       setForm(EMPTY_FORM);
-      toast({ title: editId ? "已更新" : "已新增", description: form.name });
+      toast({ title: editId ? tr("已更新", "Updated") : tr("已新增", "Added"), description: form.name });
     },
     onError: (err: any) => {
       const description = err?.code === "permission-denied"
-        ? "帳號尚未綁定商家權限，請聯絡管理員"
+        ? tr("帳號尚未綁定商家權限，請聯絡管理員", "This account doesn't have vendor access yet. Please contact an admin")
         : err.message;
-      toast({ variant: "destructive", title: "儲存失敗", description });
+      toast({ variant: "destructive", title: tr("儲存失敗", "Couldn't save"), description });
     },
   });
 
@@ -89,13 +123,13 @@ export default function VendorPortalMenu() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendorMenu", VENDOR_ID] });
-      toast({ title: "已刪除" });
+      toast({ title: tr("已刪除", "Deleted") });
     },
     onError: (err: any) => {
       const description = err?.code === "permission-denied"
-        ? "帳號尚未綁定商家權限，請聯絡管理員"
+        ? tr("帳號尚未綁定商家權限，請聯絡管理員", "This account doesn't have vendor access yet. Please contact an admin")
         : err.message;
-      toast({ variant: "destructive", title: "刪除失敗", description });
+      toast({ variant: "destructive", title: tr("刪除失敗", "Couldn't delete"), description });
     },
   });
 
@@ -107,7 +141,7 @@ export default function VendorPortalMenu() {
 
   function openEdit(item: MenuItem) {
     setEditId(item.id);
-    setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [] });
+    setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [], nameEn: item.name_en ?? "", descriptionEn: item.description_en ?? "" });
     setDialogOpen(true);
   }
 
@@ -121,16 +155,16 @@ export default function VendorPortalMenu() {
   return (
     <VendorPortalLayout>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">菜單管理</h2>
+        <h2 className="text-xl font-bold">{tr("菜單管理", "Menu")}</h2>
         <Button  onClick={openAdd}>
-          <Plus className="w-4 h-4 mr-1" /> 新增品項
+          <Plus className="w-4 h-4 mr-1" /> {tr("新增品項", "Add item")}
         </Button>
       </div>
 
       {isLoading ? (
         <SkeletonBlocks count={3} height={64} className="space-y-2" />
       ) : items.length === 0 ? (
-        <EmptyState icon={<UtensilsCrossed size={32} />} title="尚無菜單品項" description="點擊上方「新增品項」，上架第一道餐點。" />
+        <EmptyState icon={<UtensilsCrossed size={32} />} title={tr("尚無菜單品項", "No menu items yet")} description={tr("點擊上方「新增品項」，上架第一道餐點。", "Click Add item above to list your first dish.")} />
       ) : (() => {
         const categories = Array.from(new Set(items.map(i => i.category)));
         return (
@@ -151,16 +185,16 @@ export default function VendorPortalMenu() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium">{item.name}</span>
-                            {!item.is_available && <Badge variant="secondary" className="text-xs">已下架</Badge>}
+                            {!item.is_available && <Badge variant="secondary" className="text-xs">{tr("已下架", "Unavailable")}</Badge>}
                             {item.dietary_tags?.map(t => (
-                              <Badge key={t} variant="outline" className="text-xs text-green-700 border-green-200">{t}</Badge>
+                              <Badge key={t} variant="outline" className="text-xs text-green-700 border-green-200">{tr(t, tagEn(t))}</Badge>
                             ))}
                           </div>
                           <div className="text-xs text-muted-foreground truncate">{item.description}</div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-orange-600 font-semibold text-sm">NT$ {item.price}</span>
                             {item.allergens?.length > 0 && (
-                              <span className="text-xs text-red-500">含：{item.allergens.join("、")}</span>
+                              <span className="text-xs text-red-500">{tr("含：", "Contains: ")}{item.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</span>
                             )}
                           </div>
                         </div>
@@ -169,9 +203,9 @@ export default function VendorPortalMenu() {
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon" className="w-8 h-8 text-red-500"
-                            aria-label={`刪除「${item.name}」`}
+                            aria-label={tr(`刪除「${item.name}」`, `Delete ${item.name}`)}
                             onClick={async () => {
-                              if (await confirm({ title: `要刪除「${item.name}」嗎？`, description: "刪除後無法復原。", confirmLabel: "確定刪除", destructive: true })) {
+                              if (await confirm({ title: tr(`要刪除「${item.name}」嗎？`, `Delete ${item.name}?`), description: tr("刪除後無法復原。", "This can't be undone."), confirmLabel: tr("確定刪除", "Delete"), destructive: true })) {
                                 deleteMutation.mutate(item.id);
                               }
                             }}>
@@ -191,67 +225,89 @@ export default function VendorPortalMenu() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editId ? "編輯品項" : "新增品項"}</DialogTitle>
+            <DialogTitle>{editId ? tr("編輯品項", "Edit item") : tr("新增品項", "Add item")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <Label>名稱 *</Label>
+              <Label>{tr("名稱 *", "Name *")}</Label>
               <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div>
-              <Label>說明</Label>
+              <Label>{tr("說明", "Description")}</Label>
               <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
+            </div>
+            {/* 英文版（給英文介面的顧客看） */}
+            <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
+              <p className="text-xs font-semibold text-muted-foreground">
+                {tr("英文版（自動翻譯，可修改）", "English (auto-translated, editable)")}
+              </p>
+              <Input
+                value={form.nameEn}
+                onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
+                placeholder={tr("英文名稱，留空＝自動翻譯", "English name — leave blank to auto-translate")}
+                aria-label={tr("英文名稱", "English name")}
+              />
+              <Textarea
+                value={form.descriptionEn}
+                onChange={e => setForm(f => ({ ...f, descriptionEn: e.target.value }))}
+                placeholder={tr("英文說明，留空＝自動翻譯", "English description — leave blank to auto-translate")}
+                aria-label={tr("英文說明", "English description")}
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground">
+                {tr("儲存後約幾秒會自動翻好。只改中文、沒改英文時，英文會重新自動翻譯。", "Translations appear a few seconds after saving. If you change the Chinese but not the English, the English is re-translated automatically.")}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>價格 (NT$) *</Label>
+                <Label>{tr("價格 (NT$) *", "Price (NT$) *")}</Label>
                 <Input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
               </div>
               <div>
-                <Label>分類</Label>
-                <Input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="例：便當、湯品" />
+                <Label>{tr("分類", "Category")}</Label>
+                <Input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder={tr("例：便當、湯品", "e.g. Bento, Soup")} />
               </div>
             </div>
             {/* 上架與否是即時生效的開關設定 → 設計系統用 Switch */}
             <Switch
               checked={form.isAvailable}
               onCheckedChange={(checked) => setForm(f => ({ ...f, isAvailable: checked }))}
-              label="上架販售"
-              description="關閉後顧客暫時看不到這個品項"
+              label={tr("上架販售", "Available")}
+              description={tr("關閉後顧客暫時看不到這個品項", "When off, customers won't see this item")}
             />
             {/* 飲食標記 */}
             <div>
-              <Label className="block mb-1.5">飲食標記</Label>
+              <Label className="block mb-1.5">{tr("飲食標記", "Dietary tags")}</Label>
               <div className="flex flex-wrap gap-2">
                 {DIETARY_TAGS.map(tag => (
                   <Tag key={tag} selected={form.dietaryTags.includes(tag)} onClick={() => toggleTag("dietaryTags", tag)}>
-                    {tag}
+                    {tr(tag, tagEn(tag))}
                   </Tag>
                 ))}
               </div>
             </div>
             {/* 過敏原標示（食安法要求） */}
             <div>
-              <Label className="block mb-1.5">過敏原標示 <span className="text-xs text-red-500 font-normal">（食安法規定）</span></Label>
+              <Label className="block mb-1.5">{tr("過敏原標示", "Allergens")} <span className="text-xs text-red-500 font-normal">{tr("（食安法規定）", "(required by food safety law)")}</span></Label>
               <div className="flex flex-wrap gap-2">
                 {ALLERGEN_LIST.map(tag => (
                   <Tag key={tag} selected={form.allergens.includes(tag)} onClick={() => toggleTag("allergens", tag)}>
-                    {tag}
+                    {tr(tag, tagEn(tag))}
                   </Tag>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">點選含有的過敏原成分，將顯示於消費者菜單頁面。</p>
+              <p className="text-xs text-muted-foreground mt-1">{tr("點選含有的過敏原成分，將顯示於消費者菜單頁面。", "Select the allergens this item contains; they're shown on the customer menu.")}</p>
             </div>
-            <ImageUploadField label="品項圖片" vendorId={VENDOR_ID} value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
+            <ImageUploadField label={tr("品項圖片", "Item photo")} vendorId={VENDOR_ID} value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{tr("取消", "Cancel")}</Button>
             <Button
               
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending || !form.name || !form.price}
             >
-              {saveMutation.isPending ? "儲存中..." : "儲存"}
+              {saveMutation.isPending ? tr("儲存中...", "Saving...") : tr("儲存", "Save")}
             </Button>
           </DialogFooter>
         </DialogContent>

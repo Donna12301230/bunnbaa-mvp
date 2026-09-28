@@ -1,6 +1,9 @@
 export interface Vendor {
   id: string;
   name: string;
+  // *_en：Functions 用 Gemini 自動翻的英文版（functions/src/translate.js），英文介面用 loc() 讀
+  name_en?: string;
+  description_en?: string;
   item_focus: string;
   reliability_tone: "new" | "variable" | "stable";
   status?: "active" | "disabled"; // missing = active, for backward compat with seeded data
@@ -27,6 +30,9 @@ export interface MenuItem {
   id: string;
   vendor_id: string;
   name: string;
+  name_en?: string;
+  description_en?: string;
+  category_en?: string;
   description: string;
   price: number;
   category: string;
@@ -41,6 +47,10 @@ export interface MealPlan {
   id: string;
   vendor_id: string;
   label: string; // "A方案" / "B方案"
+  label_en?: string;
+  name_en?: string;
+  description_en?: string;
+  fastest_booking_en?: string;
   name: string;
   description: string;
   price_per_meal: number;
@@ -61,6 +71,7 @@ export interface Lock {
   id: string;
   vendor_id: string;
   item_name: string;
+  item_name_en?: string | null; // 下單時從 menu_items.name_en 帶進來
   pickup_window: string;
   pickup_date: string; // YYYY-MM-DD
   discount_percent: number;
@@ -74,6 +85,7 @@ export interface Lock {
   note?: string; // 消費者下單時的備註（例如「不要香菜」），購物車結帳才會有
   consumer_feedback?: string | null;
   discount_explanation?: string | null; // filled in by onLockCreated
+  discount_explanation_en?: string | null;
   buyer_uid: string;
   // 曾經持有過、後來被別人接手（轉賣／免費領取／贈送）的 uid，接手時追加。
   // 「我的轉讓」靠這個查回已被接手的項目，原持有人也因此保有讀取權限。
@@ -106,6 +118,8 @@ export interface AccuracyReport {
   error_range: string;
   explanation: string;
   pattern_note: string;
+  explanation_en?: string;
+  pattern_note_en?: string;
   scenario_answer?: string;
   disclaimer: string;
   generated_at: unknown; // Firestore Timestamp
@@ -152,6 +166,7 @@ export interface UserProfile {
   vendorId?: string; // role 為 vendor 時，owner_uid 綁定到這個帳號的 vendors/{id}
   orderBanned?: boolean;
   noPickupCount?: number;
+  lang?: "zh" | "en"; // users/{uid}.lang，取餐提醒推播用哪種語言
 }
 
 // reviews/{lockId}：消費者對已取餐的鎖定打分，公開可讀，見 firestore.rules
@@ -163,5 +178,9 @@ export interface Review {
   rating: number; // 1–5
   comment: string; // 空字串＝不公開心得
   reviewer_label: string;
+  // Functions 自動翻的英文（translateReview）
+  comment_en?: string;
+  item_name_en?: string;
+  reviewer_label_en?: string;
   created_at: unknown; // Firestore Timestamp
 }

@@ -13,6 +13,7 @@ interface BigWin {
   buyer_tag?: string;
   buyer_uid?: string; // 2026-09-24 前的舊紀錄
   item_name?: string | null;
+  item_name_en?: string; // Functions 自動翻的英文（translateDraw）
 }
 
 export default function GrowthRewardTicker() {
@@ -37,7 +38,7 @@ export default function GrowthRewardTicker() {
             <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-amber-200 shrink-0" />
             {tr(
               `使用者 ${win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} 剛抽中「${win.item_name ?? "整份餐點"}」整份 0 元大獎！`,
-              `User ${win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} just won a free ${win.item_name ?? "meal"}!`
+              `User ${win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} just won a free ${win.item_name_en || win.item_name || "meal"}!`
             )}
           </span>
         ))}

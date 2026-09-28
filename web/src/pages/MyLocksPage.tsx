@@ -1,5 +1,5 @@
 import { LOCK_STATUS_STYLE } from "@/lib/lockOutcome";
-import { tr } from "@/lib/i18n";
+import { tr, loc } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { collection, limit, onSnapshot, query, where } from "firebase/firestore";
@@ -98,7 +98,7 @@ export default function MyLocksPage() {
                   <span className={`self-start text-xs font-bold px-2 py-0.5 rounded-full ${statusInfo.className}`}>
                     {statusInfo.label}
                   </span>
-                  <h3 className="font-semibold leading-snug">{lock.item_name}</h3>
+                  <h3 className="font-semibold leading-snug">{loc(lock, "item_name")}</h3>
                   <p className="text-sm text-muted-foreground">
                     {formatDateLabel(lock.pickup_date)}・{lock.pickup_window}
                   </p>

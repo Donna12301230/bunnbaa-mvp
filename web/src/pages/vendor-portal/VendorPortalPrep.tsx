@@ -1,3 +1,4 @@
+import { tr, loc } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { format } from "date-fns";
@@ -58,7 +59,8 @@ export default function VendorPortalPrep() {
     const bySlot = new Map<string, Map<string, number>>();
     for (const lock of todaysActive) {
       const items = bySlot.get(lock.pickup_window) ?? new Map<string, number>();
-      items.set(lock.item_name, (items.get(lock.item_name) ?? 0) + 1);
+      const name = loc(lock, "item_name");
+        items.set(name, (items.get(name) ?? 0) + 1);
       bySlot.set(lock.pickup_window, items);
     }
 
@@ -78,21 +80,21 @@ export default function VendorPortalPrep() {
   return (
     <VendorPortalLayout>
       <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
-        <ChefHat className="w-5 h-5 text-orange-500" /> 今日備料
+        <ChefHat className="w-5 h-5 text-orange-500" /> {tr("今日備料", "Today's prep")}
       </h2>
-      <p className="text-sm text-muted-foreground mb-5">依取餐時段聚合的今日備料份數，出餐前對一次就好。</p>
+      <p className="text-sm text-muted-foreground mb-5">{tr("依取餐時段聚合的今日備料份數，出餐前對一次就好。", "Today's meal counts grouped by pickup time — check once before service.")}</p>
 
       <Card className="mb-4">
         <CardContent className="pt-5 pb-4 flex items-baseline gap-2">
-          <span className="text-sm text-muted-foreground">今日總備料份數</span>
-          <span className="text-2xl font-bold text-orange-600">{totalCount} 份</span>
+          <span className="text-sm text-muted-foreground">{tr("今日總備料份數", "Total meals to prep today")}</span>
+          <span className="text-2xl font-bold text-orange-600">{totalCount} {tr("份", "meals")}</span>
         </CardContent>
       </Card>
 
       {loading ? (
         <SkeletonBlocks count={3} height={160} className="grid grid-cols-1 md:grid-cols-3 gap-4" />
       ) : prepSlots.length === 0 ? (
-        <EmptyState icon={<ChefHat size={32} />} title="今日尚無待備料的訂單" description="有顧客鎖定餐點後，會依取餐時段出現在這裡。" />
+        <EmptyState icon={<ChefHat size={32} />} title={tr("今日尚無待備料的訂單", "Nothing to prep today")} description={tr("有顧客鎖定餐點後，會依取餐時段出現在這裡。", "Once customers lock meals, they'll show up here by pickup time.")} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {prepSlots.map(slot => (

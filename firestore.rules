@@ -74,7 +74,8 @@ service cloud.firestore {
                     || (isVendorOwner(vendorId)
                         && request.resource.data.diff(resource.data).affectedKeys()
                              .hasOnly(['description', 'address', 'phone', 'pickup_windows',
-                                       'business_hours', 'holidays', 'slot_capacity', 'cover_image'])
+                                       'business_hours', 'holidays', 'slot_capacity', 'cover_image',
+                                       'description_en', 'i18n_src'])
                         && request.resource.data.get('description', '') is string
                         && request.resource.data.get('description', '').size() <= 500
                         && request.resource.data.get('address', '') is string
@@ -94,7 +95,13 @@ service cloud.firestore {
                         // can't carry a javascript:/data: URL into the storefront <img>.
                         && request.resource.data.get('cover_image', '') is string
                         && request.resource.data.get('cover_image', '').size() <= 500
-                        && request.resource.data.get('cover_image', '').matches('^$|^https://.*'));
+                        && request.resource.data.get('cover_image', '').matches('^$|^https://.*')
+                        // 手動修改的英文簡介（其餘英文由 Functions translateVendor 自動翻）；
+                        // i18n_src 只能動 description——店名的英文跟店名一樣只有管理員／自動翻譯能改
+                        && request.resource.data.get('description_en', '') is string
+                        && request.resource.data.get('description_en', '').size() <= 1000
+                        && request.resource.data.get('i18n_src', {}).get('name', null)
+                             == resource.data.get('i18n_src', {}).get('name', null));
     }
 
     // Booked meals per vendor + pickup date + window (capacity), written only
@@ -360,16 +367,19 @@ service cloud.firestore {
     // them when an appeal is approved.
     match /users/{uid} {
       allow read: if (request.auth != null && request.auth.uid == uid) || isAdmin();
+      // lang：介面語言（zh／en），取餐提醒推播依這個決定用哪種語言
       allow create: if isSignedInUser() && request.auth.uid == uid
                     && request.resource.data.keys().hasOnly(
-                         ['display_name', 'phone', 'school', 'department', 'created_at']);
+                         ['display_name', 'phone', 'school', 'department', 'created_at', 'lang'])
+                    && request.resource.data.get('lang', 'zh') in ['zh', 'en'];
       // diff().affectedKeys(), not the whole document's keys() — otherwise once
       // orderBanned/noPickupCount exist on a doc (any past ban), the owner could
       // never touch their own profile fields again, since the resulting document
       // would always carry keys outside this allowlist.
       allow update: if isSignedInUser() && request.auth.uid == uid
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-                         ['display_name', 'phone', 'school', 'department', 'created_at']);
+                         ['display_name', 'phone', 'school', 'department', 'created_at', 'lang'])
+                    && request.resource.data.get('lang', 'zh') in ['zh', 'en'];
       allow update: if isAdmin()
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['orderBanned', 'noPickupCount']);
       allow delete: if false;

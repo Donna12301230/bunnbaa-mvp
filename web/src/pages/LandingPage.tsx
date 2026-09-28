@@ -17,7 +17,7 @@ import { EARLY_BIRD_TIERS } from "@/lib/pricing";
 import { useReviews } from "@/hooks/useReviews";
 import { slotLabel, vendorWindows } from "@/lib/pickupSlots";
 import "./LandingPage.css";
-import { useI18n, type Lang } from "@/lib/i18n";
+import { useI18n, type Lang, loc } from "@/lib/i18n";
 import { useVendors } from "@/hooks/useVendors";
 
 /**
@@ -204,10 +204,10 @@ function LandingContent() {
   const menuTabs = [...menuByCategory.entries()]
     .sort((a, b) => b[1].length - a[1].length)
     .slice(0, MENU_TAB_LIMIT)
-    .map(([category], i) => ({ value: `c${i}`, label: category }));
+    .map(([category, items], i) => ({ value: `c${i}`, key: category, label: loc(items[0], "category") || category }));
   const [tabState, setTab] = useState("c0");
   const tab = menuTabs.some((t) => t.value === tabState) ? tabState : "c0";
-  const tabDishes = menuByCategory.get(menuTabs.find((t) => t.value === tab)?.label ?? "")?.slice(0, MENU_ITEMS_PER_TAB) ?? [];
+  const tabDishes = menuByCategory.get(menuTabs.find((t) => t.value === tab)?.key ?? "")?.slice(0, MENU_ITEMS_PER_TAB) ?? [];
   const events = useScroller();
   const [review, setReview] = useState(0);
 
@@ -258,8 +258,8 @@ function LandingContent() {
                 <div className="lp-ticket__top">
                   <span className="lp-ticket__thumb"><CookingPot /></span>
                   <div>
-                    <p className="lp-ticket__name">{heroItem.name}</p>
-                    <p className="lp-ticket__meta">{[heroVendor?.name, heroWindow && slotLabel(heroWindow)].filter(Boolean).join("・")}</p>
+                    <p className="lp-ticket__name">{loc(heroItem, "name")}</p>
+                    <p className="lp-ticket__meta">{[loc(heroVendor, "name"), heroWindow && slotLabel(heroWindow)].filter(Boolean).join("・")}</p>
                   </div>
                   <Badge tone="success" dot>{t("已鎖定", "Locked")}</Badge>
                 </div>
@@ -355,8 +355,8 @@ function LandingContent() {
                     {m.image ? <img src={m.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} /> : <Soup />}
                   </span>
                   <div className="lp-dish__text">
-                    <h3 className="lp-h4">{m.name}</h3>
-                    <p className="lp-muted">{m.description}</p>
+                    <h3 className="lp-h4">{loc(m, "name")}</h3>
+                    <p className="lp-muted">{loc(m, "description")}</p>
                   </div>
                   <div className="lp-dish__price">
                     <span className="lp-strike">${m.price}</span>
@@ -419,10 +419,10 @@ function LandingContent() {
             <div className="lp-reviews__row">
               <Button variant="outline" iconOnly aria-label={t("上一則評價", "Previous review")} className="lp-round" disabled={reviews.length < 2} onClick={() => setReview((review + reviews.length - 1) % reviews.length)}><ChevronLeft /></Button>
               <figure className="lp-quote" aria-live="polite">
-                <blockquote>{r.comment}</blockquote>
+                <blockquote>{loc(r, "comment")}</blockquote>
                 <figcaption>
-                  <strong>{r.reviewer_label}</strong>
-                  <span>{[vendors.find((v) => v.id === r.vendor_id)?.name, r.item_name].filter(Boolean).join("・")}</span>
+                  <strong>{loc(r, "reviewer_label")}</strong>
+                  <span>{[loc(vendors.find((v) => v.id === r.vendor_id), "name"), loc(r, "item_name")].filter(Boolean).join("・")}</span>
                 </figcaption>
               </figure>
               <Button variant="outline" iconOnly aria-label={t("下一則評價", "Next review")} className="lp-round" disabled={reviews.length < 2} onClick={() => setReview((review + 1) % reviews.length)}><ChevronRight /></Button>
@@ -438,7 +438,7 @@ function LandingContent() {
             {!vendorsLoading && vendors.slice(0, 3).map((v) => (
               <article key={v.id} className="lp-store">
                 <div className="lp-store__visual" aria-hidden="true"><Store /></div>
-                <h3 className="lp-h3">{v.name}</h3>
+                <h3 className="lp-h3">{loc(v, "name")}</h3>
                 {v.address && <p className="lp-muted lp-store__addr"><MapPin aria-hidden="true" />{v.address}</p>}
                 <div className="lp-store__foot">
                   {v.verified ? <Badge tone="success" size="sm">{t("認證商家", "Verified")}</Badge> : <span />}
