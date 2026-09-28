@@ -11,7 +11,7 @@ const db = admin.firestore();
 const { generateVendorCalibrationReport } = require("./vendorCalibration");
 const { generateDiscountExplanation } = require("./consumerExplanation");
 const { requestPayment, confirmPayment } = require("./linePay");
-const { validatePickup, applyEarlyBirdPrice, vendorSlotCapacity } = require("./pricing");
+const { validatePickup, planPickupDates, applyEarlyBirdPrice, vendorSlotCapacity } = require("./pricing");
 
 // ISO 27001 A.5.15/A.8.3: privileged and cost-bearing callables fail closed in
 // deployed environments. Callers must be a platform admin, or (for anything
@@ -43,9 +43,9 @@ function assertSignedInUser(request, action) {
 }
 
 // Repeated no-shows (see markLockOutcome) set users/{uid}.orderBanned. Checked
-// at reservation time so a banned buyer never reaches LINE Pay; the
-// client-side plan-join path is blocked the same way via firestore.rules'
-// isBanned(). Missing doc/field = not banned.
+// at reservation time (single item, cart, meal plan) so a banned buyer never
+// reaches LINE Pay; clients can't create locks directly (firestore.rules).
+// Missing doc/field = not banned.
 async function assertNotBanned(uid) {
   const snap = await db.collection("users").doc(uid).get();
   if (snap.exists && snap.data().orderBanned) {
@@ -273,7 +273,16 @@ exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
     throw new HttpsError("failed-precondition", "You can't claim your own resale listing");
   }
 
-  await lockRef.update({ buyer_uid: request.auth.uid });
+  // Back to "locked" so the lock leaves the marketplace instead of showing up
+  // as the new owner's own listing; transferred_from_uids keeps it visible
+  // under the seller's 「我的轉讓」 (same field the client-side claim rules
+  // require in firestore.rules).
+  await lockRef.update({
+    status: "locked",
+    buyer_uid: request.auth.uid,
+    resale_deadline: FieldValue.delete(),
+    transferred_from_uids: FieldValue.arrayUnion(lock.buyer_uid),
+  });
   // The previous owner's device token must not keep receiving this lock's reminders.
   await db.collection("lock_tokens").doc(lockId).delete();
   return { lock_id: lockId };
@@ -336,8 +345,8 @@ function assertValidPickup(pickupDate, pickupWindow, vendor) {
  * written only here: reserved inside a transaction in confirmLinePayPayment
  * *before* LINE Pay captures the money, so two buyers racing for the last
  * meal can't both get it and the loser is never charged. Locks created
- * before 2026-09-25 (and plan-join locks, written client-side) aren't
- * counted. */
+ * before 2026-09-25 (and plan-join locks from before 2026-09-28, when that
+ * path was still client-side) aren't counted. */
 function slotCounterRef(vendorId, pickupDate, pickupWindow) {
   return db.collection("slot_counters").doc(`${vendorId}__${pickupDate}__${pickupWindow}`);
 }
@@ -533,7 +542,87 @@ exports.createCartLinePayReservation = onCall({ region: "asia-east1" }, async (r
   return { order_id: orderId, payment_url: info.paymentUrl.web };
 });
 
-exports.confirmLinePayPayment = onCall({ region: "asia-east1" }, async (request) => {
+/* ------------------------------------------------------------------ *
+ * 1e. Meal-plan join — LINE Pay, one payment for a plan's N days.
+ * Replaces HomePage's old client-side handleJoinPlan, which wrote N locks
+ * straight to Firestore: unpaid, fixed 12:00-13:00, ignoring the vendor's
+ * windows / holidays / slot capacity. Price comes from meal_plans (no
+ * early-bird on top — the plan price is already the discount). Pickup dates
+ * are the next N vendor-open days from start_date at one window. Locks are
+ * created by confirmLinePayPayment like any other checkout; plan_id is this
+ * order's id so each join groups separately.
+ * ------------------------------------------------------------------ */
+
+exports.createPlanLinePayReservation = onCall({ region: "asia-east1" }, async (request) => {
+  assertSignedInUser(request, "join a meal plan");
+  await assertNotBanned(request.auth.uid);
+  const { plan_id: planId, start_date: startDate, pickup_window: pickupWindow } = request.data || {};
+  if (typeof planId !== "string" || !planId) {
+    throw new HttpsError("invalid-argument", "plan_id is required");
+  }
+  const planSnap = await db.collection("meal_plans").doc(planId).get();
+  if (!planSnap.exists) throw new HttpsError("not-found", `No meal plan ${planId}`);
+  const plan = planSnap.data();
+  if (!Number.isInteger(plan.days) || plan.days <= 0 || plan.days > MAX_CART_UNITS) {
+    throw new HttpsError("failed-precondition", `「${plan.name}」的供餐天數設定有誤`);
+  }
+  if (typeof plan.price_per_meal !== "number" || plan.price_per_meal <= 0) {
+    throw new HttpsError("failed-precondition", `「${plan.name}」沒有設定價格`);
+  }
+  const vendorCache = new Map();
+  const vendor = await assertVendorExists(plan.vendor_id, vendorCache);
+  if (vendor.status === "disabled") {
+    throw new HttpsError("failed-precondition", `「${vendor.name ?? "這家店"}」目前暫停營業`);
+  }
+  const { dates, problem } = planPickupDates(startDate, pickupWindow, vendor, plan.days);
+  if (problem) throw new HttpsError("invalid-argument", problem);
+
+  const planLabel = `${plan.label}：${plan.name}`;
+  const price = plan.price_per_meal;
+  const appBaseUrl = process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
+  const intentRef = db.collection("payment_intents").doc();
+  const orderId = intentRef.id;
+  const lockDrafts = dates.map((date, i) => ({
+    vendor_id: plan.vendor_id,
+    item_name: `${planLabel}・第${i + 1}/${plan.days}天`,
+    pickup_window: pickupWindow,
+    pickup_date: date,
+    discount_percent: 0,
+    resellable: true,
+    locked_price: price,
+    plan_id: orderId,
+    plan_label: planLabel,
+  }));
+  await assertSlotsHaveRoom(lockDrafts, vendorCache);
+  const amount = price * plan.days;
+
+  let info;
+  try {
+    info = await requestPayment({
+      orderId,
+      amount,
+      products: [{ name: planLabel, quantity: plan.days, price }],
+      confirmUrl: `${appBaseUrl}/#/payment/confirm/${orderId}`,
+      cancelUrl: `${appBaseUrl}/#/payment/cancel/${orderId}`,
+    });
+  } catch (err) {
+    logger.error("LINE Pay plan request failed", err);
+    throw new HttpsError("internal", "LINE Pay 付款請求失敗，請稍後再試");
+  }
+
+  await intentRef.set({
+    status: "pending",
+    buyer_uid: request.auth.uid,
+    transaction_id: String(info.transactionId),
+    amount,
+    lock_drafts: lockDrafts,
+    created_at: FieldValue.serverTimestamp(),
+  });
+
+  return { order_id: orderId, payment_url: info.paymentUrl.web };
+});
+
+exports.confirmLinePayPayment =onCall({ region: "asia-east1" }, async (request) => {
   assertSignedInUser(request, "confirm a payment");
   const { order_id: orderId } = request.data || {};
   if (!orderId) throw new HttpsError("invalid-argument", "order_id is required");

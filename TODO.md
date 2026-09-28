@@ -48,7 +48,8 @@
   2. 仁和雅店主用**另一支手機**開 `/lock/vendor/redeem` →「用相機掃描 QR Code」，第一次要跳相機權限詢問，允許後看得到畫面（iPhone Safari＋Android Chrome 各試一次）
   3. 對準 QR → 視窗自動關閉、下方跳出該筆的核對結果卡，取餐編號欄自動帶入末 8 碼 → 按「確認取餐」成功。付款成功頁（`/payment/confirm/...`）上的 QR 也掃一次，確認同樣查得到
   4. 負面：再掃同一張 → 顯示「已經是『已完成取餐』狀態」；掃一張桌位點餐 QR（`VendorPortalSettings` 下載的）→ 顯示「這不是 BunnBaa 的取餐 QR Code」；拒絕相機權限 → 顯示改用手動輸入的提示
-- [ ] **「加入計畫」被封鎖時的白話提示**（§6 解封申訴，2026-09-28 改的 `HomePage.tsx`）：推 master 部署後，封鎖一個測試會員再按「預約加入計畫」，要看到「您的帳號因多次未取餐已被限制下單，請至會員中心提交解封申訴」，不是 `Missing or insufficient permissions.`。目前只過了 `tsc`
+- [ ] **「加入計畫」被封鎖時的白話提示**（§6 解封申訴，2026-09-28 改的 `HomePage.tsx`）：推 master 部署後，封鎖一個測試會員再按「預約加入計畫」，要看到「您的帳號因多次未取餐已被限制下單，請至會員中心提交解封申訴」，不是 `Missing or insufficient permissions.`。（同日「加入計畫」已改走伺服器，前端直接擋 `isOrderBanned`，登入期間才被封鎖的由 `createPlanLinePayReservation` 回同一句白話）
+- [ ] **「加入計畫」走 LINE Pay**（§6，2026-09-28 改走伺服器，emulator 已測 Function，瀏覽器還沒點過）：部署後，一般會員按「預約加入計畫」→ 確認視窗選第一天＋時段，預覽的取餐日要跳過公休日 → 勾聲明 → LINE Pay Sandbox 付款 → 付款成功頁出現 N 張 QR → `/my-bookings` 看到 N 筆、`plan_id` 相同。負面：商家設份數上限後把某天訂滿，加入計畫要被擋並說是哪一天額滿
 - [ ] **清除正式站測試資料**：2026-09-28 解封流程測試在 `customer@bunnbaa.test` 名下留了「A方案：五日輕食計畫」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）＋一筆已核准的 `ban_appeals/lI5dGTVtIBfByBIUTy3W`，到 Firestore Console 刪除（前兩筆是 no_show，會被商家校準報告算進去）。另外 9/25 份數測試的 `EJEL6PRO` 掛在仁和雅店主帳號名下（見 §6），也可以一起刪
 
 ### 4. Demo 準備（整合與交付）
@@ -77,7 +78,12 @@
 - [V] **取餐時段／公休／份數上限由商家後台控制**——2026-09-25 完成並部署：店家設定頁（`VendorPortalSettings.tsx`）的簡介、地址、電話、營業日、公休日改接真實 `vendors/{id}`，新增「取餐時段」與「每個時段份數上限」（`pickup_windows`／`business_hours`／`holidays`／`slot_capacity`；店名仍只有管理員能改）。消費端 `PickupPicker` 照商家設定顯示時段、公休、剩幾份；伺服器結帳照同一套驗證（`functions/src/pricing.js`），份數在 `confirmLinePayPayment` 用 transaction 預扣（`slot_counters`），**先扣份數再向 LINE Pay 確認扣款**，額滿就不扣款。已知限制：① 首頁左側時段選擇是先選、所有店共用預設時段，下單時才檢查該店有沒有開；② 「加入計畫」（多日方案）是前端直接寫 locks，**不受時段／公休／份數限制**；③ 2026-09-25 以前的訂單不計入份數；④ 商家改設定後，消費者要重新整理頁面才看得到（前端快取），伺服器結帳一律照最新設定。
   - 正式站驗證（2026-09-25，仁和雅咖啡店主帳號）：設定頁儲存份數 1＋公休日 10/3 成功且重新載入仍在；購物車公休日顯示「這天是店家公休日」並停用結帳、各時段顯示「剩 1 份」、數量 2 時提示只剩 1 份；實際付款一筆（10/5 11:30–12:00，NT$128＝伺服器算的 8 折，取餐編號 `EJEL6PRO`）後該時段變「已額滿」；份數改回不限後，同時段重複訂購出現提醒但不擋。測試完已把份數改回不限、刪除 10/3 公休日。`EJEL6PRO` 這筆測試訂單掛在店主帳號名下，不需要可到 Firestore Console 刪除
   - **還沒測**：兩人同時搶最後一份（transaction 應只讓一人成功、另一人不扣款）、LINE Pay 確認失敗時份數退回
-- [ ] **「加入計畫」（多日方案）改走伺服器**：目前 `HomePage.tsx` 的 `handleJoinPlan` 在前端直接寫 N 筆 locks，固定 `12:00-13:00`、不經付款，也不受商家時段／公休／份數限制
+- [V] **「加入計畫」（多日方案）改走伺服器**——2026-09-28 程式碼完成（未部署）。原本 `HomePage.tsx` 的 `handleJoinPlan` 在前端直接寫 N 筆 locks，固定 `12:00-13:00`、不經付款，也不受商家時段／公休／份數限制
+  - 新 callable `createPlanLinePayReservation({ plan_id, start_date, pickup_window })`：價格讀 `meal_plans.price_per_meal`（不再疊早鳥折扣），`functions/src/pricing.js` 的 `planPickupDates` 從開始日起、同一時段、**跳過公休／沒營業的日子**排滿 N 天（30 天內排不滿就擋），`assertSlotsHaveRoom` 檢查每天份數，一次 LINE Pay 付清；付款確認沿用 `confirmLinePayPayment`（份數 transaction、失敗退回都共用）。locks 的 `plan_id` 改成這張訂單 id（每次加入各自一組），舊資料是 `vendor_id-方案 id`
+  - 前端：「預約加入計畫」改開確認視窗——選第一天＋時段（`PickupPicker`，含剩餘份數）、預覽每天的取餐日（`web/src/lib/pickupSlots.ts` 的 `planPickupDates`，跟伺服器同規則）、勾消保法聲明 → 前往 LINE Pay
+  - `firestore.rules`：`locks` 改成 `allow create: if false`，前端再也不能自己生 lock（之前可以寫未付款的 lock）。封鎖改由 `assertNotBanned` 在伺服器擋
+  - 本機 emulator 10 項測試通過：正常加入（公休日被跳過、金額 90×3、`plan_id`／時段正確、LINE Pay Sandbox 回付款網址）、封鎖會員 `permission-denied`、額滿 `resource-exhausted`、開始日是公休日被擋、未登入被擋、前端直接建立 lock 回 403。**還沒在瀏覽器點過確認視窗**，也還沒跑完整付款（要在 LINE Pay Sandbox 頁面按付款）
+  - 部署：**Functions → hosting → rules 依序一起上**。先上 rules 的話舊版首頁的「加入計畫」會直接 403；只上 hosting 沒上 Functions 則新視窗會呼叫不到 Function。實測見 §3
 - [V] **消費者端提交解封申訴（含實際的封鎖機制）**——2026-09-28 完成，這項原本沒人排進分工表，SU 認領後做成完整版（不只是入口，連「真的會封鎖人」都補上了，理由：光做申訴表單，沒有封鎖機制配合的話永遠不會有真實使用者用到）：
   - `markLockOutcome` 標記 `no_show` 時，在同一個 transaction 裡把 `users/{buyer_uid}.noPickupCount` 加一，累計滿 2 次（對應會員條款「累計超過一次」）自動設 `orderBanned: true`
   - 封鎖後擋兩條路：`createLinePayReservation`／`createCartLinePayReservation` 開頭擋（`assertNotBanned`），`firestore.rules` 的 `locks` create 規則也擋（防 `HomePage.tsx` 的「加入計畫」這條純前端直寫路徑繞過）
@@ -93,7 +99,7 @@
   - 2026-09-28 正式站後半段也通過：管理員 `ckchildlikekid@gmail.com` 在 `/admin/appeals` 核准 → `users` 變 `orderBanned=false`／`noPickupCount=0`、`admin_audit_logs` 多一筆 `approve_ban_appeal` → 會員中心限制提示消失、購物車結帳正常導向 LINE Pay Sandbox。**整條流程正式站驗證完成**
   - 剩下要測的已移到 §3 待辦
   - 測試留在正式站的資料：`customer@bunnbaa.test` 名下「A方案：五日輕食計畫」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz` 已是 no_show；`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe` 仍是 locked），清除見 §3 待辦
-- [ ] 「我的轉讓」無法追蹤已被接手的項目（資料模型沒有記錄原轉讓者）
+- [x] 「我的轉讓」無法追蹤已被接手的項目 → 2026-09-28 locks 加 `transferred_from_uids`，接手時由 claimResoldLock／firestore.rules 強制寫入（需重新部署 rules，claimResoldLock 等 Blaze）
 - [V] **商家頁（`/vendor/:id`）手機呈現優化**——2026-09-28 完成，參考外部點餐網站的手機版面。品項改依 `menu_items.category` 分組，商家頁上方新增可橫向滑動的分類標籤列（`sticky top-16`，跟站頭疊在一起），點分類會平滑捲動到對應區塊（用 `scrollIntoView`，不是 `<a href="#..">`——整站是 hash router，網址的 `#` 是路由本身，不能拿來當錨點）。純呈現層改動，沒有動到加入購物車／取餐時間選擇等既有邏輯。只有 1 種分類時不顯示標籤列（沒意義）。**還沒在真實手機或瀏覽器裝置模式下看過**，只確認 `tsc`／`build` 過關
 
 ### 7. 待決策
@@ -140,7 +146,7 @@
 | 我的鎖定／訂單記錄頁 | 🟡 | `MyLocksPage.tsx`，簡易列表（週曆版在 `MyBookingsPage.tsx`） |
 | Gemini — 商家校準 Agent | 🟡 | Key 已到位、本機測通，待部署後在正式站驗證 |
 | Gemini — 消費者折扣說明 Agent | 🟡 | 同上 |
-| UI 模型建置 | ⬜ | UI 規格書過時，見待辦 §6 |
+| UI 模型建置 | ⬜ | 見待辦 §6 |
 | 整合測試 | ⬜ | 見待辦 §4 |
 | Demo 錄製＋Proposal | ⬜ | **10/18 前提交** |
 
@@ -209,7 +215,7 @@ UI 草圖：https://claude.ai/artifact/WyPDxzfSrUG2ZA4M3EDrJc （只參考版面
 1. **hash 路由 404**：LINE Pay 導回時直接把 `?transactionId=...` 串在 `confirmUrl` 後面，不理會 `#`。改成把 `orderId` 放進路徑（`/payment/confirm/:orderId`），並做防禦性截斷。
 2. **Confirm API 回「1159 交易不存在」**：`transactionId` 是 19 位數，超過 JS `Number` 的安全整數範圍，`res.json()` 會失去精度。改成解析前先把數字字面值加上引號再 `JSON.parse`，以字串保留。
 
-**計畫型（訂閱制多日方案）**：沒有另外的 subscription collection，「預約加入計畫」當下直接寫入 N 筆 `locks`（用 `plan_id`／`plan_label` 串起來），取餐日從明天起連續 N 天，不需要排程 Function。
+**計畫型（訂閱制多日方案）**：沒有另外的 subscription collection，「預約加入計畫」付款成功後一次寫入 N 筆 `locks`（用 `plan_id`／`plan_label` 串起來），取餐日從消費者選的開始日起、跳過公休排滿 N 個營業日，不需要排程 Function。2026-09-28 前是前端直接寫、不經付款，已改走 `createPlanLinePayReservation`。
 
 **成長獎勵抽獎**：`drawGrowthReward` 在伺服器端計算，採機率權重制，0 元券見底時自動降級成 1 折保底（機率不能信任 client）。
 

@@ -90,6 +90,29 @@ export function nextAvailablePickup(vendor?: ScheduleSource, now: Date = new Dat
   return null;
 }
 
+/**
+ * 計畫型（多日方案）的取餐日：從 startDate 起、同一個時段，跳過公休／沒營業的日子，
+ * 湊滿 days 天。跟 functions/src/pricing.js 的 planPickupDates 同一套規則，
+ * 這裡只給加入計畫的確認視窗預覽用，真正的日期由伺服器排。
+ * 起始日不能訂、或 30 天內湊不滿時回傳 null。
+ */
+export function planPickupDates(
+  vendor: ScheduleSource,
+  startDate: string,
+  pickupWindow: string,
+  days: number,
+  now: Date = new Date()
+): string[] | null {
+  if (!openWindowsOn(vendor, startDate, now).includes(pickupWindow)) return null;
+  const last = maxPickupDateStr(now);
+  const dates: string[] = [];
+  for (let date = startDate; dates.length < days; date = addDaysStr(date, 1)) {
+    if (date > last) return null;
+    if (openWindowsOn(vendor, date, now).includes(pickupWindow)) dates.push(date);
+  }
+  return dates;
+}
+
 function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.trim().split(":").map(Number);
   return h * 60 + m;

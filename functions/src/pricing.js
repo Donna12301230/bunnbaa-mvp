@@ -78,6 +78,31 @@ function validatePickup(pickupDate, pickupWindow, vendor, now = new Date()) {
   return null;
 }
 
+function addDays(dateStr, days) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Meal-plan pickup dates: `days` vendor-open dates from startDate onward, all
+ * at the same pickupWindow, skipping holidays / closed weekdays. startDate
+ * itself must be bookable. Returns { dates } or { problem } (the latter for the
+ * caller to wrap in HttpsError). Every date stays within MAX_ADVANCE_DAYS.
+ */
+function planPickupDates(startDate, pickupWindow, vendor, days, now = new Date()) {
+  const first = validatePickup(startDate, pickupWindow, vendor, now);
+  if (first) return { problem: first };
+  const dates = [];
+  for (let date = startDate; dates.length < days; date = addDays(date, 1)) {
+    if (daysBetween(taipeiToday(), date) > MAX_ADVANCE_DAYS) {
+      return { problem: `從 ${startDate} 起 ${MAX_ADVANCE_DAYS} 天內湊不滿 ${days} 個營業日，請提早開始日期` };
+    }
+    if (!validatePickup(date, pickupWindow, vendor, now)) dates.push(date);
+  }
+  return { dates };
+}
+
 function applyEarlyBirdPrice(originalPrice, pickupDate) {
   const days = Math.max(0, daysBetween(taipeiToday(), pickupDate));
   const tier = EARLY_BIRD_TIERS.find((t) => days >= t.minDays && days <= t.maxDays);
@@ -85,4 +110,4 @@ function applyEarlyBirdPrice(originalPrice, pickupDate) {
   return { discountPercent, lockedPrice: Math.round(originalPrice * (1 - discountPercent / 100)) };
 }
 
-module.exports = { MAX_ADVANCE_DAYS, validatePickup, applyEarlyBirdPrice, vendorSlotCapacity };
+module.exports = { MAX_ADVANCE_DAYS, validatePickup, planPickupDates, applyEarlyBirdPrice, vendorSlotCapacity };

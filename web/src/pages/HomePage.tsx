@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
-  collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch,
+  collection, doc, getDocs, limit, onSnapshot, orderBy, query, where,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
@@ -19,7 +19,7 @@ import GrowthRewardTicker from "@/components/GrowthRewardTicker";
 import { auth, db, functions } from "@/lib/firebase";
 import type { Vendor, MenuItem, MealPlan, Lock } from "@/types";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
-import { DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, openWindowsOn, todayStr, vendorClosedReason } from "@/lib/pickupSlots";
+import { DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, openWindowsOn, planPickupDates, slotLabel, todayStr, vendorClosedReason } from "@/lib/pickupSlots";
 import PickupPicker from "@/components/PickupPicker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -62,8 +62,12 @@ export default function HomePage() {
   const [lockDialogItem, setLockDialogItem] = useState<{ item: MenuItem; vendor: Vendor } | null>(null);
   const [uid, setUid] = useState<string | null>(null);
   const requireLogin = useRequireLogin();
-  const [joiningPlanId, setJoiningPlanId] = useState<string | null>(null);
-  const [joinedPlanIds, setJoinedPlanIds] = useState<Record<string, boolean>>({});
+  // 加入計畫確認視窗：開始日期＋時段由消費者選，送伺服器排日期、收款
+  const [planDialog, setPlanDialog] = useState<{ plan: MealPlan; vendor: Vendor } | null>(null);
+  const [planStartDate, setPlanStartDate] = useState("");
+  const [planWindow, setPlanWindow] = useState("");
+  const [planAck, setPlanAck] = useState(false);
+  const [joiningPlan, setJoiningPlan] = useState(false);
   const [growthUnlocked, setGrowthUnlocked] = useState(false);
   const [drawing, setDrawing] = useState(false);
 
@@ -197,50 +201,36 @@ export default function HomePage() {
     }
   }
 
-  // 「計畫型」（訂閱制多日方案）沒有另外的 plan/subscription collection——加入
-  // 計畫當下直接一次寫入 N 筆真實 locks（同一個 plan_id 串起來），不用排程
-  // Cloud Function 每天生一筆，所以不受 Blaze 卡住。之後在「我的餐點」會依
-  // pickup_date 自動分組出現。
-  async function handleJoinPlan(group: { vendorId: string; vendorName: string; plans: MealPlan[] }, plan: MealPlan) {
+  // 「計畫型」（訂閱制多日方案）沒有另外的 plan/subscription collection——付款
+  // 成功後 confirmLinePayPayment 一次寫入 N 筆 locks（plan_id＝這張訂單 id）。
+  // 2026-09-28 起改走伺服器 createPlanLinePayReservation：原本前端直接寫 locks，
+  // 不經付款、固定 12:00-13:00，也不看商家時段／公休／份數上限。
+  function openPlanDialog(vendorId: string, plan: MealPlan) {
     if (!requireLogin() || !uid) return;
     if (isOrderBanned) {
       toast({ title: "目前無法加入計畫", description: BANNED_HINT, variant: "destructive" });
       return;
     }
-    const planKey = `${group.vendorId}-${plan.id}`;
-    setJoiningPlanId(planKey);
+    const vendor = vendors.find((v) => v.id === vendorId);
+    if (!vendor) return;
+    const next = nextAvailablePickup(vendor);
+    setPlanStartDate(next?.date ?? todayStr());
+    setPlanWindow(next?.window ?? DEFAULT_PICKUP_WINDOWS[0]);
+    setPlanAck(false);
+    setPlanDialog({ plan, vendor });
+  }
+
+  async function handleJoinPlan(plan: MealPlan) {
+    setJoiningPlan(true);
     try {
-      const batch = writeBatch(db);
-      const planLabel = `${plan.label}：${plan.name}`;
-      for (let day = 1; day <= plan.days; day++) {
-        const pickupDate = new Date();
-        pickupDate.setDate(pickupDate.getDate() + day);
-        const ref = doc(collection(db, "locks"));
-        batch.set(ref, {
-          vendor_id: group.vendorId,
-          item_name: `${planLabel}・第${day}/${plan.days}天`,
-          pickup_window: "12:00-13:00",
-          pickup_date: pickupDate.toISOString().slice(0, 10),
-          discount_percent: 0,
-          resellable: true,
-          locked_price: plan.price_per_meal,
-          status: "locked",
-          buyer_uid: uid,
-          created_at: serverTimestamp(),
-          plan_id: planKey,
-          plan_label: planLabel,
-        });
-      }
-      await batch.commit();
-      setJoinedPlanIds(prev => ({ ...prev, [planKey]: true }));
-      toast({ title: "已加入計畫", description: `${group.vendorName} · ${plan.name}・已生成 ${plan.days} 筆鎖定，可在「我的餐點」查看。` });
+      const fn = httpsCallable(functions, "createPlanLinePayReservation");
+      const result = await fn({ plan_id: plan.id, start_date: planStartDate, pickup_window: planWindow });
+      const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
+      window.location.href = paymentUrl;
     } catch (err) {
-      // 登入期間才被封鎖的話 isOrderBanned 還是舊值，會一路寫到 firestore.rules
-      // 才被擋，這時錯誤是看不懂的 PERMISSION_DENIED 原文，換成白話提示。
-      const denied = (err as { code?: string }).code === "permission-denied";
-      toast({ title: "加入計畫失敗", description: denied ? BANNED_HINT : (err as Error).message, variant: "destructive" });
-    } finally {
-      setJoiningPlanId(null);
+      // 伺服器的錯誤訊息已經是白話（封鎖、額滿、公休等），直接顯示
+      toast({ title: "加入計畫失敗", description: (err as Error).message, variant: "destructive" });
+      setJoiningPlan(false);
     }
   }
 
@@ -481,6 +471,71 @@ export default function HomePage() {
             </DialogContent>
           </Dialog>
 
+          {/* 加入計畫確認彈窗——選第一天＋時段、預覽每天的取餐日，確認後前往 LINE Pay */}
+          <Dialog open={!!planDialog} onOpenChange={(open) => { if (!open && !joiningPlan) setPlanDialog(null); }}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+              {planDialog && (() => {
+                const { plan, vendor } = planDialog;
+                const dates = planPickupDates(vendor, planStartDate, planWindow, plan.days);
+                return (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>{plan.label}：{plan.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 py-1">
+                      <p className="text-sm text-muted-foreground">
+                        {vendor.name}・NT$ {plan.price_per_meal} × {plan.days} 餐＝<strong className="text-foreground">NT$ {plan.price_per_meal * plan.days}</strong>
+                      </p>
+                      <div>
+                        <p className="text-xs font-semibold mb-2">第一天取餐日期與每天的取餐時段</p>
+                        <PickupPicker
+                          date={planStartDate}
+                          window={planWindow}
+                          onDateChange={setPlanStartDate}
+                          onWindowChange={setPlanWindow}
+                          uid={uid}
+                          vendor={vendor}
+                        />
+                      </div>
+                      {dates ? (
+                        <div className="p-2.5 rounded-lg bg-muted border border-border text-caption leading-relaxed">
+                          <span className="font-semibold">取餐日（遇公休自動順延）：</span>
+                          {dates.map((d) => d.slice(5).replace("-", "/")).join("、")}
+                          <span className="text-muted-foreground">・每天 {slotLabel(planWindow)}</span>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1.5 p-2.5 rounded-lg bg-red-50 border border-red-200 text-caption text-red-800">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          這個開始日期／時段排不滿 {plan.days} 天（最遠只能預約 30 天內），請改選其他日期或時段。
+                        </div>
+                      )}
+                      <label className="flex items-start gap-1.5 p-2 rounded-lg bg-muted border border-border cursor-pointer">
+                        <Checkbox checked={planAck} onCheckedChange={() => setPlanAck((v) => !v)} className="mt-0.5 shrink-0" />
+                        <span className="text-caption leading-relaxed text-muted-foreground">
+                          我了解本商品為現做餐點，依消保法通訊交易解除權合理例外情事適用準則，<strong className="text-foreground">鎖定後不適用 7 天猶豫期</strong>，除商家未履約外恕不接受退款
+                        </span>
+                      </label>
+                      <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
+                        <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
+                        <span className="text-caption leading-relaxed text-orange-900">
+                          每一天都是獨立的一份，當天沒空可以單獨轉讓；取餐時段結束仍未取餐，將<strong>自動開放到轉讓市集、$0 元供人領取</strong>
+                        </span>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setPlanDialog(null)} disabled={joiningPlan}>
+                        取消
+                      </Button>
+                      <Button disabled={!dates || !planAck || joiningPlan} onClick={() => handleJoinPlan(plan)}>
+                        {joiningPlan ? "前往付款中…" : "確認加入並付款"}
+                      </Button>
+                    </DialogFooter>
+                  </>
+                );
+              })()}
+            </DialogContent>
+          </Dialog>
+
           {/* 合作店家與計畫 */}
           <section>
             <h3 className="font-heading text-2xl font-semibold mb-3">合作店家與計畫</h3>
@@ -514,16 +569,8 @@ export default function HomePage() {
                       <span className="inline-block w-fit text-xs bg-secondary text-secondary-foreground border border-ink px-2.5 py-0.5 rounded-full mb-3">
                         最快履約：{plan.fastest_booking}
                       </span>
-                      <Button
-                        className="mt-auto w-full text-sm"
-                        disabled={joiningPlanId === `${group.vendorId}-${plan.id}` || !!joinedPlanIds[`${group.vendorId}-${plan.id}`]}
-                        onClick={() => handleJoinPlan(group, plan)}
-                      >
-                        {joinedPlanIds[`${group.vendorId}-${plan.id}`]
-                          ? "已加入計畫"
-                          : joiningPlanId === `${group.vendorId}-${plan.id}`
-                          ? "處理中…"
-                          : "預約加入計畫"}
+                      <Button className="mt-auto w-full text-sm" onClick={() => openPlanDialog(group.vendorId, plan)}>
+                        預約加入計畫
                       </Button>
                     </div>
                   ))}

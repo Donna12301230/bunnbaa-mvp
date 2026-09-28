@@ -28,6 +28,18 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('orderBanned', false) == true;
     }
 
+    // A lock changing hands must append its previous owner to
+    // transferred_from_uids (arrayUnion semantics: existing entries kept, at
+    // most one added), so 「我的轉讓」 can still find it after buyer_uid moves on.
+    function recordsPreviousOwner() {
+      let before = resource.data.get('transferred_from_uids', []);
+      let after = request.resource.data.get('transferred_from_uids', []);
+      return after is list
+        && after.hasAll(before)
+        && resource.data.buyer_uid in after
+        && after.size() <= before.size() + 1;
+    }
+
     // vendors: publicly readable (browsing); writes via admin backend only for MVP
     match /vendors/{vendorId} {
       allow read: if true;
@@ -98,19 +110,17 @@ service cloud.firestore {
     match /locks/{lockId} {
       allow read: if resource.data.status in ['for_resale', 'for_gift']
                   || (request.auth != null && resource.data.buyer_uid == request.auth.uid)
+                  // Previous owners keep read access so 「我的轉讓」 can show what
+                  // happened to a lock after someone else took it over.
+                  || (request.auth != null && request.auth.uid in resource.data.get('transferred_from_uids', []))
                   || isAdmin()
                   || isVendorOwner(resource.data.vendor_id);
-      // A new lock must start as "locked" and can't carry server-managed fields,
-      // otherwise a client could mint an already-fulfilled/settled lock. Also
-      // blocks the client-side plan-join path (HomePage handleJoinPlan) for a
-      // banned buyer — LINE Pay checkout is blocked server-side, see
-      // assertNotBanned in functions/src/index.js.
-      allow create: if isSignedInUser()
-                    && !isBanned()
-                    && request.resource.data.buyer_uid == request.auth.uid
-                    && request.resource.data.status == 'locked'
-                    && !request.resource.data.keys().hasAny(
-                         ['payout_settled', 'payout_id', 'reminder_sent', 'discount_explanation', 'no_show_note']);
+      // Locks are only created by confirmLinePayPayment (Admin SDK, bypasses
+      // rules) after LINE Pay captures the money. The last client-side path,
+      // HomePage's plan-join, moved to createPlanLinePayReservation on
+      // 2026-09-28 — until then a client could mint unpaid locks here. Bans
+      // are enforced server-side by assertNotBanned.
+      allow create: if false;
       // status transitions (fulfilled, no_show) are normally done via Cloud
       // Functions with admin rights; admin backend can also override directly
       // since those Functions aren't deployed to prod yet (Blaze). Everything
@@ -144,7 +154,8 @@ service cloud.firestore {
                         && request.auth.uid != resource.data.buyer_uid
                         && request.resource.data.status == 'locked'
                         && request.resource.data.buyer_uid == request.auth.uid
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer_uid']))
+                        && recordsPreviousOwner()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer_uid', 'transferred_from_uids']))
                     // Buyer cancels their own still-unclaimed for_resale/for_gift
                     // listing back to locked (TODO.md 2026-09-22 待辦：取消轉讓
                     // 沒有對應規則). Only reachable while buyer_uid is still theirs —
@@ -162,7 +173,8 @@ service cloud.firestore {
                         && request.resource.data.status == 'locked'
                         && request.resource.data.buyer_uid == request.auth.uid
                         && request.resource.data.locked_price == 0
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer_uid', 'locked_price']))
+                        && recordsPreviousOwner()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer_uid', 'locked_price', 'transferred_from_uids']))
                     // Buyer leaves feedback once the lock is settled — one-shot (the
                     // field must not already exist) so it can't be edited after the
                     // fact; this feeds vendor calibration (functions/src/index.js

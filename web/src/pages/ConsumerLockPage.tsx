@@ -16,6 +16,7 @@ import type { Lock, Vendor } from "../types";
 import LockQRCode from "../components/LockQRCode";
 import { applyEarlyBirdPrice } from "../lib/pricing";
 import { nextAvailablePickup } from "@/lib/pickupSlots";
+import { takeOverLock } from "@/lib/transfers";
 import { toast } from "../hooks/use-toast";
 import { Gift } from "lucide-react";
 
@@ -129,11 +130,7 @@ export default function ConsumerLockPage() {
     if (!requireLogin() || !auth.currentUser) return;
     setClaimingId(lockId);
     try {
-      await updateDoc(doc(db, "locks", lockId), {
-        status: "locked",
-        buyer_uid: auth.currentUser.uid,
-        locked_price: 0,
-      });
+      await takeOverLock(lockId, auth.currentUser.uid, { locked_price: 0 });
       setMyLock({ id: lockId } as Lock);
     } catch (err) {
       toast({ variant: "destructive", title: "領取失敗", description: (err as Error).message });
@@ -146,10 +143,7 @@ export default function ConsumerLockPage() {
     if (!incomingGiftId || !requireLogin() || !auth.currentUser) return;
     setClaimingGift(true);
     try {
-      await updateDoc(doc(db, "locks", incomingGiftId), {
-        status: "locked",
-        buyer_uid: auth.currentUser.uid,
-      });
+      await takeOverLock(incomingGiftId, auth.currentUser.uid);
       setMyLock({ id: incomingGiftId } as Lock);
       setIncomingGiftId(null);
     } catch (err) {

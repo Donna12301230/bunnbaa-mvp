@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db, functions } from "@/lib/firebase";
 import { isClean } from "@/lib/searchFilter";
+import { takeOverLock } from "@/lib/transfers";
 import type { Lock } from "@/types";
 import { EmptyState, Tag } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
@@ -23,12 +24,16 @@ import { Link } from "wouter";
 //   - 沿用同一組 vendor_id + created_at 索引，篩選 for_resale 交給前端做，
 //     避免另外要求新的複合索引（跟 VendorRedeemPage/VendorPortalPrep 同慣例）
 // 「取消轉讓」2026-09-22 補上 firestore.rules 規則（owner 可以把還沒被接手的
-// for_resale 改回 locked），「我的轉讓」現在是真的可以取消。已被接手的項目一旦
-// buyer_uid 換人就無法再用「我的」查回來（資料模型沒有記錄原轉讓者），這頁
-// 「我的轉讓」只會顯示目前還在轉讓中、尚未被接手的項目。
+// for_resale 改回 locked），「我的轉讓」現在是真的可以取消。已被接手的項目靠
+// locks.transferred_from_uids（接手時由 claimResoldLock／firestore.rules 強制寫入
+// 原持有人）查回來，原持有人也保有讀取權限。
 // 轉賣價格由買家雙方私下議定、平台不經手，所以這裡不顯示「轉讓價」，只顯示
 // 原鎖定價（locked_price）。
 const VENDOR_ID = "cafe-renheya-demo";
+
+function millisOf(ts: unknown): number {
+  return (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
+}
 
 function formatCountdown(deadline: Date, now: number): string {
   const diffMin = Math.round((deadline.getTime() - now) / 60000);
@@ -44,6 +49,7 @@ export default function TransferMarketPage() {
   const [uid, setUid] = useState<string | null>(null);
   const requireLogin = useRequireLogin();
   const [locks, setLocks] = useState<Lock[]>([]);
+  const [handedOver, setHandedOver] = useState<Lock[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -73,6 +79,29 @@ export default function TransferMarketPage() {
     );
     return () => unsub();
   }, []);
+
+  // 已被接手的：只用 array-contains 單一條件（自動單欄位索引），店家篩選和排序
+  // 交給前端，避免新的複合索引。
+  useEffect(() => {
+    if (!uid) {
+      setHandedOver([]);
+      return;
+    }
+    const q = query(collection(db, "locks"), where("transferred_from_uids", "array-contains", uid), limit(100));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const rows = snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock)
+          // 接手後又轉回自己手上的，算在自己的項目，不算已被接手
+          .filter((l) => l.vendor_id === VENDOR_ID && l.buyer_uid !== uid)
+          .sort((a, b) => millisOf(b.created_at) - millisOf(a.created_at));
+        setHandedOver(rows);
+      },
+      () => setHandedOver([])
+    );
+    return () => unsub();
+  }, [uid]);
 
   // 逾時判斷是純前端算的（沒有排程 Function 幫忙轉狀態），要固定重算才會即時從
   // 「我要接手」變成「免費領取」。
@@ -129,11 +158,7 @@ export default function TransferMarketPage() {
     if (!requireLogin() || !uid) return;
     setClaimingId(lockId);
     try {
-      await updateDoc(doc(db, "locks", lockId), {
-        status: "locked",
-        buyer_uid: uid,
-        locked_price: 0,
-      });
+      await takeOverLock(lockId, uid, { locked_price: 0 });
       toast({ title: "已免費領取", description: "取餐編號可在「我的餐點」查看。" });
     } catch (err) {
       toast({ title: "領取失敗", description: (err as Error).message, variant: "destructive" });
@@ -309,9 +334,34 @@ export default function TransferMarketPage() {
                 ))}
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
-              已被接手的項目目前無法在此追蹤紀錄，因為資料模型沒有記錄原轉讓者（buyer_uid 換人後就查不到了）。
-            </p>
+            <div className="flex items-center gap-2.5 pt-2 flex-wrap">
+              <Repeat className="w-5 h-5" />
+              <h2 className="text-lg font-bold">已被接手</h2>
+              <span className="text-xs text-muted-foreground">你轉讓或贈送出去、已經有人接手的項目</span>
+            </div>
+
+            {handedOver.length === 0 ? (
+              <EmptyState size="compact" icon={<Repeat size={32} />} title="還沒有被接手的項目" />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {handedOver.map(item => (
+                  <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
+                    <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                      <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-gray-200 text-gray-700">
+                        已被接手
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-2.5 p-4 flex-1">
+                      <h3 className="text-body font-bold leading-snug">{item.item_name}</h3>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5" /> {item.pickup_date} · {item.pickup_window}
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>

@@ -75,12 +75,15 @@ export interface Lock {
   consumer_feedback?: string | null;
   discount_explanation?: string | null; // filled in by onLockCreated
   buyer_uid: string;
+  // 曾經持有過、後來被別人接手（轉賣／免費領取／贈送）的 uid，接手時追加。
+  // 「我的轉讓」靠這個查回已被接手的項目，原持有人也因此保有讀取權限。
+  transferred_from_uids?: string[];
   created_at: unknown; // Firestore Timestamp
   reminder_sent?: boolean; // device token lives in the private lock_tokens/{lockId} doc
-  // 計畫型（訂閱制多日方案）：加入計畫時一次生成 N 筆 locks，用同一個 plan_id
-  // 串起來，沒有另外的 plan/subscription collection（見 HomePage.tsx 的
-  // handleJoinPlan）。firestore.rules 的 create 規則沒有限制欄位白名單，
-  // 所以這兩個欄位不需要另外修改規則。
+  // 計畫型（訂閱制多日方案）：付款成功後一次生成 N 筆 locks，用同一個 plan_id
+  // 串起來，沒有另外的 plan/subscription collection（見 functions 的
+  // createPlanLinePayReservation）。2026-09-28 起 plan_id＝該次付款的訂單 id，
+  // 之前前端直寫的舊資料是「vendor_id-meal_plans id」。
   plan_id?: string;
   plan_label?: string;
 }
