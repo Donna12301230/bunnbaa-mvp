@@ -18,6 +18,10 @@
 
 ### 2. 部署（2026-09-25 已全部部署：規則＋索引、Functions、hosting）
 
+**⏭ 2026-09-29（明天）要做的兩件事**——2026-09-28 已從 `Donna` 分支部署 rules、Functions、hosting，還差這兩步（詳見 §8「部署順序」）：
+- [ ] **補設定資料**：在有正式站服務帳號金鑰的電腦上執行 `$env:GOOGLE_APPLICATION_CREDENTIALS="金鑰檔路徑"; node scripts/seed.js --config-only`（只寫 `platform_config/growth`＋`landing_events`，不動其他資料）。沒做之前：Landing「近期活動」是空的、商家後台成長獎勵頁顯示「平台尚未設定門檻」（抽獎本身有預設門檻，不受影響）
+- [ ] **補翻既有資料**：用管理員帳號登入正式站 → 管理後台 → 系統設定 →「補翻既有資料」，把自動翻譯上線前的店家、菜單、方案、評價、抽獎紀錄、訂單品名翻成英文（可能要幾分鐘）。有失敗筆數通常是 Gemini 忙線（503），再按一次只補失敗的。做完切到英文介面看首頁、商家頁、我的餐點，店名／菜名要是英文
+
 `firestore.rules` 新增 `menu_items`／`meal_plans`／`ban_appeals` 規則，`functions/src/index.js` 改了 `createCartLinePayReservation`／`createLinePayReservation`（改吃每個品項的真實 `vendor_id`）：
 - [V] `firebase deploy --only firestore:rules,firestore:indexes`（2026-09-24 再次更新：`locks` 改成只有轉賣中／贈送中公開讀，新增 `vendor_id+status+created_at` 複合索引——**索引要先建好**，不然轉讓市集查詢會失敗；2026-09-24 又新增 `users`／`vendor_applications` 規則，平台登入改真實 Firebase Auth 後註冊、廠商申請都要靠這兩條）
 - [V] `firebase deploy --only functions`（2026-09-24 起消費端 callable 會擋匿名身分，前端已不再匿名登入，**規則、Functions、hosting 要一起部署**，不然舊版前端的匿名使用者會全部被擋）
