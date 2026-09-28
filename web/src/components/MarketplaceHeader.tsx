@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
   Search, MapPin, Globe, User, ChevronDown, ClipboardList, Repeat,
-  CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart,
+  CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart, House,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { logout } from "@/lib/auth";
@@ -34,7 +34,9 @@ import { Input } from "@/components/ui/input";
 // 「預購餐點/轉讓市集/我的餐點/商家」這幾個分頁。這裡加一顆漢堡按鈕,用 Sheet
 // 抽屜補齊手機導覽;同時補上購物車圖示(MenuItemPage 加入購物車後,原本整站
 // 沒有任何地方能查看/結帳購物車,是斷掉的動線),見 CartPage.tsx。
-export type MarketplaceTab = "plans" | "transfer" | "bookings" | "vendors";
+//
+// 2026-09-28:最前面加「首頁」分頁,連到品牌形象頁(/landing,LandingPage.tsx)。
+export type MarketplaceTab = "landing" | "plans" | "transfer" | "bookings" | "vendors";
 
 interface NavItem {
   tab: MarketplaceTab;
@@ -59,6 +61,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
   });
 
   const navItems: NavItem[] = [
+    { tab: "landing", href: "/landing", label: "首頁", icon: House },
     { tab: "plans", href: "/home", label: "預購餐點", icon: ClipboardList },
     { tab: "transfer", href: "/marketplace", label: "轉讓市集", icon: Repeat },
     isVendor

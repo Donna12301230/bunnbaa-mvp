@@ -96,47 +96,13 @@
 .lp-pill { border-radius: var(--radius-full); }
 .lp-round { border-radius: var(--radius-full); border-color: var(--lp-line); }
 
-/* ── Header ── */
-.lp-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(10px);
-}
-.lp-header__inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  height: 72px;
-}
+/* ── Logo（頁尾用） ── */
 .lp-logo { display: inline-flex; align-items: center; gap: var(--space-2); }
 .lp-logo img { width: 44px; height: auto; }
 .lp-logo__word { font-size: 22px; font-weight: 700; letter-spacing: 0.01em; }
 .lp-logo__bunn { color: var(--brand-brown); }
 .lp-logo__baa { color: var(--brand-orange); }
 
-.lp-nav { display: none; gap: var(--space-1); }
-@media (min-width: 1024px) {
-  .lp-nav { display: flex; }
-}
-.lp-nav__link {
-  padding: 6px 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  color: var(--text) !important;
-  font-weight: 500;
-  transition: background-color var(--duration-fast) var(--ease-standard);
-}
-.lp-nav__link:hover { background: var(--brand-orange-tint); }
-.lp-nav__link.is-active {
-  background: var(--brand-orange-soft);
-  border-color: var(--brand-orange);
-  color: var(--brand-orange-text) !important;
-  font-weight: 600;
-}
-.lp-nav__link:focus-visible,
 .lp-footer__links a:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);

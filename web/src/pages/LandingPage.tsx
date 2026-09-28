@@ -10,6 +10,7 @@ import {
 import {
   AnimatedNumber, Badge, Button, IconBox, Input, Tabs, ToastProvider, useToast,
 } from "@/components/ds";
+import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { db } from "@/lib/firebase";
 import type { Vendor } from "@/types";
 import "./LandingPage.css";
@@ -20,6 +21,7 @@ import "./LandingPage.css";
  * 沒有實拍照片，照片位置以品牌色漸層 + 線條 icon 代替；之後有素材可直接換成 <img>。
  */
 
+// 頁尾連結用（頂部導覽列改用全站共用的 MarketplaceHeader）
 const NAV = [
   { href: "/landing", label: "首頁" },
   { href: "/home", label: "今日菜單" },
@@ -210,23 +212,8 @@ function LandingContent() {
 
   return (
     <div className="bb-landing">
-      {/* ── Header ── */}
-      <header className="lp-header">
-        <div className="lp-container lp-header__inner">
-          <Link href="/landing" className="lp-logo" aria-label="BunnBaa 飯飽 首頁">
-            <img src="/飯飽R.png" alt="" width={44} height={39} />
-            <span className="lp-logo__word"><span className="lp-logo__bunn">Bunn</span><span className="lp-logo__baa">Baa</span></span>
-          </Link>
-          <nav className="lp-nav" aria-label="主要導覽">
-            {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className={`lp-nav__link${n.href === "/landing" ? " is-active" : ""}`} aria-current={n.href === "/landing" ? "page" : undefined}>
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <LinkButton href="/" size="sm">立即預約</LinkButton>
-        </div>
-      </header>
+      {/* ── Header：沿用全站共用導覽列 ── */}
+      <MarketplaceHeader active="landing" />
 
       <main>
         {/* ── Hero ── */}
