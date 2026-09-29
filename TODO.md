@@ -107,6 +107,18 @@
   - 已知取捨：原持有人可讀整筆 lock（含新持有人的 consumer_feedback／no_show_note），試營運先接受；要收緊就改成獨立 transfer_records collection
   - 舊資料用 `scripts/backfill-transfers.js` 從 payment_intents 補回原付款人（只補得回第一手，非 LINE Pay 建立的 lock 補不回）
 - [V] **商家頁（`/vendor/:id`）手機呈現優化**——2026-09-28 完成，參考外部點餐網站的手機版面。品項改依 `menu_items.category` 分組，商家頁上方新增可橫向滑動的分類標籤列（`sticky top-16`，跟站頭疊在一起），點分類會平滑捲動到對應區塊（用 `scrollIntoView`，不是 `<a href="#..">`——整站是 hash router，網址的 `#` 是路由本身，不能拿來當錨點）。純呈現層改動，沒有動到加入購物車／取餐時間選擇等既有邏輯。只有 1 種分類時不顯示標籤列（沒意義）。**還沒在真實手機或瀏覽器裝置模式下看過**，只確認 `tsc`／`build` 過關
+- [V] **根路徑改成一律先看品牌形象頁**——2026-09-29 完成。雅婷 9/28 新增的 `LandingPage.tsx`（`#/landing`）原本只是獨立頁面，沒接進根路徑；`App.tsx` 的 `RootGate`（`/`）原本邏輯是「未登入顯示 `LoginPage`、已登入顯示 `HomePage`」，分兩步改成：
+  1. 已登入時 `/` 改顯示 `LandingPage`，不顯示 `HomePage`（頂部導覽標「今日菜單」，其實是訂購介面；`MarketplaceHeader`／`LandingPage` 自己的頁尾都把 `/landing` 標成「首頁」）
+  2. 未登入時 `/` 也改顯示 `LandingPage`，不再強制先跳 `LoginPage`——瀏覽本來就不用登入，登入從 `LandingPage` 上的「登入／註冊」按鈕自己點
+  `RootGate` 現在直接回傳 `LandingPage`，不用再判斷登入狀態。`/home`、`/login` 兩個路由都完全沒動，只是不再是 `/` 的預設落點。`tsc --noEmit`／`npm run build` 都已過關；**沒做**真人瀏覽器點擊驗證（照先前共識，測試留到 10/10 後）
+- [V] **商家頁（`/vendor/:id`）再次視覺改版，手機／電腦版統一**——2026-09-29 完成，延續 9/28 那版（分類標籤＋捲動），這次再對齊參考截圖更多細節：
+  - 分類標籤列從膠囊背景樣式改成底線樣式（`border-b-2`，選中橘色底線＋橘字），預設啟用第一個分類（新增 `effectiveCategory = activeCategory ?? categories[0]?.[0]`，未手動點過分類時也會有一個當前分類）
+  - 品項列表從「兩欄卡片＋邊框」改成單欄、一行一行、用分隔線分開（`divide-y`），價格從右上角移到說明文字下方
+  - 每個品項右側加圓形橘色「＋」快速加入購物車按鈕（`quickAdd`，複製自 `MenuItemPage.tsx` 既有的加入購物車邏輯，含「購物車裡有別家商家品項」提示），不用點進品項詳情頁就能加入
+  - 商家名稱旁新增星等顯示（讀 `useReviews()` + `summarizeRatings()`，沒有評價就不顯示）
+  - 商家資訊卡新增「如有餐點變動請致電確認」提醒區塊（有電話才顯示）
+  - **刻意沒做**：參考圖裡商家頁上直接內嵌「自取：今天...[更改]」的取餐時段選擇器——目前取餐時段是在 `CartPage.tsx`／`PickupPicker.tsx` 結帳前選、有時段容量檢查，搬到商家頁是架構調整不是純呈現改動，先不動，等討論
+  - `tsc --noEmit`／`npm run build` 都已過關；**沒做**真人手機／瀏覽器實測（測試留到 10/10 後）
 
 ### 7. 待決策
 
