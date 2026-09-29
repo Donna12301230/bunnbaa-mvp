@@ -27,6 +27,10 @@ import CartPage from "./pages/CartPage";
 import VendorListPage from "./pages/VendorListPage";
 import VendorPage from "./pages/VendorPage";
 import MenuItemPage from "./pages/MenuItemPage";
+import AboutPage from "./pages/AboutPage";
+import ContactPage from "./pages/ContactPage";
+import FaqPage from "./pages/FaqPage";
+import JoinUsPage from "./pages/JoinUsPage";
 import CustomerLayout from "./components/CustomerLayout";
 import { RequireVendorSignIn } from "./components/RequireRealAdmin";
 import AdminVendorsPage from "./pages/admin/AdminVendorsPage";
@@ -150,6 +154,18 @@ export default function App() {
           </Route>
           <Route path="/item/:id">
             <MarketplacePage><CustomerLayout><MenuItemPage /></CustomerLayout></MarketplacePage>
+          </Route>
+          <Route path="/about">
+            <MarketplacePage><AboutPage /></MarketplacePage>
+          </Route>
+          <Route path="/contact">
+            <MarketplacePage><ContactPage /></MarketplacePage>
+          </Route>
+          <Route path="/faq">
+            <MarketplacePage><FaqPage /></MarketplacePage>
+          </Route>
+          <Route path="/join">
+            <MarketplacePage><JoinUsPage /></MarketplacePage>
           </Route>
           <Route path="/admin/vendors">
             <MarketplacePage><AdminVendorsPage /></MarketplacePage>

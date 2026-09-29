@@ -499,18 +499,6 @@
 .lp-store__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: auto; padding-top: var(--space-4); }
 .lp-store--skeleton { min-height: 420px; background: var(--skeleton-base); border-color: transparent; }
 
-/* ── 電子報 ── */
-.lp-newsletter { display: grid; justify-items: center; gap: var(--space-5); padding-inline: var(--lp-gutter); }
-.lp-newsletter .lp-h3 { font-size: clamp(20px, 2.6vw, 28px); }
-.lp-newsletter__form {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-3);
-  width: min(520px, 100%);
-}
-.lp-newsletter__input { flex: 1 1 240px; }
-
 /* ── Footer ── */
 .lp-footer {
   display: grid;
@@ -546,7 +534,6 @@
 }
 .lp-footer__links a { color: #fff !important; font-weight: 500; }
 .lp-footer__links a:hover { text-decoration: underline !important; }
-.lp-footer__links a.is-active { color: var(--brand-orange) !important; }
 
 @media (prefers-reduced-motion: reduce) {
   .lp-ticker__track,
