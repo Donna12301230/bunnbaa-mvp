@@ -20,7 +20,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import QrScannerDialog from "@/components/QrScannerDialog";
-import { LOCK_STATUS_STYLE } from "@/lib/lockOutcome";
+import { LOCK_STATUS_STYLE, NO_SHOW_TOO_EARLY_HINT, noShowAllowed } from "@/lib/lockOutcome";
 
 // 函式產生，驗證訊息才會跟著目前語言
 const noShowSchema = () =>
@@ -229,6 +229,7 @@ export default function VendorRedeemPage() {
 
   const alreadyDone = foundLock && ["fulfilled", "no_show", "resold_and_fulfilled"].includes(foundLock.status);
   const statusInfo = foundLock ? LOCK_STATUS_STYLE[foundLock.status] : null;
+  const canNoShow = foundLock ? noShowAllowed(foundLock) : false;
 
   return (
     <VendorPortalLayout>
@@ -388,7 +389,13 @@ export default function VendorRedeemPage() {
                           <CheckCircle2 className="w-4 h-4 mr-1.5" />
                           {submitting ? tr("處理中…", "Working…") : tr("確認取餐", "Confirm pickup")}
                         </Button>
-                        <Button variant="outline" className="flex-1" disabled={submitting} onClick={() => setShowNoShowForm(true)}>
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          disabled={submitting || !canNoShow}
+                          title={canNoShow ? undefined : NO_SHOW_TOO_EARLY_HINT()}
+                          onClick={() => setShowNoShowForm(true)}
+                        >
                           {tr("登記未取餐", "Mark no-show")}
                         </Button>
                       </div>

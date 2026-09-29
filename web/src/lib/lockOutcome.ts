@@ -32,6 +32,15 @@ export function pickupCode(lock: Pick<Lock, "id">): string {
   return lock.id.slice(-8).toUpperCase();
 }
 
+/** 取餐時段結束（台北時間）後才能登記未取餐，跟 functions markLockOutcome 的伺服器檢查一致 */
+export function noShowAllowed(lock: Pick<Lock, "pickup_date" | "pickup_window">, now = Date.now()): boolean {
+  const endTime = lock.pickup_window?.split("-")[1]?.trim();
+  const end = new Date(`${lock.pickup_date}T${endTime}:00+08:00`).getTime();
+  return Number.isFinite(end) && now >= end;
+}
+
+export const NO_SHOW_TOO_EARLY_HINT = () => tr("取餐時段結束後才能登記未取餐", "Available after the pickup window ends");
+
 /** 狀態轉換只能走 Cloud Function（firestore.rules 擋直接寫） */
 export async function markLockOutcome(lockId: string, outcome: LockOutcome, note?: string) {
   const fn = httpsCallable(functions, "markLockOutcome");

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { LOCK_STATUS_STYLE, markLockOutcome, pickupCode, REDEEMABLE_STATUSES } from "@/lib/lockOutcome";
+import { LOCK_STATUS_STYLE, markLockOutcome, NO_SHOW_TOO_EARLY_HINT, noShowAllowed, pickupCode, REDEEMABLE_STATUSES } from "@/lib/lockOutcome";
 import type { Lock } from "@/types";
 
 /**
@@ -19,6 +19,7 @@ export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; sh
   const [note, setNote] = useState("");
   const status = LOCK_STATUS_STYLE[lock.status] ?? { label: lock.status, className: "bg-gray-100 text-gray-700" };
   const canRedeem = REDEEMABLE_STATUSES.has(lock.status);
+  const canNoShow = noShowAllowed(lock);
 
   async function submit(outcome: "fulfilled" | "no_show") {
     if (outcome === "no_show" && note.trim().length < 2) {
@@ -55,7 +56,16 @@ export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; sh
       {canRedeem && !noShowOpen && (
         <div className="flex gap-2">
           <Button size="sm" className="flex-1" disabled={busy} onClick={() => submit("fulfilled")}>{tr("確認取餐", "Confirm pickup")}</Button>
-          <Button size="sm" variant="outline" className="flex-1" disabled={busy} onClick={() => setNoShowOpen(true)}>{tr("登記未取餐", "Mark no-show")}</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            disabled={busy || !canNoShow}
+            title={canNoShow ? undefined : NO_SHOW_TOO_EARLY_HINT()}
+            onClick={() => setNoShowOpen(true)}
+          >
+            {tr("登記未取餐", "Mark no-show")}
+          </Button>
         </div>
       )}
       {canRedeem && noShowOpen && (

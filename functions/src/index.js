@@ -237,6 +237,21 @@ exports.markLockOutcome = onCall({ region: "asia-east1" }, async (request) => {
     if (!OPEN_LOCK_STATUSES.includes(current)) {
       throw new HttpsError("failed-precondition", `This lock is already "${current}" and can't be redeemed again`);
     }
+    // A no-show counts toward the buyer's ban, so it can only be recorded once
+    // the pickup window is actually over — not days ahead of the pickup date.
+    if (outcome === "no_show") {
+      const { pickup_date: pickupDate, pickup_window: pickupWindow } = fresh.data();
+      const end = pickupWindowEnd(pickupDate, pickupWindow);
+      if (!end || Date.now() < end.getTime()) {
+        throw new HttpsError(
+          "failed-precondition",
+          t(
+            `取餐時段（${pickupDate} ${pickupWindow}）還沒結束，結束後才能登記未取餐`,
+            `The pickup window (${pickupDate} ${pickupWindow}) isn't over yet; a no-show can only be recorded after it ends`
+          )
+        );
+      }
+    }
 
     // Reads must come before writes in a transaction, so resolve the buyer's
     // no-show count now even though it's only used for a no_show outcome.
@@ -949,6 +964,13 @@ function pickupWindowStart(pickupDate, pickupWindow) {
   // pickup_date/pickup_window are both stored in Asia/Taipei local terms
   // (spec's single-location pilot), so this constructs the instant as UTC+8.
   return new Date(`${pickupDate}T${startTime}:00+08:00`);
+}
+
+function pickupWindowEnd(pickupDate, pickupWindow) {
+  const endTime = pickupWindow?.split("-")[1]?.trim(); // "12:00-13:00" -> "13:00"
+  if (!pickupDate || !endTime) return null;
+  const end = new Date(`${pickupDate}T${endTime}:00+08:00`);
+  return Number.isNaN(end.getTime()) ? null : end;
 }
 
 async function sendPickupReminders() {
