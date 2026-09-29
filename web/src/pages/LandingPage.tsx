@@ -430,7 +430,6 @@ function LandingContent() {
         <div className="lp-footer__grid">
           <div className="lp-footer__brand">
             <Link href="/landing" className="lp-logo" aria-label={t("BunnBaa 飯飽 首頁", "BunnBaa home")}>
-              <img src="/飯飽R.png" alt="" width={44} height={39} />
               <span className="lp-logo__word"><span className="lp-logo__bunn">Bunn</span><span className="lp-logo__baa">Baa</span></span>
             </Link>
             <p className="lp-muted">{t("赫滋與羊國際藝術有限公司", "Herz & Baa International Arts Co., Ltd.")}</p>
