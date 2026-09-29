@@ -429,9 +429,9 @@ function LandingContent() {
       <footer className="lp-container lp-footer">
         <div className="lp-footer__grid">
           <div className="lp-footer__brand">
-            <Link href="/landing" className="lp-logo" aria-label={t("BunnBaa 飯飽 首頁", "BunnBaa home")}>
+            <span className="lp-logo">
               <span className="lp-logo__word"><span className="lp-logo__bunn">Bunn</span><span className="lp-logo__baa">Baa</span></span>
-            </Link>
+            </span>
             <p className="lp-muted">{t("赫滋與羊國際藝術有限公司", "Herz & Baa International Arts Co., Ltd.")}</p>
             <a href={`mailto:${PLATFORM_CONTACT_EMAIL}`} className="lp-muted lp-footer__email">{PLATFORM_CONTACT_EMAIL}</a>
           </div>
