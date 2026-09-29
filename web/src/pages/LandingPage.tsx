@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import {
-  ArrowRight, BellRing, CakeSlice, CalendarClock, ChevronLeft, ChevronRight, Clock, Coffee,
+  ArrowRight, BellRing, CakeSlice, CalendarClock, ChevronLeft, ChevronRight, Coffee,
   CookingPot, Croissant, Info, MapPin, Repeat, Salad, Sandwich, ShieldCheck, Soup,
   Sparkle, Star, Store, Ticket,
 } from "lucide-react";
@@ -188,8 +188,6 @@ function LandingContent() {
     staleTime: 15 * 60 * 1000,
   });
 
-  // 頁尾取餐時段：所有合作店家設定的時段聯集（商家後台店家設定頁維護）
-  const pickupWindows = [...new Set(vendors.flatMap((v) => vendorWindows(v)))].sort();
 
   const { data: allReviews = [] } = useReviews();
   const reviews = allReviews.filter((x) => x.comment.trim() && x.rating >= 4).slice(0, REVIEW_LIMIT);
@@ -423,23 +421,15 @@ function LandingContent() {
             <img src="/飯飽R.png" alt="" width={44} height={39} />
             <span className="lp-logo__word"><span className="lp-logo__bunn">Bunn</span><span className="lp-logo__baa">Baa</span></span>
           </Link>
-          <div>
-            <h2 className="lp-h4"><Clock aria-hidden="true" className="lp-inline-icon" /> {t("取餐時段", "Pickup times")}</h2>
-            <ul className="lp-muted lp-footer__hours">
-              {pickupWindows.map((t) => <li key={t}>{slotLabel(t)}</li>)}
-              <li>{t("實際時段與公休日依各店家設定。", "Actual times and closing days are set by each vendor.")}</li>
+          <nav className="lp-footer__nav" aria-label={t("頁尾連結", "Footer links")}>
+            <ul>
+              {FOOTER_NAV.map((n) => (
+                <li key={n.href}><Link href={n.href}>{pick(n.label, lang)}</Link></li>
+              ))}
             </ul>
-          </div>
+          </nav>
           <p className="lp-caption">© {new Date().getFullYear()} {t("BunnBaa 飯飽・越早訂，越開心。", "BunnBaa · Book early, eat happy.")}</p>
         </div>
-        <nav className="lp-footer__links" aria-label={t("頁尾連結", "Footer links")}>
-          <h2 className="lp-h4">{t("頁面連結", "Pages")}</h2>
-          <ul>
-            {FOOTER_NAV.map((n) => (
-              <li key={n.href}><Link href={n.href}>{pick(n.label, lang)}</Link></li>
-            ))}
-          </ul>
-        </nav>
       </footer>
     </div>
   );
