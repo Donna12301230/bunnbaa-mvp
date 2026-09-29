@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { ArrowLeft, MapPin, Phone, Store, UtensilsCrossed } from "lucide-react";
+import { AlertCircle, ArrowLeft, MapPin, Phone, Plus, Star, Store, UtensilsCrossed } from "lucide-react";
 import { db } from "@/lib/firebase";
 import type { Vendor, MenuItem } from "@/types";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { tr, loc } from "@/lib/i18n";
 import { tagEn } from "@/types";
+import { useCart } from "@/hooks/useCart";
+import { useToast } from "@/hooks/use-toast";
+import { useReviews, summarizeRatings } from "@/hooks/useReviews";
 
 
 function categoryAnchorId(category: string) {
@@ -28,6 +31,9 @@ function scrollToCategory(category: string) {
 export default function VendorPage() {
   const { id } = useParams<{ id: string }>();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const { addItem, vendorId: cartVendorId } = useCart();
+  const { toast } = useToast();
+  const { data: reviews = [] } = useReviews();
 
   const { data: vendor, isLoading: vendorLoading } = useQuery({
     queryKey: ["vendor", id],
@@ -61,6 +67,26 @@ export default function VendorPage() {
     return [...groups.entries()];
   }, [items]);
 
+  const rating = useMemo(() => {
+    if (!id) return null;
+    return summarizeRatings(reviews, (r) => r.vendor_id ?? null).get(id) ?? null;
+  }, [reviews, id]);
+
+  const effectiveCategory = activeCategory ?? categories[0]?.[0] ?? null;
+
+  function quickAdd(e: MouseEvent, item: MenuItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (cartVendorId && cartVendorId !== item.vendor_id) {
+      toast({
+        title: tr("購物車裡有別家商家的品項", "Your cart has items from another vendor"),
+        description: tr("加入這項會清空目前的購物車（一次只能跟一家商家預購）。", "Adding this will clear your cart (you can only pre-order from one vendor at a time)."),
+      });
+    }
+    addItem(item, item.vendor_id);
+    toast({ title: tr("已加入購物車", "Added to cart"), description: loc(item, "name") });
+  }
+
   if (vendorLoading) {
     return <SkeletonBlocks height={192} />;
   }
@@ -82,45 +108,59 @@ export default function VendorPage() {
         <ArrowLeft className="w-4 h-4" /> {tr("回商家清單", "Back to vendors")}
       </Link>
 
-      <div className="bg-white rounded-xl border border-border p-5">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {vendor.cover_image ? (
-            <img src={vendor.cover_image} alt="" className="w-full sm:w-32 h-32 rounded-lg object-cover shrink-0" />
-          ) : (
-            <div className="w-full sm:w-32 h-32 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center shrink-0">
-              <Store className="h-12 w-12 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
-            </div>
+      <div>
+        {vendor.cover_image ? (
+          <img src={vendor.cover_image} alt="" className="w-full h-40 sm:h-48 rounded-xl object-cover" />
+        ) : (
+          <div className="w-full h-40 sm:h-48 rounded-xl bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+            <Store className="h-12 w-12 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+          </div>
+        )}
+
+        <div className="mt-4">
+          <h1 className="text-xl font-bold mb-1">{loc(vendor, "name")}</h1>
+          {rating && (
+            <span className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-1.5">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <span className="font-medium text-foreground">{rating.average}</span>
+              ({rating.count}+)
+            </span>
           )}
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold mb-1">{loc(vendor, "name")}</h1>
-            {vendor.description && <p className="text-sm text-muted-foreground mb-3">{loc(vendor, "description")}</p>}
-            <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-              {vendor.address && (
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 shrink-0" /> {vendor.address}
-                </span>
-              )}
-              {vendor.phone && (
-                <span className="flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 shrink-0" /> {vendor.phone}
-                </span>
-              )}
-            </div>
+          {vendor.description && <p className="text-sm text-muted-foreground mb-3">{loc(vendor, "description")}</p>}
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+            {vendor.address && (
+              <span className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 shrink-0" /> {vendor.address}
+              </span>
+            )}
+            {vendor.phone && (
+              <span className="flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 shrink-0" /> {vendor.phone}
+              </span>
+            )}
           </div>
         </div>
+
+        {vendor.phone && (
+          <div className="flex items-start gap-2 bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-800 mt-4">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>
+              {tr(`如有餐點變動，請致電 ${vendor.phone} 確認！`, `If your order changes, please call ${vendor.phone} to confirm.`)}
+            </span>
+          </div>
+        )}
       </div>
 
       <div>
-        <h2 className="text-lg font-bold mb-3">{tr("品項", "Menu")}</h2>
         {itemsLoading ? (
-          <SkeletonBlocks count={2} height={96} className="grid grid-cols-1 sm:grid-cols-2 gap-3" />
+          <SkeletonBlocks count={2} height={72} className="space-y-1" />
         ) : items.length === 0 ? (
           <EmptyState size="compact" icon={<UtensilsCrossed size={32} />} title={tr("這家商家目前沒有上架品項", "This vendor has no items available right now")} />
         ) : (
           <>
             {categories.length > 1 && (
-              <div className="sticky top-16 z-10 -mx-3 md:-mx-4 mb-4 bg-gray-50/95 backdrop-blur-sm border-b border-border">
-                <div className="flex gap-2 overflow-x-auto px-3 md:px-4 py-2">
+              <div className="sticky top-16 z-10 -mx-3 md:-mx-4 mb-2 bg-gray-50/95 backdrop-blur-sm border-b border-border">
+                <div className="flex gap-5 overflow-x-auto px-3 md:px-4">
                   {categories.map(([category]) => (
                     <button
                       key={category}
@@ -130,10 +170,10 @@ export default function VendorPage() {
                         scrollToCategory(category);
                       }}
                       className={cn(
-                        "shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium border transition-colors whitespace-nowrap",
-                        activeCategory === category
-                          ? "bg-orange-500 border-orange-500 text-white"
-                          : "bg-white border-border text-muted-foreground hover:text-foreground"
+                        "shrink-0 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                        effectiveCategory === category
+                          ? "border-orange-500 text-orange-600"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
                       )}
                     >
                       {category}
@@ -146,33 +186,41 @@ export default function VendorPage() {
             <div className="space-y-6">
               {categories.map(([category, categoryItems]) => (
                 <section key={category} id={categoryAnchorId(category)} className="scroll-mt-32">
-                  {categories.length > 1 && <h3 className="font-semibold mb-2">{category}</h3>}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <h3 className="font-semibold mb-1 pb-2 border-b-2 border-orange-500 inline-block">{category}</h3>
+                  <div className="divide-y divide-border">
                     {categoryItems.map((item) => (
                       <Link
                         key={item.id}
                         href={`/item/${item.id}`}
-                        className="block bg-white rounded-xl border border-border p-4 shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                        className="flex items-center justify-between gap-3 py-4"
                       >
-                        <div className="flex items-start gap-3">
-                          {item.image && (
-                            <img src={item.image} alt="" loading="lazy" className="w-16 h-16 rounded-lg object-cover shrink-0" />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <h3 className="font-semibold text-sm mb-0.5 truncate">{loc(item, "name")}</h3>
-                            <p className="text-xs text-muted-foreground line-clamp-2">{loc(item, "description")}</p>
-                          </div>
-                          <span className="text-sm font-bold text-orange-600 shrink-0">NT${item.price}</span>
-                        </div>
-                        {item.dietary_tags?.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {item.dietary_tags.map((tag) => (
-                              <span key={tag} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                {tr(tag, tagEn(tag))}
-                              </span>
-                            ))}
-                          </div>
+                        {item.image && (
+                          <img src={item.image} alt="" loading="lazy" className="w-16 h-16 rounded-lg object-cover shrink-0" />
                         )}
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-semibold text-sm mb-0.5">{loc(item, "name")}</h4>
+                          {loc(item, "description") && (
+                            <p className="text-xs text-muted-foreground line-clamp-2 mb-1">{loc(item, "description")}</p>
+                          )}
+                          {item.dietary_tags?.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-1">
+                              {item.dietary_tags.map((tag) => (
+                                <span key={tag} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                  {tr(tag, tagEn(tag))}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <span className="text-sm font-bold text-orange-600">NT${item.price}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => quickAdd(e, item)}
+                          aria-label={tr("加入購物車", "Add to cart")}
+                          className="shrink-0 w-9 h-9 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 active:scale-95 transition-[transform,background-color]"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
                       </Link>
                     ))}
                   </div>

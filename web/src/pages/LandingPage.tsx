@@ -1,14 +1,14 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import {
-  ArrowRight, BellRing, CakeSlice, CalendarClock, ChevronLeft, ChevronRight, Clock, Coffee,
-  CookingPot, Croissant, Info, Mail, MapPin, Repeat, Salad, Sandwich, ShieldCheck, Soup,
+  ArrowRight, BellRing, CakeSlice, CalendarClock, ChevronLeft, ChevronRight, Coffee,
+  CookingPot, Croissant, Info, MapPin, Repeat, Salad, Sandwich, ShieldCheck, Soup,
   Sparkle, Star, Store, Ticket,
 } from "lucide-react";
 import {
-  AnimatedNumber, Badge, Button, IconBox, Input, Tabs, ToastProvider, useToast,
+  AnimatedNumber, Badge, Button, IconBox, Tabs, ToastProvider,
 } from "@/components/ds";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { db } from "@/lib/firebase";
@@ -19,6 +19,7 @@ import { slotLabel, vendorWindows } from "@/lib/pickupSlots";
 import "./LandingPage.css";
 import { useI18n, type Lang, loc } from "@/lib/i18n";
 import { useVendors } from "@/hooks/useVendors";
+import { PLATFORM_CONTACT_EMAIL } from "@/lib/subscription";
 
 /**
  * 品牌形象頁（#/landing）
@@ -31,12 +32,21 @@ import { useVendors } from "@/hooks/useVendors";
 type Bi = { zh: string; en: string };
 const pick = (text: Bi, lang: Lang) => text[lang];
 
-const NAV: { href: string; label: Bi }[] = [
-  { href: "/landing", label: { zh: "首頁", en: "Home" } },
-  { href: "/home", label: { zh: "今日菜單", en: "Today's menu" } },
-  { href: "/vendors", label: { zh: "合作店家", en: "Partner vendors" } },
-  { href: "/marketplace", label: { zh: "轉讓市集", en: "Transfers" } },
-  { href: "/my-locks", label: { zh: "我的餐點", en: "My meals" } },
+const FOOTER_COLUMNS: { title: Bi; links: { href: string; label: Bi }[] }[] = [
+  {
+    title: { zh: "關於", en: "About" },
+    links: [
+      { href: "/about", label: { zh: "關於我們", en: "About us" } },
+      { href: "/join", label: { zh: "加入我們", en: "Join us" } },
+    ],
+  },
+  {
+    title: { zh: "支援", en: "Support" },
+    links: [
+      { href: "/faq", label: { zh: "常見問題", en: "FAQ" } },
+      { href: "/contact", label: { zh: "聯絡客服", en: "Contact support" } },
+    ],
+  },
 ];
 
 const TICKER: Bi[] = [
@@ -149,42 +159,6 @@ function SectionTitle({ children, center = false }: { children: ReactNode; cente
   return <h2 className={`lp-h2${center ? " lp-center" : ""}`}>{children}</h2>;
 }
 
-function Newsletter() {
-  const { toast } = useToast();
-  const { t } = useI18n();
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | undefined>();
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError(t("請輸入有效的 Email", "Please enter a valid email"));
-      return;
-    }
-    setError(undefined);
-    // 尚未串接電子報後端，先誠實告知
-    toast({ tone: "info", title: t("電子報即將開放", "Newsletter coming soon"), description: t("目前可先登入並開啟推播，第一時間收到優惠通知。", "Sign in and turn on push notifications to hear about deals first.") });
-    setEmail("");
-  }
-  return (
-    <section className="lp-section lp-newsletter" aria-labelledby="lp-newsletter-title">
-      <IconBox size="lg"><Mail /></IconBox>
-      <h2 id="lp-newsletter-title" className="lp-h3 lp-center">{t("訂閱新菜單與早鳥優惠", "Get new menus and early-bird deals")}<br />{t("好康不漏接", "straight to your inbox")}</h2>
-      <form className="lp-newsletter__form" onSubmit={onSubmit} noValidate>
-        <Input
-          aria-label="Email"
-          type="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={error}
-          containerClassName="lp-newsletter__input"
-        />
-        <Button type="submit" className="lp-pill">{t("立即訂閱", "Subscribe")}</Button>
-      </form>
-    </section>
-  );
-}
-
 function LandingContent() {
   const { t, lang, isEn } = useI18n();
   // 招牌餐點：真實 menu_items（上架中），依 category 分頁，品項最多的分類排前面
@@ -225,8 +199,6 @@ function LandingContent() {
     staleTime: 15 * 60 * 1000,
   });
 
-  // 頁尾取餐時段：所有合作店家設定的時段聯集（商家後台店家設定頁維護）
-  const pickupWindows = [...new Set(vendors.flatMap((v) => vendorWindows(v)))].sort();
 
   const { data: allReviews = [] } = useReviews();
   const reviews = allReviews.filter((x) => x.comment.trim() && x.rating >= 4).slice(0, REVIEW_LIMIT);
@@ -451,40 +423,32 @@ function LandingContent() {
             <p className="lp-muted lp-center">{t("合作店家陸續上線中，", "More partner vendors are joining soon — ")}<Link href="/vendors" className="lp-link">{t("查看店家列表", "see the vendor list")}</Link>{t("。", ".")}</p>
           )}
         </section>
-
-        <Newsletter />
       </main>
 
       {/* ── Footer ── */}
       <footer className="lp-container lp-footer">
-        <div className="lp-footer__info">
-          <Link href="/landing" className="lp-logo" aria-label={t("BunnBaa 飯飽 首頁", "BunnBaa home")}>
-            <img src="/飯飽R.png" alt="" width={44} height={39} />
-            <span className="lp-logo__word"><span className="lp-logo__bunn">Bunn</span><span className="lp-logo__baa">Baa</span></span>
-          </Link>
-          <div>
-            <h2 className="lp-h4"><Clock aria-hidden="true" className="lp-inline-icon" /> {t("取餐時段", "Pickup times")}</h2>
-            <ul className="lp-muted lp-footer__hours">
-              {pickupWindows.map((t) => <li key={t}>{slotLabel(t)}</li>)}
-              <li>{t("實際時段與公休日依各店家設定。", "Actual times and closing days are set by each vendor.")}</li>
-            </ul>
+        <div className="lp-footer__grid">
+          <div className="lp-footer__brand">
+            <span className="lp-logo">
+              <span className="lp-logo__word"><span className="lp-logo__bunn">Bunn</span><span className="lp-logo__baa">Baa</span></span>
+            </span>
+            <p className="lp-muted">{t("赫滋與羊國際藝術有限公司", "Herz & Baa International Arts Co., Ltd.")}</p>
+            <a href={`mailto:${PLATFORM_CONTACT_EMAIL}`} className="lp-muted lp-footer__email">{PLATFORM_CONTACT_EMAIL}</a>
           </div>
+          {FOOTER_COLUMNS.map((col) => (
+            <nav key={pick(col.title, "en")} className="lp-footer__col" aria-label={pick(col.title, lang)}>
+              <h2 className="lp-footer__col-title">{pick(col.title, lang)}</h2>
+              <ul>
+                {col.links.map((n) => (
+                  <li key={n.href}><Link href={n.href}>{pick(n.label, lang)}</Link></li>
+                ))}
+              </ul>
+            </nav>
+          ))}
+        </div>
+        <div className="lp-footer__bottom">
           <p className="lp-caption">© {new Date().getFullYear()} {t("BunnBaa 飯飽・越早訂，越開心。", "BunnBaa · Book early, eat happy.")}</p>
         </div>
-        <nav className="lp-footer__links" aria-label={t("頁尾連結", "Footer links")}>
-          <h2 className="lp-h4">{t("頁面連結", "Pages")}</h2>
-          <ul>
-            {[
-              ...NAV,
-              { href: "/cart", label: { zh: "購物車", en: "Cart" } },
-              { href: "/profile", label: { zh: "會員資料", en: "My account" } },
-              { href: "/login", label: { zh: "登入／註冊", en: "Sign in / Sign up" } },
-              { href: "/vendor-portal/dashboard", label: { zh: "商家後台", en: "Vendor portal" } },
-            ].map((n) => (
-              <li key={n.href}><Link href={n.href} className={n.href === "/landing" ? "is-active" : undefined}>{pick(n.label, lang)}</Link></li>
-            ))}
-          </ul>
-        </nav>
       </footer>
     </div>
   );

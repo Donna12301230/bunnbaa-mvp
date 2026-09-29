@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
   Search, Globe, User, ChevronDown, ClipboardList, Repeat,
-  CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart, House,
+  CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { logout } from "@/lib/auth";
@@ -65,7 +65,6 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
   });
 
   const navItems: NavItem[] = [
-    { tab: "landing", href: "/landing", label: t("首頁", "Home"), icon: House },
     { tab: "plans", href: "/home", label: t("預購餐點", "Pre-order"), icon: ClipboardList },
     { tab: "transfer", href: "/marketplace", label: t("轉讓市集", "Transfers"), icon: Repeat },
     isVendor
@@ -94,9 +93,12 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
 
         <img
           src="/飯飽wordR.png"
-          alt="飯飽BunnBaa"
+          alt={t("首頁", "Home")}
+          role="button"
+          tabIndex={0}
           className="h-8 shrink-0 cursor-pointer"
-          onClick={() => navigate("/home")}
+          onClick={() => navigate("/landing")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") navigate("/landing"); }}
         />
 
         <nav className="hidden md:flex items-center gap-6 shrink-0">

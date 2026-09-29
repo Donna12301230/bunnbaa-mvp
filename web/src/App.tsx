@@ -27,6 +27,10 @@ import CartPage from "./pages/CartPage";
 import VendorListPage from "./pages/VendorListPage";
 import VendorPage from "./pages/VendorPage";
 import MenuItemPage from "./pages/MenuItemPage";
+import AboutPage from "./pages/AboutPage";
+import ContactPage from "./pages/ContactPage";
+import FaqPage from "./pages/FaqPage";
+import JoinUsPage from "./pages/JoinUsPage";
 import CustomerLayout from "./components/CustomerLayout";
 import { RequireVendorSignIn } from "./components/RequireRealAdmin";
 import AdminVendorsPage from "./pages/admin/AdminVendorsPage";
@@ -75,11 +79,12 @@ function useSyncUserLang(lang: "zh" | "en") {
   }, [user?.id, user?.lang, lang]);
 }
 
-// 根路徑跟來源專案一致：未登入顯示登入頁、已登入顯示首頁
+// 根路徑：不管有沒有登入都先看品牌形象頁 LandingPage（不是訂購用的
+// HomePage——LandingPage 自己的頁尾／MarketplaceHeader 都把 /landing 標成
+// 「首頁」、/home 標成「今日菜單」）。瀏覽本來就不用登入，登入從
+// LandingPage 上的「登入／註冊」按鈕自己點，/login 路由本身沒有動。
 function RootGate() {
-  const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading) return null;
-  return isAuthenticated ? <HomePage /> : <LoginPage />;
+  return <Suspense fallback={null}><LandingPage /></Suspense>;
 }
 
 export default function App() {
@@ -149,6 +154,18 @@ export default function App() {
           </Route>
           <Route path="/item/:id">
             <MarketplacePage><CustomerLayout><MenuItemPage /></CustomerLayout></MarketplacePage>
+          </Route>
+          <Route path="/about">
+            <MarketplacePage><AboutPage /></MarketplacePage>
+          </Route>
+          <Route path="/contact">
+            <MarketplacePage><ContactPage /></MarketplacePage>
+          </Route>
+          <Route path="/faq">
+            <MarketplacePage><FaqPage /></MarketplacePage>
+          </Route>
+          <Route path="/join">
+            <MarketplacePage><JoinUsPage /></MarketplacePage>
           </Route>
           <Route path="/admin/vendors">
             <MarketplacePage><AdminVendorsPage /></MarketplacePage>
