@@ -43,9 +43,9 @@
 - [ ] 撥款排程：`settleVendorPayouts`＋手動觸發（emulator 已驗證重複點擊不會重複結算）
 - [ ] 成長獎勵抽獎：`drawGrowthReward`（2026-09-24 修：消費者首頁原本讀 `payouts` 判斷是否解鎖，但 `payouts` 只限管理員／店主讀，消費者永遠看不到抽獎。改成讀公開的 `growth_rewards.unlocked_milestones`，由撥款結算的 `syncGrowthUnlock` 寫入、只有門檻 id 不含金額。**部署 Functions 後要跑一次** `triggerSettlementNow`（或等當天 20:00 排程）把正式站的解鎖狀態補上，不然首頁還是顯示未解鎖）
 - [ ] 我的鎖定頁：`MyLocksPage.tsx`（`/my-locks`）
-- [ ] 取餐提醒推播：`pickupReminders`／`triggerPickupRemindersNow`
-- [ ] 商家校準報告＋what-if 追問：`dailyCalibration`／`askCalibrationScenario`，以及 `reliability_tone` 自動換算
-- [ ] 到 Firestore Console 確認 `admin_audit_logs` 有 2026-09-21 煙霧測試產生的兩筆（含 `admin_email` 與狀態變化）
+- [ ] 取餐提醒推播：`pickupReminders`／`triggerPickupRemindersNow`（SU，**驗證延到 10/10 後**）
+- [ ] 商家校準報告＋what-if 追問：`dailyCalibration`／`askCalibrationScenario`，以及 `reliability_tone` 自動換算（SU，**驗證延到 10/10 後**）
+- [-] ~~到 Firestore Console 確認 `admin_audit_logs` 有 2026-09-21 煙霧測試產生的兩筆~~——2026-09-29 撤掉，早就過時：這幾天核銷、核准申訴等測試已經寫進去更多筆（例如 9/28 的 `approve_ban_appeal`），`admin_audit_logs` 機制本身已經間接驗證過很多次，不用再特地去對那兩筆舊的
 - [ ] **別家商家帳號呼叫 `markLockOutcome` 要回 `permission-denied`**（QR 核銷步驟 5 最後一項）：正式站目前只有仁和雅綁了店主。等第二家商家綁定後，用那家店主帳號開 `/lock/vendor/redeem` 查仁和雅的取餐編號，或直接呼叫 `markLockOutcome`。為避免擋不住時改到真實資料，挑一筆已經 `fulfilled` 的仁和雅鎖定來打（例：`F1S63VpLVZqDxVTvdHp0`／`XVTVDHP0`）：權限檢查排在狀態檢查之前，擋得住回 403，擋不住只會回 `failed-precondition` 不寫入。**注意：這項不能用相機掃碼測**——掃到別家店的碼前端就先擋掉，不會呼叫到 `markLockOutcome`，要用手動輸入末 8 碼或直接呼叫
 - [ ] **QR 相機掃碼**（2026-09-28 新增 `QrScannerDialog.tsx`，目前只過了 `tsc`＋`vite build`）：§2 部署 hosting 後用手機實測。前置：正式站是 HTTPS（相機必要條件）。步驟：
   1. 消費者手機開 `/my-bookings` →「使用」顯示 QR
@@ -75,7 +75,7 @@
 
 ### 6. 尚未實作的功能
 
-- [V] **手機門號 OTP 登入**（`LoginPage.tsx`，草圖 `Login.dc.html` 兩段式流程）——2026-09-25 完成：登入分頁新增「改用手機門號登入」，輸入號碼→`sendOtp()`送簡訊驗證碼→輸入驗證碼→`confirmOtp()`登入（`web/src/lib/auth.ts`，用 Firebase Phone Auth + 隱形 reCAPTCHA）。沒有 email 時 `resolveProfile()` 改用門號當 username／displayName，角色判斷不受影響（管理員＝email 白名單，門號登入者一律是會員或已綁定的廠商）。順便修正 CSP：加放 `www.google.com`／`recaptcha.net` 的 script／frame，不然 reCAPTCHA 之後會被擋（`firebase.json`）。2026-09-25 已在 Console 啟用「電話號碼」登入並部署。**還沒驗證**：要在正式站用真手機號碼實際收一次簡訊登入（本機/emulator 的 reCAPTCHA 常會失敗，不建議在本機測）
+- [V] **手機門號 OTP 登入**（`LoginPage.tsx`，草圖 `Login.dc.html` 兩段式流程）——2026-09-25 完成：登入分頁新增「改用手機門號登入」，輸入號碼→`sendOtp()`送簡訊驗證碼→輸入驗證碼→`confirmOtp()`登入（`web/src/lib/auth.ts`，用 Firebase Phone Auth + 隱形 reCAPTCHA）。沒有 email 時 `resolveProfile()` 改用門號當 username／displayName，角色判斷不受影響（管理員＝email 白名單，門號登入者一律是會員或已綁定的廠商）。順便修正 CSP：加放 `www.google.com`／`recaptcha.net` 的 script／frame，不然 reCAPTCHA 之後會被擋（`firebase.json`）。2026-09-25 已在 Console 啟用「電話號碼」登入並部署。**還沒驗證**：要在正式站用真手機號碼實際收一次簡訊登入（本機/emulator 的 reCAPTCHA 常會失敗，不建議在本機測）。**驗證延到 10/10 後（SU）**
 - [V] 2026-09-24 決定**不再使用匿名登入**：瀏覽不用登入，但鎖定／下單／購物車結帳／轉讓接手／抽獎都要先登入（前端 `useRequireLogin`、`firestore.rules` `isSignedInUser()`、Functions `assertSignedInUser()` 三層都擋）。舊的匿名帳號跟它們名下的鎖定紀錄**不搬移、不保留**
 - [V] 到 Firebase Console → Authentication → Sign-in method 把「匿名」停用——2026-09-25 完成
 - [V] **從商家點餐沒有取餐日期／時段**——2026-09-25 完成並部署、正式站驗證通過：購物車結帳前選日期＋時段（`components/PickupPicker.tsx`，今天已開始的時段不能選、最遠 30 天），列出訂單明細（商家、地點、時間、早鳥價、備註、總計），商品備註改成真的寫進 `locks.note` 並顯示在商家核對取餐頁。同時段已有「已鎖定」訂單只**提醒不擋**（`hooks/useSlotConflicts.ts`，首頁也有）。**價格改由伺服器從 `menu_items` 重算**（`functions/src/pricing.js`），原本前端送什麼價格就收什麼。`createLinePayReservation`／`createCartLinePayReservation` 參數改了（改送 `menu_item_id`＋`pickup_date`＋`pickup_window`），之後改這兩支 Function 都要跟 hosting 一起部署
@@ -207,17 +207,19 @@
 
 ### SU 負責
 
+**2026-09-29 決定：剩下的都是「去正式站點一遍確認能動」性質的驗證工作，不是新功能，10/10 之後再一次做完**（校準報告、FCM 推播、OTP 真機收簡訊）。
+
 | 模組 | 狀態 | 備註 |
 |---|---|---|
 | 商家清單／商家頁 | ✅ | `VendorListPage.tsx`／`VendorPage.tsx`，已改讀真實 `vendors` |
 | 商品列表／詳情頁 | ✅ | `VendorPage.tsx`／`MenuItemPage.tsx`，已改讀真實 `menu_items` |
 | 管理員後台 | ✅ | 訂單總覽／撥款總覽／系統設定／解封申訴／廠商管理（申請審核＋`owner_uid` 綁定）都接真 Firestore |
-| 權限控管／Firestore 安全規則 | ✅ | `firestore.rules`，新規則待部署（待辦 §2） |
-| 商家後台儀表板 | 🟡 | 含撥款區塊＋手動觸發按鈕；需要綁定 `owner_uid` |
-| 商家校準報告呈現（含 what-if 追問） | 🟡 | Gemini Key 已到位，待部署後在正式站驗證 |
-| 通知系統（FCM） | 🟡 | 同 Donna「取餐提醒推播」 |
-| 會員／身分驗證（手機門號 OTP） | 🟡 | Email＋密碼、OTP 兩種都已接真實 Firebase Auth；OTP 待 Console 手動啟用＋部署後在正式站驗證，見待辦 §6 |
-| ISO27001 | 🟡 | 技術面已修補並部署；ISMS 管理制度文件 v1 已完成；剩餘項目（CSP 改強制、2FA、API key referrer、Audit Logs、branch protection）見待辦 §5 |
+| 權限控管／Firestore 安全規則 | ✅ | `firestore.rules`，2026-09-25 起已部署 |
+| 商家後台儀表板 | ✅ | 含撥款區塊＋手動觸發按鈕；仁和雅已綁定店主帳號，2026-09-25 正式站驗證過 |
+| 商家校準報告呈現（含 what-if 追問） | 🟡 | 程式碼＋Gemini Key 都已到位並部署，**正式站驗證延到 10/10 後** |
+| 通知系統（FCM） | 🟡 | 同 Donna「取餐提醒推播」，已部署，**正式站真機驗證延到 10/10 後** |
+| 會員／身分驗證（手機門號 OTP） | 🟡 | Email＋密碼、OTP 兩種都已接真實 Firebase Auth 並部署，**真手機收簡訊驗證延到 10/10 後** |
+| ISO27001 | 🟡 | 技術面已修補並部署；ISMS 管理制度文件 v1 已完成；剩餘項目（CSP 改強制、2FA、API key referrer、Audit Logs、branch protection）見待辦 §5，多數要等雅婷回覆或長期觀察，非 SU 能單獨推進 |
 
 ---
 
