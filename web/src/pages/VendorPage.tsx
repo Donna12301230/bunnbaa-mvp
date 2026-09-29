@@ -108,42 +108,41 @@ export default function VendorPage() {
         <ArrowLeft className="w-4 h-4" /> {tr("回商家清單", "Back to vendors")}
       </Link>
 
-      <div className="bg-white rounded-xl border border-border p-5">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {vendor.cover_image ? (
-            <img src={vendor.cover_image} alt="" className="w-full sm:w-32 h-32 rounded-lg object-cover shrink-0" />
-          ) : (
-            <div className="w-full sm:w-32 h-32 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center shrink-0">
-              <Store className="h-12 w-12 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
-            </div>
+      <div>
+        {vendor.cover_image ? (
+          <img src={vendor.cover_image} alt="" className="w-full h-40 sm:h-48 rounded-xl object-cover" />
+        ) : (
+          <div className="w-full h-40 sm:h-48 rounded-xl bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+            <Store className="h-12 w-12 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+          </div>
+        )}
+
+        <div className="mt-4">
+          <h1 className="text-xl font-bold mb-1">{loc(vendor, "name")}</h1>
+          {rating && (
+            <span className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-1.5">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <span className="font-medium text-foreground">{rating.average}</span>
+              ({rating.count}+)
+            </span>
           )}
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold mb-1">{loc(vendor, "name")}</h1>
-            {rating && (
-              <span className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-1.5">
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                <span className="font-medium text-foreground">{rating.average}</span>
-                ({rating.count}+)
+          {vendor.description && <p className="text-sm text-muted-foreground mb-3">{loc(vendor, "description")}</p>}
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+            {vendor.address && (
+              <span className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 shrink-0" /> {vendor.address}
               </span>
             )}
-            {vendor.description && <p className="text-sm text-muted-foreground mb-3">{loc(vendor, "description")}</p>}
-            <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-              {vendor.address && (
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 shrink-0" /> {vendor.address}
-                </span>
-              )}
-              {vendor.phone && (
-                <span className="flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 shrink-0" /> {vendor.phone}
-                </span>
-              )}
-            </div>
+            {vendor.phone && (
+              <span className="flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 shrink-0" /> {vendor.phone}
+              </span>
+            )}
           </div>
         </div>
 
         {vendor.phone && (
-          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 mt-4">
+          <div className="flex items-start gap-2 bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-800 mt-4">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
               {tr(`如有餐點變動，請致電 ${vendor.phone} 確認！`, `If your order changes, please call ${vendor.phone} to confirm.`)}
