@@ -500,13 +500,12 @@
 .lp-store--skeleton { min-height: 420px; background: var(--skeleton-base); border-color: transparent; }
 
 /* ── Footer ──
-   淺一點的深咖啡色底（--lp-deep 混白色系的 --brand-orange-tint），跟頁面主體
-   的淺色背景拉出區隔，文字全部改用深咖啡色系，不再用純白字（之前是深咖啡底
-   配白字，這次底色變淺，白字對比不夠）。*/
+   深咖啡底（--lp-deep）配米黃字＋橘色強調，字重加粗，參照品牌故事區的配色。*/
 .lp-footer {
-  --lp-footer-bg: color-mix(in srgb, var(--lp-deep) 35%, var(--brand-orange-tint));
-  --lp-footer-text: color-mix(in srgb, var(--lp-deep) 78%, white);
-  --lp-footer-line: color-mix(in srgb, var(--lp-deep) 32%, transparent);
+  --lp-footer-bg: var(--lp-deep);
+  --lp-footer-heading: #fbead0;
+  --lp-footer-text: #e9cfa8;
+  --lp-footer-line: color-mix(in srgb, white 22%, transparent);
   margin-top: var(--space-6);
   margin-bottom: var(--space-10);
   padding: var(--space-10) var(--space-6) var(--space-8);
@@ -524,8 +523,10 @@
   .lp-footer__grid { grid-template-columns: 2fr repeat(2, 1fr); }
 }
 .lp-footer__brand { display: grid; gap: var(--space-3); align-content: start; }
+.lp-footer__brand .lp-logo__bunn { color: var(--lp-footer-heading); font-weight: 700; }
 .lp-footer__brand .lp-muted { color: var(--lp-footer-text); }
 .lp-footer__email { display: block; }
+.lp-footer__email:hover { color: var(--brand-orange); }
 .lp-footer__col-title {
   margin: 0 0 var(--space-3);
   padding-bottom: var(--space-2);
@@ -534,10 +535,10 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--lp-deep);
+  color: var(--lp-footer-heading);
 }
 .lp-footer__col ul { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.lp-footer__col a { color: var(--lp-footer-text); }
+.lp-footer__col a { color: var(--lp-footer-text); font-weight: 500; }
 .lp-footer__col a:hover { color: var(--brand-orange); text-decoration: underline; }
 .lp-footer__bottom { margin-top: var(--space-10); padding-top: var(--space-6); border-top: 1px solid var(--lp-footer-line); }
 .lp-footer__bottom .lp-caption { color: var(--lp-footer-text); }
