@@ -154,8 +154,11 @@ export default function VendorPage() {
                         href={`/item/${item.id}`}
                         className="block bg-white rounded-xl border border-border p-4 shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
+                        <div className="flex items-start gap-3">
+                          {item.image && (
+                            <img src={item.image} alt="" loading="lazy" className="w-16 h-16 rounded-lg object-cover shrink-0" />
+                          )}
+                          <div className="min-w-0 flex-1">
                             <h3 className="font-semibold text-sm mb-0.5 truncate">{loc(item, "name")}</h3>
                             <p className="text-xs text-muted-foreground line-clamp-2">{loc(item, "description")}</p>
                           </div>

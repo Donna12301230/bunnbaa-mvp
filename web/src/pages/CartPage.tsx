@@ -140,9 +140,13 @@ export default function CartPage() {
             <div className="bg-white rounded-xl border border-border divide-y divide-border">
               {lines.map(({ menuItem, quantity, note, unitPrice }) => (
                 <div key={`${menuItem.id}-${note}`} className="p-4 flex items-start gap-3">
-                  <div className="w-14 h-14 shrink-0 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
-                    <UtensilsCrossed className="h-6 w-6 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
-                  </div>
+                  {menuItem.image ? (
+                    <img src={menuItem.image} alt="" className="w-14 h-14 shrink-0 rounded-lg object-cover" />
+                  ) : (
+                    <div className="w-14 h-14 shrink-0 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                      <UtensilsCrossed className="h-6 w-6 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm">{loc(menuItem, "name")}</p>
                     {note && <p className="text-xs text-muted-foreground mt-0.5">{tr("備註：", "Note: ")}{note}</p>}

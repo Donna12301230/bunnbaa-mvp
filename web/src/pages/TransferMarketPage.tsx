@@ -13,6 +13,7 @@ import { isClean } from "@/lib/searchFilter";
 import { takeOverLock } from "@/lib/transfers";
 import type { Lock } from "@/types";
 import { useVendors } from "@/hooks/useVendors";
+import { useItemImages } from "@/hooks/useItemImages";
 import { useSelectedArea, vendorInArea } from "@/lib/location";
 import { tr, loc } from "@/lib/i18n";
 import { EmptyState, Tag } from "@/components/ds";
@@ -56,6 +57,7 @@ export default function TransferMarketPage() {
   const [now, setNow] = useState(() => Date.now());
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const { data: vendors = [] } = useVendors();
+  const imageOf = useItemImages();
   const vendorName = (id: string) => loc(vendors.find((v) => v.id === id), "name");
 
   useEffect(() => {
@@ -223,7 +225,11 @@ export default function TransferMarketPage() {
                   return (
                     <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
                       <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                        {imageOf(item) ? (
+                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      ) : (
                         <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                      )}
                         {deadline && (
                           <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-rice text-rice-foreground">
                             <Clock className="w-3 h-3" /> {formatCountdown(deadline, now)}
@@ -265,7 +271,11 @@ export default function TransferMarketPage() {
                 {expiredListings.map(item => (
                   <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
                     <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
-                      <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                      {imageOf(item) ? (
+                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      ) : (
+                        <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                      )}
                       <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-rice text-rice-foreground">
                         {tr("已逾期・開放中", "Expired · open")}
                       </span>
@@ -312,7 +322,11 @@ export default function TransferMarketPage() {
                 {myListings.map(item => (
                   <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
                     <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
-                      <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                      {imageOf(item) ? (
+                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      ) : (
+                        <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                      )}
                       <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
                         {tr("轉讓中", "Listed")}
                       </span>
@@ -352,7 +366,11 @@ export default function TransferMarketPage() {
                 {handedOver.map(item => (
                   <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
                     <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
-                      <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                      {imageOf(item) ? (
+                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      ) : (
+                        <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                      )}
                       <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-gray-200 text-gray-700">
                         {tr("已被接手", "Taken over")}
                       </span>

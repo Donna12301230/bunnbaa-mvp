@@ -453,7 +453,11 @@ export default function HomePage() {
                 return (
                   <article key={item.id} className="bg-card rounded-2xl border border-ink overflow-hidden flex flex-col">
                     <div className="relative h-32 bg-secondary border-b border-ink flex items-center justify-center">
-                      <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/70" strokeWidth={1.75} aria-hidden="true" />
+                      {item.image ? (
+                        <img src={item.image} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      ) : (
+                        <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/70" strokeWidth={1.75} aria-hidden="true" />
+                      )}
                       {vendor.verified && (
                         <span className="absolute top-2.5 left-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-card text-foreground border border-ink">
                           <BadgeCheck className="w-3 h-3" /> {t("認證商家", "Verified")}
@@ -625,9 +629,13 @@ export default function HomePage() {
                 <div key={group.vendorId} className="bg-accent rounded-3xl border border-ink p-5 grid grid-cols-1 md:grid-cols-[220px_1fr_1fr] gap-4">
                   {/* 店家資訊 */}
                   <Link href={`/vendor/${group.vendorId}`} className="flex md:flex-col gap-3 hover:opacity-90">
-                    <div className="w-20 h-20 md:w-full md:h-32 rounded-2xl bg-secondary border border-ink flex items-center justify-center shrink-0">
-                      <Store className="h-8 w-8 text-secondary-foreground/70" strokeWidth={1.75} aria-hidden="true" />
-                    </div>
+                    {group.vendor.cover_image ? (
+                      <img src={group.vendor.cover_image} alt="" loading="lazy" className="w-20 h-20 md:w-full md:h-32 rounded-2xl border border-ink object-cover shrink-0" />
+                    ) : (
+                      <div className="w-20 h-20 md:w-full md:h-32 rounded-2xl bg-secondary border border-ink flex items-center justify-center shrink-0">
+                        <Store className="h-8 w-8 text-secondary-foreground/70" strokeWidth={1.75} aria-hidden="true" />
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="font-heading text-h3 mb-1 truncate">{loc(group.vendor, "name")}</p>
                       {group.plans.map(p => (

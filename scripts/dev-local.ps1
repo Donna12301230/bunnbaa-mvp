@@ -79,6 +79,11 @@ if (-not $hasExport) {
   if ($LASTEXITCODE -ne 0) {
     Write-Host "種子資料沒有灌入（若訊息是 locks already exist 代表已經有資料，可忽略）。" -ForegroundColor Yellow
   }
+  # 20 家商家 × 10–20 品項＋100 位會員的訂單（疊在 seed.js 之上）
+  node (Join-Path $repo "scripts\seed-scale.js")
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "擴充種子資料沒有灌入（若訊息是 seed-user-001 already exists 代表已經有資料，可忽略）。" -ForegroundColor Yellow
+  }
 } else {
   Write-Host "沿用上次存檔的 emulator 資料（要重灌請加 -Reset）" -ForegroundColor Green
 }

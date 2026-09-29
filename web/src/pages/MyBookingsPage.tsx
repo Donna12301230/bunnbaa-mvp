@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, documentId, getDocs, limit, onSnapshot, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
+import { useItemImages } from "@/hooks/useItemImages";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
@@ -114,6 +115,7 @@ export default function MyBookingsPage() {
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
   const uid = user?.id ?? null;
+  const imageOf = useItemImages();
   const [locks, setLocks] = useState<Lock[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
@@ -303,6 +305,9 @@ export default function MyBookingsPage() {
 
     return (
       <article className="bg-card border border-border rounded-lg shadow-sm p-4 flex flex-col gap-2 max-w-sm">
+                      {imageOf(lock) && (
+                        <img src={imageOf(lock)} alt="" loading="lazy" className="-mx-4 -mt-4 mb-1 h-28 w-[calc(100%+2rem)] max-w-none rounded-t-lg object-cover" />
+                      )}
                       <Badge variant="muted" className={`self-start ${statusInfo.className}`}>
                         {statusInfo.label}
                       </Badge>

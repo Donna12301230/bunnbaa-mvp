@@ -78,9 +78,13 @@ export default function MenuItemPage() {
       </Link>
 
       <div className="bg-white rounded-xl border border-border overflow-hidden">
-        <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
-          <UtensilsCrossed className="h-14 w-14 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
-        </div>
+        {item.image ? (
+          <img src={item.image} alt={loc(item, "name")} className="w-full h-48 sm:h-64 object-cover" />
+        ) : (
+          <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+            <UtensilsCrossed className="h-14 w-14 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+          </div>
+        )}
         <div className="p-5 space-y-4">
           <div>
             <h1 className="text-xl font-bold mb-1">{loc(item, "name")}</h1>

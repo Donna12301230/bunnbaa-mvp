@@ -4,7 +4,7 @@
 
 對應文件：`BunnBaa_0到1架構文件.docx`（唯一權威文件）、`BunnBaa_技術規格文件_v6_消費者端補強版.docx`（都在 repo 根目錄）。舊雛型：`../BunnBaa Parse_Ref/`。架構與開發設定見 [README.md](README.md)。舊版詳細紀錄（每項的來龍去脈、測試過程）請看 git 歷史 `26469e2` 以前的 TODO.md。
 
-正式站：https://bunnbaa-mvp-5474.web.app ｜ 目前正式站版本：`Donna` 分支 `2e1a59b`（2026-09-28 部署 rules、Functions 21 支、hosting）
+正式站：https://bunnbaa-mvp-5474.web.app ｜ 目前正式站版本：`Donna` 分支 `e50e527`（2026-09-29 部署 `markLockOutcome`＋hosting；rules 與其他 Functions 仍是 09-28 的 `2e1a59b`）
 
 ---
 
@@ -25,9 +25,9 @@
 - [ ] 撰寫英文版 Proposal
 
 ### 正式站驗證（程式碼已部署，還沒在正式站實際點過）
-- [ ] **「加入計畫」走 LINE Pay**：會員按「預約加入計畫」→ 選第一天＋時段（預覽要跳過公休日）→ 勾聲明 → LINE Pay Sandbox 付款 → 付款成功頁出現 N 張 QR → `/my-bookings` 看到 N 筆、`plan_id` 相同。負面：把某天訂滿，要被擋並說明哪一天額滿
-- [ ] **「加入計畫」被封鎖時的白話提示**：封鎖測試會員後按「預約加入計畫」，要看到「您的帳號因多次未取餐已被限制下單…」，不是 `Missing or insufficient permissions.`
-- [ ] **QR 相機掃碼**（`QrScannerDialog.tsx`，只過 `tsc`＋`build`；先確認已隨 hosting 上線，`firebase.json` 要是 `camera=(self)`）：
+- [ ] **「加入計畫」走 LINE Pay**：會員按「預約加入計畫」→ 選第一天＋時段（預覽要跳過公休日；09-29 看過對話框能開，但 5 家商家都沒設公休／週休，要先幫一家設公休日才測得到）→ 勾聲明 → LINE Pay Sandbox 付款 → 付款成功頁出現 N 張 QR → `/my-bookings` 看到 N 筆、`plan_id` 相同。負面：把某天訂滿，要被擋並說明哪一天額滿
+- [ ] **「加入計畫」被封鎖時的白話提示**：封鎖測試會員後按「預約加入計畫」（`customer@bunnbaa.test` 申訴已核准、目前沒被封鎖，要重新封鎖才測得到），要看到「您的帳號因多次未取餐已被限制下單…」，不是 `Missing or insufficient permissions.`
+- [ ] **QR 相機掃碼**（`QrScannerDialog.tsx`，只過 `tsc`＋`build`；09-29 已確認正式站 header 是 `camera=(self)`）：
   1. 消費者手機 `/my-bookings` →「使用」顯示 QR
   2. 店主用另一支手機開 `/lock/vendor/redeem` →「用相機掃描 QR Code」，iPhone Safari＋Android Chrome 各試一次
   3. 掃到後自動帶入末 8 碼 → 「確認取餐」成功；付款成功頁的 QR 也掃一次
@@ -35,9 +35,10 @@
 - [ ] **購物車跨店結帳**：用非仁和雅的品項走一次購物車，到 Firestore 確認 `locks.vendor_id` 是正確商家
 - [ ] 撥款排程：`settleVendorPayouts`＋手動觸發
 - [ ] 成長獎勵抽獎：先跑一次 `triggerSettlementNow`（或等 20:00 排程）補上 `growth_rewards.unlocked_milestones`，再測 `drawGrowthReward`
-- [ ] 我的鎖定頁 `/my-locks`（`MyLocksPage.tsx`）
-- [ ] 評分：`/my-bookings` 已取餐的餐點打分 → 首頁計畫評分、Landing 評價出現；同一筆再評要被擋
-- [ ] 商家頁（`/vendor/:id`）手機版面：分類標籤列在真手機／裝置模式下看一次
+- [x] 我的鎖定頁 `/my-locks`（`MyLocksPage.tsx`）：09-29 正式站正常顯示、console 無錯誤。小問題：列表沒照日期排序；9/24 的 $0 抽獎單過了取餐日仍是「已鎖定」
+- [ ] 評分（09-29 確認 9/25 已取餐那筆有「評分／留下回饋」、表單正常，還沒送出）：`/my-bookings` 已取餐的餐點打分 → 首頁計畫評分、Landing 評價出現；同一筆再評要被擋
+- [ ] 商家頁（`/vendor/:id`）手機版面：分類標籤列在真手機／裝置模式下看一次（仁和雅只有「便當」一個分類，要挑多分類的店）
+- [ ] **提前登記未取餐要被擋**（`e50e527`）：店主開 `/lock/vendor/redeem` 查明天的單，「登記未取餐」要是灰的、滑鼠移上去有提示；商家後台訂單列同樣。取餐時段結束後才可按
 
 ### 需要第二家商家綁店主才能測
 目前正式站只有仁和雅咖啡有店主帳號。綁法：廠商申請 → `/admin/vendors` 核准。
