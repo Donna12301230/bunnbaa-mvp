@@ -32,6 +32,7 @@ import ContactPage from "./pages/ContactPage";
 import FaqPage from "./pages/FaqPage";
 import JoinUsPage from "./pages/JoinUsPage";
 import CustomerLayout from "./components/CustomerLayout";
+import SiteFooter from "./components/SiteFooter";
 import { RequireVendorSignIn } from "./components/RequireRealAdmin";
 import AdminVendorsPage from "./pages/admin/AdminVendorsPage";
 import AdminAppealsPage from "./pages/admin/AdminAppealsPage";
@@ -67,8 +68,16 @@ function NotFound() {
   );
 }
 
+// 全站共用外框：所有路由都包在這裡，頁尾（SiteFooter）統一在這裡掛一次，
+// 頁面本身（含 CustomerLayout）不用各自處理。/landing 是唯一例外，因為
+// LandingPage 走獨立的 lazy Suspense 路由、不經過這層，自己掛了一份。
 function MarketplacePage({ children }: { children: React.ReactNode }) {
-  return <div className="font-sans antialiased bg-background text-foreground">{children}</div>;
+  return (
+    <div className="font-sans antialiased bg-background text-foreground">
+      {children}
+      <SiteFooter />
+    </div>
+  );
 }
 
 // 登入中的使用者把介面語言存進 users/{uid}.lang，排程推播（取餐提醒）才知道要用哪種語言。
@@ -106,8 +115,10 @@ export default function App() {
       <Router hook={useHashLocation} key={lang}>
         <Switch>
           {/* 根路徑：未登入 = 登入頁，已登入 = 首頁（與 bunnbaa.com 行為一致） */}
+          {/* 不包 MarketplacePage：RootGate 一律顯示 LandingPage，LandingPage 自己有 SiteFooter，
+              包了會變兩份頁尾（跟 /landing 路由一樣直接裸 Suspense） */}
           <Route path="/">
-            <MarketplacePage><RootGate /></MarketplacePage>
+            <RootGate />
           </Route>
 
           {/* 舊的單品鎖定示範頁（/lock、/lock/vendor）2026-09-30 拿掉：下單改走便當購物車，

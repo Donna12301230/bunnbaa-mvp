@@ -24,8 +24,8 @@ const VALUES = [
     icon: ShieldCheck,
     title: tr("履約有保障", "Guaranteed fulfilment"),
     body: tr(
-      "截單前免費取消；去不了可以轉讓或捐為愛心餐；每累計 100 元一張抽獎券，人人有獎。",
-      "Free cancellation before cutoff; transfer or donate if you can't make it; every NT$100 earns a reward ticket and everyone wins."
+      "截單前免費取消；去不了可以轉讓或捐為愛心餐；取餐時段結束前 30 分鐘還會提醒你，忘記取的話便當會轉給需要的人，不會白白浪費。店家若未如期出餐，全額退款並加贈 20 點回饋金；每累計 100 元一張抽獎券，人人有獎。",
+      "Free cancellation before cutoff; transfer or donate if you can't make it; we'll remind you 30 minutes before your pickup window ends, and if it's still unclaimed it goes to someone who needs it — nothing wasted. If a vendor doesn't serve on time, you get a full refund plus 20 reward points; every NT$100 you pay earns a reward ticket and everyone wins."
     ),
   },
 ];
