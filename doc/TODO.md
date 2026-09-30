@@ -8,15 +8,18 @@
 
 ---
 
-## 🆕 第一階段規格改版（`spec-phase1` 分支，2026-09-30，尚未部署）
+## 🆕 第一階段規格改版（`spec-phase1` 分支，2026-09-30，部署中）
 
 依 `doc/BunnBaa 飯飽｜第一階段技術規格.md` 改版，保留鎖定折扣＋轉讓＋LINE Pay（對照表見 README「第一階段規格」）。
 emulator 端對端測試已跑過：截單判定許願、備料清單／時間軸、QR 簽章與防截圖、備援取餐號、抽獎券累計、抽獎、截單前取消退券、捐愛心餐→預約→核銷、週／月叫貨單、區域洞察、開放許願、停班自動取消。**瀏覽器畫面還沒實際點過。**
 
+**2026-09-30 SU 補充**：master 這次 fast-forward 進來時，GitHub Actions 已經自動把前端 Hosting 部署上去了（推上 master 就會觸發，跟 Functions/rules 是分開的部署目標）——代表這段時間正式站是「新前端＋舊後端」不一致的狀態，直到下面 rules/indexes 補上為止才恢復一致。之後如果又要 merge 大改版到 master，最好先確認 Functions/rules 能不能一起跟上，不然會有同樣的空窗期。
+
 部署前要做：
-- [ ] `functions/.env` 加 `PICKUP_QR_SECRET`（隨機長字串，見 `.env.example`）
-- [ ] 部署 `firestore:rules,firestore:indexes,functions,hosting`（新增 16 個複合索引，建立需要幾分鐘）
-- [ ] 正式站灌 `node scripts/seed-phase1.js`（或 `--catalog-only` 只灌模板與配方）
+- [x] `functions/.env` 加 `PICKUP_QR_SECRET`：2026-09-30 SU 已產生一組隨機字串（64 碼 hex），**還沒真的寫進正式站的 `functions/.env`**——本機沒有 `GEMINI_API_KEY`／`LINE_PAY_*` 這幾把既有金鑰，等雅婷把完整 `.env` 補齊再一起部署 Functions，避免用不完整的 `.env` 部署把現有能動的翻譯／LINE Pay 洗掉
+- [x] 部署 `firestore:rules,firestore:indexes`：2026-09-30 SU 已部署完成（先審查過規則，沒發現安全漏洞，只有 `charityBans` 沒開放管理員讀取，但目前沒有前端頁面用到，不影響）；索引在背景建立，可能還要幾分鐘才會顯示為 Enabled
+- [ ] 部署 `functions,hosting`（hosting 其實已經在 master push 時自動上了；functions 卡在上面的金鑰，等雅婷）
+- [ ] 正式站灌 `node scripts/seed-phase1.js`（或 `--catalog-only` 只灌模板與配方）——需要服務帳號金鑰
 - [ ] Firebase Console 確認新排程都有啟用：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`（每 5–10 分）、`closeRewardPeriod`（週一 00:10）、`buildWeeklyPurchase`（週六 12:00）、`buildMonthlyPurchase`（25 日）、`pollDisasterFeeds`（每 15 分）
 - [ ] 舊的 `drawGrowthReward`、`markLockOutcome`、`createLinePayReservation`、`pickupReminders`、`triggerPickupRemindersNow` 已移除，部署時 CLI 會問要不要刪除雲端上的舊函式 → 選是
 
