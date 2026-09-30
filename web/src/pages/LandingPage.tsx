@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import {
   ArrowRight, BellRing, CakeSlice, CalendarClock, ChevronLeft, ChevronRight, Coffee,
-  CookingPot, Croissant, Info, MapPin, Repeat, Salad, Sandwich, ShieldCheck, Soup,
+  CookingPot, Croissant, MapPin, Repeat, Salad, Sandwich, ShieldCheck, Soup,
   Sparkle, Star, Store, Ticket,
 } from "lucide-react";
 import {
@@ -38,13 +38,6 @@ const TICKER: Bi[] = [
   { zh: "店家未出餐，全額退款再送 20 點", en: "Vendor didn't serve? Full refund plus 20 points" },
   { zh: "取餐前推播提醒，不怕忘記", en: "Push reminders before pickup" },
   { zh: "每 100 元一張抽獎券，人人有獎", en: "A reward ticket every NT$100 — everyone wins" },
-];
-
-const FEATURES: { icon: ReactNode; title: Bi; body: Bi }[] = [
-  { icon: <CalendarClock />, title: { zh: "越早訂越便宜", en: "Book early, pay less" }, body: { zh: "越早訂，越開心：訂明天 95 折，提前 2 天以上 8 折，可預訂到下週五。", en: "Book early, save more: 5% off for tomorrow, 20% off 2+ days ahead, up to next Friday." } },
-  { icon: <Repeat />, title: { zh: "去不了也不浪費", en: "Nothing goes to waste" }, body: { zh: "截單前免費取消；之後可轉讓給同學，或捐為愛心餐給需要的人。", en: "Cancel free before cutoff; after that, transfer it or donate it as a charity meal." } },
-  { icon: <ShieldCheck />, title: { zh: "履約有保障", en: "Guaranteed fulfilment" }, body: { zh: "店家若未如期出餐，全額退款並加贈 20 點回饋金。", en: "If the vendor doesn't serve on time, you get a full refund plus 20 reward points." } },
-  { icon: <BellRing />, title: { zh: "準時提醒取餐", en: "Pickup reminders" }, body: { zh: "取餐時段開始前推播通知，排隊時間留給自己。", en: "Get a push notification before your pickup window starts — no more queuing." } },
 ];
 
 // 早鳥最高折扣（預訂到下週五，看得到的階梯），跟 lib/pricing 同一套級距與四捨五入
@@ -198,41 +191,7 @@ function LandingContent() {
       <MarketplaceHeader active="landing" />
 
       <main>
-        {/* ── Hero ── */}
-        {/* 範例票券用第一道真實上架餐點，沒有餐點時不顯示票券 */}
-        <section className="lp-container lp-hero">
-          <h1 className="lp-display">{t("越早訂，越開心。", "Book early, eat happy.")}<br />{t("每一口都準時開飯", "Every meal, right on time")}</h1>
-          <p className="lp-lead">{t(`提前預付鎖定學校附近的好店午餐，享最高 ${(100 - BEST_EARLY_BIRD) / 10} 折早鳥價；時間到直接取餐，不用排隊。`, `Prepay and lock in lunch from great spots near campus with up to ${BEST_EARLY_BIRD}% early-bird savings — then just pick it up, no queue.`)}</p>
-          <div className="lp-hero__cta">
-            <LinkButton href="/home" variant="secondary" size="lg" rightIcon={<ArrowRight />}>{t("探索今日菜單", "Explore today's menu")}</LinkButton>
-          </div>
-
-          <div className="lp-hero__visual" aria-hidden="true">
-            <div className="lp-hero__glow" />
-            {heroItem && (
-              <div className="lp-ticket">
-                <div className="lp-ticket__top">
-                  <span className="lp-ticket__thumb"><CookingPot /></span>
-                  <div>
-                    <p className="lp-ticket__name">{loc(heroItem, "name")}</p>
-                    <p className="lp-ticket__meta">{[loc(heroVendor, "name"), heroWindow && slotLabel(heroWindow)].filter(Boolean).join("・")}</p>
-                  </div>
-                  <Badge tone="success" dot>{t("已鎖定", "Locked")}</Badge>
-                </div>
-                <div className="lp-ticket__price">
-                  <span className="lp-strike">NT$ {heroItem.price}</span>
-                  <span className="lp-ticket__now">NT$ {earlyBird(heroItem.price)}</span>
-                  <Badge tone="brand" variant="solid" shape="pill">{t(`早鳥 ${(100 - BEST_EARLY_BIRD) / 10} 折`, `Early bird −${BEST_EARLY_BIRD}%`)}</Badge>
-                </div>
-              </div>
-            )}
-            <div className="lp-float lp-float--a"><Ticket /> {t("可轉讓給同學", "Transferable to classmates")}</div>
-            <div className="lp-float lp-float--b"><BellRing /> {t("取餐前推播提醒", "Pickup reminder")}</div>
-            <div className="lp-float lp-float--c"><ShieldCheck /> {t("未出餐全額退", "Full refund if not served")}</div>
-          </div>
-        </section>
-
-        {/* ── 品牌故事 ── */}
+        {/* ── 品牌故事（2026-09-30 移到最上面，第一眼先看品牌訴求，Hero 的探索按鈕跟著往下） ── */}
         <section className="lp-story" aria-labelledby="lp-story-title">
           <div className="lp-container lp-story__inner">
             <img src="/飯飽R.png" alt="" className="lp-story__mark" width={72} height={64} />
@@ -266,26 +225,37 @@ function LandingContent() {
           </div>
         </div>
 
-        {/* ── 特色 ── */}
-        <section className="lp-section lp-container lp-features" aria-labelledby="lp-features-title">
-          <div className="lp-features__visual" aria-hidden="true">
-            <img src="/飯飽R.png" alt="" />
+        {/* ── Hero ── */}
+        {/* 範例票券用第一道真實上架餐點，沒有餐點時不顯示票券 */}
+        <section className="lp-container lp-hero">
+          <h1 className="lp-display">{t("越早訂，越開心。", "Book early, eat happy.")}<br />{t("每一口都準時開飯", "Every meal, right on time")}</h1>
+          <p className="lp-lead">{t(`提前預付鎖定學校附近的好店午餐，享最高 ${(100 - BEST_EARLY_BIRD) / 10} 折早鳥價；時間到直接取餐，不用排隊。`, `Prepay and lock in lunch from great spots near campus with up to ${BEST_EARLY_BIRD}% early-bird savings — then just pick it up, no queue.`)}</p>
+          <div className="lp-hero__cta">
+            <LinkButton href="/home" variant="secondary" size="lg" rightIcon={<ArrowRight />}>{t("探索今日菜單", "Explore today's menu")}</LinkButton>
           </div>
-          <div className="lp-features__body">
-            <h2 id="lp-features-title" className="lp-h2">{t("BunnBaa 有什麼不一樣", "What makes BunnBaa different")}</h2>
-            <ul className="lp-features__grid">
-              {FEATURES.map((f) => (
-                <li key={f.title.zh}>
-                  <IconBox size="lg">{f.icon}</IconBox>
-                  <h3 className="lp-h4">{pick(f.title, lang)}</h3>
-                  <p className="lp-muted">{pick(f.body, lang)}</p>
-                </li>
-              ))}
-            </ul>
-            <div className="lp-features__cta">
-              <LinkButton href="/home">{t("開始預約", "Start booking")}</LinkButton>
-              <p className="lp-note"><Info aria-hidden="true" /> {t("全額預付；截單前免費取消，截單後可轉讓或捐為愛心餐。", "Prepaid; free cancellation before cutoff, then transfer or donate.")}</p>
-            </div>
+
+          <div className="lp-hero__visual" aria-hidden="true">
+            <div className="lp-hero__glow" />
+            {heroItem && (
+              <div className="lp-ticket">
+                <div className="lp-ticket__top">
+                  <span className="lp-ticket__thumb"><CookingPot /></span>
+                  <div>
+                    <p className="lp-ticket__name">{loc(heroItem, "name")}</p>
+                    <p className="lp-ticket__meta">{[loc(heroVendor, "name"), heroWindow && slotLabel(heroWindow)].filter(Boolean).join("・")}</p>
+                  </div>
+                  <Badge tone="success" dot>{t("已鎖定", "Locked")}</Badge>
+                </div>
+                <div className="lp-ticket__price">
+                  <span className="lp-strike">NT$ {heroItem.price}</span>
+                  <span className="lp-ticket__now">NT$ {earlyBird(heroItem.price)}</span>
+                  <Badge tone="brand" variant="solid" shape="pill">{t(`早鳥 ${(100 - BEST_EARLY_BIRD) / 10} 折`, `Early bird −${BEST_EARLY_BIRD}%`)}</Badge>
+                </div>
+              </div>
+            )}
+            <div className="lp-float lp-float--a"><Ticket /> {t("可轉讓給同學", "Transferable to classmates")}</div>
+            <div className="lp-float lp-float--b"><BellRing /> {t("取餐前推播提醒", "Pickup reminder")}</div>
+            <div className="lp-float lp-float--c"><ShieldCheck /> {t("未出餐全額退", "Full refund if not served")}</div>
           </div>
         </section>
 
@@ -393,7 +363,9 @@ function LandingContent() {
             {vendorsLoading && Array.from({ length: 3 }, (_, i) => <div key={i} className="lp-store lp-store--skeleton" />)}
             {!vendorsLoading && vendors.slice(0, 3).map((v) => (
               <article key={v.id} className="lp-store">
-                <div className="lp-store__visual" aria-hidden="true"><Store /></div>
+                <div className="lp-store__visual" aria-hidden="true">
+                  {v.cover_image ? <img src={v.cover_image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} /> : <Store />}
+                </div>
                 <h3 className="lp-h3">{loc(v, "name")}</h3>
                 {v.address && <p className="lp-muted lp-store__addr"><MapPin aria-hidden="true" />{v.address}</p>}
                 <div className="lp-store__foot">

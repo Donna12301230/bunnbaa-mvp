@@ -188,9 +188,8 @@
   50% { transform: translateY(-8px); }
 }
 
-/* ── 品牌故事（深棕帶） ── */
+/* ── 品牌故事（深棕帶，2026-09-30 移到最上面，緊接在導覽列後面，不用再留上方間距） ── */
 .lp-story {
-  margin-top: var(--space-16);
   background: var(--lp-deep);
   color: #fff;
 }
@@ -259,37 +258,6 @@
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
-
-/* ── 特色 ── */
-.lp-features { display: grid; gap: var(--space-10); align-items: center; }
-@media (min-width: 1024px) {
-  .lp-features { grid-template-columns: 5fr 6fr; gap: 72px; }
-}
-.lp-features__visual {
-  display: grid;
-  place-items: center;
-  aspect-ratio: 1;
-  max-height: 520px;
-  border: 1px solid var(--lp-line);
-  border-radius: 40px;
-  background:
-    radial-gradient(circle at 30% 25%, var(--surface), transparent 60%),
-    var(--brand-orange-soft);
-}
-.lp-features__visual img { width: 58%; height: auto; }
-.lp-features__grid {
-  display: grid;
-  gap: var(--space-8) var(--space-10);
-  margin: var(--space-10) 0 0;
-  padding: 0;
-  list-style: none;
-}
-@media (min-width: 768px) {
-  .lp-features__grid { grid-template-columns: 1fr 1fr; }
-}
-.lp-features__grid li { display: grid; gap: var(--space-2); justify-items: start; }
-.lp-features__grid .lp-h4 { margin-top: var(--space-2); }
-.lp-features__cta { display: grid; gap: var(--space-3); justify-items: start; margin-top: var(--space-10); }
 
 /* ── 菜單 ── */
 .lp-menu {

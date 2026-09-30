@@ -1,5 +1,5 @@
 import { tr } from "@/lib/i18n";
-import { CalendarClock, HeartHandshake, Recycle, ShieldCheck, Sparkles } from "lucide-react";
+import { BellRing, CalendarClock, HeartHandshake, Recycle, ShieldCheck, Sparkles } from "lucide-react";
 import CustomerLayout from "@/components/CustomerLayout";
 import PageHero from "@/components/PageHero";
 
@@ -24,8 +24,16 @@ const VALUES = [
     icon: ShieldCheck,
     title: tr("履約有保障", "Guaranteed fulfilment"),
     body: tr(
-      "截單前免費取消；去不了可以轉讓或捐為愛心餐；取餐時段結束前 30 分鐘還會提醒你，忘記取的話便當會轉給需要的人，不會白白浪費。店家若未如期出餐，全額退款並加贈 20 點回饋金；每累計 100 元一張抽獎券，人人有獎。",
-      "Free cancellation before cutoff; transfer or donate if you can't make it; we'll remind you 30 minutes before your pickup window ends, and if it's still unclaimed it goes to someone who needs it — nothing wasted. If a vendor doesn't serve on time, you get a full refund plus 20 reward points; every NT$100 you pay earns a reward ticket and everyone wins."
+      "截單前免費取消；去不了可以轉讓或捐為愛心餐。店家若未如期出餐，全額退款並加贈 20 點回饋金；每累計 100 元一張抽獎券，人人有獎。",
+      "Free cancellation before cutoff; transfer or donate if you can't make it. If a vendor doesn't serve on time, you get a full refund plus 20 reward points; every NT$100 you pay earns a reward ticket and everyone wins."
+    ),
+  },
+  {
+    icon: BellRing,
+    title: tr("準時提醒取餐", "Pickup reminders"),
+    body: tr(
+      "取餐時段開始前推播通知，排隊時間留給自己；結束前 30 分鐘還沒取，會再提醒一次，30 分鐘後仍未取餐就轉給需要的人，不會白白浪費。",
+      "Get a push notification before your pickup window starts — no more queuing. We'll remind you again 30 minutes before it ends, and if it's still unclaimed 30 minutes after, it goes to someone who needs it."
     ),
   },
 ];
@@ -63,8 +71,8 @@ export default function AboutPage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-bold">{tr("我們在意的三件事", "What we care about")}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <h2 className="text-lg font-bold">{tr("我們在意的事", "What we care about")}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {VALUES.map(({ icon: Icon, title, body }) => (
               <div key={title} className="bg-white rounded-xl border border-border p-4">
                 <Icon className="w-6 h-6 text-orange-500 mb-2" />
