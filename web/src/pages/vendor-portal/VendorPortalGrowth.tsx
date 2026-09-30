@@ -1,207 +1,210 @@
-import { discountText } from "@/lib/pricing";
-import { tr } from "@/lib/i18n";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
+import { Download, PauseCircle, PlayCircle, Search, Trophy, RefreshCw } from "lucide-react";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trophy, Ticket, Sparkles } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
-import { EmptyState } from "@/components/ds";
+import { useMyVendor } from "@/hooks/useMyVendor";
+import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ConfirmDialog";
+import { db, functions } from "@/lib/firebase";
+import { httpsCallable } from "@/lib/callable";
+import { ALL_TIERS, allocatePool, tierLabel } from "@/lib/rewards";
+import { usePlatformConfig } from "@/lib/platformConfig";
+import { tr } from "@/lib/i18n";
+import type { Coupon, RewardStatus } from "@/types";
 
-// 對應 UI草圖 VendorDashboard.dc.html「成長獎勵」分頁——全新機制，之前的雛型
-// 完全沒有：商家累積合作營收達門檻後，解鎖消費者端抽獎（單抽／十連抽），獎項是
-// 折扣券（8/6/5/3/1折或整份 0 元）。對應 Main 草圖新增的跑馬燈「剛抽中...0 元
-// 大獎」（見 HomePage.tsx 的 GrowthRewardTicker）。
-//
-// 2026-09-22 接上真實資料：
-//   - 累積營收：即時加總這個商家的 payouts.amount（跟 payouts 共用 vendor_id
-//     索引），不用另外存一個累計欄位怕跟實際撥款對不上
-//   - 門檻：平台層級設定，讀 platform_config/growth（跟 Functions drawGrowthReward／
-//     syncGrowthUnlock 同一份），只有管理員能改
-//   - 0 元券庫存／開獎紀錄：真的讀 growth_rewards/{vendorId}、draws
-//     collection——這兩個都只由 Cloud Function `drawGrowthReward` 寫（機率
-//     計算不能信任 client），程式碼在 functions/src/index.js，但因為 Blaze
-//     還沒升級，還沒有機會在正式站被呼叫過，這頁目前大概率會一直看到
-//     「尚無資料」直到有人在 emulator 或正式站抽過獎
-
-interface Milestone {
+interface Period {
   id: string;
-  label: string;
-  label_en?: string;
-  threshold: number;
+  status?: string;
+  net_revenue?: number;
+  refunds?: number;
+  tickets?: number;
+  carried_revenue?: number;
+  carried_tickets?: number;
+  total_revenue?: number;
+  total_tickets?: number;
+  pool?: number;
+  allocation?: Record<string, number>;
+  remaining?: Record<string, number>;
+  leftover?: number;
+  unclaimed_amount?: number;
+  draw_deadline?: unknown;
 }
-
-// price_percent＝要付原價的幾 %；標籤依語言組（8 折＝20% off）
-const TIER_STYLE: Record<number, { bg: string; color: string }> = {
-  80: { bg: "bg-amber-50", color: "text-amber-700" },
-  60: { bg: "bg-amber-50", color: "text-amber-700" },
-  50: { bg: "bg-blue-50", color: "text-blue-700" },
-  30: { bg: "bg-purple-50", color: "text-purple-700" },
-  10: { bg: "bg-orange-50", color: "text-orange-700" },
-  0: { bg: "bg-yellow-100", color: "text-yellow-800" },
+const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
+const STATUS_LABEL: Record<string, [string, string]> = {
+  pooled: ["開獎中", "Draw open"], carried: ["未達門檻，結轉", "Carried over"], closed: ["已結束", "Closed"], paused: ["暫停", "Paused"],
 };
-const tierLabel = (pricePercent: number) =>
-  pricePercent === 0 ? tr("0元整份", "Free meal") : discountText(100 - pricePercent);
 
-interface DrawRecord {
-  id: string;
-  price_percent: number;
-  item_name?: string | null;
-  item_name_en?: string;
-  created_at?: { toDate?: () => Date };
-}
-
+/**
+ * 成長獎勵與券負債看板（規格 §8、§9.3、§9.4）：每週以淨營業額 10% 生成回饋池，拆成折價券抽獎，
+ * 人人有獎；券發出後規則不可變更。店家以「流通中負債」掌握潛在成本。
+ */
 export default function VendorPortalGrowth() {
-  // 商家後台只讓 role=vendor 進來，vendorId 是登入店主綁定的商家
-  const VENDOR_ID = useAuth().user?.vendorId;
-  const [cumulativeRevenue, setCumulativeRevenue] = useState(0);
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [defaultVoucherTotal, setDefaultVoucherTotal] = useState(0);
-  const [reward, setReward] = useState<{ voucher_remaining?: number; voucher_total?: number }>({});
-  const voucherTotal = reward.voucher_total ?? defaultVoucherTotal;
-  const voucherRemaining = reward.voucher_remaining ?? voucherTotal;
+  const vendorId = useAuth().user?.vendorId;
+  const { data: vendor } = useMyVendor();
+  const { data: config } = usePlatformConfig();
+  const { toast } = useToast();
+  const confirm = useConfirm();
+  const [periods, setPeriods] = useState<Period[]>([]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [status, setStatus] = useState<RewardStatus | null>(null);
+  const [lookup, setLookup] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "platform_config", "growth"), (snap) => {
-      const data = snap.data() ?? {};
-      setMilestones([...((data.milestones as Milestone[] | undefined) ?? [])].sort((a, b) => a.threshold - b.threshold));
-      setDefaultVoucherTotal(typeof data.voucher_total === "number" ? data.voucher_total : 0);
-    });
-    return () => unsub();
-  }, []);
-  const [drawHistory, setDrawHistory] = useState<DrawRecord[]>([]);
+    if (!vendorId) return;
+    const u1 = onSnapshot(collection(db, "vendors", vendorId, "rewardPeriods"), (s) => setPeriods(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Period).sort((a, b) => b.id.localeCompare(a.id))));
+    const u2 = onSnapshot(query(collection(db, "coupons"), where("vendor_id", "==", vendorId)), (s) => setCoupons(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Coupon)));
+    const u3 = onSnapshot(doc(db, "rewardStatus", vendorId), (s) => setStatus(s.exists() ? ({ id: s.id, ...s.data() } as RewardStatus) : null));
+    return () => {
+      u1();
+      u2();
+      u3();
+    };
+  }, [vendorId]);
 
-  useEffect(() => {
-    if (!VENDOR_ID) return;
-    const unsub = onSnapshot(query(collection(db, "payouts"), where("vendor_id", "==", VENDOR_ID)), (snap) => {
-      setCumulativeRevenue(snap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0));
-    });
-    return () => unsub();
-  }, [VENDOR_ID]);
+  const current = periods.find((p) => p.status === "pooled") ?? periods.find((p) => p.status === "closed");
+  const m = useMemo(() => {
+    const sum = (list: Coupon[]) => list.reduce((s, c) => s + (c.discount || 0), 0);
+    const owned = coupons.filter((c) => c.status === "owned");
+    const redeemed = coupons.filter((c) => c.status === "redeemed");
+    const soon = owned.filter((c) => millis(c.expires_at) < Date.now() + 7 * 86400000);
+    return {
+      liability: sum(owned), ownedCount: owned.length,
+      redeemedAll: sum(redeemed), redeemedCount: redeemed.length,
+      redeemedPeriod: sum(redeemed.filter((c) => c.pool_period === current?.id)),
+      returned: sum(coupons.filter((c) => c.status === "expired" || c.status === "unclaimed")) + periods.reduce((s, p) => s + (p.leftover || 0), 0),
+      expiringSoon: sum(soon), expiringCount: soon.length,
+    };
+  }, [coupons, periods, current?.id]);
 
-  useEffect(() => {
-    if (!VENDOR_ID) return;
-    const unsub = onSnapshot(doc(db, "growth_rewards", VENDOR_ID), (snap) => {
-      setReward(snap.data() ?? {});
-    });
-    return () => unsub();
-  }, [VENDOR_ID]);
+  const found = lookup.trim() ? coupons.filter((c) => c.id === lookup.trim() || c.lock_id === lookup.trim()) : [];
 
-  useEffect(() => {
-    if (!VENDOR_ID) return;
-    // 單一 equality（vendor_id），不加 orderBy，避免另外要求新複合索引，排序
-    // 交給前端做——同 VendorPortalPrep/TransferMarketPage 的慣例。
-    const unsub = onSnapshot(query(collection(db, "draws"), where("vendor_id", "==", VENDOR_ID)), (snap) => {
-      const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as DrawRecord);
-      rows.sort((a, b) => (b.created_at?.toDate?.().getTime() ?? 0) - (a.created_at?.toDate?.().getTime() ?? 0));
-      setDrawHistory(rows.slice(0, 20));
-    });
-    return () => unsub();
-  }, [VENDOR_ID]);
+  function exportCsv() {
+    const rows = coupons.filter((c) => (!from || c.pool_period >= from) && (!to || c.pool_period <= to));
+    const header = ["coupon_id", "pool_period", "tier", "discount", "status", "expires_at", "lock_id"];
+    const csv = [header, ...rows.map((c) => [c.id, c.pool_period, c.tier, c.discount, c.status, c.expires_at ? new Date(millis(c.expires_at)).toISOString() : "", c.lock_id ?? ""])]
+      .map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `coupons_${vendorId}_${from || "all"}_${to || "all"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function togglePause() {
+    const paused = !vendor?.rewards_paused_from;
+    if (paused && !(await confirm({ title: tr("暫停參加下一期？", "Pause the next period?"), description: tr("需提前 7 天：從 7 天後的那一週起不再發抽獎券、不開池。已發出的券照常兌現。", "Takes effect from the week at least 7 days out. Issued coupons stay valid."), confirmLabel: tr("暫停", "Pause") }))) return;
+    setBusy(true);
+    try {
+      const res = await httpsCallable(functions, "setRewardPause")({ paused });
+      const r = res.data as { paused_from: string | null };
+      toast({ title: r.paused_from ? tr(`將從 ${r.paused_from} 那週起暫停`, `Paused from ${r.paused_from}`) : tr("已恢復參加", "Resumed") });
+    } catch (err) {
+      toast({ variant: "destructive", title: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function closeNow() {
+    setBusy(true);
+    try {
+      const res = await httpsCallable(functions, "triggerRewardPeriodNow")({});
+      toast({ title: tr("已結算上一期", "Last period settled"), description: JSON.stringify(res.data) });
+    } catch (err) {
+      toast({ variant: "destructive", title: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const preview = allocatePool(Math.floor(10000), 1000);
 
   return (
     <VendorPortalLayout>
-      <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
-        <Trophy className="w-5 h-5 text-orange-500" /> {tr("成長獎勵", "Growth rewards")}
-      </h2>
-      <p className="text-sm text-muted-foreground mb-5">
-        {tr("累積合作營收達門檻，解鎖消費者端抽獎機制；獎項是折扣券或整份免費，鼓勵消費者持續回購。", "Reach a revenue threshold to unlock a prize draw for customers — prizes are discount vouchers or free meals that keep them coming back.")}
+      <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><Trophy className="w-5 h-5 text-orange-500" /> {tr("成長獎勵・券負債", "Rewards & coupon liability")}</h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        {tr(`每週一結算上一週：淨營業額 × ${Math.round((config?.rewardRate ?? 0.1) * 100)}% 生成回饋池，抽獎券滿 ${config?.minTicketsToOpen ?? 100} 張才開池（未達標結轉，不強制開池）。折價券於線上結帳時自動套用，店家不需人工收券；券發出後規則不可變更。`,
+          `Settled every Monday: net revenue × ${Math.round((config?.rewardRate ?? 0.1) * 100)}% becomes the pool; it opens once ${config?.minTicketsToOpen ?? 100} tickets are in.`)}
       </p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* 門檻進度 */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">{tr("門檻進度", "Progress")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {milestones.length === 0 && (
-              <p className="text-sm text-muted-foreground">{tr("平台尚未設定成長獎勵門檻。", "The platform hasn't set growth thresholds yet.")}</p>
-            )}
-            {milestones.map(m => {
-              const achieved = cumulativeRevenue >= m.threshold;
-              const pct = Math.min(100, Math.round((cumulativeRevenue / m.threshold) * 100));
-              return (
-                <div key={m.id}>
-                  <div className="flex items-center justify-between mb-1.5 text-sm">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" /> {tr(m.label, m.label_en ?? m.label)}
-                    </span>
-                    {achieved ? (
-                      <span className="text-xs font-bold text-green-700">{tr("已達成", "Reached")}</span>
-                    ) : (
-                      <span className="text-xs font-semibold text-muted-foreground">
-                        ${cumulativeRevenue.toLocaleString()} / ${m.threshold.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${achieved ? "bg-green-600" : "bg-orange-500"}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  {!achieved && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {tr(`還差 $${(m.threshold - cumulativeRevenue).toLocaleString()} 解鎖`, `$${(m.threshold - cumulativeRevenue).toLocaleString()} to unlock`)}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">{tr("本期回饋池", "Current pool")}</p><p className="text-xl font-bold">NT${current?.pool ?? 0}</p><p className="text-xs text-muted-foreground">{current ? current.id : "—"}</p></CardContent></Card>
+        <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">{tr("流通中負債", "Outstanding liability")}</p><p className="text-xl font-bold text-orange-600">NT${m.liability}</p><p className="text-xs text-muted-foreground">{m.ownedCount} {tr("張持有中", "held")}</p></CardContent></Card>
+        <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">{tr("已兌現（本期／累計）", "Redeemed (period / total)")}</p><p className="text-xl font-bold">NT${m.redeemedPeriod} / {m.redeemedAll}</p><p className="text-xs text-muted-foreground">{m.redeemedCount} {tr("張", "coupons")}</p></CardContent></Card>
+        <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">{tr("回歸金額（過期、未抽、未分配）", "Returned (expired, unclaimed, unallocated)")}</p><p className="text-xl font-bold">NT${m.returned}</p></CardContent></Card>
+        <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">{tr("未來 7 天到期", "Expiring in 7 days")}</p><p className="text-xl font-bold">NT${m.expiringSoon}</p><p className="text-xs text-muted-foreground">{m.expiringCount} {tr("張", "coupons")}</p></CardContent></Card>
+        <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">{tr("距離開池", "To next pool")}</p><p className="text-xl font-bold">{status?.pool_open ? tr("開獎中", "Open") : `${status?.tickets_so_far ?? 0}/${status?.min_tickets ?? 100}`}</p><p className="text-xs text-muted-foreground">{status?.pool_open ? "" : tr(`再 ${status?.amount_to_open ?? "—"} 元`, `NT$${status?.amount_to_open ?? "—"} to go`)}</p></CardContent></Card>
+      </div>
+
+      {current?.allocation && (
+        <Card className="mb-4">
+          <CardHeader className="pb-2"><CardTitle className="text-base">{tr("本期券種分配（剩餘／總數）", "This pool's coupons (left / total)")}</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-3 md:grid-cols-6 gap-2 text-center text-sm">
+            {ALL_TIERS.map((t) => (
+              <div key={t.code} className="rounded border p-2"><p className="text-xs">{tierLabel(t.code)}</p><p className="font-bold">{current.remaining?.[t.code] ?? 0}/{current.allocation?.[t.code] ?? 0}</p><p className="text-xs text-muted-foreground">{tr(`折 ${t.discount}`, `−${t.discount}`)}</p></div>
+            ))}
           </CardContent>
         </Card>
+      )}
 
-        {/* 0 元券庫存 */}
+      <Card className="mb-4">
+        <CardHeader className="pb-2"><CardTitle className="text-base">{tr("結算紀錄", "Periods")}</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1">{tr("期別（週一）", "Week")}</th><th>{tr("淨營業額", "Net revenue")}</th><th>{tr("結轉", "Carried")}</th><th>{tr("抽獎券", "Tickets")}</th><th>{tr("回饋池", "Pool")}</th><th>{tr("狀態", "Status")}</th></tr></thead>
+            <tbody>{periods.map((p) => (
+              <tr key={p.id} className="border-t">
+                <td className="py-1">{p.id}</td>
+                <td>NT${p.net_revenue ?? 0}{p.refunds ? <span className="text-xs text-red-600"> (−{p.refunds})</span> : null}</td>
+                <td className="text-xs">{p.carried_revenue ? `NT$${p.carried_revenue}／${p.carried_tickets}${tr("張", "")}` : "—"}</td>
+                <td>{p.total_tickets ?? p.tickets ?? 0}</td>
+                <td>{p.pool ? `NT$${p.pool}` : "—"}</td>
+                <td>{p.status ? <Badge variant="muted">{tr(...(STATUS_LABEL[p.status] ?? [p.status, p.status]))}</Badge> : tr("累積中", "Accumulating")}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+          {periods.length === 0 && <p className="text-sm text-muted-foreground">{tr("還沒有結算紀錄。", "No periods yet.")}</p>}
+        </CardContent>
+      </Card>
+
+      <div className="grid md:grid-cols-2 gap-4 mb-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-1.5">
-              <Ticket className="w-4 h-4 text-orange-500" /> {tr("0 元券庫存", "Free-meal vouchers")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-2">{tr("剩餘", "Remaining")} {voucherRemaining} / {voucherTotal}</p>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
-              <div className="h-full rounded-full bg-yellow-500" style={{ width: `${(voucherRemaining / voucherTotal) * 100}%` }} />
+          <CardHeader className="pb-2"><CardTitle className="text-base">{tr("查詢單張券", "Look up a coupon")}</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex gap-2"><Input value={lookup} onChange={(e) => setLookup(e.target.value)} placeholder={tr("券 ID 或訂單 ID", "Coupon ID or order ID")} /><Button variant="outline" size="icon"><Search /></Button></div>
+            {found.map((c) => <p key={c.id} className="text-sm">{c.id}：{tierLabel(c.tier)} {tr(`折 ${c.discount}`, `−${c.discount}`)}・{c.status}・{c.pool_period}{c.lock_id ? `・${tr("訂單", "order")} ${c.lock_id}` : ""}</p>)}
+            {lookup && found.length === 0 && <p className="text-xs text-muted-foreground">{tr("查無資料", "Not found")}</p>}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">{tr("匯出 CSV 與設定", "Export & settings")}</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex gap-2 items-center text-sm">
+              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /> ～ <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" />
+              <Button size="sm" variant="outline" onClick={exportCsv}><Download /> CSV</Button>
             </div>
-            <p className="text-xs text-muted-foreground">{tr("見底後將自動降級為 1 折券，仍保留六級保底機制", "When they run out, winners get a 90%-off voucher instead; all six tiers still apply")}</p>
+            <Button size="sm" variant="outline" onClick={togglePause} disabled={busy}>
+              {vendor?.rewards_paused_from ? <><PlayCircle /> {tr(`恢復參加（目前從 ${vendor.rewards_paused_from} 起暫停）`, `Resume (paused from ${vendor.rewards_paused_from})`)}</> : <><PauseCircle /> {tr("暫停參加下一期", "Pause next period")}</>}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={closeNow} disabled={busy}><RefreshCw /> {tr("立即結算上一期（Demo）", "Settle last period now (demo)")}</Button>
+            <p className="text-xs text-muted-foreground">{tr("不可修改已發出券的折抵、效期或適用範圍。", "Issued coupons' value, validity and scope can't be changed.")}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* 歷史開獎名單 */}
-      <Card className="mt-4">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">{tr("歷史開獎名單", "Draw history")}</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {drawHistory.length === 0 ? (
-            <EmptyState size="compact" icon={<Trophy size={32} />} title={tr("尚無開獎紀錄", "No draws yet")} />
-          ) : (
-            <>
-              <div className="grid grid-cols-3 gap-2 px-6 py-2 text-xs font-semibold text-muted-foreground border-b border-border">
-                <span>{tr("日期", "Date")}</span>
-                <span>{tr("抽中等級", "Prize")}</span>
-                <span>{tr("品項", "Item")}</span>
-              </div>
-              {drawHistory.map(d => {
-                const style = { ...(TIER_STYLE[d.price_percent] ?? { bg: "bg-gray-100", color: "text-gray-600" }), label: tierLabel(d.price_percent) };
-                const date = d.created_at?.toDate?.();
-                return (
-                  <div key={d.id} className="grid grid-cols-3 gap-2 px-6 py-3 text-sm border-b border-border last:border-0 items-center">
-                    <span className="text-muted-foreground">{date ? date.toLocaleDateString("zh-TW") : "—"}</span>
-                    <span>
-                      <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full ${style.bg} ${style.color}`}>
-                        {style.label}
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground truncate">{tr(d.item_name ?? "—", d.item_name_en || d.item_name || "—")}</span>
-                  </div>
-                );
-              })}
-            </>
-          )}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">{tr("分配演算法範例（淨營業額 100,000、1,000 張抽獎券）", "Allocation example (NT$100,000, 1,000 tickets)")}</CardTitle></CardHeader>
+        <CardContent className="text-sm">
+          {ALL_TIERS.map((t) => `${tierLabel(t.code)} ${preview.counts[t.code]}`).join("、")}；{tr(`合計 ${preview.spent} 元，餘 ${preview.leftover} 元回歸店家。保底九五折人人有獎。`, `Total NT$${preview.spent}, NT$${preview.leftover} returned. Everyone gets at least 5% off.`)}
         </CardContent>
       </Card>
     </VendorPortalLayout>

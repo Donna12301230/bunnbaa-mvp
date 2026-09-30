@@ -83,4 +83,15 @@ function confirmPayment({ transactionId, amount }) {
   return callLinePay("POST", uri, { amount, currency: "TWD" });
 }
 
-module.exports = { requestPayment, confirmPayment };
+/**
+ * Refunds a captured payment, fully or partially (refundAmount omitted = full).
+ * One cart checkout is one LINE Pay transaction covering several locks, so
+ * cancelling a single lock before cutoff is a partial refund of that lock's
+ * locked_price. 停班停課自動退款（§11）也走這裡。
+ */
+function refundPayment({ transactionId, refundAmount }) {
+  const uri = `/v3/payments/${transactionId}/refund`;
+  return callLinePay("POST", uri, refundAmount === undefined ? {} : { refundAmount });
+}
+
+module.exports = { requestPayment, confirmPayment, refundPayment };

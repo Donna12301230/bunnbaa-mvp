@@ -16,17 +16,17 @@ export function MemberNotice() {
       </ul>
       <p className="font-semibold">3. Ordering rules</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>Please pick up your order on time. Orders not collected in time are handled at the vendor's discretion.</li>
+        <li>Phase 1 covers weekday (Mon–Fri) lunch pickup only. You can book up to next Friday; orders close at <span className="font-semibold">20:00 the day before pickup</span> (a vendor may close earlier).</li>
+        <li>Side-dish wishes are decided at cutoff. If a wish doesn't reach the minimum, you get the default side and the order still stands.</li>
         <li>If you have allergies or special dietary needs, note them on your order and confirm directly with the vendor.</li>
-        <li><span className="font-semibold text-red-700">More than one uncollected, unpaid order will result in loss of ordering privileges.</span> If you believe this is a mistake, you can submit an appeal from My account.</li>
-        <li>Orders over <span className="font-semibold">NT$1,000</span> require a deposit after ordering before they are confirmed.</li>
+        <li><span className="font-semibold">Meals not picked up 30 minutes after the pickup window become charity meals</span>: no refund, but reward tickets are still issued. Before pickup you can donate a meal yourself.</li>
       </ul>
       <p className="font-semibold">4. Cancellations and refunds</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li><span className="font-semibold">Before confirmation</span> (not yet confirmed by the vendor): you may contact the vendor to cancel at no charge.</li>
-        <li><span className="font-semibold">After confirmation</span>: contact the vendor to cancel at least <span className="font-semibold">24 hours</span> before pickup.</li>
-        <li>Deposits for cancelled orders are refunded in cash by the vendor, on a schedule agreed between the vendor and the customer.</li>
-        <li>If the vendor cancels a confirmed order, the customer may request a full refund of the deposit.</li>
+        <li><span className="font-semibold">Before cutoff</span>: cancel or change for free with a full refund to your original payment method; coupons are returned with their original expiry.</li>
+        <li><span className="font-semibold">After cutoff</span>: the vendor has already bought and prepared ingredients, so there are no free cancellations. You can still transfer, gift or donate the meal.</li>
+        <li>If a work suspension is announced for the pickup location's county, that day's orders are cancelled and refunded automatically. During disasters the vendor may substitute an equivalent side dish.</li>
+        <li>If the vendor fails to serve, you get a full refund.</li>
         <li>Support: herzbaa@gmail.com</li>
       </ul>
       <p className="font-semibold">5. Personal data</p>
@@ -47,17 +47,17 @@ export function MemberNotice() {
       </ul>
       <p className="font-semibold">三、訂餐規範</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>下單後請準時於指定時間取餐，逾時未取視情況由廠商自行處理。</li>
+        <li>第一階段只做週一至週五午餐自取。可預訂至下週五，<span className="font-semibold">取餐日前一天 20:00 截單</span>（店家可提前截單）。</li>
+        <li>配菜許願於截單時判定，未達最低量自動改為預設配菜，訂單照常成立。</li>
         <li>如對餐點有過敏或特殊飲食需求，請於備註欄位說明，並直接與廠商確認。</li>
-        <li><span className="font-semibold text-red-700">未取貨且未付款累計超過一次，將喪失訂餐資格。</span>如認為封禁有誤，可至會員中心提交申訴。</li>
-        <li>單筆訂單金額超過 <span className="font-semibold">NT$1,000</span> 者，須於下單後繳付訂金，方可成立訂單。</li>
+        <li><span className="font-semibold">取餐時段結束 30 分鐘後仍未取餐，便當將轉為愛心餐</span>，不退款但照常發放抽獎券；取餐前也可主動「捐為愛心餐」。</li>
       </ul>
       <p className="font-semibold">四、取消與退款政策</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>訂單<span className="font-semibold">確認前</span>（廠商尚未確認）：可聯繫廠商取消，無違約責任。</li>
-        <li>訂單<span className="font-semibold">確認後</span>：請於取餐日<span className="font-semibold"> 24 小時前</span>聯繫廠商申請取消。</li>
-        <li>取消訂單後，已繳付之訂金由廠商以現金退還；退還時程由廠商與顧客協議。</li>
-        <li>廠商因故取消已確認之訂單，顧客可要求全額退還訂金。</li>
+        <li><span className="font-semibold">截單前</span>：可免費取消或修改，全額退回原付款方式；用券訂單的折價券退回並保留原到期日。</li>
+        <li><span className="font-semibold">截單後</span>：店家已依訂單採購備料，不可免費取消（現做餐點屬易腐敗商品，通訊交易解除權之例外）；可轉讓、贈送或捐為愛心餐。</li>
+        <li>取餐地點所在縣市宣布停班時，當日訂單自動取消並全額退款；天災期間店家可等值替換配菜。</li>
+        <li>店家未如期出餐，全額退款。</li>
         <li>客服聯絡方式：herzbaa@gmail.com</li>
       </ul>
       <p className="font-semibold">五、個人資料保護</p>

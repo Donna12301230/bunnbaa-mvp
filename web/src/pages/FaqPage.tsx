@@ -8,29 +8,29 @@ const FAQS = [
   {
     q: tr("要怎麼預購餐點？", "How do I pre-order a meal?"),
     a: tr(
-      "在「商家」頁選一家店、點想吃的品項加入購物車，結帳時選取餐日期與時段即可。提前訂通常會有早鳥折扣。",
-      "Go to Vendors, pick a store and add items to your cart, then choose a pickup date and time slot at checkout. Ordering ahead usually comes with an early-bird discount."
+      "在「商家」頁選一家店、點便當選取餐日（可訂到下週五）、配菜（可許願候選菜或選「不要」）與加減飯，加入購物車後用 LINE Pay 結帳。取餐前一天 20:00 截單。",
+      "Go to Vendors, pick a store and a bento, then choose the pickup day (up to next Friday), sides (wish for a candidate or remove one) and rice. Check out with LINE Pay. Orders close at 20:00 the day before."
     ),
   },
   {
     q: tr("早鳥折扣怎麼算？", "How does the early-bird discount work?"),
     a: tr(
-      "依下單到取餐的天數計算：今天訂明天 95 折，提前 2～13 天 8 折，提前 14～30 天最高 7 折。",
-      "It depends on how far ahead you order: 5% off for tomorrow, 20% off 2–13 days ahead, and up to 30% off 14–30 days ahead."
+      "越早訂，越開心：訂明天的 95 折，提前 2 天以上 8 折（預訂範圍到下週五）。加飯 +10、減飯 −5、某格配菜不要 −5，直接反映在金額上。",
+      "Book early, save more: 5% off for tomorrow, 20% off 2+ days ahead (you can book up to next Friday). Extra rice +10, less rice −5, and removing a side −5."
     ),
   },
   {
     q: tr("臨時去不了怎麼辦？", "What if I can't make it after ordering?"),
     a: tr(
-      "可以到「我的餐點」把訂單轉讓或贈送給同學；如果一直沒人接手，逾時後會自動開放讓其他人 $0 領取，不會整份浪費掉。",
-      "Go to My meals and transfer or gift the order to someone else. If nobody claims it in time, it's automatically opened up for anyone to claim for free — so it doesn't go to waste."
+      "截單前可以直接取消，全額退款。截單後可以到「我的餐點」轉讓、贈送、分享代領連結，或在取餐當天按「捐為愛心餐」。",
+      "Before cutoff you can cancel for a full refund. After cutoff you can transfer, gift, share a proxy pickup link, or donate it as a charity meal on the day."
     ),
   },
   {
     q: tr("沒去取餐會怎樣？", "What happens if I don't show up to pick up my order?"),
     a: tr(
-      "累計 2 次未取餐，帳號會被暫時限制下單。如果有特殊原因，可以到「會員中心」提交申訴，管理員審核後會解除限制。",
-      "After 2 no-shows, your account is temporarily restricted from placing new orders. If there's a good reason, you can submit an appeal from My account — an admin will review it and lift the restriction if approved."
+      "取餐時段結束 30 分鐘後仍未取餐，便當會轉為愛心餐，開放給需要的人領取。不退款，但這筆訂單的抽獎券照常發放。",
+      "Meals not picked up 30 minutes after the window become charity meals for people in need. There's no refund, but your reward tickets are still issued."
     ),
   },
   {
@@ -50,8 +50,8 @@ const FAQS = [
   {
     q: tr("取餐前會有提醒嗎？", "Will I get a reminder before pickup?"),
     a: tr(
-      "會，取餐時段開始前會推播通知（需先在裝置上允許通知權限）。",
-      "Yes — you'll get a push notification shortly before your pickup window starts (make sure notifications are allowed on your device)."
+      "會，取餐時段結束前 30 分鐘還沒取餐會提醒你；許願未成立、停班停課退款、抽獎開池也會通知（右上角鈴鐺）。",
+      "Yes — we remind you 30 minutes before the pickup window ends, and notify you about wishes, work-suspension refunds and reward draws (see the bell icon)."
     ),
   },
   {

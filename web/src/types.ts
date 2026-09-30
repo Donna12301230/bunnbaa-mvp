@@ -24,6 +24,18 @@ export interface Vendor {
   business_hours?: BusinessHour[];
   holidays?: string[]; // YYYY-MM-DD
   slot_capacity?: number; // 每個取餐時段所有餐點合計上限；0／沒設＝不限，已訂數在 slot_counters
+  // 第一階段規格 §2 店家可調參數（沒設＝平台預設）
+  cutoff_time?: string; // 前一天幾點截單，只能比平台（20:00）早
+  safety_stock_rate?: number;
+  candidate_min_qty?: number;
+  lat?: number; // 取餐點座標：附近愛心餐、區域洞察
+  lng?: number;
+  forecast_daily?: Record<string, number>; // 新店家前 4 週自填預估：menu_item_id → 每日份數
+  anomaly_weeks?: string[]; // 店家標記的異常週（週一日期），預測時排除
+  disaster_dates?: string[]; // 停班停課日（Functions 寫）
+  typhoon_notice?: { dates: string[]; event_id: string } | null;
+  menu_locked_week?: string;
+  rewards_paused_from?: string;
 }
 
 export interface MenuItem {
@@ -41,6 +53,46 @@ export interface MenuItem {
   allergens: string[];
   dietary_tags: string[];
   created_at: unknown; // Firestore Timestamp
+  // 便當（第一階段規格 §3）：沒有 slots 的是單品，不能加減飯菜
+  template?: string | null;
+  main?: { name: string; component_id?: string | null } | null;
+  rice_component_id?: string | null;
+  fixed?: { name: string; component_id?: string | null }[]; // 固定附餐（例：滷蛋），不能換也不能減
+  slots?: BentoSlot[];
+  weekdays?: number[]; // 週菜單輪替：只在這幾天供應（沒設＝每天）
+  component_id?: string | null; // 單品對應的半成品（備料用）
+}
+
+export interface BentoCandidate {
+  name: string;
+  component_id?: string | null;
+  portion_level: number; // 1 全份、0.75、0.5 半份（由成本推算，店家可微調）
+  weekly_cap?: number | null; // 本週供應上限
+  min_qty?: number | null; // 成立最低量（沒設＝店家設定／平台預設）
+  disabled?: boolean; // 成本比例 < 0.5，不得列為候選
+}
+
+export interface BentoSlot {
+  category: string; // 青菜類、肉類配菜、蛋豆類…候選菜只能同類別
+  default: { name: string; component_id?: string | null };
+  candidates: BentoCandidate[];
+}
+
+export type RiceOption = "add" | "normal" | "less";
+/** 下單時每格的選擇：預設菜、候選菜 index、不要 */
+export type SlotChoice = "default" | "none" | number;
+
+export interface LockSlot {
+  category: string;
+  default_dish: string;
+  default_component_id?: string | null;
+  removed: boolean;
+  wished: string | null;
+  wished_component_id?: string | null;
+  candidate_index?: number;
+  resolved: string | null; // 截單判定後的實際配菜
+  portion_level: number | null;
+  substituted_from?: string;
 }
 
 export interface MealPlan {
@@ -65,7 +117,10 @@ export type LockStatus =
   | "for_gift"
   | "resold_and_fulfilled"
   | "fulfilled"
-  | "no_show";
+  | "no_show" // 舊制（未取餐停權），現在改轉愛心餐
+  | "charity" // 未取餐轉入或主動捐出的愛心餐
+  | "cancelling"
+  | "cancelled"; // 截單前取消、停班停課自動退款
 
 export interface Lock {
   id: string;
@@ -99,6 +154,25 @@ export interface Lock {
   plan_id?: string;
   plan_label?: string;
   meal_plan_id?: string; // meal_plans 的 id，2026-09-28 之後加入的計畫才有
+  // 第一階段規格：便當內容、金額拆解、取餐憑證
+  menu_item_id?: string | null;
+  slots?: LockSlot[];
+  rice?: RiceOption;
+  list_price?: number;
+  early_bird_amount?: number;
+  adjust_amount?: number;
+  coupon_id?: string | null;
+  coupon_discount?: number;
+  payer_uid?: string;
+  pickup_code?: string; // 4 碼取餐號
+  share_token?: string; // 代領連結
+  cutoff_at?: unknown; // Firestore Timestamp
+  cutoff_done?: boolean;
+  charity_source?: "noshow" | "donated";
+  cancel_reason?: "customer" | "disaster";
+  refunded_amount?: number;
+  tickets_issued?: number;
+  tags?: string[];
 }
 
 export interface Payout {
@@ -167,6 +241,10 @@ export interface UserProfile {
   orderBanned?: boolean;
   noPickupCount?: number;
   lang?: "zh" | "en"; // users/{uid}.lang，取餐提醒推播用哪種語言
+  homeGeo?: string; // 常用地點（粗略 geohash 7 碼）
+  donatedCount?: number; // 主動捐出的愛心餐份數（個人愛心紀錄）
+  mutedKinds?: string[]; // 關掉的通知類型，例如 "charity"
+  charityNearbyPush?: boolean; // 「附近有愛心餐」推播，預設關閉
 }
 
 // reviews/{lockId}：消費者對已取餐的鎖定打分，公開可讀，見 firestore.rules
@@ -183,4 +261,120 @@ export interface Review {
   item_name_en?: string;
   reviewer_label_en?: string;
   created_at: unknown; // Firestore Timestamp
+}
+
+// ── 第一階段規格：配方、採購、獎勵、愛心餐、洞察 ──────────────────────────
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  category: string;
+  unit: string; // g / 個
+  purchase_unit_label: string; // 例：盒、公斤、袋
+  purchase_unit_size: number; // 一個採購單位是多少 unit
+  yield_rate: number; // 熟成率（熟重 / 生重）
+  loss_rate: number;
+  shelf_days: number;
+  frequency: "monthly" | "weekly" | "daily";
+  supplier_id?: string | null;
+  unit_price: number; // 每採購單位
+}
+
+export interface Component {
+  id: string;
+  name: string;
+  portion_grams: number;
+  ingredients: { ingredient_id: string; grams: number }[];
+  prep_minutes: number;
+  equipment: string;
+  batch_capacity: number;
+  advance_hours: number;
+  method?: string;
+  flavors?: string[];
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone?: string;
+  line_id?: string;
+  note?: string;
+}
+
+export interface Coupon {
+  id: string;
+  vendor_id: string;
+  vendor_name?: string;
+  tier: string;
+  label: string;
+  discount: number;
+  status: "issued" | "owned" | "redeemed" | "expired" | "unclaimed";
+  pool_period: string;
+  user_id?: string;
+  expires_at?: unknown;
+  lock_id?: string;
+}
+
+export interface RewardTicket {
+  id: string;
+  vendor_id: string;
+  vendor_name?: string;
+  user_id: string;
+  period_id: string;
+  status: "pending" | "drawable" | "drawn" | "forfeited" | "revoked";
+  pool_period?: string;
+  draw_deadline?: unknown;
+  coupon_id?: string;
+}
+
+export interface RewardStatus {
+  id: string;
+  vendor_name: string;
+  tickets_so_far: number;
+  min_tickets: number;
+  amount_to_open: number;
+  pool_open: boolean;
+  pool_period: string | null;
+  draw_deadline: unknown;
+  remaining_total: number;
+  paused?: boolean;
+}
+
+export interface CharityMeal {
+  id: string;
+  vendor_id: string;
+  vendor_name: string;
+  vendor_address?: string;
+  lat: number | null;
+  lng: number | null;
+  date: string;
+  source: "noshow" | "donated";
+  status: "available" | "reserved" | "claimed" | "given" | "wasted";
+  pickup_code?: string | null;
+  item_name: string;
+  sides: string[];
+  deadline: unknown;
+}
+
+export interface CharityReservation {
+  id: string;
+  user_id: string;
+  meal_id: string;
+  vendor_id: string;
+  vendor_name: string;
+  date: string;
+  item_name: string;
+  status: "reserved" | "claimed" | "expired";
+  expires_at: unknown;
+}
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  link: string | null;
+  kind: string;
+  read: boolean;
+  created_at: unknown;
 }

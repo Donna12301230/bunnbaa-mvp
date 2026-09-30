@@ -56,6 +56,25 @@ BunnBaa/
 
 詳細權限見 `firestore.rules`。
 
+### 第一階段規格（2026-09-30 改版）
+
+依 `doc/BunnBaa 飯飽｜第一階段技術規格.md` 改版，但**保留「鎖定早鳥折扣＋轉讓」**（使用者決定）：訂單仍是 `locks`，付款仍是 LINE Pay，愛心餐放在轉讓市集的「愛心餐」分頁。和規格不同的地方：
+
+| 規格 | 實作 |
+|---|---|
+| `orders` 集合 | 沿用 `locks`，加 `slots`／`rice`／`pickup_code`／`payer_uid` 等欄位（`functions/src/orders.js` 開頭註解） |
+| 固定售價＋加減 | 早鳥折扣（打在品項原價）＋加減＋折價券；預訂到下週五，所以最高 8 折 |
+| 截單後不可取消 | 不可退款，但仍可轉讓、贈送、捐為愛心餐 |
+| `vendors/{v}/items` | 沿用 `menu_items`，加 `main`／`slots`／`fixed`／`rice_component_id`／`weekdays` |
+| `userSpend/{v}_{u}_{period}` | `userSpend/{v}_{u}`，未滿 100 元的餘額直接結轉 |
+| `areaInsights/{geohash5}_{week}` | `areaInsights/{vendorId}_{week}`（以店家取餐點為圓心 1 公里） |
+
+新增集合：`platformConfig`、`dishLibrary`、`templates`、`vendors/{v}/ingredients|components|suppliers|inventory|purchaseLists|prepPlans|rewardPeriods|wishTally`、`sideWishes`、`openWishes`、`userSpend`、`rewardTickets`、`coupons`、`rewardStatus`、`tasteProfiles`、`areaInsights`、`charityMeals`、`charityReservations`、`charityBans`、`disasterEvents`、`anomalies`、`notifications`、`userTokens`。
+
+Functions 依功能拆檔（`functions/src/`）：`orders.js`（下單、LINE Pay、截單、QR 取餐、取消退款）、`charity.js`、`rewardsFns.js`、`purchasing.js`、`insights.js`、`disaster.js`；純計算在 `bento.js`、`prep.js`、`rewards.js`、`calendar.js`、`config.js`（前端 `web/src/lib/` 有對應的顯示用副本）。
+
+第一階段 demo 資料：`node scripts/seed-phase1.js`（跑在 `seed.js` 之後，固定 id 可重跑；`--catalog-only` 只寫參數、菜色庫、模板與兩家 demo 店的配方）。
+
 ## Cloud Functions 一覽
 
 | 分類 | Function | 類型 |

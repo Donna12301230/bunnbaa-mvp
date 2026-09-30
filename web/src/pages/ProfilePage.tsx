@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/firebase";
 import type { UserProfile } from "@/types";
+import TasteAndNotifySection from "@/components/TasteAndNotifySection";
 
 interface BanAppeal {
   id: string;
@@ -179,6 +180,8 @@ export default function ProfilePage() {
 
         {user?.orderBanned && <BanAppealSection user={user} />}
 
+        {user && <TasteAndNotifySection user={user} />}
+
         {/* 快速功能 */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button
@@ -192,13 +195,13 @@ export default function ProfilePage() {
             </div>
           </button>
           <button
-            onClick={() => navigate("/my-locks")}
+            onClick={() => navigate("/rewards")}
             className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
           >
             <History className="w-5 h-5 text-orange-500 shrink-0" />
             <div>
-              <p className="font-medium text-sm">{tr("我的鎖定紀錄", "My lock history")}</p>
-              <p className="text-xs text-muted-foreground">{tr("真實資料簡易列表（開發用）", "Simple list of your data (for development)")}</p>
+              <p className="font-medium text-sm">{tr("抽獎券與折價券", "Tickets & coupons")}</p>
+              <p className="text-xs text-muted-foreground">{tr("成長獎勵：抽獎、查看折價券到期日", "Draw and check coupon expiry")}</p>
             </div>
           </button>
           <button

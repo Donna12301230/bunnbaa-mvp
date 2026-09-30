@@ -1,12 +1,16 @@
 // Server-side copy of web/src/lib/pricing.ts + web/src/lib/pickupSlots.ts.
-// Pickup schedule is per vendor (vendors/{id}.pickup_windows / business_hours /
-// holidays / slot_capacity, edited in the vendor portal); unset fields fall
-// back to DEFAULT_PICKUP_WINDOWS, open every day, unlimited capacity.
-// Prices are computed here from menu_items, never taken from the client —
-// otherwise a tampered request could lock a meal at any price it likes.
+// 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格.md）：
+//   - 只做午餐自取、營業日週一至週五（platformConfig.businessWeekdays）
+//   - 取餐日前一天 cutoffTime（預設 20:00）截單；店家可提前（vendors.cutoff_time），不可延後
+//   - 預訂開放到下週五
+//   - 仍保留「鎖定早鳥折扣」：越早訂越便宜（使用者 2026-09-30 決定）
+// 店家取餐排程：vendors.pickup_windows（取餐時段內再切的小時段）、business_hours、holidays、
+// slot_capacity。沒設的欄位退回預設。價格一律由伺服器依 menu_items 計算，不信任前端。
 // Keep the tiers and slots in sync with the web copies by hand.
 
 const { t } = require("./i18n");
+const { DEFAULT_PLATFORM_CONFIG } = require("./config");
+const { taipeiToday, addDays, daysBetween, weekdayOf, lastBookableDate, at, toMinutes, splitWindow } = require("./calendar");
 
 const EARLY_BIRD_TIERS = [
   { minDays: 0, maxDays: 1, discountPercent: 5 },
@@ -14,11 +18,9 @@ const EARLY_BIRD_TIERS = [
   { minDays: 14, maxDays: 30, discountPercent: 30 },
 ];
 
-// Farthest pickup date a buyer may book (last early-bird tier's upper bound).
-const MAX_ADVANCE_DAYS = 30;
-
-const DEFAULT_PICKUP_WINDOWS = ["11:30-12:00", "12:00-12:30", "12:30-13:00"];
+const DEFAULT_PICKUP_WINDOWS = ["11:00-11:30", "11:30-12:00", "12:00-12:30", "12:30-13:00"];
 const WINDOW_PATTERN = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function isValidWindow(window) {
   if (typeof window !== "string" || !WINDOW_PATTERN.test(window)) return false;
@@ -31,29 +33,59 @@ function vendorWindows(vendor) {
   return own.length > 0 ? own : DEFAULT_PICKUP_WINDOWS;
 }
 
+/** 整個取餐時段（最早開始～最晚結束），例 "11:00-13:00"；轉愛心餐、提醒都以結束時間起算 */
+function vendorPickupRange(vendor) {
+  const windows = vendorWindows(vendor);
+  const starts = windows.map((w) => splitWindow(w).start).sort();
+  const ends = windows.map((w) => splitWindow(w).end).sort();
+  return `${starts[0]}-${ends[ends.length - 1]}`;
+}
+
+/** 店家截單時間：只能比平台早，不能晚 */
+function vendorCutoffTime(vendor, config = DEFAULT_PLATFORM_CONFIG) {
+  const own = vendor?.cutoff_time;
+  if (typeof own === "string" && TIME_PATTERN.test(own) && own < config.cutoffTime) return own;
+  return config.cutoffTime;
+}
+
+/** 某個取餐日的截單時間點（取餐日前一天） */
+function cutoffAt(pickupDate, vendor, config = DEFAULT_PLATFORM_CONFIG) {
+  return at(addDays(pickupDate, -1), vendorCutoffTime(vendor, config));
+}
+
+function isPastCutoff(pickupDate, vendor, config = DEFAULT_PLATFORM_CONFIG, now = new Date()) {
+  return now.getTime() >= cutoffAt(pickupDate, vendor, config).getTime();
+}
+
 /** 0 / missing / invalid = unlimited (returns null). */
 function vendorSlotCapacity(vendor) {
   const cap = vendor?.slot_capacity;
   return Number.isInteger(cap) && cap > 0 ? cap : null;
 }
 
-function taipeiToday() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }); // YYYY-MM-DD
-}
-
-function daysBetween(fromDate, toDate) {
-  const from = Date.parse(`${fromDate}T00:00:00Z`);
-  const to = Date.parse(`${toDate}T00:00:00Z`);
-  return Math.round((to - from) / (24 * 60 * 60 * 1000));
+/** 這天店家有沒有營業（平台營業日＋店家公休／每週營業設定） */
+function closedReason(pickupDate, vendor, config = DEFAULT_PLATFORM_CONFIG) {
+  const name = vendor?.name ?? t("這家店", "This vendor");
+  const weekday = weekdayOf(pickupDate);
+  if (!config.businessWeekdays.includes(weekday)) {
+    return t(`${pickupDate} 不是營業日（第一階段只做週一至週五午餐）`, `${pickupDate} isn't a business day (weekday lunches only)`);
+  }
+  if (Array.isArray(vendor?.holidays) && vendor.holidays.includes(pickupDate)) {
+    return t(`「${name}」${pickupDate} 公休`, `${name} is closed on ${pickupDate}`);
+  }
+  const hours = Array.isArray(vendor?.business_hours) ? vendor.business_hours.find((h) => h?.weekday === weekday) : null;
+  if (hours && hours.open === false) {
+    return t(`「${name}」${pickupDate} 沒有營業`, `${name} isn't open on ${pickupDate}`);
+  }
+  return null;
 }
 
 /**
- * Returns a problem message (caller wraps it in HttpsError), or null when
- * pickupDate is YYYY-MM-DD within [today, today + MAX_ADVANCE_DAYS] in
- * Asia/Taipei, the vendor is open that day, the window is one of the vendor's
- * windows, and that window hasn't already started.
+ * Returns a problem message (caller wraps it in HttpsError), or null when the
+ * date/window can still be booked: business day, vendor open, within
+ * [today, 下週五], window is one of the vendor's, and the cutoff hasn't passed.
  */
-function validatePickup(pickupDate, pickupWindow, vendor, now = new Date()) {
+function validatePickup(pickupDate, pickupWindow, vendor, config = DEFAULT_PLATFORM_CONFIG, now = new Date()) {
   if (typeof pickupDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(pickupDate)) {
     return t("取餐日期格式不正確", "Invalid pickup date");
   }
@@ -61,55 +93,57 @@ function validatePickup(pickupDate, pickupWindow, vendor, now = new Date()) {
   if (!windows.includes(pickupWindow)) {
     return t(`「${vendor?.name ?? "這家店"}」沒有 ${pickupWindow} 這個取餐時段`, `${vendor?.name ?? "This vendor"} doesn't offer the ${pickupWindow} pickup time`);
   }
-  if (Array.isArray(vendor?.holidays) && vendor.holidays.includes(pickupDate)) {
-    return t(`「${vendor?.name ?? "這家店"}」${pickupDate} 公休`, `${vendor?.name ?? "This vendor"} is closed on ${pickupDate}`);
+  const closed = closedReason(pickupDate, vendor, config);
+  if (closed) return closed;
+  const today = taipeiToday(now);
+  const last = lastBookableDate(today);
+  if (pickupDate < today || pickupDate > last) {
+    return t(`目前只能預訂到 ${last}（下週五）`, `You can book up to ${last} (next Friday)`);
   }
-  const weekday = new Date(`${pickupDate}T00:00:00Z`).getUTCDay();
-  const hours = Array.isArray(vendor?.business_hours) ? vendor.business_hours.find((h) => h?.weekday === weekday) : null;
-  if (hours && hours.open === false) {
-    return t(`「${vendor?.name ?? "這家店"}」${pickupDate} 沒有營業`, `${vendor?.name ?? "This vendor"} isn't open on ${pickupDate}`);
-  }
-  const days = daysBetween(taipeiToday(), pickupDate);
-  if (Number.isNaN(days) || days < 0 || days > MAX_ADVANCE_DAYS) {
-    return t(`取餐日期只能選今天到 ${MAX_ADVANCE_DAYS} 天後`, `Pickup must be between today and ${MAX_ADVANCE_DAYS} days from now`);
-  }
-  const start = new Date(`${pickupDate}T${pickupWindow.split("-")[0]}:00+08:00`);
-  if (start.getTime() <= now.getTime()) {
-    return t("這個取餐時段已經開始，請改選其他時段", "That pickup time has already started. Please choose another.");
+  if (isPastCutoff(pickupDate, vendor, config, now)) {
+    return t(
+      `${pickupDate} 的訂單已在前一天 ${vendorCutoffTime(vendor, config)} 截單，請改選其他日期`,
+      `Orders for ${pickupDate} closed at ${vendorCutoffTime(vendor, config)} the day before. Please pick another date.`
+    );
   }
   return null;
 }
 
-function addDays(dateStr, days) {
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 /**
- * Meal-plan pickup dates: `days` vendor-open dates from startDate onward, all
- * at the same pickupWindow, skipping holidays / closed weekdays. startDate
- * itself must be bookable. Returns { dates } or { problem } (the latter for the
- * caller to wrap in HttpsError). Every date stays within MAX_ADVANCE_DAYS.
+ * Meal-plan pickup dates: `days` bookable dates from startDate onward, all at
+ * the same pickupWindow. Returns { dates } or { problem }.
  */
-function planPickupDates(startDate, pickupWindow, vendor, days, now = new Date()) {
-  const first = validatePickup(startDate, pickupWindow, vendor, now);
+function planPickupDates(startDate, pickupWindow, vendor, days, config = DEFAULT_PLATFORM_CONFIG, now = new Date()) {
+  const first = validatePickup(startDate, pickupWindow, vendor, config, now);
   if (first) return { problem: first };
+  const last = lastBookableDate(taipeiToday(now));
   const dates = [];
   for (let date = startDate; dates.length < days; date = addDays(date, 1)) {
-    if (daysBetween(taipeiToday(), date) > MAX_ADVANCE_DAYS) {
-      return { problem: t(`從 ${startDate} 起 ${MAX_ADVANCE_DAYS} 天內湊不滿 ${days} 個營業日，請提早開始日期`, `There aren't ${days} open days within ${MAX_ADVANCE_DAYS} days of ${startDate}. Please start earlier.`) };
+    if (date > last) {
+      return { problem: t(`從 ${startDate} 起到下週五湊不滿 ${days} 個營業日，請提早開始日期`, `There aren't ${days} open days between ${startDate} and next Friday. Please start earlier.`) };
     }
-    if (!validatePickup(date, pickupWindow, vendor, now)) dates.push(date);
+    if (!validatePickup(date, pickupWindow, vendor, config, now)) dates.push(date);
   }
   return { dates };
 }
 
-function applyEarlyBirdPrice(originalPrice, pickupDate) {
-  const days = Math.max(0, daysBetween(taipeiToday(), pickupDate));
-  const tier = EARLY_BIRD_TIERS.find((t) => days >= t.minDays && days <= t.maxDays);
-  const discountPercent = tier?.discountPercent ?? 0;
+function earlyBirdPercent(pickupDate, now = new Date()) {
+  const days = Math.max(0, daysBetween(taipeiToday(now), pickupDate));
+  return EARLY_BIRD_TIERS.find((tier) => days >= tier.minDays && days <= tier.maxDays)?.discountPercent ?? 0;
+}
+
+function applyEarlyBirdPrice(originalPrice, pickupDate, now = new Date()) {
+  const discountPercent = earlyBirdPercent(pickupDate, now);
   return { discountPercent, lockedPrice: Math.round(originalPrice * (1 - discountPercent / 100)) };
 }
 
-module.exports = { MAX_ADVANCE_DAYS, validatePickup, planPickupDates, applyEarlyBirdPrice, vendorSlotCapacity };
+function windowMinutes(window) {
+  const { start, end } = splitWindow(window);
+  return toMinutes(end) - toMinutes(start);
+}
+
+module.exports = {
+  EARLY_BIRD_TIERS, DEFAULT_PICKUP_WINDOWS, isValidWindow, vendorWindows, vendorPickupRange, vendorCutoffTime,
+  cutoffAt, isPastCutoff, closedReason, validatePickup, planPickupDates, applyEarlyBirdPrice, earlyBirdPercent,
+  vendorSlotCapacity, windowMinutes,
+};

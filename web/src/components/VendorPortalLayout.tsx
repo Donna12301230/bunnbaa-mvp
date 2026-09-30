@@ -1,7 +1,7 @@
 import { tr } from "@/lib/i18n";
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, UtensilsCrossed, ClipboardList, Settings, ArrowLeft, CalendarDays, Search, TrendingUp, AlertTriangle, ChefHat, Trophy } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, ClipboardList, Settings, ArrowLeft, CalendarDays, ScanLine, TrendingUp, AlertTriangle, ChefHat, Trophy, BookOpen, ShoppingBasket, HeartHandshake, MapPinned } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyVendor } from "@/hooks/useMyVendor";
@@ -12,14 +12,18 @@ import { useToast } from "@/hooks/use-toast";
 // 用函式包起來，每次 render 依目前語言組標籤
 const navItems = () => [
   { href: "/vendor-portal/dashboard", label: tr("總覽", "Overview"), icon: LayoutDashboard },
-  { href: "/vendor-portal/sessions", label: tr("訂餐時段", "Pickup slots"), icon: CalendarDays },
-  // 核對取餐指向真的接 Firestore 的 /lock/vendor/redeem（跟 MarketplaceHeader 同一個入口）
-  { href: "/lock/vendor/redeem", label: tr("核對取餐", "Redeem"), icon: Search },
+  // 取餐掃碼指向 /lock/vendor/redeem（舊路徑，跟 MarketplaceHeader 同一個入口）
+  { href: "/lock/vendor/redeem", label: tr("取餐掃碼", "Pickup scan"), icon: ScanLine },
+  { href: "/vendor-portal/prep", label: tr("每日備料", "Daily prep"), icon: ChefHat },
+  { href: "/vendor-portal/purchasing", label: tr("採購叫貨", "Purchasing"), icon: ShoppingBasket },
   { href: "/vendor-portal/menu", label: tr("菜單管理", "Menu"), icon: UtensilsCrossed },
+  { href: "/vendor-portal/recipes", label: tr("配方原物料", "Recipes"), icon: BookOpen },
   { href: "/vendor-portal/orders", label: tr("訂單管理", "Orders"), icon: ClipboardList },
-  { href: "/vendor-portal/prep", label: tr("今日備料", "Today's prep"), icon: ChefHat },
+  { href: "/vendor-portal/sessions", label: tr("訂餐時段", "Pickup slots"), icon: CalendarDays },
+  { href: "/vendor-portal/charity", label: tr("愛心餐", "Charity"), icon: HeartHandshake },
+  { href: "/vendor-portal/growth", label: tr("券負債看板", "Rewards"), icon: Trophy },
+  { href: "/vendor-portal/insights", label: tr("區域洞察", "Insights"), icon: MapPinned },
   { href: "/vendor-portal/reports", label: tr("統計報表", "Reports"), icon: TrendingUp },
-  { href: "/vendor-portal/growth", label: tr("成長獎勵", "Growth rewards"), icon: Trophy },
   { href: "/vendor-portal/settings", label: tr("店家設定", "Store settings"), icon: Settings },
 ];
 
@@ -117,9 +121,9 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
         </aside>
 
         {/* Mobile bottom nav */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border flex md:hidden z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border flex md:hidden z-50 overflow-x-auto">
           {navItems().map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className="flex-1">
+            <Link key={href} href={href} className="flex-1 min-w-[64px]">
               <div className={cn(
                 "flex flex-col items-center py-2 text-xs",
                 location === href || location.startsWith(href) ? "text-primary" : "text-muted-foreground"

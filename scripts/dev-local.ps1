@@ -84,6 +84,11 @@ if (-not $hasExport) {
   if ($LASTEXITCODE -ne 0) {
     Write-Host "擴充種子資料沒有灌入（若訊息是 seed-user-001 already exists 代表已經有資料，可忽略）。" -ForegroundColor Yellow
   }
+  # 第一階段規格：模板、配方、便當、歷史訂單、許願、回饋池（固定 id，可重跑）
+  node (Join-Path $repo "scripts\seed-phase1.js")
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "第一階段種子資料沒有灌入，請看上面的錯誤訊息。" -ForegroundColor Yellow
+  }
 } else {
   Write-Host "沿用上次存檔的 emulator 資料（要重灌請加 -Reset）" -ForegroundColor Green
 }

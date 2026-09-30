@@ -1,96 +1,88 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
-import { CalendarDays, MapPin, Minus, Plus, ShoppingCart, Trash2, UtensilsCrossed } from "lucide-react";
+import { CalendarDays, MapPin, Minus, Plus, ShoppingCart, Ticket, Trash2, UtensilsCrossed } from "lucide-react";
 import { httpsCallable } from "@/lib/callable";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
-import { useCart } from "@/hooks/useCart";
+import { useCart, type CartLine } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { db, functions } from "@/lib/firebase";
 import type { Vendor } from "@/types";
 import { EmptyState } from "@/components/ds";
-import PickupPicker from "@/components/PickupPicker";
 import { useAuth } from "@/hooks/useAuth";
-import { applyEarlyBirdPrice } from "@/lib/pricing";
-import { DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, slotLabel as toSlotLabel, todayStr } from "@/lib/pickupSlots";
-import { useSlotAvailability } from "@/hooks/useSlotAvailability";
+import { useMyCoupons, millis } from "@/hooks/useMyRewards";
+import { bookingProblem, slotLabel, vendorCutoffTime } from "@/lib/pickupSlots";
+import { discountText } from "@/lib/pricing";
+import { portionLabel, priceBreakdown, riceLabel } from "@/lib/bento";
+import { couponTitle } from "@/lib/rewards";
 import { tr, loc } from "@/lib/i18n";
 
-// 購物車頁面。
-// UIUX 檢視後新增:原本 MenuItemPage「加入購物車」只會彈 toast,useCart 把品項存進
-// localStorage,但全站沒有任何頁面能查看/調整/送出購物車——是斷掉的核心動線。
-// 這頁補上查看、調整數量、刪除、送出預購的畫面。
-// 「送出預購」接真的 LINE Pay（createCartLinePayReservation，
-// functions/src/index.js），付款確認後才建立真實 locks 文件。每個 cart
-// item 現在都帶著真實 vendor_id（來自真實 menu_items），Cloud Function
-// 依此各自歸戶到正確的商家，不再全部掛在單一寫死的商家底下。
-// 2026-09-25：結帳前要選取餐日期＋時段（原本伺服器寫死「今天 12:00-13:00」、
-// 沒有早鳥價），並列出完整明細。價格由伺服器依 menu_items 重算，這裡的金額只是預覽。
+// 購物車（規格 §4）：每一行是一份便當，各自有取餐日（到下週五）、時段、配菜與加減飯；
+// 每筆（每一份）限用一張折價券，折抵 = min(券面, 加減後小計)。金額只是預覽，
+// createCartLinePayReservation 會依 menu_items 重算；金額 0 元（折價券全額折抵）不經 LINE Pay。
 export default function CartPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const confirm = useConfirm();
-  const { items, vendorId, total, removeItem, updateQuantity, clearCart } = useCart();
+  const { lines, vendorId, update, remove, clearCart } = useCart();
   const [checkingOut, setCheckingOut] = useState(false);
+  const [ack, setAck] = useState(false);
   const requireLogin = useRequireLogin();
   const { user } = useAuth();
-  const [pickup, setPickup] = useState(
-    () => nextAvailablePickup() ?? { date: todayStr(), window: DEFAULT_PICKUP_WINDOWS[0] }
-  );
-  const { discountPercent, tierLabel } = applyEarlyBirdPrice(100, pickup.date);
-  const lines = items.map((line) => ({
-    ...line,
-    unitPrice: applyEarlyBirdPrice(line.menuItem.price, pickup.date).lockedPrice,
-  }));
-  const discountedTotal = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
-  const slotLabel = toSlotLabel(pickup.window);
+  const { usable } = useMyCoupons(user?.id);
 
   const { data: vendor } = useQuery({
     queryKey: ["vendor", vendorId],
     queryFn: async () => {
-      if (!vendorId) return null;
-      const snap = await getDoc(doc(db, "vendors", vendorId));
+      const snap = await getDoc(doc(db, "vendors", vendorId!));
       return snap.exists() ? ({ id: snap.id, ...snap.data() } as Vendor) : null;
     },
     enabled: !!vendorId,
   });
 
-  // 商家資料載入後，如果目前選的日期這家店不營業，跳到這家店最近一個能訂的日期
-  const [pickupSyncedFor, setPickupSyncedFor] = useState<string | null>(null);
-  useEffect(() => {
-    if (!vendor || pickupSyncedFor === vendor.id) return;
-    setPickupSyncedFor(vendor.id);
-    const next = nextAvailablePickup(vendor);
-    if (next && next.date > pickup.date) setPickup(next);
-  }, [vendor, pickupSyncedFor, pickup.date]);
-  const { closedReason, slots } = useSlotAvailability(vendor, pickup.date);
-  const selectedSlot = slots.find((s) => s.window === pickup.window);
-  const canCheckout = !closedReason && !!selectedSlot?.open
-    && (selectedSlot.remaining === null || selectedSlot.remaining >= items.reduce((n, i) => n + i.quantity, 0));
+  const vendorCoupons = usable.filter((c) => c.vendor_id === vendorId);
+  const usedCoupons = new Set(lines.map((l) => l.couponId).filter(Boolean));
+  const couponOf = (l: CartLine) => vendorCoupons.find((c) => c.id === l.couponId);
+
+  const priced = lines.map((l) => {
+    const unit = priceBreakdown(l.menuItem, l.pickupDate, l.rice, l.choices);
+    const coupon = couponOf(l);
+    const couponDiscount = coupon ? Math.min(coupon.discount, unit.subtotal) : 0;
+    return { line: l, unit, couponDiscount, total: unit.subtotal * l.quantity - couponDiscount, problem: vendor ? bookingProblem(vendor, l.pickupDate) : null };
+  });
+  const listTotal = priced.reduce((s, p) => s + p.unit.listPrice * p.line.quantity, 0);
+  const earlyTotal = priced.reduce((s, p) => s + p.unit.earlyBird * p.line.quantity, 0);
+  const adjustTotal = priced.reduce((s, p) => s + p.unit.adjust * p.line.quantity, 0);
+  const couponTotal = priced.reduce((s, p) => s + p.couponDiscount, 0);
+  const grandTotal = priced.reduce((s, p) => s + p.total, 0);
+  const blocked = priced.find((p) => p.problem);
 
   async function handleCheckout() {
-    // 購物車可以先放著不登入，結帳才要求登入（購物車存在本機，登入回來還在）
     if (!requireLogin()) return;
     setCheckingOut(true);
     try {
-
       const fn = httpsCallable(functions, "createCartLinePayReservation");
       const result = await fn({
-        pickup_date: pickup.date,
-        pickup_window: pickup.window,
-        items: items.map(({ menuItem, quantity, note }) => ({
-          menu_item_id: menuItem.id,
-          quantity,
-          note: note.trim(),
+        lines: lines.map((l) => ({
+          menu_item_id: l.menuItem.id,
+          pickup_date: l.pickupDate,
+          pickup_window: l.pickupWindow,
+          slots: l.choices.map((choice) => ({ choice })),
+          rice: l.rice,
+          quantity: l.quantity,
+          note: l.note,
+          coupon_id: l.couponId || null,
         })),
       });
-      const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
+      const { order_id: orderId, payment_url: paymentUrl, free } = result.data as { order_id: string; payment_url: string; free?: boolean };
       clearCart();
-      window.location.href = paymentUrl;
+      if (free) navigate(`/payment/confirm/${orderId}`);
+      else window.location.href = paymentUrl;
     } catch (err) {
       toast({ title: tr("前往付款失敗", "Couldn't start payment"), description: (err as Error).message, variant: "destructive" });
       setCheckingOut(false);
@@ -100,16 +92,15 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <MarketplaceHeader />
-
       <div className="max-w-2xl mx-auto px-4 md:px-6 py-6 space-y-4">
         <h1 className="text-2xl font-bold">{tr("購物車", "Cart")}</h1>
 
-        {items.length === 0 ? (
+        {lines.length === 0 ? (
           <div className="bg-white rounded-xl border border-border shadow-sm">
             <EmptyState
               icon={<ShoppingCart size={32} />}
               title={tr("購物車還是空的", "Your cart is empty")}
-              description={tr("逛逛附近的商家，提前預約享早鳥價。", "Browse nearby vendors and book early for early-bird prices.")}
+              description={tr("越早訂，越開心：提前預約享早鳥價。", "Book early, save more.")}
               action={<Button onClick={() => navigate("/vendors")}>{tr("去逛逛商家", "Browse vendors")}</Button>}
             />
           </div>
@@ -118,75 +109,71 @@ export default function CartPage() {
             {vendor && (
               <p className="text-sm text-muted-foreground">
                 {tr("來自 ", "From ")}<span className="font-semibold text-foreground">{loc(vendor, "name")}</span>
-                {tr("・一次只能跟一家商家預購", " · you can pre-order from one vendor at a time")}
+                {tr("・一次只能跟一家商家預購", " · one vendor per checkout")}
               </p>
             )}
 
-            <div className="bg-white rounded-xl border border-border p-4 space-y-3">
-              <h2 className="text-sm font-semibold flex items-center gap-1.5">
-                <CalendarDays className="w-4 h-4 text-orange-500" /> {tr("取餐日期與時段", "Pickup date & time")}
-              </h2>
-              <PickupPicker
-                date={pickup.date}
-                window={pickup.window}
-                onDateChange={(date) => setPickup((p) => ({ ...p, date }))}
-                onWindowChange={(window) => setPickup((p) => ({ ...p, window }))}
-                uid={user?.id}
-                vendor={vendor}
-              />
-              <p className="text-xs text-muted-foreground">{tr("早鳥優惠：", "Early bird: ")}{discountPercent > 0 ? tierLabel : tr("此日期沒有早鳥折扣", "no early-bird discount for this date")}</p>
-            </div>
-
             <div className="bg-white rounded-xl border border-border divide-y divide-border">
-              {lines.map(({ menuItem, quantity, note, unitPrice }) => (
-                <div key={`${menuItem.id}-${note}`} className="p-4 flex items-start gap-3">
-                  {menuItem.image ? (
-                    <img src={menuItem.image} alt="" className="w-14 h-14 shrink-0 rounded-lg object-cover" />
+              {priced.map(({ line, unit, couponDiscount, problem }) => (
+                <div key={line.key} className="p-4 flex items-start gap-3">
+                  {line.menuItem.image ? (
+                    <img src={line.menuItem.image} alt="" className="w-14 h-14 shrink-0 rounded-lg object-cover" />
                   ) : (
                     <div className="w-14 h-14 shrink-0 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
                       <UtensilsCrossed className="h-6 w-6 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm">{loc(menuItem, "name")}</p>
-                    {note && <p className="text-xs text-muted-foreground mt-0.5">{tr("備註：", "Note: ")}{note}</p>}
-                    <p className="text-sm font-bold text-orange-600 mt-1">
-                      NT${unitPrice}
-                      {unitPrice < menuItem.price && (
-                        <span className="ml-1.5 text-xs font-normal text-muted-foreground line-through">NT${menuItem.price}</span>
-                      )}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <p className="font-semibold text-sm">{loc(line.menuItem, "name")}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <CalendarDays className="w-3.5 h-3.5" /> {line.pickupDate}・{slotLabel(line.pickupWindow)}
+                      {unit.discountPercent > 0 && <span className="text-green-700">・{tr("早鳥", "Early bird")} {discountText(unit.discountPercent)}</span>}
                     </p>
+                    {line.menuItem.slots && line.choices.length > 0 && (
+                      <ul className="text-xs text-muted-foreground">
+                        {line.menuItem.slots.map((slot, i) => {
+                          const c = line.choices[i];
+                          const text = c === "none" ? tr("不要", "none") : c === "default" || c === undefined ? slot.default.name
+                            : tr(`許願 ${slot.candidates[c].name}（${portionLabel(slot.candidates[c].portion_level)}）`, `Wish: ${slot.candidates[c].name}`);
+                          return <li key={i}>{slot.category}：{text}</li>;
+                        })}
+                      </ul>
+                    )}
+                    {riceLabel(line.rice) && <p className="text-xs text-muted-foreground">{riceLabel(line.rice)}</p>}
+                    {line.note && <p className="text-xs text-muted-foreground">{tr("備註：", "Note: ")}{line.note}</p>}
+                    <p className="text-sm font-bold text-orange-600">
+                      NT${unit.subtotal}{line.quantity > 1 && ` × ${line.quantity}`}
+                      {couponDiscount > 0 && <span className="ml-1.5 text-xs text-green-700">{tr(`折價券 −${couponDiscount}`, `coupon −${couponDiscount}`)}</span>}
+                    </p>
+                    {vendorCoupons.length > 0 && (
+                      <label className="flex items-center gap-1.5 text-xs">
+                        <Ticket className="w-3.5 h-3.5 text-orange-500" />
+                        <select
+                          className="h-8 rounded-md border border-input bg-background px-1.5 text-xs"
+                          value={line.couponId ?? ""}
+                          onChange={(e) => update(line.key, { couponId: e.target.value || null })}
+                          aria-label={tr("使用折價券", "Use a coupon")}
+                        >
+                          <option value="">{tr("不使用折價券", "No coupon")}</option>
+                          {vendorCoupons.map((c) => (
+                            <option key={c.id} value={c.id} disabled={usedCoupons.has(c.id) && line.couponId !== c.id}>
+                              {couponTitle(c.discount)}（{tr("到期", "exp.")} {new Date(millis(c.expires_at)).toLocaleDateString()}）
+                            </option>
+                          ))}
+                        </select>
+                        {line.quantity > 1 && line.couponId && <span className="text-muted-foreground">{tr("只折其中一份", "applies to one")}</span>}
+                      </label>
+                    )}
+                    {problem && <p className="text-xs text-red-600">{problem}{tr("，請移除後重新選擇日期。", " — remove it and pick another date.")}</p>}
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:bg-red-50 hover:text-red-600"
-                      onClick={() => removeItem(menuItem.id, note)}
-                      aria-label={tr(`移除 ${menuItem.name}`, `Remove ${menuItem.name}`)}
-                    >
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-red-50 hover:text-red-600" onClick={() => remove(line.key)} aria-label={tr("移除", "Remove")}>
                       <Trash2 />
                     </Button>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 rounded-full"
-                        onClick={() => updateQuantity(menuItem.id, note, quantity - 1)}
-                        aria-label={tr("減少數量", "Decrease quantity")}
-                      >
-                        <Minus />
-                      </Button>
-                      <span className="w-5 text-center text-sm font-medium">{quantity}</span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 rounded-full"
-                        onClick={() => updateQuantity(menuItem.id, note, quantity + 1)}
-                        aria-label={tr("增加數量", "Increase quantity")}
-                      >
-                        <Plus />
-                      </Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => update(line.key, { quantity: line.quantity - 1 })} aria-label={tr("減少數量", "Decrease quantity")}><Minus /></Button>
+                      <span className="w-5 text-center text-sm font-medium">{line.quantity}</span>
+                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => update(line.key, { quantity: line.quantity + 1 })} aria-label={tr("增加數量", "Increase quantity")}><Plus /></Button>
                     </div>
                   </div>
                 </div>
@@ -207,48 +194,33 @@ export default function CartPage() {
             <div className="bg-white rounded-xl border border-border p-4 space-y-3">
               <h2 className="text-sm font-semibold">{tr("訂單明細", "Order summary")}</h2>
               <dl className="text-sm space-y-1.5">
-                <div className="flex justify-between gap-3">
-                  <dt className="text-muted-foreground">{tr("商家", "Vendor")}</dt>
-                  <dd className="text-right">{loc(vendor, "name") || "—"}</dd>
-                </div>
                 {vendor?.address && (
                   <div className="flex justify-between gap-3">
-                    <dt className="text-muted-foreground flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {tr("取餐地點", "Pickup location")}</dt>
+                    <dt className="text-muted-foreground flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {tr("取餐地點（自取）", "Pickup (self)")}</dt>
                     <dd className="text-right">{vendor.address}</dd>
                   </div>
                 )}
-                <div className="flex justify-between gap-3">
-                  <dt className="text-muted-foreground">{tr("取餐時間", "Pickup time")}</dt>
-                  <dd className="text-right font-medium">{pickup.date}・{slotLabel}</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-muted-foreground">{tr("原價小計", "Subtotal")}</dt>
-                  <dd className="text-right">NT${total}</dd>
-                </div>
-                {total > discountedTotal && (
-                  <div className="flex justify-between gap-3 text-green-700">
-                    <dt>{tr("早鳥折扣", "Early-bird discount")}</dt>
-                    <dd className="text-right">−NT${total - discountedTotal}</dd>
-                  </div>
-                )}
+                <div className="flex justify-between gap-3"><dt className="text-muted-foreground">{tr("原價小計", "Subtotal")}</dt><dd>NT${listTotal}</dd></div>
+                {earlyTotal > 0 && <div className="flex justify-between gap-3 text-green-700"><dt>{tr("早鳥折扣", "Early-bird discount")}</dt><dd>−NT${earlyTotal}</dd></div>}
+                {adjustTotal !== 0 && <div className="flex justify-between gap-3"><dt className="text-muted-foreground">{tr("加減飯菜", "Adjustments")}</dt><dd>{adjustTotal > 0 ? "+" : "−"}NT${Math.abs(adjustTotal)}</dd></div>}
+                {couponTotal > 0 && <div className="flex justify-between gap-3 text-green-700"><dt>{tr("折價券", "Coupons")}</dt><dd>−NT${couponTotal}</dd></div>}
               </dl>
               <div className="flex items-center justify-between text-base font-bold pt-2 border-t border-border">
-                <span>{tr("總計", "Total")}</span>
-                <span className="text-orange-600">NT${discountedTotal}</span>
+                <span>{tr("實付", "Total")}</span>
+                <span className="text-orange-600">NT${grandTotal}</span>
               </div>
-              {!canCheckout && (
-                <p className="text-xs text-red-600">
-                  {selectedSlot?.remaining != null && selectedSlot.remaining > 0
-                    ? tr(`這個時段只剩 ${selectedSlot.remaining} 份，請減少數量或改選其他時段。`, `Only ${selectedSlot.remaining} left in this slot. Reduce the quantity or pick another time.`)
-                    : tr("請先選一個可以預約的取餐日期與時段。", "Please choose an available pickup date and time.")}
-                </p>
-              )}
-              <Button
-                className="w-full"
-                onClick={handleCheckout}
-                disabled={checkingOut || !canCheckout}
-              >
-                {checkingOut ? tr("前往付款中…", "Redirecting to payment…") : tr("送出預購並付款", "Place order & pay")}
+              <label className="flex items-start gap-1.5 p-2 rounded-lg bg-muted border border-border cursor-pointer">
+                <Checkbox checked={ack} onCheckedChange={() => setAck((v) => !v)} className="mt-0.5 shrink-0" />
+                <span className="text-caption leading-relaxed text-muted-foreground">
+                  {tr(
+                    `我了解：取餐前一天 ${vendorCutoffTime(vendor)} 截單，截單前可免費取消全額退款；截單後店家已依訂單備料，不可退款，但可以轉讓、贈送或捐為愛心餐。取餐時段結束 30 分鐘仍未取餐，將轉為愛心餐、不退款（照常發抽獎券）。停班停課當日訂單自動全額退款；天災期間店家可等值替換配菜。`,
+                    `I understand: orders close at ${vendorCutoffTime(vendor)} the day before pickup and can be cancelled for a full refund until then. After cutoff there are no refunds, but you can transfer, gift or donate the meal. Meals not picked up 30 min after the window become charity meals (no refund; reward tickets still issued). Orders are refunded automatically on work-suspension days; during disasters the vendor may substitute an equivalent side.`
+                  )}
+                </span>
+              </label>
+              {blocked && <p className="text-xs text-red-600">{tr("有餐點已過截單或不能預訂，請先移除。", "Some meals are past cutoff — please remove them first.")}</p>}
+              <Button className="w-full" onClick={handleCheckout} disabled={checkingOut || !ack || !!blocked}>
+                {checkingOut ? tr("處理中…", "Working…") : grandTotal === 0 ? tr("折價券全額折抵，送出預購", "Covered by coupons — place order") : tr("送出預購並以 LINE Pay 付款", "Place order & pay with LINE Pay")}
               </Button>
             </div>
           </>

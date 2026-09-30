@@ -3,8 +3,9 @@ import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
   Search, Globe, User, ChevronDown, ClipboardList, Repeat,
-  CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart,
+  CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart, Trophy,
 } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
 import { logout } from "@/lib/auth";
 import { useCart } from "@/hooks/useCart";
@@ -39,7 +40,7 @@ import { setLang, useI18n } from "@/lib/i18n";
 // 沒有任何地方能查看/結帳購物車,是斷掉的動線),見 CartPage.tsx。
 //
 // 2026-09-28:最前面加「首頁」分頁,連到品牌形象頁(/landing,LandingPage.tsx)。
-export type MarketplaceTab = "landing" | "plans" | "transfer" | "bookings" | "vendors";
+export type MarketplaceTab = "landing" | "plans" | "transfer" | "bookings" | "vendors" | "rewards";
 
 interface NavItem {
   tab: MarketplaceTab;
@@ -66,11 +67,12 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
 
   const navItems: NavItem[] = [
     { tab: "plans", href: "/home", label: t("預購餐點", "Pre-order"), icon: ClipboardList },
-    { tab: "transfer", href: "/marketplace", label: t("轉讓市集", "Transfers"), icon: Repeat },
+    { tab: "transfer", href: "/marketplace", label: t("轉讓・愛心餐", "Transfers"), icon: Repeat },
     isVendor
       ? { tab: "bookings", href: "/lock/vendor/redeem", label: t("核對取餐", "Redeem"), icon: QrCode }
       : { tab: "bookings", href: "/my-bookings", label: t("我的餐點", "My meals"), icon: CalendarDays },
     { tab: "vendors", href: "/vendors", label: t("商家", "Vendors"), icon: Store },
+    { tab: "rewards", href: "/rewards", label: t("成長獎勵", "Rewards"), icon: Trophy },
   ];
 
   function go(href: string) {
@@ -149,6 +151,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
             </DropdownMenuContent>
           </DropdownMenu>
 
+          <NotificationBell />
           <Button
             variant="ghost"
             size="icon"

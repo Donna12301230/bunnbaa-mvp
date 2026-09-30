@@ -61,7 +61,7 @@ async function resolveProfile(u: User): Promise<UserProfile> {
   }
 
   // users/{uid} 是註冊時寫的個人資料（電話、學校、科系），沒有也不影響登入。
-  // orderBanned/noPickupCount 是 markLockOutcome 在標記 no_show 時順手寫的。
+  // orderBanned/noPickupCount 是舊制未取餐停權寫的；donated_count 是捐愛心餐時 Functions 寫的。
   let extra: {
     display_name?: string;
     phone?: string;
@@ -69,6 +69,10 @@ async function resolveProfile(u: User): Promise<UserProfile> {
     orderBanned?: boolean;
     noPickupCount?: number;
     lang?: "zh" | "en";
+    home_geo?: string;
+    donated_count?: number;
+    muted_kinds?: string[];
+    charity_nearby_push?: boolean;
   } = {};
   try {
     const snap = await getDoc(doc(db, "users", u.uid));
@@ -91,7 +95,26 @@ async function resolveProfile(u: User): Promise<UserProfile> {
     orderBanned: extra.orderBanned || false,
     noPickupCount: extra.noPickupCount || 0,
     lang: extra.lang,
+    homeGeo: extra.home_geo,
+    donatedCount: extra.donated_count || 0,
+    mutedKinds: extra.muted_kinds || [],
+    charityNearbyPush: !!extra.charity_nearby_push,
   };
+}
+
+// 異常偵測（規格 §9.5「同一裝置 > 2 個帳號領券」）：瀏覽器本機的隨機裝置 id，登入時記到
+// users/{uid}.device_id。只用於平台異常標記，不做其他用途；讀寫失敗（無痕模式）就略過。
+function recordDevice(uid: string) {
+  try {
+    let id = localStorage.getItem("bunnbaa.device");
+    if (!id) {
+      id = Array.from(crypto.getRandomValues(new Uint8Array(12))).map((b) => b.toString(16).padStart(2, "0")).join("");
+      localStorage.setItem("bunnbaa.device", id);
+    }
+    setDoc(doc(db, "users", uid), { device_id: id }, { merge: true }).catch(() => undefined);
+  } catch {
+    // 沒有 localStorage 就不記
+  }
 }
 
 let _resolveSeq = 0;
@@ -105,6 +128,7 @@ async function refresh(u: User | null) {
   }
   setState({ user: _state.user, loading: true });
   const profile = await resolveProfile(u);
+  recordDevice(u.uid);
   // 期間如果又換了帳號，丟掉這次比較舊的結果
   if (seq === _resolveSeq) setState({ user: profile, loading: false });
 }

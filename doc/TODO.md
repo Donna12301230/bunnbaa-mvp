@@ -8,6 +8,26 @@
 
 ---
 
+## 🆕 第一階段規格改版（`spec-phase1` 分支，2026-09-30，尚未部署）
+
+依 `doc/BunnBaa 飯飽｜第一階段技術規格.md` 改版，保留鎖定折扣＋轉讓＋LINE Pay（對照表見 README「第一階段規格」）。
+emulator 端對端測試已跑過：截單判定許願、備料清單／時間軸、QR 簽章與防截圖、備援取餐號、抽獎券累計、抽獎、截單前取消退券、捐愛心餐→預約→核銷、週／月叫貨單、區域洞察、開放許願、停班自動取消。**瀏覽器畫面還沒實際點過。**
+
+部署前要做：
+- [ ] `functions/.env` 加 `PICKUP_QR_SECRET`（隨機長字串，見 `.env.example`）
+- [ ] 部署 `firestore:rules,firestore:indexes,functions,hosting`（新增 16 個複合索引，建立需要幾分鐘）
+- [ ] 正式站灌 `node scripts/seed-phase1.js`（或 `--catalog-only` 只灌模板與配方）
+- [ ] Firebase Console 確認新排程都有啟用：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`（每 5–10 分）、`closeRewardPeriod`（週一 00:10）、`buildWeeklyPurchase`（週六 12:00）、`buildMonthlyPurchase`（25 日）、`pollDisasterFeeds`（每 15 分）
+- [ ] 舊的 `drawGrowthReward`、`markLockOutcome`、`createLinePayReservation`、`pickupReminders`、`triggerPickupRemindersNow` 已移除，部署時 CLI 會問要不要刪除雲端上的舊函式 → 選是
+
+正式站要點過一次的流程：
+- [ ] 消費者：品項頁組便當（選日期、許願候選菜、不要、加減飯）→ 購物車套折價券 → LINE Pay → 我的餐點（QR、修改許願、截單前取消退款、代領連結、捐為愛心餐）
+- [ ] 店家：配方與原物料（Gemini 草稿、套用模板）→ 菜單便當設定 → 每日備料（產生、勾選、列印標籤、等值替換）→ 採購叫貨（盤點、LINE 傳送）→ 取餐掃碼 → 愛心餐 → 券負債看板 → 區域洞察
+- [ ] 管理員：平台參數、菜色庫與模板、天災事件（手動建立停班事件會真的退款，先用測試訂單）、異常審核
+- [ ] 手機：相機掃碼、定位（`firebase.json` 已改成 `geolocation=(self)`）
+
+---
+
 ## ⏭ 今天（2026-09-29）
 
 - [ ] **補設定資料**：在有正式站服務帳號金鑰的電腦上執行

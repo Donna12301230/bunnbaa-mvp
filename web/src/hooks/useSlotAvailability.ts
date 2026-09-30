@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { isSlotStarted, vendorClosedReason, vendorWindows } from "@/lib/pickupSlots";
+import { bookingProblem, isSlotStarted, vendorWindows } from "@/lib/pickupSlots";
 import type { Vendor } from "@/types";
 
 export interface SlotAvailability {
@@ -35,7 +35,8 @@ export function useSlotAvailability(vendor: Vendor | null | undefined, pickupDat
     staleTime: 15 * 1000,
   });
 
-  const closedReason = vendorClosedReason(vendor, pickupDate);
+  // 非營業日、公休、停班停課、已截單、超出預訂範圍都算不能訂
+  const closedReason = pickupDate ? bookingProblem(vendor, pickupDate) : null;
   const slots: SlotAvailability[] = vendorWindows(vendor).map((window) => {
     const started = isSlotStarted(pickupDate, window);
     const remaining = capacity === null ? null : Math.max(0, capacity - (booked[window] ?? 0));

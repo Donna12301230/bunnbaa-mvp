@@ -11,8 +11,6 @@ import { ConfirmProvider } from "@/components/ConfirmDialog";
 import { SiteThemeRoot } from "@/lib/siteLook";
 import { useAuth } from "@/hooks/useAuth";
 
-import ConsumerLockPage from "./pages/ConsumerLockPage";
-import VendorDashboard from "./pages/VendorDashboard";
 import VendorRedeemPage from "./pages/VendorRedeemPage";
 import PaymentConfirmPage from "./pages/PaymentConfirmPage";
 import PaymentCancelPage from "./pages/PaymentCancelPage";
@@ -22,7 +20,9 @@ import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
 import TransferMarketPage from "./pages/TransferMarketPage";
 import MyBookingsPage from "./pages/MyBookingsPage";
-import MyLocksPage from "./pages/MyLocksPage";
+import GiftClaimPage from "./pages/GiftClaimPage";
+import PickupProxyPage from "./pages/PickupProxyPage";
+import RewardsPage from "./pages/RewardsPage";
 import CartPage from "./pages/CartPage";
 import VendorListPage from "./pages/VendorListPage";
 import VendorPage from "./pages/VendorPage";
@@ -38,6 +38,9 @@ import AdminAppealsPage from "./pages/admin/AdminAppealsPage";
 import AdminLocksPage from "./pages/admin/AdminLocksPage";
 import AdminPayoutsPage from "./pages/admin/AdminPayoutsPage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
+import AdminPlatformPage from "./pages/admin/AdminPlatformPage";
+import AdminDishesPage from "./pages/admin/AdminDishesPage";
+import { AdminAnomaliesPage, AdminDisastersPage } from "./pages/admin/AdminEventsPage";
 import VendorPortalDashboard from "./pages/vendor-portal/VendorPortalDashboard";
 import VendorPortalMenu from "./pages/vendor-portal/VendorPortalMenu";
 import VendorPortalOrders from "./pages/vendor-portal/VendorPortalOrders";
@@ -47,6 +50,10 @@ import VendorPortalReports from "./pages/vendor-portal/VendorPortalReports";
 import VendorPortalSessions from "./pages/vendor-portal/VendorPortalSessions";
 import VendorPortalSessionSummary from "./pages/vendor-portal/VendorPortalSessionSummary";
 import VendorPortalSettings from "./pages/vendor-portal/VendorPortalSettings";
+import VendorPortalRecipes from "./pages/vendor-portal/VendorPortalRecipes";
+import VendorPortalPurchasing from "./pages/vendor-portal/VendorPortalPurchasing";
+import VendorPortalCharity from "./pages/vendor-portal/VendorPortalCharity";
+import VendorPortalInsights from "./pages/vendor-portal/VendorPortalInsights";
 
 const DesignSystemPreview = lazy(() => import("./pages/DesignSystemPreview"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
@@ -103,22 +110,32 @@ export default function App() {
             <MarketplacePage><RootGate /></MarketplacePage>
           </Route>
 
-          {/* 既有的預購鎖定機制 Demo — 維持原樣，改掛在 /lock 底下 */}
+          {/* 舊的單品鎖定示範頁（/lock、/lock/vendor）2026-09-30 拿掉：下單改走便當購物車，
+              贈送改 /gift/:lockId。/lock/vendor/redeem 保留為取餐掃碼頁的路徑。 */}
           <Route path="/lock">
-            <div className="legacy-ui"><ConsumerLockPage /></div>
+            <Redirect to="/home" replace />
           </Route>
           <Route path="/lock/vendor">
-            <div className="legacy-ui"><RequireVendorSignIn><VendorDashboard /></RequireVendorSignIn></div>
+            <Redirect to="/vendor-portal/dashboard" replace />
           </Route>
           <Route path="/lock/vendor/redeem">
-            <MarketplacePage><VendorRedeemPage /></MarketplacePage>
+            <MarketplacePage><RequireVendorSignIn><VendorRedeemPage /></RequireVendorSignIn></MarketplacePage>
+          </Route>
+          <Route path="/gift/:lockId">
+            <MarketplacePage><GiftClaimPage /></MarketplacePage>
+          </Route>
+          <Route path="/pickup/:lockId/:token">
+            <MarketplacePage><PickupProxyPage /></MarketplacePage>
+          </Route>
+          <Route path="/rewards">
+            <MarketplacePage><RewardsPage /></MarketplacePage>
           </Route>
           {/* :orderId, not a query string — LINE Pay appends ?transactionId=...
               by string concatenation with no regard for the "#" boundary, which
               would otherwise land inside the hash fragment and break the match.
               See functions/src/index.js's createLinePayReservation. */}
           <Route path="/payment/confirm/:orderId">
-            <div className="legacy-ui"><PaymentConfirmPage /></div>
+            <MarketplacePage><PaymentConfirmPage /></MarketplacePage>
           </Route>
           <Route path="/payment/cancel/:orderId">
             <div className="legacy-ui"><PaymentCancelPage /></div>
@@ -141,7 +158,7 @@ export default function App() {
             <MarketplacePage><MyBookingsPage /></MarketplacePage>
           </Route>
           <Route path="/my-locks">
-            <MarketplacePage><MyLocksPage /></MarketplacePage>
+            <Redirect to="/my-bookings" replace />
           </Route>
           <Route path="/cart">
             <MarketplacePage><CartPage /></MarketplacePage>
@@ -182,6 +199,18 @@ export default function App() {
           <Route path="/admin/settings">
             <MarketplacePage><AdminSettingsPage /></MarketplacePage>
           </Route>
+          <Route path="/admin/platform">
+            <MarketplacePage><AdminPlatformPage /></MarketplacePage>
+          </Route>
+          <Route path="/admin/dishes">
+            <MarketplacePage><AdminDishesPage /></MarketplacePage>
+          </Route>
+          <Route path="/admin/anomalies">
+            <MarketplacePage><AdminAnomaliesPage /></MarketplacePage>
+          </Route>
+          <Route path="/admin/disasters">
+            <MarketplacePage><AdminDisastersPage /></MarketplacePage>
+          </Route>
           <Route path="/vendor-portal/dashboard">
             <MarketplacePage><VendorPortalDashboard /></MarketplacePage>
           </Route>
@@ -212,6 +241,18 @@ export default function App() {
           </Route>
           <Route path="/vendor-portal/settings">
             <MarketplacePage><VendorPortalSettings /></MarketplacePage>
+          </Route>
+          <Route path="/vendor-portal/recipes">
+            <MarketplacePage><VendorPortalRecipes /></MarketplacePage>
+          </Route>
+          <Route path="/vendor-portal/purchasing">
+            <MarketplacePage><VendorPortalPurchasing /></MarketplacePage>
+          </Route>
+          <Route path="/vendor-portal/charity">
+            <MarketplacePage><VendorPortalCharity /></MarketplacePage>
+          </Route>
+          <Route path="/vendor-portal/insights">
+            <MarketplacePage><VendorPortalInsights /></MarketplacePage>
           </Route>
 
           {/* 設計系統預覽（tokens + 元件狀態一覽）；lazy 載入，不增加其他頁面的 bundle */}

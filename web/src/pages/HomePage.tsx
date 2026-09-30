@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   collection, doc, getDocs, limit, onSnapshot, orderBy, query, where,
@@ -20,19 +20,18 @@ import { auth, db, functions } from "@/lib/firebase";
 import type { Vendor, MenuItem, MealPlan, Lock } from "@/types";
 import { summarizeRatings, useReviews } from "@/hooks/useReviews";
 import { areaLabel, setSelectedArea, useSelectedArea, vendorInArea } from "@/lib/location";
-import { applyEarlyBirdPrice, discountText, EARLY_BIRD_TIERS, tierRangeText } from "@/lib/pricing";
+import { applyEarlyBirdPrice, discountText, VISIBLE_EARLY_BIRD_TIERS, tierRangeText } from "@/lib/pricing";
+import type { RewardStatus } from "@/types";
 import { tr, useI18n, loc } from "@/lib/i18n";
-import { addDaysStr, DEFAULT_PICKUP_WINDOWS, nextAvailablePickup, openWindowsOn, planPickupDates, slotLabel, todayStr, vendorClosedReason } from "@/lib/pickupSlots";
+import { addDaysStr, DEFAULT_PICKUP_WINDOWS, maxPickupDateStr, nextAvailablePickup, openWindowsOn, planPickupDates, setPreferredPickup, slotLabel, todayStr, vendorClosedReason, vendorCutoffTime } from "@/lib/pickupSlots";
+import { isBento } from "@/lib/bento";
 import PickupPicker from "@/components/PickupPicker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useVendors } from "@/hooks/useVendors";
 
 const bannedHint = () =>
-  tr("您的帳號因多次未取餐已被限制下單，請至會員中心提交解封申訴", "Your account can't place orders after repeated no-shows. Please submit an appeal from My account.");
-// 抽獎結果 price_percent＝要付原價的幾 %（80＝8 折），0＝整份免費
-const growthTierLabel = (pricePercent: number) =>
-  pricePercent === 0 ? tr("整份 0 元", "a free meal") : discountText(100 - pricePercent);
+  tr("您的帳號已被限制下單，請至會員中心提交解封申訴", "Your account can't place orders. Please submit an appeal from My account.");
 const EARLY_BIRD_ICONS = [Clock, CalendarDays, Rocket];
 
 // 取餐時段清單在 lib/pickupSlots.ts（pickup_window 用 ASCII 連字號，跟
@@ -57,8 +56,8 @@ const SORT_OPTIONS = [
 ] as const;
 type SortId = (typeof SORT_OPTIONS)[number]["id"];
 
-// 預約日曆最多看 31 天，跟取餐日選擇的上限（30 天內）一致
-const MAX_RANGE_DAYS = 31;
+// 預約日曆最多看到下週五（第一階段規格的預訂範圍）
+const MAX_RANGE_DAYS = 14;
 
 
 // 消保法聲明（鎖定單點、加入計畫共用）
@@ -67,8 +66,8 @@ function WaiverText() {
   return (
     <>
       {t("我了解本商品為現做餐點，依消保法通訊交易解除權合理例外情事適用準則，", "I understand these are freshly made meals. Under Taiwan's Consumer Protection Act exceptions for distance sales, ")}
-      <strong className="text-foreground">{t("鎖定後不適用 7 天猶豫期", "the 7-day cooling-off period does not apply once locked")}</strong>
-      {t("，除商家未履約外恕不接受退款", ", and no refunds are given unless the vendor fails to serve.")}
+      <strong className="text-foreground">{t(`取餐前一天 ${vendorCutoffTime(null)} 截單前可免費取消，截單後不適用 7 天猶豫期、恕不退款`, `meals can be cancelled for free until ${vendorCutoffTime(null)} the day before; after cutoff the 7-day cooling-off period doesn't apply and there are no refunds`)}</strong>
+      {t("（可轉讓、贈送或捐為愛心餐；停班停課自動全額退款，天災期間店家可等值替換配菜）", " (you can still transfer, gift or donate it; work-suspension days are refunded automatically, and vendors may substitute an equivalent side during disasters)")}
     </>
   );
 }
@@ -83,9 +82,7 @@ export default function HomePage() {
   const [pickupDate, setPickupDate] = useState(() => nextAvailablePickup()?.date ?? todayStr());
   const [pickupWindow, setPickupWindow] = useState(() => nextAvailablePickup()?.window ?? DEFAULT_PICKUP_WINDOWS[0]);
   const [selectedSort, setSelectedSort] = useState<SortId>("relevance");
-  const [waiverAck, setWaiverAck] = useState<Record<string, boolean>>({});
-  const [lockingMealId, setLockingMealId] = useState<string | null>(null);
-  const [lockDialogItem, setLockDialogItem] = useState<{ item: MenuItem; vendor: Vendor } | null>(null);
+  const [, navigate] = useLocation();
   const [uid, setUid] = useState<string | null>(null);
   const requireLogin = useRequireLogin();
   // 加入計畫確認視窗：開始日期＋時段由消費者選，送伺服器排日期、收款
@@ -94,44 +91,20 @@ export default function HomePage() {
   const [planWindow, setPlanWindow] = useState("");
   const [planAck, setPlanAck] = useState(false);
   const [joiningPlan, setJoiningPlan] = useState(false);
-  const [growthUnlockedIds, setGrowthUnlockedIds] = useState<string[]>([]);
-  const [drawingVendorId, setDrawingVendorId] = useState<string | null>(null);
+  const [rewardStatuses, setRewardStatuses] = useState<RewardStatus[]>([]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
     return () => unsub();
   }, []);
 
-  // payouts（營收金額）只有管理員／店主能讀，消費者端改讀公開的
-  // growth_rewards.unlocked_milestones——撥款結算時由 Functions syncGrowthUnlock 更新，
-  // 只寫達到哪些門檻，不寫金額。真正能不能抽還是 drawGrowthReward 伺服器端再驗一次。
-  // 每家商家一份 growth_rewards/{vendorId}，列出所有已達 tier1 的商家。
+  // 成長獎勵（規格 §8）：公開進度 rewardStatus（只有抽獎券張數與開池狀態，不含營業額）
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "growth_rewards"), (snap) => {
-      setGrowthUnlockedIds(
-        snap.docs
-          .filter((d) => ((d.data().unlocked_milestones as string[] | undefined) ?? []).includes("tier1"))
-          .map((d) => d.id)
-      );
-    });
+    const unsub = onSnapshot(collection(db, "rewardStatus"), (snap) => {
+      setRewardStatuses(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as RewardStatus));
+    }, () => setRewardStatuses([]));
     return () => unsub();
   }, []);
-
-  async function handleDrawGrowthReward(vendorId: string) {
-    if (!requireLogin()) return;
-    setDrawingVendorId(vendorId);
-    try {
-      const fn = httpsCallable(functions, "drawGrowthReward");
-      const result = await fn({ vendor_id: vendorId });
-      const pricePercent = (result.data as { price_percent: number }).price_percent;
-      const label = growthTierLabel(pricePercent);
-      toast({ title: t("抽獎結果", "Draw result"), description: t(`恭喜抽中 ${label}！`, `Congrats, you won ${label}!`) });
-    } catch (err) {
-      toast({ title: t("抽獎失敗", "Draw failed"), description: (err as Error).message, variant: "destructive" });
-    } finally {
-      setDrawingVendorId(null);
-    }
-  }
 
   // 真實商家清單，「今日推薦鎖定方案」跟「合作店家與計畫」都要用（各自的
   // 品項/方案是分開的子集合查詢，商家本身只查一次）。
@@ -237,32 +210,16 @@ export default function HomePage() {
     .filter((t) => !area || vendorInArea(vendors.find((v) => v.id === t.vendor_id), area))
     .filter((t) => rangeInvalid || (t.pickup_date >= rangeDates[0] && t.pickup_date <= rangeDates[rangeDates.length - 1]));
 
-  async function handleLockMeal(item: MenuItem, vendor: Vendor) {
-    if (!requireLogin() || !uid) return;
-    // 首頁左側的時段是先選的、所有店共用；下單前確認這家店這天有開這個時段
+  // 便當要選配菜、加減飯，帶著左側選好的日期時段到品項頁組便當再加入購物車（規格 §4）
+  function openItem(item: MenuItem, vendor: Vendor) {
     if (!openWindowsOn(vendor, pickupDate).includes(pickupWindow)) {
       toast({
         title: t("這家店這個時段不開放預購", "This vendor doesn't take pre-orders for that slot"),
-        description: vendorClosedReason(vendor, pickupDate) ?? t("請到左側改選其他日期或時段，或從商家頁點餐選這家店的時段。", "Pick another date or time on the left, or order from the vendor's page to choose one of its slots."),
-        variant: "destructive",
+        description: vendorClosedReason(vendor, pickupDate) ?? t("可能已截單，請改選其他日期，或到品項頁選這家店的時段。", "It may be past cutoff — pick another date, or choose a slot on the item page."),
       });
-      return;
     }
-    setLockingMealId(item.id);
-    try {
-      // 價格由伺服器依 menu_items 重算，只送品項 id 跟取餐時間
-      const fn = httpsCallable(functions, "createLinePayReservation");
-      const result = await fn({
-        menu_item_id: item.id,
-        pickup_window: pickupWindow,
-        pickup_date: pickupDate,
-      });
-      const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
-      window.location.href = paymentUrl;
-    } catch (err) {
-      toast({ title: t("前往付款失敗", "Couldn't start payment"), description: (err as Error).message, variant: "destructive" });
-      setLockingMealId(null);
-    }
+    setPreferredPickup({ date: pickupDate, window: pickupWindow });
+    navigate(`/item/${item.id}`);
   }
 
   // 「計畫型」（訂閱制多日方案）沒有另外的 plan/subscription collection——付款
@@ -319,6 +276,7 @@ export default function HomePage() {
                 type="date"
                 value={startDate}
                 min={todayStr()}
+                max={maxPickupDateStr()}
                 onChange={e => setStartDate(e.target.value)}
                 className="h-10"
               />
@@ -330,6 +288,7 @@ export default function HomePage() {
                 type="date"
                 value={endDate}
                 min={startDate}
+                max={maxPickupDateStr()}
                 onChange={e => setEndDate(e.target.value)}
                 className="h-10"
               />
@@ -364,13 +323,13 @@ export default function HomePage() {
 
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex gap-2.5">
             <Bell className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-            <p className="text-xs leading-relaxed text-amber-800">{t("取餐提醒：鎖定成功後，我們會在取餐時段開始前推播通知，降低錯過取餐的機率。", "Pickup reminders: once your meal is locked, we'll send a push notification before your pickup window so you don't miss it.")}</p>
+            <p className="text-xs leading-relaxed text-amber-800">{t(`越早訂，越開心：可預訂到下週五，取餐前一天 ${vendorCutoffTime(null)} 截單。取餐時段結束前 30 分鐘還沒取餐會提醒你；結束 30 分鐘後仍未取餐，便當會轉為愛心餐。`, `Book early, save more: up to next Friday; orders close at ${vendorCutoffTime(null)} the day before. We'll remind you 30 min before pickup ends; meals still unclaimed 30 min after become charity meals.`)}</p>
           </div>
 
           <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
             <h3 className="text-sm font-semibold">{t("早鳥預約折扣", "Early-bird discounts")}</h3>
             <div className="space-y-2.5 text-sm">
-              {EARLY_BIRD_TIERS.map((tier, i) => {
+              {VISIBLE_EARLY_BIRD_TIERS.map((tier, i) => {
                 const Icon = EARLY_BIRD_ICONS[i] ?? Rocket;
                 return (
                   <div key={tier.minDays} className="flex items-center gap-2.5">
@@ -387,25 +346,16 @@ export default function HomePage() {
             <h3 className="text-sm font-semibold flex items-center gap-1.5">
               <Trophy className="w-4 h-4 text-primary" /> {t("成長獎勵抽獎", "Growth reward draw")}
             </h3>
-            {growthUnlockedIds.length > 0 ? (
-              <>
-                <p className="text-xs text-muted-foreground">{t("以下店家已解鎖抽獎，手氣好可以抽到整份 0 元！", "These vendors have unlocked the draw — you could win a free meal!")}</p>
-                {growthUnlockedIds.map((vendorId) => (
-                  <div key={vendorId} className="flex items-center gap-2">
-                    <span className="flex-1 text-sm truncate">{loc(vendors.find((v) => v.id === vendorId), "name") || t("合作店家", "Partner vendor")}</span>
-                    <Button
-                      size="sm"
-                      disabled={drawingVendorId !== null}
-                      onClick={() => handleDrawGrowthReward(vendorId)}
-                    >
-                      {drawingVendorId === vendorId ? t("抽獎中…", "Drawing…") : t("抽一次", "Draw")}
-                    </Button>
-                  </div>
-                ))}
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">{t("合作店家累積營收還沒達到解鎖門檻，尚無法抽獎。", "No partner vendor has reached the unlock threshold yet.")}</p>
-            )}
+            <p className="text-xs text-muted-foreground">{t("每累計實付 100 元一張抽獎券，店家每週拿營業額 10% 當回饋池，滿 100 張開獎、人人有獎。", "Every NT$100 you pay earns a ticket. Vendors put 10% of weekly revenue into a pool — 100 tickets opens the draw, and everyone wins.")}</p>
+            {rewardStatuses.slice(0, 5).map((st) => (
+              <div key={st.id} className="flex items-center gap-2 text-sm">
+                <span className="flex-1 truncate">{st.vendor_name || loc(vendors.find((v) => v.id === st.id), "name")}</span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {st.pool_open ? t("開獎中", "Draw open") : t(`再 ${st.amount_to_open} 元開獎`, `NT$${st.amount_to_open} to open`)}
+                </span>
+              </div>
+            ))}
+            <Button asChild size="sm" variant="outline" className="w-full"><Link href="/rewards">{t("我的抽獎券與折價券", "My tickets & coupons")}</Link></Button>
           </div>
 
           <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
@@ -480,11 +430,8 @@ export default function HomePage() {
                           {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through mr-1.5">{t("原價", "was")} ${item.price}</span>}
                           <span className="font-heading text-2xl font-semibold">${lockedPrice}</span>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => setLockDialogItem({ item, vendor })}
-                        >
-                          {t("立即預付鎖定", "Prepay & lock")}
+                        <Button size="sm" onClick={() => openItem(item, vendor)}>
+                          {isBento(item) ? t("選配菜・鎖定", "Choose sides & lock") : t("立即預付鎖定", "Prepay & lock")}
                         </Button>
                       </div>
                     </div>
@@ -493,65 +440,6 @@ export default function HomePage() {
               })}
             </div>
           </section>
-
-          {/* 立即預付鎖定確認彈窗——折扣說明/消保法聲明/轉讓市集提醒改成點按鈕當下才顯示，不塞在每張卡片上 */}
-          <Dialog open={!!lockDialogItem} onOpenChange={(open) => { if (!open) setLockDialogItem(null); }}>
-            <DialogContent>
-              {lockDialogItem && (() => {
-                const { item, vendor } = lockDialogItem;
-                const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
-                const hasAcked = !!waiverAck[item.id];
-                const isSubmitting = lockingMealId === item.id;
-                return (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle>{loc(item, "name")}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-3 py-1">
-                      <p className="text-sm text-muted-foreground">{loc(vendor, "name")}・{t("取餐時段：", "Pickup: ")}{pickupDate}（{pickupWindow}）・${lockedPrice}</p>
-
-                      <div className="flex gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
-                        <Star className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5 fill-amber-500" />
-                        <p className="text-caption leading-relaxed text-amber-900">
-                          {discountPercent > 0
-                            ? t(`提前預付鎖定，換到 ${discountText(discountPercent)}早鳥價；全額預付、不可退款但可轉賣過戶。`, `Prepay early for ${discountText(discountPercent)}. Fully prepaid and non-refundable, but transferable.`)
-                            : t("當日鎖定；全額預付、不可退款但可轉賣過戶。", "Same-day lock. Fully prepaid and non-refundable, but transferable.")}
-                        </p>
-                      </div>
-
-                      <label className="flex items-start gap-1.5 p-2 rounded-lg bg-muted border border-border cursor-pointer">
-                        <Checkbox
-                          checked={hasAcked}
-                          onCheckedChange={() => setWaiverAck(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                          className="mt-0.5 shrink-0"
-                        />
-                        <span className="text-caption leading-relaxed text-muted-foreground">
-                          <WaiverText />
-                        </span>
-                      </label>
-                      <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
-                        <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
-                        <span className="text-caption leading-relaxed text-orange-900">
-                          {t("取餐時段結束仍未取餐，將", "If it isn't picked up by the end of the window, it will be ")}<strong>{t("自動開放到轉讓市集、$0 元供人領取", "listed on the transfer market for anyone to claim for $0")}</strong>{t("，避免整份浪費", " so nothing goes to waste")}
-                        </span>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setLockDialogItem(null)} disabled={isSubmitting}>
-                        {t("取消", "Cancel")}
-                      </Button>
-                      <Button
-                        disabled={!hasAcked || isSubmitting}
-                        onClick={() => handleLockMeal(item, vendor)}
-                      >
-                        {isSubmitting ? t("前往付款中…", "Redirecting to payment…") : t("確認鎖定並付款", "Confirm & pay")}
-                      </Button>
-                    </DialogFooter>
-                  </>
-                );
-              })()}
-            </DialogContent>
-          </Dialog>
 
           {/* 加入計畫確認彈窗——選第一天＋時段、預覽每天的取餐日，確認後前往 LINE Pay */}
           <Dialog open={!!planDialog} onOpenChange={(open) => { if (!open && !joiningPlan) setPlanDialog(null); }}>
@@ -588,7 +476,7 @@ export default function HomePage() {
                       ) : (
                         <div className="flex gap-1.5 p-2.5 rounded-lg bg-red-50 border border-red-200 text-caption text-red-800">
                           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                          {t(`這個開始日期／時段排不滿 ${plan.days} 天（最遠只能預約 30 天內），請改選其他日期或時段。`, `This start date and time can't fit ${plan.days} days (bookings must be within 30 days). Please pick another date or time.`)}
+                          {t(`這個開始日期／時段排不滿 ${plan.days} 天（最遠只能預約到下週五），請改選其他日期或時段。`, `This start date and time can't fit ${plan.days} days (bookings go up to next Friday). Please pick another date or time.`)}
                         </div>
                       )}
                       <label className="flex items-start gap-1.5 p-2 rounded-lg bg-muted border border-border cursor-pointer">
@@ -600,7 +488,7 @@ export default function HomePage() {
                       <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
                         <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
                         <span className="text-caption leading-relaxed text-orange-900">
-                          {t("每一天都是獨立的一份，當天沒空可以單獨轉讓；取餐時段結束仍未取餐，將", "Each day is a separate meal you can transfer on its own. If it isn't picked up by the end of the window, it will be ")}<strong>{t("自動開放到轉讓市集、$0 元供人領取", "listed on the transfer market for anyone to claim for $0")}</strong>
+                          {t("每一天都是獨立的一份，當天沒空可以單獨轉讓或捐為愛心餐；取餐時段結束 30 分鐘仍未取餐，將", "Each day is a separate meal you can transfer or donate on its own. If it isn't picked up 30 min after the window ends, it ")}<strong>{t("轉為愛心餐、開放給需要的人", "becomes a charity meal for someone in need")}</strong>
                         </span>
                       </div>
                     </div>
@@ -681,7 +569,7 @@ export default function HomePage() {
                 <div>
                   <h3 className="font-heading text-2xl font-semibold mb-1">{t("同學轉讓保底專區", "Classmate transfers")}</h3>
                   <p className="text-sm max-w-xl">
-                    {t("臨時去不了？可安全轉讓給同學，全額入袋；逾時沒人接手，系統會自動開放到轉讓市集、$0 元供人領取，不浪費一份鎖定。", "Can't make it? Safely transfer your meal to a classmate. If nobody takes it in time, it's automatically listed for anyone to claim for $0 — no meal wasted.")}
+                    {t("臨時去不了？截單後也能安全轉讓給同學；逾時沒人接手會開放 $0 元領取，或直接捐為愛心餐，不浪費一份便當。", "Can't make it? Transfer your meal to a classmate, even after cutoff. Unclaimed transfers open for $0, or donate it as a charity meal — no meal wasted.")}
                   </p>
                 </div>
               </div>

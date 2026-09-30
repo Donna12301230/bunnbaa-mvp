@@ -19,7 +19,10 @@ const statusLabels = (): Record<LockStatus, string> => ({
   for_gift: tr("贈送中", "Being gifted"),
   resold_and_fulfilled: tr("已轉賣完成取餐", "Picked up by new owner"),
   fulfilled: tr("已完成取餐", "Picked up"),
-  no_show: tr("未取餐", "No-show"),
+  no_show: tr("未取餐（舊制）", "No-show (legacy)"),
+  charity: tr("已轉愛心餐", "Charity meal"),
+  cancelling: tr("退款中", "Refunding"),
+  cancelled: tr("已取消退款", "Cancelled"),
 });
 
 /**

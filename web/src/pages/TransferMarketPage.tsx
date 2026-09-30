@@ -17,6 +17,7 @@ import { useItemImages } from "@/hooks/useItemImages";
 import { useSelectedArea, vendorInArea } from "@/lib/location";
 import { tr, loc } from "@/lib/i18n";
 import { EmptyState, Tag } from "@/components/ds";
+import CharityMealsSection from "@/components/CharityMealsSection";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { Link } from "wouter";
 
@@ -47,7 +48,10 @@ function formatCountdown(deadline: Date, now: number): string {
 
 export default function TransferMarketPage() {
   const { toast } = useToast();
-  const [browseTab, setBrowseTab] = useState<"browse" | "mine">("browse");
+  // 愛心餐也放在轉讓市集（使用者 2026-09-30 決定）；通知連結帶 ?tab=charity 直接開這個分頁
+  const [browseTab, setBrowseTab] = useState<"browse" | "charity" | "mine">(() =>
+    window.location.hash.includes("tab=charity") ? "charity" : "browse"
+  );
   const [search, setSearch] = useState("");
   const [uid, setUid] = useState<string | null>(null);
   const requireLogin = useRequireLogin();
@@ -192,7 +196,7 @@ export default function TransferMarketPage() {
 
       <PageHero
         title={tr("轉讓市集", "Transfer market")}
-        description={tr("同學安全轉讓已鎖定的方案，全額入袋；逾時沒人接手，系統會自動開放 $0 元供人領取。", "Safely pass locked meals between classmates. If nobody takes one in time, anyone can claim it for $0.")}
+        description={tr("同學安全轉讓已鎖定的便當，截單後也能轉；逾時沒人接手，系統會自動開放 $0 元供人領取。沒領到的便當會變成愛心餐。", "Pass locked meals between classmates, even after cutoff. If nobody takes one in time, anyone can claim it for $0. Unclaimed meals become charity meals.")}
       >
         <HeroSearch id="marketplaceSearch" label={tr("搜尋轉讓項目", "Search transfers")} value={search} onChange={setSearch} placeholder={tr("搜尋餐點名稱", "Search by meal name")} />
       </PageHero>
@@ -202,6 +206,9 @@ export default function TransferMarketPage() {
         <div className="flex gap-2">
           <Tag selected={browseTab === "browse"} onClick={() => setBrowseTab("browse")}>
             {tr("瀏覽轉讓", "Browse")}
+          </Tag>
+          <Tag selected={browseTab === "charity"} onClick={() => setBrowseTab("charity")}>
+            {tr("愛心餐", "Charity meals")}
           </Tag>
           <Tag selected={browseTab === "mine"} onClick={() => setBrowseTab("mine")}>
             {tr("我的轉讓", "My transfers")}
@@ -305,6 +312,8 @@ export default function TransferMarketPage() {
             )}
           </>
         )}
+
+        {browseTab === "charity" && <CharityMealsSection />}
 
         {!loading && browseTab === "mine" && (
           <>

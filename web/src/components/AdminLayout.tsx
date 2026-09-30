@@ -1,7 +1,7 @@
 import { tr } from "@/lib/i18n";
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings } from "lucide-react";
+import { Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings, SlidersHorizontal, BookMarked, CloudLightning, AlertOctagon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 // 用函式包起來，每次 render 依目前語言組標籤
 const navItems = () => [
   { href: "/admin/vendors", label: tr("廠商管理", "Vendors"), icon: Store },
+  { href: "/admin/platform", label: tr("平台參數", "Parameters"), icon: SlidersHorizontal },
+  { href: "/admin/dishes", label: tr("菜色庫與模板", "Dishes"), icon: BookMarked },
+  { href: "/admin/anomalies", label: tr("異常審核", "Anomalies"), icon: AlertOctagon },
+  { href: "/admin/disasters", label: tr("天災事件", "Disasters"), icon: CloudLightning },
   { href: "/admin/appeals", label: tr("解封申訴", "Appeals"), icon: ShieldAlert },
   { href: "/admin/locks", label: tr("訂單總覽", "Orders"), icon: ClipboardList },
   { href: "/admin/payouts", label: tr("撥款總覽", "Payouts"), icon: Wallet },
@@ -87,9 +91,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </aside>
 
         {/* Mobile bottom nav */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border flex md:hidden z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border flex md:hidden z-50 overflow-x-auto">
           {navItems().map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className="flex-1">
+            <Link key={href} href={href} className="flex-1 min-w-[64px]">
               <div className={cn(
                 "relative flex flex-col items-center py-2 text-xs",
                 location === href || location.startsWith(href) ? "text-primary" : "text-muted-foreground"

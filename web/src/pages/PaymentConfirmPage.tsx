@@ -1,28 +1,30 @@
-import { tr } from "@/lib/i18n";
+import { tr, loc } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
 import { httpsCallable } from "@/lib/callable";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { arrayUnion, doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { CheckCircle2 } from "lucide-react";
 import { auth, db, functions } from "../lib/firebase";
-import LockQRCode from "../components/LockQRCode";
 import { registerForPickupReminders } from "../lib/messaging";
+import MarketplaceHeader from "@/components/MarketplaceHeader";
+import { Button } from "@/components/ui/button";
+import { riceLabel, slotText } from "@/lib/bento";
+import { vendorCutoffTime } from "@/lib/pickupSlots";
+import type { Lock } from "@/types";
 
 /**
- * LINE Pay redirects here after the buyer approves payment (confirmUrl set
- * in createLinePayReservation). We must wait for Firebase Auth to restore
- * the buyer's logged-in session before calling confirmLinePayPayment — this
- * is a full page reload coming back from LINE Pay's domain, so
- * auth.currentUser is briefly null until onAuthStateChanged fires.
+ * LINE Pay redirects here after the buyer approves payment (confirmUrl set in
+ * createCartLinePayReservation). 折價券全額折抵（0 元）的訂單不經 LINE Pay，
+ * 購物車直接導到這裡。We must wait for Firebase Auth to restore the buyer's
+ * session before calling confirmLinePayPayment — this is a full page reload
+ * coming back from LINE Pay's domain.
  */
 export default function PaymentConfirmPage() {
   const [status, setStatus] = useState<"waiting-auth" | "confirming" | "done" | "error">("waiting-auth");
-  // 每筆 lock 的 id＋真正的 vendor_id（購物車可能跨店，QR 裡的 vendorId 不能寫死）
-  const [locks, setLocks] = useState<{ id: string; vendorId: string }[]>([]);
+  const [locks, setLocks] = useState<Lock[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
-  // Route is /payment/confirm/:orderId. LINE Pay's ?transactionId=... append
-  // can still end up glued onto this param (see App.tsx's comment on this
-  // route) — strip anything from "?" or "&" onward defensively.
+  // LINE Pay's ?transactionId=... append can end up glued onto this param
   const { orderId: rawOrderId } = useParams<{ orderId: string }>();
   const orderId = rawOrderId?.split(/[?&]/)[0];
 
@@ -32,11 +34,7 @@ export default function PaymentConfirmPage() {
       setErrorMessage(tr("缺少訂單編號，無法確認付款", "Missing order ID — can't confirm the payment"));
       return;
     }
-
     const unsub = onAuthStateChanged(auth, async (user) => {
-      // onAuthStateChanged's first call already reflects the restored session,
-      // so null here means the buyer really isn't logged in (e.g. logged out
-      // in another tab mid-payment) — confirmLinePayPayment would reject them.
       unsub();
       if (!user || user.isAnonymous) {
         setStatus("error");
@@ -45,33 +43,17 @@ export default function PaymentConfirmPage() {
       }
       setStatus("confirming");
       try {
-        // Handles both a single-item checkout (ConsumerLockPage) and a
-        // multi-item cart checkout (CartPage) — confirmLinePayPayment always
-        // creates one Lock doc per cart line/quantity and returns all their ids.
-        const fn = httpsCallable(functions, "confirmLinePayPayment");
-        const result = await fn({ order_id: orderId });
+        const result = await httpsCallable(functions, "confirmLinePayPayment")({ order_id: orderId });
         const { lock_ids: ids } = result.data as { lock_ids: string[] };
-        // 付款已成功，讀不到 vendor_id 也不能讓頁面變成「付款確認失敗」；
-        // 商家掃碼只看 lockId、店家歸屬以 Firestore 為準，vendorId 空白不影響核銷
-        const vendorIds = await Promise.all(
-          ids.map((id) =>
-            getDoc(doc(db, "locks", id))
-              .then((d) => (d.data()?.vendor_id as string | undefined) ?? "")
-              .catch(() => "")
-          )
-        );
-        setLocks(ids.map((id, i) => ({ id, vendorId: vendorIds[i] })));
+        // 付款已成功，讀不到細節也不能讓頁面變成「付款確認失敗」
+        const docs = await Promise.all(ids.map((id) => getDoc(doc(db, "locks", id)).catch(() => null)));
+        setLocks(docs.filter((d) => d?.exists()).map((d) => ({ id: d!.id, ...d!.data() }) as Lock));
         setStatus("done");
-
         try {
           const fcmToken = await registerForPickupReminders();
-          if (fcmToken) {
-            await Promise.all(
-              ids.map((id) => setDoc(doc(db, "lock_tokens", id), { fcm_token: fcmToken, buyer_uid: user.uid }))
-            );
-          }
+          if (fcmToken) await setDoc(doc(db, "userTokens", user.uid), { tokens: arrayUnion(fcmToken) }, { merge: true });
         } catch (err) {
-          console.warn("Could not save pickup-reminder token:", err);
+          console.warn("Could not save push token:", err);
         }
       } catch (err) {
         setStatus("error");
@@ -82,33 +64,44 @@ export default function PaymentConfirmPage() {
   }, [orderId]);
 
   return (
-    <div className="page">
-      <div className="kicker">BunnBaa · {tr("付款確認", "Payment")}</div>
-      {(status === "waiting-auth" || status === "confirming") && (
-        <div className="card">
-          <p className="muted">{tr("確認付款中…", "Confirming payment…")}</p>
-        </div>
-      )}
-      {status === "done" && locks.length > 0 && (
-        <div className="card">
-          <h2>{tr("付款成功！", "Payment successful!")}</h2>
-          {locks.map(({ id, vendorId }) => (
-            <LockQRCode key={id} lockId={id} vendorId={vendorId} />
-          ))}
-          <p className="muted" style={{ marginTop: 12 }}>
-            <Link href="/my-locks">{tr("查看我的訂單", "View my orders")}</Link>
-          </p>
-        </div>
-      )}
-      {status === "error" && (
-        <div className="card">
-          <h2>{tr("付款確認失敗", "Payment confirmation failed")}</h2>
-          <p className="muted">{errorMessage}</p>
-          <p className="muted">
-            <Link href="/my-locks">{tr("查看我的訂單", "View my orders")}</Link>
-          </p>
-        </div>
-      )}
+    <div className="min-h-screen bg-gray-50">
+      <MarketplaceHeader />
+      <div className="max-w-lg mx-auto px-4 py-8 space-y-4">
+        {(status === "waiting-auth" || status === "confirming") && (
+          <div className="bg-white rounded-xl border border-border p-6 text-center text-muted-foreground">{tr("確認付款中…", "Confirming payment…")}</div>
+        )}
+        {status === "done" && (
+          <div className="bg-white rounded-xl border border-border p-5 space-y-4">
+            <h1 className="text-xl font-bold flex items-center gap-2"><CheckCircle2 className="w-6 h-6 text-green-600" /> {tr("預購成功！", "You're all set!")}</h1>
+            <ul className="divide-y divide-border">
+              {locks.map((l) => (
+                <li key={l.id} className="py-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="font-semibold">{loc(l, "item_name")}</span>
+                    <span>NT${l.locked_price}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{l.pickup_date}・{l.pickup_window}・{tr("取餐號", "Code")} {l.pickup_code}</p>
+                  {(l.slots?.length ?? 0) > 0 && (
+                    <p className="text-xs text-muted-foreground">{l.slots!.map(slotText).join("／")}{riceLabel(l.rice) ? `／${riceLabel(l.rice)}` : ""}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              {tr(`取餐前一天 ${vendorCutoffTime(null)} 截單並判定配菜許願，未成立會改預設菜並通知你。取餐時到「我的餐點」出示 QR Code。`,
+                `Orders close at ${vendorCutoffTime(null)} the day before; side-dish wishes are decided then. Show your QR code from My meals at pickup.`)}
+            </p>
+            <Button asChild className="w-full"><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
+          </div>
+        )}
+        {status === "error" && (
+          <div className="bg-white rounded-xl border border-border p-5 space-y-2">
+            <h1 className="text-lg font-bold">{tr("付款確認失敗", "Payment confirmation failed")}</h1>
+            <p className="text-sm text-muted-foreground">{errorMessage}</p>
+            <Link href="/my-bookings" className="text-sm text-primary underline">{tr("查看我的餐點", "View my meals")}</Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

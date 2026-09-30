@@ -16,16 +16,16 @@ const VALUES = [
     icon: CalendarClock,
     title: tr("越早訂越划算", "Book early, save more"),
     body: tr(
-      "提前 1～30 天鎖定餐點，最高可享 7 折，排隊時間也留給自己。",
-      "Lock in a meal 1–30 days ahead for up to 30% off, and skip the lunch-hour queue."
+      "最晚前一天 20:00 預訂，可訂到下週五，提前 2 天以上 8 折；店家依確定訂單備料，不浪費。",
+      "Order by 20:00 the day before, up to next Friday, and get 20% off 2+ days ahead. Vendors prep only what's ordered."
     ),
   },
   {
     icon: ShieldCheck,
     title: tr("履約有保障", "Guaranteed fulfilment"),
     body: tr(
-      "店家若未如期出餐，全額退款並加贈回饋金；去不了也能轉讓給同學。",
-      "If a vendor doesn't serve on time you get a full refund plus bonus points; can't make it? Transfer the meal to a classmate."
+      "截單前免費取消；去不了可以轉讓或捐為愛心餐；每累計 100 元一張抽獎券，人人有獎。",
+      "Free cancellation before cutoff; transfer or donate if you can't make it; every NT$100 earns a reward ticket and everyone wins."
     ),
   },
 ];

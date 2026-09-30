@@ -2,10 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, doc, documentId, getDocs, limit, onSnapshot, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useItemImages } from "@/hooks/useItemImages";
-import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2, Star } from "lucide-react";
+import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2, Star, HeartHandshake, XCircle, Users, Pencil } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { getLang, tr, loc } from "@/lib/i18n";
 import { enUS } from "date-fns/locale";
@@ -16,7 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
+import { httpsCallable } from "@/lib/callable";
+import PickupQr from "@/components/PickupQr";
+import EditWishesDialog from "@/components/EditWishesDialog";
+import { useConfirm } from "@/components/ConfirmDialog";
+import { riceLabel, slotText } from "@/lib/bento";
+import { isPastCutoff, todayStr } from "@/lib/pickupSlots";
 import type { Lock } from "@/types";
 import { EmptyState } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
@@ -54,11 +59,14 @@ const statusStyle = (status: string): { label: string; className: string } => {
     fulfilled: { label: tr("已取餐", "Picked up"), className: "bg-green-100 text-green-700" },
     resold_and_fulfilled: { label: tr("已由轉賣對象取餐", "Picked up by new owner"), className: "bg-green-100 text-green-700" },
     no_show: { label: tr("已登記未取餐", "No-show"), className: "bg-red-100 text-red-700" },
+    charity: { label: tr("已轉為愛心餐", "Charity meal"), className: "bg-pink-100 text-pink-700" },
+    cancelling: { label: tr("退款中", "Refunding"), className: "bg-gray-100 text-gray-700" },
+    cancelled: { label: tr("已取消・已退款", "Cancelled · refunded"), className: "bg-gray-100 text-gray-500" },
   };
   return map[status] ?? { label: status, className: "bg-gray-100 text-gray-700" };
 };
 
-const FEEDBACK_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled", "no_show"]);
+const FEEDBACK_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled", "no_show", "charity"]);
 // 有實際拿到餐的才能評分（reviews，公開）；no_show 只能留私下回饋給商家校準
 const REVIEW_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled"]);
 
@@ -128,6 +136,8 @@ export default function MyBookingsPage() {
   const [publicComment, setPublicComment] = useState<Record<string, boolean>>({});
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Lock | null>(null);
+  const confirm = useConfirm();
 
   useEffect(() => {
     if (!uid) return;
@@ -283,7 +293,42 @@ export default function MyBookingsPage() {
   }
 
   function giftLinkFor(lockId: string): string {
-    return `${window.location.origin}${window.location.pathname}?gift=${lockId}#/lock`;
+    return `${window.location.origin}${window.location.pathname}#/gift/${lockId}`;
+  }
+
+  function proxyLinkFor(lock: Lock): string {
+    return `${window.location.origin}${window.location.pathname}#/pickup/${lock.id}/${lock.share_token ?? ""}`;
+  }
+
+  async function callLock(lock: Lock, name: "cancelLock" | "donateLock", done: string) {
+    setBusyId(lock.id);
+    try {
+      await httpsCallable(functions, name)({ lock_id: lock.id });
+      toast({ title: done });
+    } catch (err) {
+      toast({ title: tr("操作失敗", "Something went wrong"), description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleCancel(lock: Lock) {
+    const ok = await confirm({
+      title: tr("取消這份並退款？", "Cancel and refund this meal?"),
+      description: tr(`將退回 NT$${lock.locked_price}（原付款方式）${lock.coupon_id ? "，折價券退回並保留原到期日" : ""}。`, `NT$${lock.locked_price} will be refunded${lock.coupon_id ? " and your coupon returned" : ""}.`),
+      confirmLabel: tr("取消並退款", "Cancel & refund"),
+      destructive: true,
+    });
+    if (ok) await callLock(lock, "cancelLock", tr("已取消，退款處理中", "Cancelled — refund on its way"));
+  }
+
+  async function handleDonate(lock: Lock) {
+    const ok = await confirm({
+      title: tr("捐為愛心餐？", "Donate as a charity meal?"),
+      description: tr("這份便當會立即開放給需要的人領取，不退款，照常發放抽獎券，並計入你的愛心紀錄。", "It'll be open for someone in need right away. No refund; reward tickets are still issued."),
+      confirmLabel: tr("捐出", "Donate"),
+    });
+    if (ok) await callLock(lock, "donateLock", tr("謝謝你的愛心", "Thank you for your kindness"));
   }
 
   async function copyLink(text: string) {
@@ -314,34 +359,80 @@ export default function MyBookingsPage() {
                       <h3 className="text-h3 leading-snug">{loc(lock, "item_name")}</h3>
                       <p className="text-body-sm text-muted-foreground">
                         {formatDateLabel(lock.pickup_date)}・{lock.pickup_window} {tr("取餐", "pickup")}・${lock.locked_price}
+                        {lock.pickup_code && <span>・{tr("取餐號", "Code")} <strong className="text-foreground">{lock.pickup_code}</strong></span>}
                       </p>
+                      {(lock.slots?.length ?? 0) > 0 && (
+                        <ul className="text-caption text-muted-foreground space-y-0.5">
+                          {lock.slots!.map((slot, i) => <li key={i}>• {slotText(slot)}</li>)}
+                          {riceLabel(lock.rice) && <li>• {riceLabel(lock.rice)}</li>}
+                        </ul>
+                      )}
+                      {(lock.coupon_discount ?? 0) > 0 && (
+                        <p className="text-caption text-green-700">{tr(`已用折價券折抵 ${lock.coupon_discount} 元`, `Coupon: −NT$${lock.coupon_discount}`)}</p>
+                      )}
+                      {lock.status === "charity" && (
+                        <p className="text-caption text-pink-700">
+                          {lock.charity_source === "donated"
+                            ? tr("謝謝你的愛心，這份已開放給需要的人領取。", "Thank you — it's open for someone in need.")
+                            : tr("這份沒有領到，已轉為愛心餐。抽獎券照常發放；下次來不了可以先按「捐為愛心餐」。", "Not picked up, so it became a charity meal. Tickets were still issued.")}
+                        </p>
+                      )}
+
+                      {["locked", "for_resale", "for_gift"].includes(lock.status) && (() => {
+                        const beforeCutoff = !isPastCutoff(lock.pickup_date);
+                        const isPayer = (lock.payer_uid ?? lock.buyer_uid) === uid;
+                        const pickupDay = lock.pickup_date === todayStr();
+                        const windowOpen = (pickupWindowEnd(lock.pickup_date, lock.pickup_window)?.getTime() ?? 0) > now;
+                        return (
+                          <div className="flex flex-col gap-2 pt-1">
+                            {beforeCutoff ? (
+                              <p className="text-caption text-muted-foreground">{tr("取餐前一天截單前可免費取消、修改許願。", "Free cancellation and wish changes until the cutoff the day before.")}</p>
+                            ) : (
+                              <p className="text-caption text-muted-foreground">{tr("已截單，不能退款；可以轉讓、贈送或捐為愛心餐。", "Past cutoff — no refunds, but you can transfer, gift or donate it.")}</p>
+                            )}
+                            {lock.status === "locked" && beforeCutoff && (
+                              <div className="flex gap-2">
+                                {lock.menu_item_id && (lock.slots?.length ?? 0) > 0 && (
+                                  <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => setEditing(lock)}>
+                                    <Pencil /> {tr("修改許願", "Edit wishes")}
+                                  </Button>
+                                )}
+                                {isPayer && (
+                                  <Button variant="outline" size="sm" className="flex-1 border-red-300 text-red-600 hover:bg-red-50" disabled={isBusy} onClick={() => handleCancel(lock)}>
+                                    <XCircle /> {tr("取消退款", "Cancel")}
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                            {lock.status !== "for_gift" && (qrOpen[lock.id] ? (
+                              <div>
+                                <PickupQr lockId={lock.id} size={140} />
+                                <div className="flex justify-center gap-2">
+                                  <Button variant="link" size="sm" onClick={() => setZoomedLock(lock)}><Maximize2 /> {tr("放大", "Enlarge")}</Button>
+                                  <Button variant="link" size="sm" onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: false }))}>{tr("收起", "Hide")}</Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <Button size="sm" onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: true }))}>
+                                <QrCode /> {tr("使用（顯示取餐碼）", "Use (show pickup code)")}
+                              </Button>
+                            ))}
+                            {lock.share_token && lock.status === "locked" && (
+                              <Button variant="outline" size="sm" onClick={() => copyLink(proxyLinkFor(lock))}>
+                                <Users /> {tr("複製代領連結", "Copy proxy pickup link")}
+                              </Button>
+                            )}
+                            {pickupDay && windowOpen && lock.status !== "for_gift" && (
+                              <Button variant="outline" size="sm" className="border-pink-300 text-pink-700 hover:bg-pink-50" disabled={isBusy} onClick={() => handleDonate(lock)}>
+                                <HeartHandshake /> {tr("來不了？捐為愛心餐", "Can't make it? Donate it")}
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {lock.status === "locked" && (
                         <div className="flex flex-col gap-2 pt-1">
-                          {qrOpen[lock.id] ? (
-                            <div className="flex flex-col items-center gap-1.5 text-center py-2">
-                              <button
-                                type="button"
-                                onClick={() => setZoomedLock(lock)}
-                                className="relative rounded-md ring-offset-2 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
-                                aria-label={tr("放大顯示核銷 QR Code", "Enlarge pickup QR code")}
-                              >
-                                <QRCodeSVG value={JSON.stringify({ lockId: lock.id, vendorId: lock.vendor_id })} size={120} level="M" />
-                                <span className="absolute -bottom-1 -right-1 bg-card border border-border rounded-full p-1 shadow-sm">
-                                  <Maximize2 size={12} />
-                                </span>
-                              </button>
-                              <span className="text-body-sm font-bold">{tr("取餐編號", "Pickup code")} {lock.id.slice(-8).toUpperCase()}</span>
-                              <span className="text-caption text-muted-foreground">{tr("點擊 QR Code 可放大，請於取餐時向店員出示", "Tap the QR code to enlarge it and show it to staff at pickup")}</span>
-                              <Button variant="link" size="sm" onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: false }))}>
-                                {tr("收起", "Hide")}
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button size="sm" onClick={() => setQrOpen((prev) => ({ ...prev, [lock.id]: true }))}>
-                              <QrCode /> {tr("使用（顯示取餐碼）", "Use (show pickup code)")}
-                            </Button>
-                          )}
                           <div className="flex gap-2">
                             <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => handleGift(lock)}>
                               <Gift /> {tr("贈送", "Gift")}
@@ -450,7 +541,7 @@ export default function MyBookingsPage() {
     <div className="min-h-screen bg-gray-50">
       <MarketplaceHeader active="bookings" />
 
-      <PageHero title={tr("我的餐點", "My meals")} description={tr("週曆上點一筆訂單看詳情、使用取餐碼或轉讓／贈送。", "Tap an order on the calendar to see details, show your pickup code, or transfer / gift it.")} />
+      <PageHero title={tr("我的餐點", "My meals")} description={tr("週曆上點一筆訂單看詳情、出示取餐碼、截單前取消，或轉讓／贈送／捐為愛心餐。", "Tap an order to see details, show your pickup code, cancel before cutoff, or transfer / gift / donate it.")} />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         {!authLoading && !uid ? (
@@ -524,19 +615,12 @@ export default function MyBookingsPage() {
           <DialogTitle className="text-center">{tr("取餐核銷碼", "Pickup code")}</DialogTitle>
           {zoomedLock && (
             <>
-              <div className="bg-white p-4 rounded-lg">
-                <QRCodeSVG
-                  value={JSON.stringify({ lockId: zoomedLock.id, vendorId: zoomedLock.vendor_id })}
-                  size={260}
-                  level="M"
-                />
-              </div>
-              <span className="text-h3 font-bold tracking-wide">{zoomedLock.id.slice(-8).toUpperCase()}</span>
-              <span className="text-caption text-muted-foreground text-center">{tr("請將畫面出示給店員核對，核對後即完成取餐", "Show this screen to staff — once they check it, your pickup is done")}</span>
+              <PickupQr lockId={zoomedLock.id} size={260} />
             </>
           )}
         </DialogContent>
       </Dialog>
+      <EditWishesDialog lock={editing} onClose={() => setEditing(null)} />
     </div>
   );
 }

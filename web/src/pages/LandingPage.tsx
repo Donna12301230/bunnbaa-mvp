@@ -13,7 +13,7 @@ import {
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { db } from "@/lib/firebase";
 import type { MenuItem, Vendor } from "@/types";
-import { EARLY_BIRD_TIERS } from "@/lib/pricing";
+import { VISIBLE_EARLY_BIRD_TIERS } from "@/lib/pricing";
 import { useReviews } from "@/hooks/useReviews";
 import { slotLabel, vendorWindows } from "@/lib/pickupSlots";
 import "./LandingPage.css";
@@ -54,24 +54,25 @@ const TICKER: Bi[] = [
   { zh: "臨時去不了？轉讓給同學，全額入袋", en: "Can't make it? Transfer your meal to a classmate" },
   { zh: "店家未出餐，全額退款再送 20 點", en: "Vendor didn't serve? Full refund plus 20 points" },
   { zh: "取餐前推播提醒，不怕忘記", en: "Push reminders before pickup" },
-  { zh: "合作店家成長獎勵，有機會抽中 0 元", en: "Growth rewards: win a free meal" },
+  { zh: "每 100 元一張抽獎券，人人有獎", en: "A reward ticket every NT$100 — everyone wins" },
 ];
 
 const FEATURES: { icon: ReactNode; title: Bi; body: Bi }[] = [
-  { icon: <CalendarClock />, title: { zh: "越早訂越便宜", en: "Book early, pay less" }, body: { zh: "今天訂明天 95 折，提前 2–13 天 8 折，提前 14–30 天 7 折。", en: "5% off for tomorrow, 20% off 2–13 days ahead, 30% off 14–30 days ahead." } },
-  { icon: <Repeat />, title: { zh: "去不了也不浪費", en: "Nothing goes to waste" }, body: { zh: "鎖定的餐點可轉讓給同學；逾時沒人接手，自動開放 $0 領取。", en: "Transfer a locked meal to a classmate; if nobody takes it in time, anyone can claim it for $0." } },
+  { icon: <CalendarClock />, title: { zh: "越早訂越便宜", en: "Book early, pay less" }, body: { zh: "越早訂，越開心：訂明天 95 折，提前 2 天以上 8 折，可預訂到下週五。", en: "Book early, save more: 5% off for tomorrow, 20% off 2+ days ahead, up to next Friday." } },
+  { icon: <Repeat />, title: { zh: "去不了也不浪費", en: "Nothing goes to waste" }, body: { zh: "截單前免費取消；之後可轉讓給同學，或捐為愛心餐給需要的人。", en: "Cancel free before cutoff; after that, transfer it or donate it as a charity meal." } },
   { icon: <ShieldCheck />, title: { zh: "履約有保障", en: "Guaranteed fulfilment" }, body: { zh: "店家若未如期出餐，全額退款並加贈 20 點回饋金。", en: "If the vendor doesn't serve on time, you get a full refund plus 20 reward points." } },
   { icon: <BellRing />, title: { zh: "準時提醒取餐", en: "Pickup reminders" }, body: { zh: "取餐時段開始前推播通知，排隊時間留給自己。", en: "Get a push notification before your pickup window starts — no more queuing." } },
 ];
 
-// 早鳥最高折扣（提前 14–30 天），跟 lib/pricing 同一套級距與四捨五入
-const BEST_EARLY_BIRD = Math.max(...EARLY_BIRD_TIERS.map((t) => t.discountPercent));
+// 早鳥最高折扣（預訂到下週五，看得到的階梯），跟 lib/pricing 同一套級距與四捨五入
+const BEST_EARLY_BIRD = Math.max(...VISIBLE_EARLY_BIRD_TIERS.map((t) => t.discountPercent));
 const earlyBird = (price: number) => Math.round(price * (1 - BEST_EARLY_BIRD / 100));
 const MENU_TAB_LIMIT = 5;
 const MENU_ITEMS_PER_TAB = 4;
 
 // 最早可提前預約天數＝早鳥級距的最大天數（lib/pricing）
-const MAX_ADVANCE_DAYS = Math.max(...EARLY_BIRD_TIERS.map((t) => t.maxDays));
+// 預訂開放到下週五：最多提前 11 天（週一訂下週五）
+const MAX_ADVANCE_DAYS = 11;
 
 // 近期活動讀 landing_events（管理員在 Firestore 維護），icon 存成字串 key
 const EVENT_ICONS: Record<string, ReactNode> = {
@@ -300,7 +301,7 @@ function LandingContent() {
             </ul>
             <div className="lp-features__cta">
               <LinkButton href="/home">{t("開始預約", "Start booking")}</LinkButton>
-              <p className="lp-note"><Info aria-hidden="true" /> {t("全額預付、不可退款，但可轉讓過戶。", "Fully prepaid and non-refundable, but transferable.")}</p>
+              <p className="lp-note"><Info aria-hidden="true" /> {t("全額預付；截單前免費取消，截單後可轉讓或捐為愛心餐。", "Prepaid; free cancellation before cutoff, then transfer or donate.")}</p>
             </div>
           </div>
         </section>
@@ -338,7 +339,7 @@ function LandingContent() {
               ))}
             </ul>
             {menuItems.length === 0 && <p className="lp-muted lp-center">{t("合作店家的餐點即將上架。", "Partner menus are coming soon.")}</p>}
-            <p className="lp-note lp-center">{t(`價格為提前 14–${MAX_ADVANCE_DAYS} 天的早鳥 ${(100 - BEST_EARLY_BIRD) / 10} 折價；實際品項與價格以各店家菜單為準。`, `Prices shown are the ${BEST_EARLY_BIRD}% early-bird price for booking 14–${MAX_ADVANCE_DAYS} days ahead; see each vendor's menu for actual items and prices.`)}</p>
+            <p className="lp-note lp-center">{t(`價格為提前 2 天以上的早鳥 ${(100 - BEST_EARLY_BIRD) / 10} 折價；實際品項與價格以各店家菜單為準。`, `Prices shown are the ${BEST_EARLY_BIRD}% early-bird price for booking 2+ days ahead; see each vendor's menu for actual items and prices.`)}</p>
           </div>
         </section>
 

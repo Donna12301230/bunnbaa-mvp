@@ -20,7 +20,12 @@ import { ImageUploadField } from "@/components/ImageUploadField";
 import { format, parseISO } from "date-fns";
 import { deleteField, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { DEFAULT_PICKUP_WINDOWS, MAX_HOLIDAYS, MAX_PICKUP_WINDOWS, isValidWindow, slotLabel, windowsOverlap } from "@/lib/pickupSlots";
+import { DEFAULT_PICKUP_WINDOWS, MAX_HOLIDAYS, MAX_PICKUP_RANGE_MINUTES, MAX_PICKUP_WINDOWS, isValidWindow, pickupRangeMinutes, slotLabel, windowsOverlap } from "@/lib/pickupSlots";
+import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
+import { useQuery } from "@tanstack/react-query";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { currentPosition } from "@/lib/geo";
+import type { MenuItem } from "@/types";
 import { dateLocale, getLang, tr } from "@/lib/i18n";
 import type { BusinessHour, Vendor } from "@/types";
 import { Tooltip } from "@/components/ds";
@@ -70,6 +75,8 @@ function pickupWindowsProblem(windows: string[]): string | null {
       if (windowsOverlap(windows[i], windows[j])) return tr(`取餐時段「${slotLabel(windows[i])}」跟「${slotLabel(windows[j])}」重疊了`, `Pickup times ${slotLabel(windows[i])} and ${slotLabel(windows[j])} overlap`);
     }
   }
+  // 第一階段規格 §2：取餐時段可調，但整段不可超過 2 小時
+  if (pickupRangeMinutes(windows) > MAX_PICKUP_RANGE_MINUTES) return tr("整個取餐時段（最早到最晚）不可超過 2 小時", "The whole pickup window can't exceed 2 hours");
   return null;
 }
 
@@ -134,8 +141,20 @@ export default function VendorPortalSettings() {
   const [newHoliday, setNewHoliday] = useState("");
   const [pickupWindows, setPickupWindows] = useState<string[]>(DEFAULT_PICKUP_WINDOWS);
   const [slotCapacity, setSlotCapacity] = useState("");
+  // 第一階段規格 §2「店家可調」
+  const [cutoffTime, setCutoffTime] = useState(DEFAULT_PLATFORM_CONFIG.cutoffTime);
+  const [safetyRate, setSafetyRate] = useState(String(DEFAULT_PLATFORM_CONFIG.safetyStockRate * 100));
+  const [minQty, setMinQty] = useState(String(DEFAULT_PLATFORM_CONFIG.candidateMinQty));
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
+  const [forecast, setForecast] = useState<Record<string, string>>({});
 
   const { data: realVendor, isLoading: realVendorLoading } = useMyVendor();
+  const { data: menuItems = [] } = useQuery({
+    queryKey: ["vendorMenu", realVendor?.id],
+    queryFn: async () => (await getDocs(query(collection(db, "menu_items"), where("vendor_id", "==", realVendor!.id)))).docs.map((d) => ({ id: d.id, ...d.data() }) as MenuItem),
+    enabled: !!realVendor?.id,
+  });
 
   useEffect(() => {
     if (!realVendor) return;
@@ -150,6 +169,12 @@ export default function VendorPortalSettings() {
     setBusinessHours(bh && bh.length === 7 ? bh : DEFAULT_BH);
     setPickupWindows(realVendor.pickup_windows?.length ? realVendor.pickup_windows : DEFAULT_PICKUP_WINDOWS);
     setSlotCapacity(realVendor.slot_capacity ? String(realVendor.slot_capacity) : "");
+    setCutoffTime(realVendor.cutoff_time ?? DEFAULT_PLATFORM_CONFIG.cutoffTime);
+    setSafetyRate(String(Math.round((realVendor.safety_stock_rate ?? DEFAULT_PLATFORM_CONFIG.safetyStockRate) * 100)));
+    setMinQty(String(realVendor.candidate_min_qty ?? DEFAULT_PLATFORM_CONFIG.candidateMinQty));
+    setLat(realVendor.lat != null ? String(realVendor.lat) : "");
+    setLng(realVendor.lng != null ? String(realVendor.lng) : "");
+    setForecast(Object.fromEntries(Object.entries(realVendor.forecast_daily ?? {}).map(([k, v]) => [k, String(v)])));
   }, [realVendor]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -164,6 +189,16 @@ export default function VendorPortalSettings() {
         throw new Error(tr("份數上限請填 0～10000 的整數（空白或 0 代表不限）", "The limit must be a whole number from 0 to 10000 (blank or 0 means no limit)"));
       }
       if (holidays.length > MAX_HOLIDAYS) throw new Error(tr(`公休日最多 ${MAX_HOLIDAYS} 天`, `At most ${MAX_HOLIDAYS} closing days`));
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoffTime) || cutoffTime > DEFAULT_PLATFORM_CONFIG.cutoffTime) {
+        throw new Error(tr(`截單時間只能提前，不能晚於前一天 ${DEFAULT_PLATFORM_CONFIG.cutoffTime}`, `Cutoff can only be earlier than ${DEFAULT_PLATFORM_CONFIG.cutoffTime}`));
+      }
+      const safety = Number(safetyRate) / 100;
+      if (!(safety >= 0 && safety <= 1)) throw new Error(tr("安全庫存請填 0～100%", "Safety stock must be 0–100%"));
+      const min = Number(minQty);
+      if (!Number.isInteger(min) || min < 1 || min > 500) throw new Error(tr("候選菜成立最低量請填 1～500 的整數", "Minimum must be 1–500"));
+      const latNum = lat.trim() === "" ? null : Number(lat);
+      const lngNum = lng.trim() === "" ? null : Number(lng);
+      if ((latNum !== null && !Number.isFinite(latNum)) || (lngNum !== null && !Number.isFinite(lngNum))) throw new Error(tr("座標格式不正確", "Invalid coordinates"));
       await updateDoc(doc(db, "vendors", realVendor.id), {
         description: description.trim(),
         // 英文簡介：手動改過就釘住（i18n_src 設成目前中文，自動翻譯不會蓋掉）；
@@ -180,6 +215,11 @@ export default function VendorPortalSettings() {
         pickup_windows: [...pickupWindows].sort(),
         slot_capacity: capacity,
         cover_image: coverImage,
+        cutoff_time: cutoffTime,
+        safety_stock_rate: safety,
+        candidate_min_qty: min,
+        ...(latNum !== null && lngNum !== null ? { lat: latNum, lng: lngNum } : {}),
+        forecast_daily: Object.fromEntries(Object.entries(forecast).filter(([, v]) => v.trim() !== "" && Number(v) >= 0).map(([k, v]) => [k, Number(v)])),
       });
     },
     onSuccess: () => {
@@ -237,6 +277,52 @@ export default function VendorPortalSettings() {
       </h2>
 
       <div className="max-w-lg space-y-5">
+
+        {/* ── 預購規則（第一階段規格 §2 店家可調） ── */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">{tr("預購規則", "Pre-order rules")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="cutoff">{tr("截單時間（取餐前一天）", "Cutoff (day before)")}</Label>
+                <Input id="cutoff" type="time" value={cutoffTime} max={DEFAULT_PLATFORM_CONFIG.cutoffTime} onChange={(e) => setCutoffTime(e.target.value)} />
+                <p className="text-xs text-muted-foreground mt-1">{tr(`只能提前，不能晚於 ${DEFAULT_PLATFORM_CONFIG.cutoffTime}`, `Earlier only, not after ${DEFAULT_PLATFORM_CONFIG.cutoffTime}`)}</p>
+              </div>
+              <div>
+                <Label htmlFor="safety">{tr("安全庫存（%）", "Safety stock (%)")}</Label>
+                <Input id="safety" type="number" min={0} max={100} value={safetyRate} onChange={(e) => setSafetyRate(e.target.value)} />
+                <p className="text-xs text-muted-foreground mt-1">{tr("預測用量 × (1 + 安全庫存)", "Forecast × (1 + safety)")}</p>
+              </div>
+              <div>
+                <Label htmlFor="minqty">{tr("候選菜成立最低量（份）", "Candidate minimum (meals)")}</Label>
+                <Input id="minqty" type="number" min={1} value={minQty} onChange={(e) => setMinQty(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label>{tr("取餐點座標（附近愛心餐、區域洞察用）", "Pickup location (charity map, area insights)")}</Label>
+              <div className="flex gap-2">
+                <Input placeholder={tr("緯度", "Lat")} value={lat} onChange={(e) => setLat(e.target.value)} />
+                <Input placeholder={tr("經度", "Lng")} value={lng} onChange={(e) => setLng(e.target.value)} />
+                <Button type="button" variant="outline" size="sm" onClick={async () => { try { const pos = await currentPosition(); setLat(pos.lat.toFixed(5)); setLng(pos.lng.toFixed(5)); } catch { toast({ variant: "destructive", title: tr("無法定位", "Couldn't locate") }); } }}>{tr("用目前位置", "Use here")}</Button>
+              </div>
+            </div>
+            {menuItems.length > 0 && (
+              <div>
+                <Label>{tr("新店家每日預估份數（前 4 週預測用）", "Daily estimate for new stores (first 4 weeks)")}</Label>
+                <div className="space-y-1 mt-1">
+                  {menuItems.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2">
+                      <span className="flex-1 truncate">{item.name}</span>
+                      <Input className="w-24 h-8" type="number" min={0} value={forecast[item.id] ?? ""} onChange={(e) => setForecast((f) => ({ ...f, [item.id]: e.target.value }))} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* ── 基本資料 ── */}
         <Card>

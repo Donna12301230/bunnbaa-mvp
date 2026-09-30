@@ -1,8 +1,8 @@
 import { useMemo, useState, type MouseEvent } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { AlertCircle, ArrowLeft, MapPin, Phone, Plus, Star, Store, UtensilsCrossed } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowLeft, MapPin, Phone, Plus, Sparkles, Star, Store, UtensilsCrossed } from "lucide-react";
 import { db } from "@/lib/firebase";
 import type { Vendor, MenuItem } from "@/types";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
@@ -14,6 +14,9 @@ import { tagEn } from "@/types";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 import { useReviews, summarizeRatings } from "@/hooks/useReviews";
+import { isBento } from "@/lib/bento";
+import { nextAvailablePickup } from "@/lib/pickupSlots";
+import OpenWishDialog from "@/components/OpenWishDialog";
 
 
 function categoryAnchorId(category: string) {
@@ -31,7 +34,9 @@ function scrollToCategory(category: string) {
 export default function VendorPage() {
   const { id } = useParams<{ id: string }>();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const { addItem, vendorId: cartVendorId } = useCart();
+  const { add, vendorId: cartVendorId } = useCart();
+  const [, navigate] = useLocation();
+  const [wishOpen, setWishOpen] = useState(false);
   const { toast } = useToast();
   const { data: reviews = [] } = useReviews();
 
@@ -74,17 +79,23 @@ export default function VendorPage() {
 
   const effectiveCategory = activeCategory ?? categories[0]?.[0] ?? null;
 
+  // 便當要選日期與配菜，直接帶到品項頁；單品用最近能訂的日期時段快速加入
   function quickAdd(e: MouseEvent, item: MenuItem) {
     e.preventDefault();
     e.stopPropagation();
+    const next = nextAvailablePickup(vendor);
+    if (isBento(item) || !next) {
+      navigate(`/item/${item.id}`);
+      return;
+    }
     if (cartVendorId && cartVendorId !== item.vendor_id) {
       toast({
         title: tr("購物車裡有別家商家的品項", "Your cart has items from another vendor"),
         description: tr("加入這項會清空目前的購物車（一次只能跟一家商家預購）。", "Adding this will clear your cart (you can only pre-order from one vendor at a time)."),
       });
     }
-    addItem(item, item.vendor_id);
-    toast({ title: tr("已加入購物車", "Added to cart"), description: loc(item, "name") });
+    add({ menuItem: item, vendorId: item.vendor_id, pickupDate: next.date, pickupWindow: next.window, choices: [], rice: "normal", quantity: 1, note: "", couponId: null });
+    toast({ title: tr("已加入購物車", "Added to cart"), description: `${loc(item, "name")}・${next.date} ${next.window}` });
   }
 
   if (vendorLoading) {
@@ -140,6 +151,19 @@ export default function VendorPage() {
             )}
           </div>
         </div>
+
+        {vendor.typhoon_notice?.dates?.length ? (
+          <div className="flex items-start gap-2 bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-800 mt-4">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{tr(`颱風警報：${vendor.typhoon_notice.dates.join("、")} 的訂單可能因停班停課取消（會自動全額退款）。`, `Typhoon warning: orders on ${vendor.typhoon_notice.dates.join(", ")} may be cancelled (automatic full refund).`)}</span>
+          </div>
+        ) : null}
+
+        <div className="flex items-center justify-between gap-2 bg-orange-50 rounded-lg px-3 py-2 text-xs text-orange-900 mt-4">
+          <span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 shrink-0" />{tr("想吃的菜這家店沒有？許願看看，人數夠多店家就會考慮上架。", "Want a dish this vendor doesn't have? Make a wish — enough wishes and they may add it.")}</span>
+          <Button size="sm" variant="outline" className="shrink-0" onClick={() => setWishOpen(true)}>{tr("許願新菜", "Wish for a dish")}</Button>
+        </div>
+        <OpenWishDialog open={wishOpen} onOpenChange={setWishOpen} vendorId={vendor.id} vendorName={loc(vendor, "name")} />
 
         {vendor.phone && (
           <div className="flex items-start gap-2 bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-800 mt-4">
@@ -212,6 +236,7 @@ export default function VendorPage() {
                             </div>
                           )}
                           <span className="text-sm font-bold text-orange-600">NT${item.price}</span>
+                          {isBento(item) && <span className="ml-2 text-xs text-muted-foreground">{tr("可選配菜・加減飯", "Choose sides · rice")}</span>}
                         </div>
                         <button
                           type="button"

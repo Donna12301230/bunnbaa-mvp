@@ -23,6 +23,10 @@ import { tr } from "@/lib/i18n";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState, Switch, Tag } from "@/components/ds";
+import BentoEditor, { EMPTY_BENTO, type BentoForm } from "@/components/BentoEditor";
+import { useVendorCatalog } from "@/hooks/useVendorCatalog";
+import { addDaysStr, mondayOf, todayStr } from "@/lib/pickupSlots";
+import { Link } from "wouter";
 
 const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
 
@@ -56,11 +60,15 @@ export default function VendorPortalMenu() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [bento, setBento] = useState<BentoForm>(EMPTY_BENTO);
 
   // 登入店主綁定（vendors/{id}.owner_uid）的商家；寫入權限由 firestore.rules 的
   // isVendorOwner 把關，這裡不另外檢查。
   const { data: myVendor } = useMyVendor();
   const VENDOR_ID = myVendor?.id;
+  const { data: catalog } = useVendorCatalog(VENDOR_ID);
+  // 週六 12:00 產生下週叫貨單後，下週主菜鎖定，只能等值替換配菜（§16 暫定）
+  const nextWeekLocked = !!myVendor?.menu_locked_week && myVendor.menu_locked_week >= mondayOf(addDaysStr(todayStr(), 7));
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["vendorMenu", VENDOR_ID],
@@ -86,6 +94,12 @@ export default function VendorPortalMenu() {
         image: form.image || null, // Firestore SDK throws on `undefined` field values
         allergens: form.allergens,
         dietary_tags: form.dietaryTags,
+        // 便當結構（規格 §3.2）
+        main: bento.bento && bento.mainName ? { name: bento.mainName, component_id: bento.mainComponentId || null } : null,
+        rice_component_id: bento.bento ? bento.riceComponentId || null : null,
+        slots: bento.bento ? bento.slots.filter((sl) => sl.default.name).map((sl) => ({ ...sl, candidates: sl.candidates.filter((c) => c.name) })) : [],
+        weekdays: bento.bento ? bento.weekdays : [],
+        component_id: !bento.bento ? bento.componentId || null : null,
       };
       const original = editId ? items.find((i) => i.id === editId) ?? null : null;
       const english = englishOverrides(form, original);
@@ -107,6 +121,7 @@ export default function VendorPortalMenu() {
       setDialogOpen(false);
       setEditId(null);
       setForm(EMPTY_FORM);
+      setBento(EMPTY_BENTO);
       toast({ title: editId ? tr("已更新", "Updated") : tr("已新增", "Added"), description: form.name });
     },
     onError: (err: any) => {
@@ -136,12 +151,22 @@ export default function VendorPortalMenu() {
   function openAdd() {
     setEditId(null);
     setForm(EMPTY_FORM);
+    setBento(EMPTY_BENTO);
     setDialogOpen(true);
   }
 
   function openEdit(item: MenuItem) {
     setEditId(item.id);
     setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [], nameEn: item.name_en ?? "", descriptionEn: item.description_en ?? "" });
+    setBento({
+      bento: (item.slots?.length ?? 0) > 0,
+      mainName: item.main?.name ?? "",
+      mainComponentId: item.main?.component_id ?? "",
+      riceComponentId: item.rice_component_id ?? "",
+      componentId: item.component_id ?? "",
+      weekdays: item.weekdays ?? [],
+      slots: item.slots ?? [],
+    });
     setDialogOpen(true);
   }
 
@@ -155,7 +180,10 @@ export default function VendorPortalMenu() {
   return (
     <VendorPortalLayout>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">{tr("菜單管理", "Menu")}</h2>
+        <div>
+          <h2 className="text-xl font-bold">{tr("菜單管理", "Menu")}</h2>
+          <p className="text-xs text-muted-foreground">{tr("主菜、配菜格與候選菜；配方在", "Mains, side slots and candidates; recipes live in")} <Link href="/vendor-portal/recipes" className="text-primary underline">{tr("配方與原物料", "Recipes")}</Link></p>
+        </div>
         <Button  onClick={openAdd}>
           <Plus className="w-4 h-4 mr-1" /> {tr("新增品項", "Add item")}
         </Button>
@@ -191,6 +219,13 @@ export default function VendorPortalMenu() {
                             ))}
                           </div>
                           <div className="text-xs text-muted-foreground truncate">{item.description}</div>
+                          {(item.slots?.length ?? 0) > 0 && (
+                            <div className="text-xs text-muted-foreground truncate">
+                              {item.main?.name && <>{tr("主菜", "Main")} {item.main.name}・</>}
+                              {item.slots!.map((sl) => `${sl.default.name}${sl.candidates.length ? `（+${sl.candidates.map((c) => c.name).join("/")}）` : ""}`).join("、")}
+                              {item.weekdays?.length ? `・${tr("週", "")}${item.weekdays.join(",")}` : ""}
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-orange-600 font-semibold text-sm">NT$ {item.price}</span>
                             {item.allergens?.length > 0 && (
@@ -223,7 +258,7 @@ export default function VendorPortalMenu() {
       })()}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editId ? tr("編輯品項", "Edit item") : tr("新增品項", "Add item")}</DialogTitle>
           </DialogHeader>
@@ -298,6 +333,10 @@ export default function VendorPortalMenu() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">{tr("點選含有的過敏原成分，將顯示於消費者菜單頁面。", "Select the allergens this item contains; they're shown on the customer menu.")}</p>
             </div>
+            {nextWeekLocked && bento.bento && (
+              <p className="text-xs text-amber-700 bg-amber-50 rounded p-2">{tr("下週叫貨單已產生，下週主菜已鎖定；請只做等值的配菜替換。", "Next week's purchase list is out, so mains are locked — only swap sides for equivalents.")}</p>
+            )}
+            <BentoEditor value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} />
             <ImageUploadField label={tr("品項圖片", "Item photo")} vendorId={VENDOR_ID} value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
           </div>
           <DialogFooter>
