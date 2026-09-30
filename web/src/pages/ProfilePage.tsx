@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDoc, collection, getDocs, limit, orderBy, query, serverTimestamp, where } from "firebase/firestore";
 import {
   User, Mail, Phone, GraduationCap, ArrowLeft, LogOut,
-  ClipboardList, Users, Store, History, ShieldAlert,
+  ClipboardList, Store, History, ShieldAlert,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { logout } from "@/lib/auth";
@@ -202,16 +202,6 @@ export default function ProfilePage() {
             <div>
               <p className="font-medium text-sm">{tr("抽獎券與折價券", "Tickets & coupons")}</p>
               <p className="text-xs text-muted-foreground">{tr("成長獎勵：抽獎、查看折價券到期日", "Draw and check coupon expiry")}</p>
-            </div>
-          </button>
-          <button
-            onClick={() => comingSoon(tr("我的開團", "My group orders"))}
-            className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-          >
-            <Users className="w-5 h-5 text-orange-500 shrink-0" />
-            <div>
-              <p className="font-medium text-sm">{tr("我的開團", "My group orders")}</p>
-              <p className="text-xs text-muted-foreground">{tr("管理你發起的合購", "Manage group orders you started")}</p>
             </div>
           </button>
           {user?.role === "customer" && (

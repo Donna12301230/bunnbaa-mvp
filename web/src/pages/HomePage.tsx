@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { httpsCallable } from "@/lib/callable";
 import {
   Clock, CalendarDays, Rocket, Star, User, MapPin, Trophy,
-  ShieldCheck, Bell, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store, UtensilsCrossed, Bot } from "lucide-react";
+  BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -197,6 +197,23 @@ export default function HomePage() {
     return cards;
   }, [lockMealCards, rangeDates, area, selectedSort, vendorRatings, pickupDate]);
 
+  // 依商家分組（「哪些店家有什麼」），避免每個品項各自一張大圖卡片排成一片、太雜亂；
+  // 商家順序沿用 sortedMealCards 已經排好的順序（第一次出現該商家的位置）。
+  const vendorMealGroups = useMemo(() => {
+    const groups: { vendor: Vendor; items: MenuItem[] }[] = [];
+    const index = new Map<string, number>();
+    for (const { item, vendor } of sortedMealCards) {
+      let i = index.get(vendor.id);
+      if (i === undefined) {
+        i = groups.length;
+        index.set(vendor.id, i);
+        groups.push({ vendor, items: [] });
+      }
+      groups[i].items.push(item);
+    }
+    return groups;
+  }, [sortedMealCards]);
+
   const visiblePlanGroups = useMemo(() => {
     const groups = vendorPlanGroups.filter((g) => {
       const vendor = vendors.find((v) => v.id === g.vendorId);
@@ -332,16 +349,6 @@ export default function HomePage() {
             />
           </div>
 
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-3.5 flex gap-2.5">
-            <ShieldCheck className="w-4 h-4 text-green-700 shrink-0 mt-0.5" />
-            <p className="text-xs leading-relaxed text-green-800">{t("保障說明：店家若未如期出餐，全額退款並加贈 20 點回饋金。", "Our guarantee: if the vendor doesn't serve on time, you get a full refund plus 20 reward points.")}</p>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex gap-2.5">
-            <Bell className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-            <p className="text-xs leading-relaxed text-amber-800">{t(`越早訂，越開心：可預訂到下週五，取餐前一天 ${vendorCutoffTime(null)} 截單。取餐時段結束前 30 分鐘還沒取餐會提醒你；結束 30 分鐘後仍未取餐，便當會轉為愛心餐。`, `Book early, save more: up to next Friday; orders close at ${vendorCutoffTime(null)} the day before. We'll remind you 30 min before pickup ends; meals still unclaimed 30 min after become charity meals.`)}</p>
-          </div>
-
           <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
             <h3 className="text-sm font-semibold">{t("早鳥預約折扣", "Early-bird discounts")}</h3>
             <div className="space-y-2.5 text-sm">
@@ -400,60 +407,60 @@ export default function HomePage() {
 
         {/* ── 右側：主內容 ── */}
         <main className="flex-1 min-w-0 space-y-8">
-          {/* 今日推薦鎖定方案（單點型） */}
+          {/* 今日推薦方案（單點型）——改成依商家分組的清單，取代原本一格一張大圖卡片
+              （每個品項都要放大圖、徽章、價格，排成一片太雜亂），改成「哪些店家有什麼」：
+              一家店一張卡片，底下用一行一行列出品項名稱＋價格＋按鈕。 */}
           <section className="space-y-4">
             <div className="flex items-baseline justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2.5">
                 <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground border border-ink">{t("單點型", "Single meal")}</span>
-                <h3 className="font-heading text-2xl font-semibold">{t("今日推薦鎖定方案", "Today's picks")}</h3>
+                <h3 className="font-heading text-2xl font-semibold">{t("今日推薦方案", "Today's picks")}</h3>
               </div>
               <span className="text-sm text-muted-foreground font-semibold">{pickupDate}・{pickupWindow}</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {sortedMealCards.length === 0 && (
-                <p className="text-sm text-muted-foreground md:col-span-3">{t("這段期間沒有開放預購的品項，試著調整左側的預約日曆。", "Nothing is open for pre-order in this range — try adjusting the dates on the left.")}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {vendorMealGroups.length === 0 && (
+                <p className="text-sm text-muted-foreground md:col-span-2">{t("這段期間沒有開放預購的品項，試著調整左側的預約日曆。", "Nothing is open for pre-order in this range — try adjusting the dates on the left.")}</p>
               )}
-              {sortedMealCards.map(({ item, vendor }) => {
-                const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
-                return (
-                  <article key={item.id} className="bg-card rounded-2xl border border-ink overflow-hidden flex flex-col">
-                    <div className="relative h-32 bg-secondary border-b border-ink flex items-center justify-center">
-                      {item.image ? (
-                        <img src={item.image} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
-                      ) : (
-                        <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/70" strokeWidth={1.75} aria-hidden="true" />
-                      )}
-                      {vendor.verified && (
-                        <span className="absolute top-2.5 left-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-card text-foreground border border-ink">
-                          <BadgeCheck className="w-3 h-3" /> {t("認證商家", "Verified")}
-                        </span>
-                      )}
-                      {vendor.reliability_tone === "stable" && (
-                        <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-card text-green-700 border border-ink">
-                          <CheckCircle2 className="w-3 h-3" /> {t("履約穩定度：穩定", "Reliability: stable")}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <div>
-                        <h4 className="font-heading text-h3 leading-snug">{loc(item, "name")}</h4>
-                        <p className="text-xs text-muted-foreground font-semibold mt-0.5">{loc(vendor, "name")}・{t("取餐時段：", "Pickup: ")}{pickupDate}（{pickupWindow}）</p>
-                      </div>
+              {vendorMealGroups.map(({ vendor, items }) => (
+                <article key={vendor.id} className="bg-card rounded-2xl border border-ink p-4">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <h4 className="font-heading text-lg font-semibold">{loc(vendor, "name")}</h4>
+                    {vendor.verified && (
+                      <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-ink">
+                        <BadgeCheck className="w-3 h-3" /> {t("認證商家", "Verified")}
+                      </span>
+                    )}
+                    {vendor.reliability_tone === "stable" && (
+                      <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-green-700 border border-ink">
+                        <CheckCircle2 className="w-3 h-3" /> {t("履約穩定", "Stable")}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground font-semibold mb-2">{t("取餐時段：", "Pickup: ")}{pickupDate}（{pickupWindow}）</p>
 
-                      <div className="flex items-center justify-between mt-auto pt-1">
-                        <div>
-                          {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through mr-1.5">{t("原價", "was")} ${item.price}</span>}
-                          <span className="font-heading text-2xl font-semibold">${lockedPrice}</span>
+                  <div className="divide-y divide-border">
+                    {items.map((item) => {
+                      const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
+                      return (
+                        <div key={item.id} className="flex items-center justify-between gap-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{loc(item, "name")}</p>
+                            <div>
+                              {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through mr-1.5">${item.price}</span>}
+                              <span className="font-heading text-lg font-semibold">${lockedPrice}</span>
+                            </div>
+                          </div>
+                          <Button size="sm" variant="outline" onClick={() => openItem(item, vendor)}>
+                            {isBento(item) ? t("選配菜", "Choose sides") : t("立即預付", "Prepay")}
+                          </Button>
                         </div>
-                        <Button size="sm" onClick={() => openItem(item, vendor)}>
-                          {isBento(item) ? t("選配菜・鎖定", "Choose sides & lock") : t("立即預付鎖定", "Prepay & lock")}
-                        </Button>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+                      );
+                    })}
+                  </div>
+                </article>
+              ))}
             </div>
           </section>
 
