@@ -358,14 +358,21 @@ exports.onLockCreated = onDocumentCreated(
         }
       }
     } else {
-      explanation = await generateDiscountExplanation({
-        discountPercent: lock.discount_percent,
-        resellable: lock.resellable !== false,
-        pickupWindow: lock.pickup_window,
-        // Qualitative only, per spec 6.2 — never expose the raw accuracy
-        // number to the consumer-facing agent.
-        vendorReliabilityTone: vendor.reliability_tone || "new",
-      });
+      // Gemini 失敗（沒設 key、503／429）只少一段說明文字，不能讓觸發器當掉
+      // （emulator 會殺掉 worker 重啟，拖慢後面所有觸發器）。測試文件 F-10。
+      try {
+        explanation = await generateDiscountExplanation({
+          discountPercent: lock.discount_percent,
+          resellable: lock.resellable !== false,
+          pickupWindow: lock.pickup_window,
+          // Qualitative only, per spec 6.2 — never expose the raw accuracy
+          // number to the consumer-facing agent.
+          vendorReliabilityTone: vendor.reliability_tone || "new",
+        });
+      } catch (err) {
+        logger.warn(`Couldn't generate discount explanation for lock ${event.params.lockId}`, err);
+        return;
+      }
       try {
         [explanation.explanation_text_en] = await translateTexts([explanation.explanation_text]);
       } catch (err) {
