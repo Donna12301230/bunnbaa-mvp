@@ -1,19 +1,25 @@
-import { tr } from "@/lib/i18n";
+import { tr, loc } from "@/lib/i18n";
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDoc, collection, getDocs, limit, orderBy, query, serverTimestamp, where } from "firebase/firestore";
 import {
-  User, Mail, Phone, GraduationCap, ArrowLeft, LogOut,
-  ClipboardList, Store, History, ShieldAlert,
+  Mail, Phone, GraduationCap, ArrowLeft, LogOut,
+  ClipboardList, Store, History, ShieldAlert, User, Utensils,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { logout } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { useVendors } from "@/hooks/useVendors";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/firebase";
-import type { UserProfile } from "@/types";
+import { avatarUrl } from "@/lib/avatar";
+import { slotLabel } from "@/lib/pickupSlots";
+import { cn } from "@/lib/utils";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { EmptyState } from "@/components/ds";
+import type { Lock, LockStatus, UserProfile } from "@/types";
 import TasteAndNotifySection from "@/components/TasteAndNotifySection";
 
 interface BanAppeal {
@@ -111,10 +117,152 @@ function BanAppealSection({ user }: { user: UserProfile }) {
 const roleLabel = (role: string) =>
   ({ customer: tr("一般會員", "Member"), vendor: tr("廠商", "Vendor"), admin: tr("平台管理員", "Admin") } as Record<string, string>)[role] ?? role;
 
+const orderStatusLabel = (): Record<LockStatus, string> => ({
+  locked: tr("鎖定中", "Locked"),
+  for_resale: tr("轉賣中", "For resale"),
+  for_gift: tr("贈送中", "Being gifted"),
+  resold_and_fulfilled: tr("已轉賣完成取餐", "Picked up by new owner"),
+  fulfilled: tr("已完成取餐", "Picked up"),
+  no_show: tr("未取餐（舊制）", "No-show (legacy)"),
+  charity: tr("已轉愛心餐", "Charity meal"),
+  cancelling: tr("退款中", "Refunding"),
+  cancelled: tr("已取消退款", "Cancelled"),
+});
+
+const orderStatusTone: Record<LockStatus, string> = {
+  locked: "bg-orange-50 text-orange-700",
+  for_resale: "bg-blue-50 text-blue-700",
+  for_gift: "bg-blue-50 text-blue-700",
+  resold_and_fulfilled: "bg-green-50 text-green-700",
+  fulfilled: "bg-green-50 text-green-700",
+  no_show: "bg-gray-100 text-gray-600",
+  charity: "bg-pink-50 text-pink-700",
+  cancelling: "bg-gray-100 text-gray-600",
+  cancelled: "bg-gray-100 text-gray-600",
+};
+
+function formatDate(ts: unknown): string {
+  const d = (ts as { toDate?: () => Date } | undefined)?.toDate?.();
+  return d ? d.toLocaleDateString() : "—";
+}
+
+// 我的訂單——表格呈現最近的鎖定紀錄，完整功能（QR、轉讓、贈送、評分）還是在 /my-bookings。
+function OrdersPanel({ uid }: { uid: string }) {
+  const { data: vendors = [] } = useVendors();
+  const { data: locks = [], isLoading } = useQuery({
+    queryKey: ["myProfileRecentLocks", uid],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "locks"), where("buyer_uid", "==", uid), limit(200)));
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Lock & { created_at?: { toMillis?: () => number } });
+    },
+  });
+  const recent = [...locks]
+    .sort((a, b) => (b.created_at?.toMillis?.() ?? 0) - (a.created_at?.toMillis?.() ?? 0))
+    .slice(0, 20);
+  const labels = orderStatusLabel();
+
+  return (
+    <section className="bg-white rounded-xl border border-border overflow-hidden">
+      <div className="p-4 border-b border-border flex items-center justify-between gap-2">
+        <h2 className="font-semibold">{tr("我的訂單", "My orders")}</h2>
+        <Button asChild size="sm" variant="outline"><Link href="/my-bookings">{tr("查看完整我的餐點", "See full order history")}</Link></Button>
+      </div>
+      {isLoading ? (
+        <div className="p-4"><SkeletonBlocks count={3} height={44} className="space-y-2" /></div>
+      ) : recent.length === 0 ? (
+        <div className="p-6">
+          <EmptyState size="compact" icon={<ClipboardList size={32} />} title={tr("還沒有訂單紀錄", "No orders yet")} />
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-xs text-muted-foreground">
+                <th className="text-left font-medium px-4 py-2">{tr("品項", "Item")}</th>
+                <th className="text-left font-medium px-4 py-2">{tr("商家", "Vendor")}</th>
+                <th className="text-left font-medium px-4 py-2">{tr("取餐日期", "Pickup")}</th>
+                <th className="text-left font-medium px-4 py-2">{tr("金額", "Price")}</th>
+                <th className="text-left font-medium px-4 py-2">{tr("狀態", "Status")}</th>
+                <th className="text-left font-medium px-4 py-2">{tr("建立日期", "Created")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recent.map((lock) => (
+                <tr key={lock.id} className="border-t border-border">
+                  <td className="px-4 py-2.5">{loc(lock, "item_name")}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{loc(vendors.find((v) => v.id === lock.vendor_id), "name") || "—"}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">{lock.pickup_date}（{slotLabel(lock.pickup_window)}）</td>
+                  <td className="px-4 py-2.5">${lock.locked_price}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={cn("inline-block text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap", orderStatusTone[lock.status])}>
+                      {labels[lock.status]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">{formatDate(lock.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AccountPanel({ user }: { user: UserProfile }) {
+  return (
+    <section className="bg-white rounded-xl border border-border p-5">
+      <div className="flex items-center gap-4 mb-5">
+        <div className="w-14 h-14 rounded-full bg-orange-100 shrink-0 overflow-hidden">
+          <img src={avatarUrl(user.id)} alt="" className="w-full h-full" />
+        </div>
+        <div>
+          <p className="font-semibold text-lg">{user.displayName || user.username}</p>
+          <span className="inline-block mt-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+            {roleLabel(user.role)}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Mail className="w-4 h-4 shrink-0" /> {user.email || tr("尚未設定", "Not set")}
+        </div>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Phone className="w-4 h-4 shrink-0" /> {user.phone || tr("尚未設定", "Not set")}
+        </div>
+        {user.department && (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <GraduationCap className="w-4 h-4 shrink-0" />
+            {user.department}{user.studentId ? `・${user.studentId}` : ""}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+type Tab = "account" | "orders" | "taste";
+
+function SidebarButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors",
+        active ? "bg-orange-50 text-orange-700" : "text-muted-foreground hover:bg-gray-50 hover:text-foreground"
+      )}
+    >
+      {icon} {label}
+    </button>
+  );
+}
+
 export default function ProfilePage() {
   const [, navigate] = useLocation();
   const { user, isLoading } = useAuth();
   const { toast } = useToast();
+  const [tab, setTab] = useState<Tab>("account");
 
   const logoutMutation = useMutation({
     mutationFn: () => logout(),
@@ -145,88 +293,52 @@ export default function ProfilePage() {
         </div>
       </header>
 
-      <main className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
-        <h1 className="text-xl font-bold">{tr("會員中心", "My account")}</h1>
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 flex flex-col md:flex-row gap-6">
+        {/* ── 左側：會員專區導覽 ── */}
+        <aside className="md:w-56 shrink-0">
+          <div className="bg-white rounded-xl border border-border p-3 space-y-1 md:sticky md:top-20">
+            <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tr("會員專區", "Member area")}</p>
+            <SidebarButton active={tab === "account"} icon={<User className="w-4 h-4" />} label={tr("帳號資訊", "Account")} onClick={() => setTab("account")} />
+            <SidebarButton active={tab === "orders"} icon={<ClipboardList className="w-4 h-4" />} label={tr("我的訂單", "My orders")} onClick={() => setTab("orders")} />
+            <SidebarButton active={tab === "taste"} icon={<Utensils className="w-4 h-4" />} label={tr("口味與通知", "Taste & notifications")} onClick={() => setTab("taste")} />
 
-        {/* 帳號資訊 */}
-        <section className="bg-white rounded-xl border border-border p-5">
-          <div className="flex items-center gap-4 mb-5">
-            <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-              <User className="w-7 h-7 text-orange-500" />
-            </div>
-            <div>
-              <p className="font-semibold text-lg">{user?.displayName || user?.username}</p>
-              <span className="inline-block mt-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
-                {roleLabel(user?.role ?? "customer")}
-              </span>
-            </div>
-          </div>
+            <div className="my-2 border-t border-border" />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Mail className="w-4 h-4 shrink-0" /> {user?.email || tr("尚未設定", "Not set")}
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Phone className="w-4 h-4 shrink-0" /> {user?.phone || tr("尚未設定", "Not set")}
-            </div>
-            {user?.department && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <GraduationCap className="w-4 h-4 shrink-0" />
-                {user.department}{user.studentId ? `・${user.studentId}` : ""}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {user?.orderBanned && <BanAppealSection user={user} />}
-
-        {user && <TasteAndNotifySection user={user} />}
-
-        {/* 快速功能 */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <button
-            onClick={() => navigate("/my-bookings")}
-            className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-          >
-            <ClipboardList className="w-5 h-5 text-orange-500 shrink-0" />
-            <div>
-              <p className="font-medium text-sm">{tr("我的訂單", "My orders")}</p>
-              <p className="text-xs text-muted-foreground">{tr("查看鎖定與取餐紀錄", "See your locked meals and pickups")}</p>
-            </div>
-          </button>
-          <button
-            onClick={() => navigate("/rewards")}
-            className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-          >
-            <History className="w-5 h-5 text-orange-500 shrink-0" />
-            <div>
-              <p className="font-medium text-sm">{tr("抽獎券與折價券", "Tickets & coupons")}</p>
-              <p className="text-xs text-muted-foreground">{tr("成長獎勵：抽獎、查看折價券到期日", "Draw and check coupon expiry")}</p>
-            </div>
-          </button>
-          {user?.role === "customer" && (
             <button
-              onClick={() => comingSoon(tr("申請成為廠商", "Vendor applications"))}
-              className="bg-white rounded-xl border border-border p-4 flex items-center gap-3 text-left shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              onClick={() => navigate("/rewards")}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left text-muted-foreground hover:bg-gray-50 hover:text-foreground transition-colors"
             >
-              <Store className="w-5 h-5 text-orange-500 shrink-0" />
-              <div>
-                <p className="font-medium text-sm">{tr("申請成為廠商", "Become a vendor")}</p>
-                <p className="text-xs text-muted-foreground">{tr("上架自己的餐點方案", "List your own meals")}</p>
-              </div>
+              <History className="w-4 h-4" /> {tr("抽獎券與折價券", "Tickets & coupons")}
             </button>
-          )}
-        </section>
+            {user?.role === "customer" && (
+              <button
+                onClick={() => comingSoon(tr("申請成為廠商", "Vendor applications"))}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left text-muted-foreground hover:bg-gray-50 hover:text-foreground transition-colors"
+              >
+                <Store className="w-4 h-4" /> {tr("申請成為廠商", "Become a vendor")}
+              </button>
+            )}
 
-        <Button
-          variant="ghost"
-          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-          onClick={() => logoutMutation.mutate()}
-          disabled={logoutMutation.isPending}
-        >
-          <LogOut className="w-4 h-4 mr-2" /> {tr("登出", "Sign out")}
-        </Button>
-      </main>
+            <div className="my-2 border-t border-border" />
+
+            <button
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <LogOut className="w-4 h-4" /> {tr("登出", "Sign out")}
+            </button>
+          </div>
+        </aside>
+
+        {/* ── 右側：內容 ── */}
+        <main className="flex-1 min-w-0 space-y-6">
+          {user?.orderBanned && <BanAppealSection user={user} />}
+          {user && tab === "account" && <AccountPanel user={user} />}
+          {user && tab === "orders" && <OrdersPanel uid={user.id} />}
+          {user && tab === "taste" && <TasteAndNotifySection user={user} />}
+        </main>
+      </div>
     </div>
   );
 }
