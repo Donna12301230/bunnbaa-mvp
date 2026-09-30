@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { httpsCallable } from "@/lib/callable";
 import {
   Clock, CalendarDays, Rocket, Star, User, MapPin, Trophy,
-  ShieldCheck, Bell, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store, UtensilsCrossed } from "lucide-react";
+  ShieldCheck, Bell, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store, UtensilsCrossed, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -29,6 +29,7 @@ import PickupPicker from "@/components/PickupPicker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useVendors } from "@/hooks/useVendors";
+import ShoppingAssistant from "@/components/ShoppingAssistant";
 
 const bannedHint = () =>
   tr("您的帳號已被限制下單，請至會員中心提交解封申訴", "Your account can't place orders. Please submit an appeal from My account.");
@@ -92,6 +93,7 @@ export default function HomePage() {
   const [planAck, setPlanAck] = useState(false);
   const [joiningPlan, setJoiningPlan] = useState(false);
   const [rewardStatuses, setRewardStatuses] = useState<RewardStatus[]>([]);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
@@ -264,6 +266,20 @@ export default function HomePage() {
         {/* ── 左側：計畫工具箱 ── */}
         <aside className="lg:w-72 shrink-0 space-y-4">
           <h2 className="font-heading text-2xl font-semibold">{t("計畫工具箱", "Planner")}</h2>
+
+          {/* 對話式預購助理（AI）：用一句話找符合條件、還有名額的預購 */}
+          <button
+            type="button"
+            onClick={() => setAssistantOpen(true)}
+            className="w-full text-left bg-card rounded-2xl border border-ink p-4 flex gap-3 items-center hover:border-primary transition-colors"
+          >
+            <Bot className="w-8 h-8 text-primary shrink-0" />
+            <span>
+              <span className="block text-sm font-semibold">{t("問問預購助理", "Ask the meal assistant")}</span>
+              <span className="block text-xs text-muted-foreground">{t("「下週一到五中午，預算 120，不吃牛」", "\"Weekday lunches next week, under NT$120, no beef\"")}</span>
+            </span>
+          </button>
+          <ShoppingAssistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
 
           <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
             <h3 className="text-sm font-semibold flex items-center gap-1.5">

@@ -532,6 +532,20 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
       allow create, delete: if false;
     }
+    // AI 功能（doc/AI功能設計.md）：只有 Functions 讀寫
+    // menu_embeddings：品項向量（轉讓媒合用），不給前端讀，品項頁不用多載向量
+    // resale_matches：轉讓媒合通知了誰、是否由被通知的人接手（影響指標），管理員可讀
+    // assistant_cache：預購助理單輪問答快取
+    match /menu_embeddings/{id} {
+      allow read, write: if false;
+    }
+    match /resale_matches/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /assistant_cache/{id} {
+      allow read, write: if false;
+    }
     // 推播 token（每人最多保留 5 個裝置）
     match /userTokens/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;

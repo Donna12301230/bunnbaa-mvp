@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   addDoc, collection, deleteDoc, deleteField, doc, getDocs, query, updateDoc, where,
@@ -11,11 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, UtensilsCrossed } from "lucide-react";
+import { Camera, Plus, Pencil, Sparkles, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
+import { httpsCallable } from "@/lib/callable";
+import { imageToBase64 } from "@/lib/imageData";
 import { useMyVendor } from "@/hooks/useMyVendor";
 import type { MenuItem } from "@/types";
 import { ALLERGEN_LIST, DIETARY_TAGS, tagEn } from "@/types";
@@ -27,6 +29,17 @@ import BentoEditor, { EMPTY_BENTO, type BentoForm } from "@/components/BentoEdit
 import { useVendorCatalog } from "@/hooks/useVendorCatalog";
 import { addDaysStr, mondayOf, todayStr } from "@/lib/pickupSlots";
 import { Link } from "wouter";
+
+// 拍照上架（functions/src/menuVision.js）回傳的草稿，店主按「填入表單」確認後才寫進 menu_items
+interface MenuDraft {
+  name: string;
+  name_en: string;
+  price: number | null;
+  category: string;
+  dietary_tags: string[];
+  allergens: string[];
+  description: string;
+}
 
 const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
 
@@ -61,6 +74,11 @@ export default function VendorPortalMenu() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [bento, setBento] = useState<BentoForm>(EMPTY_BENTO);
+  const photoInput = useRef<HTMLInputElement>(null);
+  const [reading, setReading] = useState(false);
+  const [drafts, setDrafts] = useState<MenuDraft[]>([]);
+  const [draftNote, setDraftNote] = useState("");
+  const [activeDraft, setActiveDraft] = useState<number | null>(null);
 
   // 登入店主綁定（vendors/{id}.owner_uid）的商家；寫入權限由 firestore.rules 的
   // isVendorOwner 把關，這裡不另外檢查。
@@ -122,6 +140,10 @@ export default function VendorPortalMenu() {
       setEditId(null);
       setForm(EMPTY_FORM);
       setBento(EMPTY_BENTO);
+      if (activeDraft !== null) {
+        setDrafts((list) => list.filter((_, i) => i !== activeDraft));
+        setActiveDraft(null);
+      }
       toast({ title: editId ? tr("已更新", "Updated") : tr("已新增", "Added"), description: form.name });
     },
     onError: (err: any) => {
@@ -148,7 +170,46 @@ export default function VendorPortalMenu() {
     },
   });
 
+  async function readMenuPhoto(file: File) {
+    if (!VENDOR_ID) return;
+    setReading(true);
+    try {
+      const { base64, mimeType } = await imageToBase64(file);
+      const res = await httpsCallable(functions, "extractMenuFromImage")({ vendor_id: VENDOR_ID, image_base64: base64, mime_type: mimeType });
+      const data = res.data as { items: MenuDraft[]; note: string };
+      setDrafts(data.items);
+      setDraftNote(data.note);
+      if (data.items.length === 0) {
+        toast({ title: tr("照片裡沒有讀到品項", "No items found in the photo"), description: data.note || undefined });
+      }
+    } catch (err) {
+      toast({ variant: "destructive", title: tr("辨識失敗", "Couldn't read the photo"), description: (err as Error).message });
+    } finally {
+      setReading(false);
+      if (photoInput.current) photoInput.current.value = "";
+    }
+  }
+
+  function openDraft(index: number) {
+    const d = drafts[index];
+    setEditId(null);
+    setActiveDraft(index);
+    setForm({
+      ...EMPTY_FORM,
+      name: d.name,
+      description: d.description,
+      price: d.price ? String(d.price) : "",
+      category: d.category || EMPTY_FORM.category,
+      allergens: d.allergens,
+      dietaryTags: d.dietary_tags,
+      nameEn: d.name_en,
+    });
+    setBento(EMPTY_BENTO);
+    setDialogOpen(true);
+  }
+
   function openAdd() {
+    setActiveDraft(null);
     setEditId(null);
     setForm(EMPTY_FORM);
     setBento(EMPTY_BENTO);
@@ -156,6 +217,7 @@ export default function VendorPortalMenu() {
   }
 
   function openEdit(item: MenuItem) {
+    setActiveDraft(null);
     setEditId(item.id);
     setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [], nameEn: item.name_en ?? "", descriptionEn: item.description_en ?? "" });
     setBento({
@@ -184,10 +246,62 @@ export default function VendorPortalMenu() {
           <h2 className="text-xl font-bold">{tr("菜單管理", "Menu")}</h2>
           <p className="text-xs text-muted-foreground">{tr("主菜、配菜格與候選菜；配方在", "Mains, side slots and candidates; recipes live in")} <Link href="/vendor-portal/recipes" className="text-primary underline">{tr("配方與原物料", "Recipes")}</Link></p>
         </div>
-        <Button  onClick={openAdd}>
-          <Plus className="w-4 h-4 mr-1" /> {tr("新增品項", "Add item")}
-        </Button>
+        <div className="flex gap-2">
+          <input
+            ref={photoInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) readMenuPhoto(file);
+            }}
+          />
+          <Button variant="outline" onClick={() => photoInput.current?.click()} disabled={reading || !VENDOR_ID}>
+            <Camera className="w-4 h-4 mr-1" /> {reading ? tr("AI 辨識中…", "Reading…") : tr("拍照上架", "From a photo")}
+          </Button>
+          <Button  onClick={openAdd}>
+            <Plus className="w-4 h-4 mr-1" /> {tr("新增品項", "Add item")}
+          </Button>
+        </div>
       </div>
+
+      {drafts.length > 0 && (
+        <Card className="mb-5 border-orange-200 bg-orange-50/40">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-orange-500" /> {tr(`AI 讀到 ${drafts.length} 個品項草稿`, `AI found ${drafts.length} draft item(s)`)}</p>
+                <p className="text-xs text-muted-foreground">{tr("草稿還沒上架。按「填入表單」確認價格、飲食標記與過敏原後再儲存。", "Nothing is listed yet. Use Fill in form to check price, dietary tags and allergens, then save.")}</p>
+                {draftNote && <p className="text-xs text-amber-700 mt-1">{draftNote}</p>}
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => { setDrafts([]); setDraftNote(""); }}>{tr("全部清除", "Clear all")}</Button>
+            </div>
+            <div className="space-y-2">
+              {drafts.map((d, i) => (
+                <div key={`${d.name}-${i}`} className="flex items-center gap-3 bg-white rounded-lg border px-3 py-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">{d.name}</span>
+                      <span className="text-xs text-muted-foreground">{d.category}</span>
+                      {d.dietary_tags.map((tag) => <Badge key={tag} variant="outline" className="text-xs text-green-700 border-green-200">{tr(tag, tagEn(tag))}</Badge>)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {d.price ? `NT$ ${d.price}` : tr("價格未讀到", "No price found")}
+                      {d.allergens.length > 0 && <span className="text-red-500">{tr("・可能含：", " · May contain: ")}{d.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</span>}
+                    </div>
+                  </div>
+                  <Button size="sm" onClick={() => openDraft(i)}>{tr("填入表單", "Fill in form")}</Button>
+                  <Button variant="ghost" size="icon" className="w-8 h-8" aria-label={tr(`略過「${d.name}」`, `Skip ${d.name}`)} onClick={() => setDrafts((list) => list.filter((_, j) => j !== i))}>
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {isLoading ? (
         <SkeletonBlocks count={3} height={64} className="space-y-2" />
@@ -262,6 +376,9 @@ export default function VendorPortalMenu() {
           <DialogHeader>
             <DialogTitle>{editId ? tr("編輯品項", "Edit item") : tr("新增品項", "Add item")}</DialogTitle>
           </DialogHeader>
+          {activeDraft !== null && (
+            <p className="text-xs text-amber-800 bg-amber-50 rounded p-2">{tr("這是 AI 從照片讀出的草稿，請確認價格、飲食標記與過敏原（食安法規定）正確再儲存。", "This is an AI draft from your photo. Check price, dietary tags and allergens (required by law) before saving.")}</p>
+          )}
           <div className="space-y-3 py-2">
             <div>
               <Label>{tr("名稱 *", "Name *")}</Label>

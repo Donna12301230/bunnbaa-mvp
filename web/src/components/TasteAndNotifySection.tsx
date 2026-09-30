@@ -62,6 +62,11 @@ export default function TasteAndNotifySection({ user }: { user: UserProfile }) {
 
   const topTags = Object.entries(scores).filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const charityMuted = muted.includes("charity");
+  const toggleMuted = (kind: string, on: boolean) => {
+    const next = on ? muted.filter((k) => k !== kind) : [...muted, kind];
+    setMuted(next);
+    saveUser({ muted_kinds: next });
+  };
 
   return (
     <div className="grid md:grid-cols-2 gap-4">
@@ -92,13 +97,16 @@ export default function TasteAndNotifySection({ user }: { user: UserProfile }) {
         <p className="text-sm">{tr(`你主動捐出了 ${user.donatedCount ?? 0} 份愛心餐`, `You've donated ${user.donatedCount ?? 0} meal(s)`)}</p>
         <Switch
           checked={!charityMuted}
-          onCheckedChange={(on) => {
-            const next = on ? muted.filter((k) => k !== "charity") : [...muted, "charity"];
-            setMuted(next);
-            saveUser({ muted_kinds: next });
-          }}
+          onCheckedChange={(on) => toggleMuted("charity", on)}
           label={tr("愛心餐相關通知", "Charity meal notifications")}
           description={tr("捐出、未取餐轉愛心餐、預約提醒", "Donations, unclaimed meals, reservation reminders")}
+        />
+        {/* AI 轉讓媒合（functions/src/resaleMatch.js）：有人轉讓你常訂的類似便當時通知 */}
+        <Switch
+          checked={!muted.includes("resale_match")}
+          onCheckedChange={(on) => toggleMuted("resale_match", on)}
+          label={tr("可能想接手的轉讓通知", "Transfers you might want")}
+          description={tr("有人轉讓你常訂的類似便當時通知你，每天最多 2 則", "When someone transfers a meal like the ones you order; max 2 a day")}
         />
         <Switch
           checked={nearbyPush}

@@ -11,6 +11,7 @@ const { onCall, HttpsError, assertAdminOrEmulator, assertSignedInUser, assertAdm
 const { generateVendorCalibrationReport } = require("./vendorCalibration");
 const { generateDiscountExplanation } = require("./consumerExplanation");
 const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./translate");
+const { recordMatchedClaim } = require("./resaleMatch").helpers;
 
 // 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格.md）的功能拆在各模組：
 //   orders.js     下單計價、LINE Pay、截單判定許願、每日備料、QR 取餐、取消退款
@@ -19,6 +20,11 @@ const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./trans
 //   purchasing.js 週／月叫貨單、預測、盤點
 //   insights.js   開放許願、口味偏好、區域洞察、Gemini 菜名歸類與配方草稿
 //   disaster.js   颱風警報、停班停課自動退款、菜價變動、等值替換配菜
+// AI 功能（doc/AI功能設計.md）：
+//   menuVision.js        拍照上架菜單（Gemini Vision）
+//   resaleMatch.js       轉讓智慧媒合（Embeddings + Firestore 向量搜尋 → 推播）
+//   shoppingAssistant.js 對話式預購助理（Gemini function calling）
+//   pickupForecast.js    備料頁的預估取餐區間（一般統計，不用 LLM 算數字）
 // 各模組 exports 裡的 Cloud Functions 在檔案最後一次掛上。
 
 /* ------------------------------------------------------------------ *
@@ -186,6 +192,8 @@ exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
       qr_nonce: FieldValue.delete(),
     });
   });
+  // AI 轉讓媒合的影響指標：接手的人是不是被通知的會員（失敗不影響接手）
+  await recordMatchedClaim(lockId, request.auth.uid).catch((err) => logger.warn(`recordMatchedClaim ${lockId}`, err));
   return { lock_id: lockId };
 });
 
@@ -464,7 +472,10 @@ exports.translateAllContent = onCall({ region: "asia-east1", timeoutSeconds: 540
 /* ------------------------------------------------------------------ *
  * 第一階段規格的各模組
  * ------------------------------------------------------------------ */
-for (const mod of ["./orders", "./charity", "./rewardsFns", "./purchasing", "./insights", "./disaster"]) {
+for (const mod of [
+  "./orders", "./charity", "./rewardsFns", "./purchasing", "./insights", "./disaster",
+  "./menuVision", "./resaleMatch", "./shoppingAssistant", "./pickupForecast",
+]) {
   for (const [name, fn] of Object.entries(require(mod))) {
     // 只掛 Cloud Functions（helpers 等模組內部共用的東西不是函式或沒有 __trigger/run）
     if (typeof fn === "function" && (fn.__endpoint || fn.run)) exports[name] = fn;

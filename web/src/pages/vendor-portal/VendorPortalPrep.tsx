@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
-import { AlertTriangle, ChefHat, Clock, Printer, RefreshCw, Replace, Sparkles } from "lucide-react";
+import { AlertTriangle, ChefHat, Clock, MessageCircleQuestion, Printer, RefreshCw, Replace, Sparkles, TrendingUp } from "lucide-react";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,81 @@ interface PrepPlan {
   done?: Record<string, boolean>;
   substitutions?: { from: string; to: string }[];
   charity_result?: { total: number; given_onsite: number; wasted: number };
+}
+
+// 預估取餐區間（functions/src/pickupForecast.js）：一般統計算的數字，不經 LLM
+interface PickupForecast {
+  date: string;
+  locked: number;
+  enough: boolean;
+  days_used: number;
+  same_weekday: boolean;
+  low?: number;
+  high?: number;
+  expected?: number;
+  disclaimer: string;
+}
+
+/**
+ * 備料頁上方的「預估實際取餐」區間（AI 功能 4，強化現有校準）。區間用統計算，
+ * 白話追問接既有的 askCalibrationScenario（Gemini）。預付制每份都要做，
+ * 區間是讓店家預期大約幾份會轉成愛心餐。
+ */
+function PickupForecastCard({ vendorId, date, lockCount }: { vendorId: string; date: string; lockCount: number }) {
+  const [forecast, setForecast] = useState<PickupForecast | null>(null);
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [asking, setAsking] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    httpsCallable(functions, "getPickupForecast")({ vendor_id: vendorId, date })
+      .then((res) => { if (!cancelled) setForecast(res.data as PickupForecast); })
+      .catch(() => { if (!cancelled) setForecast(null); });
+    return () => { cancelled = true; };
+  }, [vendorId, date, lockCount]);
+
+  async function ask() {
+    const q = question.trim();
+    if (!q) return;
+    setAsking(true);
+    setAnswer("");
+    try {
+      const res = await httpsCallable(functions, "askCalibrationScenario")({ vendor_id: vendorId, question: q });
+      setAnswer((res.data as { scenario_answer: string }).scenario_answer);
+    } catch (err) {
+      setAnswer(tr(`追問失敗：${(err as Error).message}`, `Couldn't get an answer: ${(err as Error).message}`));
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  if (!forecast || forecast.locked === 0) return null;
+  const basis = forecast.same_weekday
+    ? tr(`過去 ${forecast.days_used} 個同星期幾`, `the last ${forecast.days_used} same weekdays`)
+    : tr(`過去 ${forecast.days_used} 個營業日`, `the last ${forecast.days_used} business days`);
+  return (
+    <Card className="mb-4 print:hidden">
+      <CardContent className="p-4 space-y-2">
+        <p className="text-sm flex items-center gap-1.5 font-semibold"><TrendingUp className="w-4 h-4 text-orange-500" /> {tr("預估實際取餐", "Expected pickups")}</p>
+        {forecast.enough && forecast.low !== undefined && forecast.high !== undefined ? (
+          <p className="text-sm">
+            {tr(`已鎖定 ${forecast.locked} 份，依${basis}的取餐紀錄，預估實際取餐 `, `${forecast.locked} locked. Based on ${basis}, expect `)}
+            <span className="text-lg font-bold text-orange-600">{forecast.low === forecast.high ? forecast.low : `${forecast.low}–${forecast.high}`}</span>
+            {tr(" 份；其餘會在取餐時段結束後轉為愛心餐。", " pickups; the rest become charity meals after the window.")}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">{tr(`已鎖定 ${forecast.locked} 份。取餐紀錄還不夠（至少 3 個營業日），暫時算不出區間。`, `${forecast.locked} locked. Not enough pickup history yet (3+ days) for a range.`)}</p>
+        )}
+        <p className="text-xs text-muted-foreground">{forecast.disclaimer}</p>
+        <div className="flex gap-2 pt-1">
+          <Input className="h-9" value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") ask(); }} placeholder={tr("追問，例如：下雨天取餐率會差多少？", "Ask, e.g. how do rainy days affect pickups?")} />
+          <Button size="sm" variant="outline" onClick={ask} disabled={asking || !question.trim()}><MessageCircleQuestion /> {asking ? tr("思考中…", "Thinking…") : tr("追問", "Ask")}</Button>
+        </div>
+        {answer && <p className="text-sm bg-orange-50 rounded p-2 whitespace-pre-line">{answer}</p>}
+      </CardContent>
+    </Card>
+  );
 }
 
 /**
@@ -123,6 +198,8 @@ export default function VendorPortalPrep() {
           {dates.map((d) => <Tag key={d} selected={date === d} onClick={() => setDate(d)}>{d === today ? tr("今天", "Today") : d < today ? tr("昨天", "Yesterday") : tr("下一個營業日", "Next day")} {d.slice(5)}</Tag>)}
         </div>
       </div>
+
+      {vendorId && date >= today && <PickupForecastCard vendorId={vendorId} date={date} lockCount={locks.length} />}
 
       {!plan ? (
         <div className="space-y-4 print:hidden">
