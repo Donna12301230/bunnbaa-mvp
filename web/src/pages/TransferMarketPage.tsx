@@ -49,9 +49,12 @@ function formatCountdown(deadline: Date, now: number): string {
 export default function TransferMarketPage() {
   const { toast } = useToast();
   // 愛心餐也放在轉讓市集（使用者 2026-09-30 決定）；通知連結帶 ?tab=charity 直接開這個分頁
-  const [browseTab, setBrowseTab] = useState<"browse" | "charity" | "mine">(() =>
-    window.location.hash.includes("tab=charity") ? "charity" : "browse"
-  );
+  const [browseTab, setBrowseTab] = useState<"browse" | "charity" | "mine">(() => {
+    if (!`${window.location.search}${window.location.hash}`.includes("tab=charity")) return "browse";
+    // 用過就清掉 ?tab=charity，免得之後再進轉讓市集還停在愛心餐分頁
+    if (window.location.search) history.replaceState(history.state, "", window.location.pathname + window.location.hash);
+    return "charity";
+  });
   const [search, setSearch] = useState("");
   const [uid, setUid] = useState<string | null>(null);
   const requireLogin = useRequireLogin();

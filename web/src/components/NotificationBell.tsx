@@ -32,7 +32,8 @@ export default function NotificationBell() {
 
   function open(n: AppNotification) {
     if (!n.read) updateDoc(doc(db, "notifications", n.id), { read: true }).catch(() => {});
-    if (n.link) navigate(n.link.split("?")[0]);
+    // wouter 的 hash navigate 會把 ?query 放到網址的 search（# 前面），路由照樣比對得到
+    if (n.link) navigate(n.link);
   }
 
   return (
