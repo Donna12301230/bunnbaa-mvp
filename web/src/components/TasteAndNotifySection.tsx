@@ -11,9 +11,17 @@ import { tr } from "@/lib/i18n";
 
 const PREFS = [
   { key: "spicy", zh: "愛吃辣", en: "Loves spicy" },
+  { key: "no_spicy", zh: "不吃辣", en: "No spicy" },
   { key: "no_beef", zh: "不吃牛", en: "No beef" },
+  { key: "no_pork", zh: "不吃豬", en: "No pork" },
+  { key: "no_seafood", zh: "不吃海鮮", en: "No seafood" },
   { key: "vegetarian", zh: "素食", en: "Vegetarian" },
+  { key: "vegan", zh: "全素", en: "Vegan" },
   { key: "light", zh: "偏好清淡", en: "Prefers light" },
+  { key: "heavy_flavor", zh: "重口味", en: "Prefers strong flavor" },
+  { key: "less_oil", zh: "少油", en: "Less oily" },
+  { key: "less_salt", zh: "少鹽", en: "Less salty" },
+  { key: "more_veggie", zh: "多蔬菜", en: "More veggies" },
 ];
 
 /**
