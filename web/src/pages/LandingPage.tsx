@@ -160,6 +160,7 @@ function LandingContent() {
   const tab = menuTabs.some((t) => t.value === tabState) ? tabState : "c0";
   const tabDishes = menuByCategory.get(menuTabs.find((t) => t.value === tab)?.key ?? "")?.slice(0, MENU_ITEMS_PER_TAB) ?? [];
   const events = useScroller();
+  const stores = useScroller();
   const [review, setReview] = useState(0);
 
   // 合作店家：真實 vendors（與首頁共用 queryKey），取前 3 間
@@ -364,12 +365,20 @@ function LandingContent() {
           </section>
         )}
 
-        {/* ── 合作店家 ── */}
-        <section className="lp-section lp-container" aria-labelledby="lp-stores-title">
-          <h2 id="lp-stores-title" className="lp-h2 lp-center">{t("找到你附近的合作店家", "Find partner vendors near you")}</h2>
-          <div className="lp-stores">
-            {vendorsLoading && Array.from({ length: 3 }, (_, i) => <div key={i} className="lp-store lp-store--skeleton" />)}
-            {!vendorsLoading && vendors.slice(0, 3).map((v) => (
+        {/* ── 合作店家（可左右滑動） ── */}
+        <section className="lp-section" aria-labelledby="lp-stores-title">
+          <div className="lp-container lp-row-head">
+            <SectionTitle><span id="lp-stores-title">{t("找到你附近的合作店家", "Find partner vendors near you")}</span></SectionTitle>
+            {!vendorsLoading && vendors.length > 1 && (
+              <div className="lp-arrows">
+                <Button variant="outline" iconOnly aria-label={t("上一間店家", "Previous vendor")} className="lp-round" onClick={() => stores.scroll(-1)}><ChevronLeft /></Button>
+                <Button variant="outline" iconOnly aria-label={t("下一間店家", "Next vendor")} className="lp-round" onClick={() => stores.scroll(1)}><ChevronRight /></Button>
+              </div>
+            )}
+          </div>
+          <div className="lp-scroller lp-stores" ref={stores.ref}>
+            {vendorsLoading && Array.from({ length: 4 }, (_, i) => <div key={i} className="lp-store lp-store--skeleton" />)}
+            {!vendorsLoading && vendors.map((v) => (
               <article key={v.id} className="lp-store">
                 <div className="lp-store__visual" aria-hidden="true">
                   {v.cover_image ? <img src={v.cover_image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} /> : <Store />}
@@ -385,6 +394,9 @@ function LandingContent() {
           </div>
           {!vendorsLoading && vendors.length === 0 && (
             <p className="lp-muted lp-center">{t("合作店家陸續上線中，", "More partner vendors are joining soon — ")}<Link href="/vendors" className="lp-link">{t("查看店家列表", "see the vendor list")}</Link>{t("。", ".")}</p>
+          )}
+          {!vendorsLoading && vendors.length > 0 && (
+            <p className="lp-muted lp-center lp-stores__all"><Link href="/vendors" className="lp-link">{t("查看全部店家", "See all vendors")}</Link></p>
           )}
         </section>
       </main>
