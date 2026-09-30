@@ -96,17 +96,6 @@
 .lp-pill { border-radius: var(--radius-full); }
 .lp-round { border-radius: var(--radius-full); border-color: var(--lp-line); }
 
-/* ── Logo（頁尾用） ── */
-.lp-logo { display: inline-flex; align-items: center; gap: var(--space-2); }
-.lp-logo img { width: 44px; height: auto; }
-.lp-logo__word { font-size: 22px; font-weight: 700; letter-spacing: 0.01em; }
-.lp-logo__bunn { color: var(--brand-brown); }
-.lp-logo__baa { color: var(--brand-orange); }
-
-.lp-footer__links a:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
-}
 
 /* ── Hero ── */
 .lp-hero { padding-top: var(--space-12); text-align: center; }
@@ -498,50 +487,6 @@
 .lp-store__addr svg { width: var(--icon-sm); height: var(--icon-sm); flex-shrink: 0; margin-top: 3px; }
 .lp-store__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: auto; padding-top: var(--space-4); }
 .lp-store--skeleton { min-height: 420px; background: var(--skeleton-base); border-color: transparent; }
-
-/* ── Footer ──
-   深咖啡底（--lp-deep）配米黃字＋橘色強調，字重加粗，參照品牌故事區的配色。*/
-.lp-footer {
-  --lp-footer-bg: var(--lp-deep);
-  --lp-footer-heading: #fbead0;
-  --lp-footer-text: #e9cfa8;
-  --lp-footer-line: color-mix(in srgb, white 22%, transparent);
-  margin-top: var(--space-6);
-  margin-bottom: var(--space-10);
-  padding: var(--space-10) var(--space-6) var(--space-8);
-  border-radius: 32px;
-  background: var(--lp-footer-bg);
-}
-@media (min-width: 768px) {
-  .lp-footer { padding: var(--space-12) var(--space-10) var(--space-8); }
-}
-.lp-footer__grid {
-  display: grid;
-  gap: var(--space-8);
-}
-@media (min-width: 640px) {
-  .lp-footer__grid { grid-template-columns: 2fr repeat(2, 1fr); }
-}
-.lp-footer__brand { display: grid; gap: var(--space-3); align-content: start; }
-.lp-footer__brand .lp-logo__bunn { color: var(--lp-footer-heading); font-weight: 700; }
-.lp-footer__brand .lp-muted { color: var(--lp-footer-text); }
-.lp-footer__email { display: block; }
-.lp-footer__email:hover { color: var(--brand-orange); }
-.lp-footer__col-title {
-  margin: 0 0 var(--space-3);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--lp-footer-line);
-  font-size: var(--font-caption-size);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--lp-footer-heading);
-}
-.lp-footer__col ul { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.lp-footer__col a { color: var(--lp-footer-text); font-weight: 500; }
-.lp-footer__col a:hover { color: var(--brand-orange); text-decoration: underline; }
-.lp-footer__bottom { margin-top: var(--space-10); padding-top: var(--space-6); border-top: 1px solid var(--lp-footer-line); }
-.lp-footer__bottom .lp-caption { color: var(--lp-footer-text); }
 
 @media (prefers-reduced-motion: reduce) {
   .lp-ticker__track,

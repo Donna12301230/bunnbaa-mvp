@@ -1,0 +1,52 @@
+/* 全站共用頁尾。只用 tokens.css 的全域變數（除了 --sf-deep 這種頁尾自己的配色），
+   不依賴 LandingPage.css 的 .bb-landing 作用域，才能在任何頁面單獨掛用。 */
+.site-footer {
+  --sf-deep: #5c3726;
+  --sf-heading: #fbead0;
+  --sf-text: #e9cfa8;
+  --sf-line: color-mix(in srgb, white 22%, transparent);
+  --sf-max: 1120px;
+  --sf-gutter: var(--space-4);
+
+  width: 100%;
+  max-width: calc(var(--sf-max) + 2 * var(--sf-gutter));
+  margin: var(--space-6) auto var(--space-10);
+  padding: var(--space-10) var(--space-6) var(--space-8);
+  border-radius: 32px;
+  background: var(--sf-deep);
+}
+@media (min-width: 768px) {
+  .site-footer { --sf-gutter: var(--space-8); padding: var(--space-12) var(--space-10) var(--space-8); }
+}
+.site-footer a { text-decoration: none; }
+
+.site-footer__grid { display: grid; gap: var(--space-8); }
+@media (min-width: 640px) {
+  .site-footer__grid { grid-template-columns: 2fr repeat(2, 1fr); }
+}
+.site-footer__brand { display: grid; gap: var(--space-3); align-content: start; }
+.site-footer__logo { display: inline-flex; font-size: 22px; font-weight: 700; letter-spacing: 0.01em; }
+.site-footer__logo-bunn { color: var(--sf-heading); }
+.site-footer__logo-baa { color: var(--brand-orange); }
+.site-footer__muted { margin: 0; color: var(--sf-text); }
+.site-footer__email { display: block; }
+.site-footer__email:hover { color: var(--brand-orange); }
+.site-footer__col-title {
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--sf-line);
+  font-size: var(--font-caption-size);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sf-heading);
+}
+.site-footer__col ul { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.site-footer__col a { color: var(--sf-text); font-weight: 500; }
+.site-footer__col a:hover { color: var(--brand-orange); text-decoration: underline; }
+.site-footer__col a:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+.site-footer__bottom { margin-top: var(--space-10); padding-top: var(--space-6); border-top: 1px solid var(--sf-line); }
+.site-footer__caption { margin: 0; color: var(--sf-text); font-size: var(--font-caption-size); }

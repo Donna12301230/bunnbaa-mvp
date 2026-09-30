@@ -19,7 +19,7 @@ import { slotLabel, vendorWindows } from "@/lib/pickupSlots";
 import "./LandingPage.css";
 import { useI18n, type Lang, loc } from "@/lib/i18n";
 import { useVendors } from "@/hooks/useVendors";
-import { PLATFORM_CONTACT_EMAIL } from "@/lib/subscription";
+import SiteFooter from "@/components/SiteFooter";
 
 /**
  * 品牌形象頁（#/landing）
@@ -31,23 +31,6 @@ import { PLATFORM_CONTACT_EMAIL } from "@/lib/subscription";
 // 中英並排的固定文案（行銷文字，不是資料），依 lang 挑
 type Bi = { zh: string; en: string };
 const pick = (text: Bi, lang: Lang) => text[lang];
-
-const FOOTER_COLUMNS: { title: Bi; links: { href: string; label: Bi }[] }[] = [
-  {
-    title: { zh: "關於", en: "About" },
-    links: [
-      { href: "/about", label: { zh: "關於我們", en: "About us" } },
-      { href: "/join", label: { zh: "加入我們", en: "Join us" } },
-    ],
-  },
-  {
-    title: { zh: "支援", en: "Support" },
-    links: [
-      { href: "/faq", label: { zh: "常見問題", en: "FAQ" } },
-      { href: "/contact", label: { zh: "聯絡客服", en: "Contact support" } },
-    ],
-  },
-];
 
 const TICKER: Bi[] = [
   { zh: "提前 14 天預約，最高 7 折", en: "Book 14 days ahead for up to 30% off" },
@@ -426,31 +409,7 @@ function LandingContent() {
         </section>
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="lp-container lp-footer">
-        <div className="lp-footer__grid">
-          <div className="lp-footer__brand">
-            <span className="lp-logo">
-              <span className="lp-logo__word"><span className="lp-logo__bunn">Bunn</span><span className="lp-logo__baa">Baa</span></span>
-            </span>
-            <p className="lp-muted">{t("赫滋與羊國際藝術有限公司", "Herz & Baa International Arts Co., Ltd.")}</p>
-            <a href={`mailto:${PLATFORM_CONTACT_EMAIL}`} className="lp-muted lp-footer__email">{PLATFORM_CONTACT_EMAIL}</a>
-          </div>
-          {FOOTER_COLUMNS.map((col) => (
-            <nav key={pick(col.title, "en")} className="lp-footer__col" aria-label={pick(col.title, lang)}>
-              <h2 className="lp-footer__col-title">{pick(col.title, lang)}</h2>
-              <ul>
-                {col.links.map((n) => (
-                  <li key={n.href}><Link href={n.href}>{pick(n.label, lang)}</Link></li>
-                ))}
-              </ul>
-            </nav>
-          ))}
-        </div>
-        <div className="lp-footer__bottom">
-          <p className="lp-caption">© {new Date().getFullYear()} {t("BunnBaa 飯飽・越早訂，越開心。", "BunnBaa · Book early, eat happy.")}</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
