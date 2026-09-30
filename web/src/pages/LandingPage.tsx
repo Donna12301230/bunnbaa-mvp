@@ -185,6 +185,10 @@ function LandingContent() {
   const heroVendor = heroItem ? vendors.find((v) => v.id === heroItem.vendor_id) : undefined;
   const heroWindow = heroVendor ? vendorWindows(heroVendor)[0] : undefined;
 
+  // 圖片牆用真實品項照片，不夠 6 張（或還沒有照片）的部分用原本的線條 icon 補位
+  const galleryPhotos = menuItems.filter((m) => m.image).map((m) => m.image);
+  const galleryTiles = GALLERY.map((g, i) => ({ ...g, photo: galleryPhotos[i] }));
+
   return (
     <div className="bb-landing">
       {/* ── Header：沿用全站共用導覽列 ── */}
@@ -327,10 +331,14 @@ function LandingContent() {
         </section>
 
         {/* ── 圖片牆（跑馬燈） ── */}
+        {/* 有真實品項照片（menu_items.image）就用照片鋪滿形狀，沒有照片的品項（或
+            品項還不夠 6 個）用原本的線條 icon 佔位；形狀／色調還是固定 6 種循環。 */}
         <div className="lp-gallery" aria-hidden="true">
           <div className="lp-gallery__track">
-            {[...GALLERY, ...GALLERY].map((g, i) => (
-              <span key={i} className={`lp-shape lp-shape--${g.shape} lp-shape--t${i % 3}`}>{g.icon}</span>
+            {[...galleryTiles, ...galleryTiles].map((g, i) => (
+              <span key={i} className={`lp-shape lp-shape--${g.shape} lp-shape--t${i % 3}`}>
+                {g.photo ? <img src={g.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : g.icon}
+              </span>
             ))}
           </div>
         </div>

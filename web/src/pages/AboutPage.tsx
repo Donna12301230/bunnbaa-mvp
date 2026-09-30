@@ -2,6 +2,7 @@ import { tr } from "@/lib/i18n";
 import { BellRing, CalendarClock, HeartHandshake, Recycle, ShieldCheck, Sparkles } from "lucide-react";
 import CustomerLayout from "@/components/CustomerLayout";
 import PageHero from "@/components/PageHero";
+import Reveal from "@/components/Reveal";
 
 const VALUES = [
   {
@@ -46,39 +47,45 @@ export default function AboutPage() {
       hero={<PageHero title={tr("關於我們", "About us")} description={tr("飯飽 BunnBaa，讓每一餐都準時、划算、不浪費。", "BunnBaa — every meal on time, at a better price, with nothing wasted.")} />}
     >
       <div className="max-w-3xl mx-auto space-y-10">
-        <section className="space-y-3">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-orange-500" /> {tr("我們的故事", "Our story")}
-          </h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {tr(
-              "飯飽 BunnBaa 由赫滋與羊國際藝術有限公司開發，起點是校園裡常見的畫面：中午排隊排到教室外、熱門餐點賣完撲空，店家則常常猜不準今天該備多少料，猜多了報廢、猜少了讓客人失望。我們想做的，是讓學生提前鎖定想吃的那一份，店家也能照實際訂單準備，兩邊都少一點浪費、多一點確定。",
-              "BunnBaa was built by Herz & Baa International Arts Co., Ltd. around a familiar campus scene: lunch queues spilling out the door, popular dishes selling out, and vendors guessing how much to prep — too much becomes waste, too little means disappointed customers. We wanted students to lock in the meal they want ahead of time, and vendors to prep against real orders instead of guesswork — less waste, more certainty, for everyone."
-            )}
-          </p>
-        </section>
+        <Reveal>
+          <section className="space-y-3">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-orange-500" /> {tr("我們的故事", "Our story")}
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {tr(
+                "飯飽 BunnBaa 由赫滋與羊國際藝術有限公司開發，起點是校園裡常見的畫面：中午排隊排到教室外、熱門餐點賣完撲空，店家則常常猜不準今天該備多少料，猜多了報廢、猜少了讓客人失望。我們想做的，是讓學生提前鎖定想吃的那一份，店家也能照實際訂單準備，兩邊都少一點浪費、多一點確定。",
+                "BunnBaa was built by Herz & Baa International Arts Co., Ltd. around a familiar campus scene: lunch queues spilling out the door, popular dishes selling out, and vendors guessing how much to prep — too much becomes waste, too little means disappointed customers. We wanted students to lock in the meal they want ahead of time, and vendors to prep against real orders instead of guesswork — less waste, more certainty, for everyone."
+              )}
+            </p>
+          </section>
+        </Reveal>
 
-        <section className="space-y-3">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <HeartHandshake className="w-5 h-5 text-orange-500" /> {tr("我們的使命", "Our mission")}
-          </h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {tr(
-              "讓預購變成日常習慣：早一點下單、店家早一點安心備料、大家都吃得到、也吃得剛好。",
-              "Make pre-ordering the everyday habit: order a little earlier, let vendors prep with confidence, and make sure everyone gets fed — with just the right amount made."
-            )}
-          </p>
-        </section>
+        <Reveal>
+          <section className="space-y-3">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <HeartHandshake className="w-5 h-5 text-orange-500" /> {tr("我們的使命", "Our mission")}
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {tr(
+                "讓預購變成日常習慣：早一點下單、店家早一點安心備料、大家都吃得到、也吃得剛好。",
+                "Make pre-ordering the everyday habit: order a little earlier, let vendors prep with confidence, and make sure everyone gets fed — with just the right amount made."
+              )}
+            </p>
+          </section>
+        </Reveal>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-bold">{tr("我們在意的事", "What we care about")}</h2>
+          <Reveal><h2 className="text-lg font-bold">{tr("我們在意的事", "What we care about")}</h2></Reveal>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {VALUES.map(({ icon: Icon, title, body }) => (
-              <div key={title} className="bg-white rounded-xl border border-border p-4">
-                <Icon className="w-6 h-6 text-orange-500 mb-2" />
-                <h3 className="font-semibold text-sm mb-1">{title}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">{body}</p>
-              </div>
+            {VALUES.map(({ icon: Icon, title, body }, i) => (
+              <Reveal key={title} delay={i * 100}>
+                <div className="bg-white rounded-xl border border-border p-4 h-full">
+                  <Icon className="w-6 h-6 text-orange-500 mb-2" />
+                  <h3 className="font-semibold text-sm mb-1">{title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{body}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </section>
