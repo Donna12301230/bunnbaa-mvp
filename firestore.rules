@@ -208,7 +208,8 @@ service cloud.firestore {
                     // fact; this feeds vendor calibration (functions/src/index.js
                     // buildVendorHistory), so it shouldn't be revisable.
                     || (isSignedInUser() && resource.data.buyer_uid == request.auth.uid
-                        && resource.data.status in ['fulfilled', 'resold_and_fulfilled', 'no_show']
+                        // charity：第一階段未取餐／主動捐出都轉成愛心餐（MyBookingsPage FEEDBACK_ELIGIBLE）
+                        && resource.data.status in ['fulfilled', 'resold_and_fulfilled', 'no_show', 'charity']
                         && !resource.data.keys().hasAny(['consumer_feedback'])
                         && request.resource.data.consumer_feedback is string
                         && request.resource.data.consumer_feedback.size() > 0

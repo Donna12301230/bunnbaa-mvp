@@ -33,7 +33,7 @@ type Bi = { zh: string; en: string };
 const pick = (text: Bi, lang: Lang) => text[lang];
 
 const TICKER: Bi[] = [
-  { zh: "提前 14 天預約，最高 7 折", en: "Book 14 days ahead for up to 30% off" },
+  { zh: "訂明天 95 折，提前 2 天以上 8 折", en: "5% off for tomorrow, 20% off 2+ days ahead" },
   { zh: "臨時去不了？轉讓給同學，全額入袋", en: "Can't make it? Transfer your meal to a classmate" },
   { zh: "店家未出餐，全額退款再送 20 點", en: "Vendor didn't serve? Full refund plus 20 points" },
   { zh: "取餐前推播提醒，不怕忘記", en: "Push reminders before pickup" },
