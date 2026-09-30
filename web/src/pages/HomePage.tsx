@@ -9,8 +9,8 @@ import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { useAuth } from "@/hooks/useAuth";
 import { httpsCallable } from "@/lib/callable";
 import {
-  Clock, CalendarDays, Rocket, Star, User, MapPin, Trophy,
-  BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store } from "lucide-react";
+  Clock, CalendarDays, Rocket, Star, MapPin, Trophy,
+  BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store, UtensilsCrossed } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -29,6 +29,7 @@ import PickupPicker from "@/components/PickupPicker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useVendors } from "@/hooks/useVendors";
+import { avatarUrl } from "@/lib/avatar";
 
 const bannedHint = () =>
   tr("您的帳號已被限制下單，請至會員中心提交解封申訴", "Your account can't place orders. Please submit an appeal from My account.");
@@ -429,11 +430,20 @@ export default function HomePage() {
                       const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
                       return (
                         <div key={item.id} className="flex items-center justify-between gap-3 py-2.5">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{loc(item, "name")}</p>
-                            <div>
-                              {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through mr-1.5">${item.price}</span>}
-                              <span className="font-heading text-lg font-semibold">${lockedPrice}</span>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-lg bg-secondary shrink-0 overflow-hidden flex items-center justify-center">
+                              {item.image ? (
+                                <img src={item.image} alt="" loading="lazy" className="w-full h-full object-cover" />
+                              ) : (
+                                <UtensilsCrossed className="w-4 h-4 text-secondary-foreground/60" strokeWidth={1.75} aria-hidden="true" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{loc(item, "name")}</p>
+                              <div>
+                                {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through mr-1.5">${item.price}</span>}
+                                <span className="font-heading text-lg font-semibold">${lockedPrice}</span>
+                              </div>
                             </div>
                           </div>
                           <Button size="sm" variant="outline" onClick={() => openItem(item, vendor)}>
@@ -595,9 +605,7 @@ export default function HomePage() {
               {visibleTransfers.map(tr_ => (
                 <div key={tr_.id} className="shrink-0 w-64 bg-card text-foreground rounded-2xl p-3 border border-ink">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-secondary border border-ink flex items-center justify-center shrink-0">
-                      <User className="w-3.5 h-3.5 text-secondary-foreground" />
-                    </div>
+                    <img src={avatarUrl(tr_.buyer_uid)} alt="" className="w-6 h-6 rounded-full bg-secondary border border-ink shrink-0" />
                     <span className="text-xs font-medium truncate">{t(`使用者 ${tr_.buyer_uid.slice(-6)} 轉讓`, `Transferred by user ${tr_.buyer_uid.slice(-6)}`)}</span>
                   </div>
                   <p className="text-sm font-semibold line-clamp-1 mb-2">{loc(tr_, "item_name")}</p>
