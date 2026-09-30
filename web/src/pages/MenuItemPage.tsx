@@ -3,7 +3,8 @@ import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
 import { AlertTriangle, ArrowLeft, CalendarDays, Info, Minus, Plus, ShoppingCart, Sparkles, UtensilsCrossed } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { auth, db, functions } from "@/lib/firebase";
+import { httpsCallable } from "@/lib/callable";
 import type { MenuItem, RiceOption, SlotChoice, Vendor } from "@/types";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
@@ -75,6 +76,12 @@ export default function MenuItemPage() {
 
   useEffect(() => {
     if (item?.slots) setChoices(item.slots.map(() => "default"));
+  }, [item?.id]);
+
+  // 瀏覽訊號（§10.1）：登入者看品項頁記一次，伺服器端同一天同品項只算一次
+  useEffect(() => {
+    if (!item?.id || !auth.currentUser) return;
+    httpsCallable(functions, "recordItemView")({ menu_item_id: item.id }).catch(() => {});
   }, [item?.id]);
 
   const { slots: windowSlots } = useSlotAvailability(vendor, date);

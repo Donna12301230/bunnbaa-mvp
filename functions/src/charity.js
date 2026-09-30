@@ -295,5 +295,26 @@ exports.submitCharityResult = onCall({}, async (request) => {
     charity_result: { total: meals.size, reserved_claimed: claimed, given_onsite: Math.min(given, open.length), wasted, submitted_at: FieldValue.serverTimestamp() },
   }, { merge: true });
   await batch.commit();
+  // 當日愛心餐全數送出（§7.4）：補發給原訂購人，只發一次
+  const planRef = db().collection("vendors").doc(vendorId).collection("prepPlans").doc(date);
+  const alreadyNotified = (await planRef.get()).data()?.charity_all_given_notified;
+  const wastedBefore = meals.docs.filter((d) => d.data().status === "wasted").length;
+  if (wasted === 0 && wastedBefore === 0 && meals.size > 0 && !alreadyNotified) {
+    await planRef.set({ charity_all_given_notified: true }, { merge: true });
+    const lockIds = [...new Set(meals.docs.map((d) => d.data().lock_id).filter(Boolean))];
+    const owners = new Set();
+    for (const id of lockIds) {
+      const lock = (await db().collection("locks").doc(id).get()).data();
+      if (lock?.buyer_uid) owners.add(lock.buyer_uid);
+    }
+    for (const uid of owners) {
+      await notifyUser(uid, {
+        kind: "charity",
+        title: t("今天的愛心餐都送出去了", "All of today's charity meals were given out"),
+        body: t("謝謝你，今天沒有浪費任何一份便當。", "Thank you — not a single meal went to waste today."),
+        link: "/my-bookings",
+      });
+    }
+  }
   return { wasted, given: Math.min(given, open.length), claimed };
 });

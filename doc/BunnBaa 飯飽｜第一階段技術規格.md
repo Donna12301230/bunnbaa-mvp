@@ -1,22 +1,22 @@
 # BunnBaa 飯飽｜第一階段技術規格
 
-Sep 29, 2026 · @Tom
+Sep 29, 2026 · @Tom（Sep 30, 2026 修訂：對齊實作——保留鎖定早鳥折扣＋轉讓、LINE Pay、訂單沿用 `locks`）
 
 ## 1. 概述
 
-飯飽第一階段做「上班族午餐便當預購」：消費者提前預訂、店家依確定訂單採購備料，並以成長獎勵、配菜許願、愛心餐三個機制串起回購、需求探索與減少浪費。標語「越早訂，越開心。」
+飯飽第一階段做「上班族午餐便當預購」：消費者提前預訂（越早訂折扣越多，並可轉讓）、店家依確定訂單採購備料，並以成長獎勵、配菜許願、愛心餐三個機制串起回購、需求探索與減少浪費。標語「越早訂，越開心。」
 
 **角色**
 
 | 角色 | 主要功能 |
 | --- | --- |
-| 消費者 | 預訂、加減飯菜、配菜許願、開放許願、QR 取餐、抽獎、愛心餐預約 |
+| 消費者 | 預訂（早鳥折扣）、加減飯菜、配菜許願、開放許願、轉讓／贈送、QR 取餐、抽獎、愛心餐預約 |
 | 店家 | 菜單與配方、採購與備料清單、流程建議、取餐掃碼、券負債看板、區域洞察 |
 | 平台管理者 | 全域參數、菜色庫與模板、異常審核、天災事件 |
 
 **第一階段範圍**：只做午餐、只做自取、週一至週五營業、平台統一規則與單一回饋比例。
 
-**技術棧**：React + TypeScript + Vite 前端；Firebase（Firestore、Functions、Auth）後端；Gemini agent 負責配方草稿、菜名歸類與說明文字。**數量與時間一律由程式計算，AI 不參與任何份量、金額、抽獎的運算。**
+**技術棧**：React + TypeScript + Vite 前端；Firebase（Firestore、Functions、Auth）後端；金流 LINE Pay（Request／Confirm／Refund API）；Gemini agent 負責配方草稿、菜名歸類與說明文字。**數量與時間一律由程式計算，AI 不參與任何份量、金額、抽獎的運算。**
 
 **資料主線**：配方 → 自動標籤 → 口味統計 → 發現缺口 → 許願 → 進入備料 → 完成取餐 → 計入成長獎勵。
 
@@ -28,7 +28,9 @@ Sep 29, 2026 · @Tom
 
 | 名詞 | 定義 |
 | --- | --- |
-| 截單 | 取餐日前一天 20:00，訂單鎖定 |
+| 鎖定 | 一筆預訂（`locks` 文件），付款後成立，可轉讓、贈送或捐為愛心餐 |
+| 早鳥折扣 | 依提前天數打在品項原價上的折扣，越早訂越便宜 |
+| 截單 | 取餐日前一天 20:00，訂單內容鎖定、不再退款 |
 | 淨營業額 | 已完成或轉愛心餐的訂單實付金額，扣除退款 |
 | 回饋池 | 淨營業額 × 回饋比例，用來生成折價券 |
 | 抽獎券 | 每累計實付 100 元一張 |
@@ -112,13 +114,20 @@ Sep 29, 2026 · @Tom
 
 ## 4. 訂單
 
-消費者最晚在取餐前一天 20:00 下單，截單後不可免費取消；配菜可許願，未成立自動退回預設菜，訂單照常成立。
+消費者最晚在取餐前一天 20:00 下單，以 LINE Pay 付款；截單後不可退款，但仍可轉讓、贈送或捐為愛心餐。配菜可許願，未成立自動退回預設菜，訂單照常成立。
 
 ### 4.1 下單與截單
 
 - 可預訂至下週五；鼓勵週六 12:00 前訂好下週，以提高週進料準確度。
-- 截單前可自由修改或取消，全額退款。
-- 截單後不可免費取消（店家已依訂單備料）；天災例外見第 11 節。
+- **早鳥折扣**：依提前天數打在品項原價上（預訂範圍到下週五，最高 8 折）；加減選項與折價券在折扣後計算。金額一律由伺服器重算。
+- 截單前可自由修改（許願、不要、加減飯）或取消，LINE Pay 全額退款、折價券退回。
+- 截單後不可退款（店家已依訂單備料）；天災例外見第 11 節。
+
+### 4.1.1 轉讓與贈送
+
+- 截單前後都可在「轉讓市集」上架轉售，或以連結贈送給他人；接手者付款後成為新持有人並取得取餐 QR；抽獎券仍歸原付款人。
+- 取餐時段內可主動「捐為愛心餐」（見第 7 節）。
+- 未轉出且未取餐者，依第 7 節轉為愛心餐。
 
 ### 4.2 加減選項
 
@@ -233,6 +242,8 @@ Sep 29, 2026 · @Tom
 - 未取餐訂單：不退款、計入店家營業額、發放抽獎券。
 - 消費者可在取餐時段內主動按「捐為愛心餐」，該份立即開放領取。
 
+愛心餐的入口放在「轉讓市集」的「愛心餐」分頁，和轉售、贈送的便當同一處瀏覽。
+
 ### 7.2 領取方式
 
 - **線上預約**：手機驗證帳號，每人每天限 1 份；預約後 30 分鐘內到場出示 QR code，店家掃碼確認。逾時未到，該份釋出並停止預約功能 7 天（不影響一般訂餐）。預約前畫面清楚提示懲罰規則。
@@ -256,7 +267,7 @@ Sep 29, 2026 · @Tom
 
 > 今天的便當沒有領到 為了不浪費，店家已將它轉為愛心餐，開放給需要的人。這筆訂單的抽獎券已照常發放。 下次來不了的話，可以在取餐前按「捐為愛心餐」，餐點會更新鮮。
 
-用詞為「已開放領取」，不宣稱「已送到」，因為第一階段無法追蹤單一盒的去向。當日愛心餐全數送出時，可補發「今天的愛心餐都送出去了」。使用者可在設定中關閉愛心餐通知。
+用詞為「已開放領取」，不宣稱「已送到」，因為第一階段無法追蹤單一盒的去向。店家輸入送出份數後若當日沒有報廢，補發「今天的愛心餐都送出去了」給原訂購人（每天一次）。使用者可在設定中關閉愛心餐通知。
 
 ### 7.5 報廢回饋
 
@@ -264,7 +275,7 @@ Sep 29, 2026 · @Tom
 
 ## 8. 成長獎勵
 
-每週以店家淨營業額的 10% 生成回饋池，拆成折價券供消費者抽獎，人人有獎；抽獎券未達 100 張不開池，持續累積直到達標。
+每週以店家淨營業額的 10% 生成回饋池，拆成折價券供消費者抽獎，人人有獎；抽獎券未達 100 張不開池，持續累積直到達標。成長獎勵與第 4.1 節的早鳥折扣各自獨立：早鳥折扣在下單時直接折價，回饋池以折扣後的實付金額計算。
 
 ### 8.1 結算與開池
 
@@ -276,7 +287,7 @@ Sep 29, 2026 · @Tom
 ### 8.2 抽獎券發放
 
 - 以「使用者 × 店家 × 結算期」累計實付金額，每 100 元一張，餘額結轉下一期。
-- 發放時機：掃碼完成取餐，或訂單轉為愛心餐時。
+- 發放時機：掃碼完成取餐，或訂單轉為愛心餐時；抽獎券歸原付款人（`payer_uid`，轉讓後不變）。
 - 抽獎券只能抽該店家的回饋池；開池前不過期。
 
 ### 8.3 券種
@@ -401,6 +412,16 @@ Sep 29, 2026 · @Tom
 
 以下為主要集合與欄位；取餐點獨立成集合，第二階段加入食物櫃時不需重構。
 
+**與原設計的差異**（為保留鎖定早鳥折扣＋轉讓）：
+
+| 原設計 | 實作 |
+| --- | --- |
+| `orders` 集合 | 沿用 `locks`，加 `slots`／`rice`／`pickup_code`／`payer_uid` 等欄位；轉讓狀態 `for_resale`／`for_gift` |
+| `vendors/{v}/items` | 沿用 `menu_items`，加 `main`／`slots`／`fixed`／`rice_component_id`／`weekdays` |
+| `userSpend/{v}_{u}_{period}` | `userSpend/{v}_{u}`，未滿 100 元的餘額直接結轉 |
+| `areaInsights/{geohash5}_{week}` | `areaInsights/{vendorId}_{week}`（以店家取餐點為圓心 1 公里） |
+| — | 新增 `payment_intents`（LINE Pay）、`notifications`、`userTokens`、`anomalies`、`rewardStatus` |
+
 ```
 platformConfig/global            // 第 2 節全域參數
 platformConfig/growthReward      // rate, ticketUnit, tiers[], minTicketsToOpen ...
@@ -421,12 +442,14 @@ vendors/{vendorId}
 
 pickupPoints/{pointId}           // type: counter | locker, vendorId, geohash, lockerConfig
 
-orders/{orderId}
-  userId, vendorId, pickupPointId, pickupDate
-  items[{itemId, slots[{dish, wished, resolved, removed}], rice: add|normal|less}]
-  originalAmount, adjustAmount, discountAmount, paidAmount, couponId
-  status: placed | locked | completed | charity | cancelled | refunded
-  pickupCode, qrNonce
+locks/{lockId}                   // 一筆＝一份便當
+  buyer_uid（持有人）, payer_uid（付款人，抽獎券歸他）, vendor_id, menu_item_id, pickup_date
+  slots[{category, default_dish, removed, wished, resolved, portion_level}], rice: add|normal|less
+  list_price, early_bird_amount, adjust_amount, coupon_discount, locked_price（實付）, coupon_id
+  status: locked | for_resale | for_gift | fulfilled | resold_and_fulfilled | charity | cancelled
+  payment_intent_id, transaction_id, pickup_code, phone_last3, qr_nonce, share_token
+  cutoff_done, charity_source: noshow | donated
+payment_intents/{id}             // LINE Pay 付款意圖，只有 Functions 能寫
 
 sideWishes/{vendorId}_{date}_{slot}_{dishId}   // 候選菜許願計數
 openWishes/{wishId}              // userId, vendorId, dishId, createdAt
@@ -450,7 +473,11 @@ disasterEvents/{eventId}         // type, counties, dates, source
 
 | Function | 觸發 | 功能 |
 | --- | --- | --- |
-| `lockOrders` | 每日 20:00 | 截單、判定候選菜許願、產生每日備料與標籤、缺料警示 |
+| `createCartLinePayReservation` / `confirmLinePayPayment` | Callable | LINE Pay 發起付款、確認後建立 `locks`（伺服器重算早鳥價與加減） |
+| `claimResoldLock` | Callable | 接手轉讓／領取贈送 |
+| `cancelLock` / `updateLockChoices` | Callable | 截單前取消退款、修改許願與加減 |
+| `donateLock` | Callable | 取餐時段內捐為愛心餐 |
+| `lockOrders` | 每 10 分（依店家截單時間） | 截單、判定候選菜許願、產生每日備料與標籤、缺料警示 |
 | `buildWeeklyPurchase` | 週六 12:00 | 預測、扣盤點、產生週叫貨單與分日到貨 |
 | `buildMonthlyPurchase` | 每月 25 日 | 小盤商叫貨單 |
 | `applyCoupon` | Callable（結帳） | 驗證並套用折價券 |
@@ -468,6 +495,7 @@ disasterEvents/{eventId}         // type, counties, dates, source
 | `tallyOpenWishes` | 每日 | 近 30 天人數，達 20 人通知店家 |
 | `buildAreaInsights` | 每週 | 匿名區域統計與供需缺口 |
 | `pollDisasterFeeds` | 每 15 分 | 颱風警報與停班停課，觸發預警或取消退款 |
+| `recordItemView` | Callable | 瀏覽品項頁的口味訊號（同人同品項每天一次） |
 | `normalizeDishName` | Callable（Gemini） | 自由輸入菜名歸類 |
 | `draftRecipe` | Callable（Gemini） | 產生配方草稿 |
 
@@ -481,7 +509,7 @@ disasterEvents/{eventId}         // type, counties, dates, source
 
 - **折價券效期**：無償發行的抵用券、折價券不屬於消保法規範的商品（服務）禮券，可設使用期限，但須於領取時明示。
 - **抽獎**：屬公平交易法「贈獎」，受《事業提供贈品贈獎額度辦法》規範；本系統單張券最高 100 元，遠低於最大獎項與全年總額上限。
-- **截單後不可取消**：現做餐點屬易腐敗商品，通訊交易解除權應有例外適用，條款寫法待律師確認。
+- **截單後不可退款**：現做餐點屬易腐敗商品，通訊交易解除權應有例外適用，條款寫法待律師確認；截單後仍提供轉讓、贈送作為替代。
 - **活動辦法須載明**：規則由平台訂定；券的成本由店家負擔、於店家訂單中折抵。
 - **天災**：停班自動退款、天災期間等值替換配菜須事先寫入條款。
 - **愛心餐**：現場自取、當日有效、取餐結束 2 小時後報廢；保存與交付的食安責任由店家負責。
@@ -514,7 +542,8 @@ disasterEvents/{eventId}         // type, counties, dates, source
 
 以下為討論中未定案、本文件先行採用的暫定答案，確認後勾選。
 
-- [ ] **金流服務**：暫定選用支援 API 全額與部分退款的台灣金流（例如綠界或藍新），停班自動退款依賴此能力。
+- [x] **金流服務**：LINE Pay（Refund API 支援全額與部分退款，停班自動退款依賴此能力）。Demo 用 Sandbox，特約商店審核後切正式。
+- [x] **訂單模型**：保留鎖定早鳥折扣＋轉讓，訂單沿用 `locks`；截單後不退款但可轉讓、贈送、捐為愛心餐。
 - [ ] **取餐時段**：暫定 11:00–13:00，店家可調但不超過 2 小時。
 - [ ] **減飯份量**：暫定為白飯減半。
 - [ ] **加飯份量**：暫定 +100 g 熟飯。

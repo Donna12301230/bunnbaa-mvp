@@ -75,6 +75,39 @@ exports.onLockCreatedTaste = onDocumentCreated({ document: "locks/{lockId}", reg
 });
 
 /**
+ * 瀏覽品項頁（§10.1 訊號最弱的一種，+1）：只加主菜與預設配菜的標籤。
+ * 同一人同一品項每天只算一次（users/{uid}.viewed_items 記當天看過的品項）。
+ */
+exports.recordItemView = onCall({}, async (request) => {
+  assertSignedInUser(request, "記錄瀏覽");
+  const uid = request.auth.uid;
+  const itemId = String(request.data?.menu_item_id || "");
+  if (!itemId) throw new HttpsError("invalid-argument", "menu_item_id is required");
+  const today = taipeiToday();
+  const userRef = db().collection("users").doc(uid);
+  const fresh = await db().runTransaction(async (tx) => {
+    const log = (await tx.get(userRef)).data()?.viewed_items || {};
+    const seen = log.date === today ? log.ids || [] : [];
+    if (seen.includes(itemId)) return false;
+    tx.set(userRef, { viewed_items: { date: today, ids: [...seen, itemId].slice(-50) } }, { merge: true });
+    return true;
+  });
+  if (!fresh) return { ok: true };
+  const item = await db().collection("menu_items").doc(itemId).get();
+  if (!item.exists) return { ok: true };
+  const catalog = await loadVendorCatalog(item.data().vendor_id);
+  const menuItem = catalog.itemsById[itemId];
+  if (!menuItem) return { ok: true };
+  const tagsOf = (componentId) => dishTags(catalog.componentsById[componentId], catalog.ingredientsById);
+  const deltas = new Map();
+  const add = (tags) => tags.forEach((tag) => deltas.set(tag, (deltas.get(tag) || 0) + SIGNAL.view));
+  add(tagsOf(menuItem.main?.component_id));
+  (menuItem.slots || []).forEach((slot) => add(tagsOf(slot.default?.component_id)));
+  await bumpTaste(uid, deltas);
+  return { ok: true };
+});
+
+/**
  * 開放許願（§4.4）：先從平台菜色庫選（dish_id），找不到再自由輸入，由 Gemini 歸類到標準菜名。
  * 以人數計，同一人重複許願只算一次；只計近 30 天。畫面註明「許願不保證供應」。
  */
