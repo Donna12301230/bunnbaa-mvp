@@ -20,6 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/comp
 import { Input } from "@/components/ui/input";
 import AreaPicker from "@/components/AreaPicker";
 import { setLang, useI18n } from "@/lib/i18n";
+import { avatarUrl } from "@/lib/avatar";
 
 // 抽自 HomePage 的共用頂部列——依 UI草圖(Main/Marketplace/MyBookings 三頁共用同一組
 // 導覽)統一給三頁用:預購餐點(計畫方案首頁)／轉讓市集／我的餐點。也給
@@ -174,8 +175,8 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="flex items-center gap-1 text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <User className="w-4 h-4" />
+                <button type="button" className="flex items-center gap-1.5 text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <img src={avatarUrl(user.id)} alt="" className="w-5 h-5 rounded-full bg-orange-100" />
                   <span className="max-w-[80px] truncate hidden sm:inline">{user.displayName || user.username}</span>
                   <ChevronDown className="w-3 h-3" />
                 </button>
