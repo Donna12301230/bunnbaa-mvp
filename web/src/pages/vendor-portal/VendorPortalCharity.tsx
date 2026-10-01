@@ -83,7 +83,7 @@ export default function VendorPortalCharity() {
 
   return (
     <VendorPortalLayout>
-      <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><HeartHandshake className="w-5 h-5 text-pink-500" /> {tr("愛心餐", "Charity meals")}</h2>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-1 flex items-center gap-2"><HeartHandshake className="w-5 h-5 text-pink-500" /> {tr("愛心餐", "Charity meals")}</h1>
       <p className="text-sm text-muted-foreground mb-4">{tr("未取餐不退款但照常計入營業額；轉為愛心餐後當天現場領取。預約者請到「取餐掃碼」掃 QR；未預約的份數先到先領，每人一份由店家判斷。", "No-shows still count as revenue. Reserved pickups are scanned in Pickup scan; walk-ins are first come, first served.")}</p>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">

@@ -142,7 +142,7 @@ export default function VendorPortalPurchasing() {
   return (
     <VendorPortalLayout>
       <div className="print:hidden">
-        <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><ShoppingBasket className="w-5 h-5 text-orange-500" /> {tr("採購與叫貨", "Purchasing")}</h2>
+        <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-1 flex items-center gap-2"><ShoppingBasket className="w-5 h-5 text-orange-500" /> {tr("採購與叫貨", "Purchasing")}</h1>
         <p className="text-sm text-muted-foreground mb-4">{tr("週叫貨單每週六 12:00 鎖定產生、月叫貨單每月 25 日產生。先在週六 12:00 前盤點，只改有差異的項目。", "Weekly lists are generated Saturdays at 12:00, monthly on the 25th. Count stock before Saturday noon — only change what differs.")}</p>
       </div>
       <Tabs defaultValue="weekly">

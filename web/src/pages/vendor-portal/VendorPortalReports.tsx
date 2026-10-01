@@ -201,9 +201,9 @@ export default function VendorPortalReports() {
 
   return (
     <VendorPortalLayout>
-      <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-5 flex items-center gap-2">
         <TrendingUp className="w-5 h-5 text-orange-500" /> {tr("訂單統計報表", "Order reports")}
-      </h2>
+      </h1>
 
       {/* 校準洞察（對應 UI草圖「收益及未來備料趨勢」分頁；同一份 Gemini 校準報告
           真正串接在 /lock/vendor，見 pages/VendorDashboard.tsx） */}

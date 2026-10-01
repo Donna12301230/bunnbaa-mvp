@@ -69,10 +69,10 @@ export default function VendorPortalSessionSummary() {
   return (
     <VendorPortalLayout>
       {back}
-      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-4 flex items-center gap-2">
         <Clock className="w-5 h-5 text-orange-500" />
         {format(new Date(`${slot.date}T00:00:00`), "M/d (EEE)", { locale: dateLocale() })} {slotLabel(slot.window)}
-      </h2>
+      </h1>
 
       {loading ? (
         <SkeletonBlocks count={3} height={96} className="space-y-3" />

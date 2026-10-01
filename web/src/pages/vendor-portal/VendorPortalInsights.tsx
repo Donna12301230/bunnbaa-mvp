@@ -84,7 +84,7 @@ export default function VendorPortalInsights() {
   return (
     <VendorPortalLayout>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-        <h2 className="text-xl font-bold flex items-center gap-2"><MapPinned className="w-5 h-5 text-orange-500" /> {tr("區域洞察與許願", "Area insights & wishes")}</h2>
+        <h1 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-2"><MapPinned className="w-5 h-5 text-orange-500" /> {tr("區域洞察與許願", "Area insights & wishes")}</h1>
         <Button variant="outline" size="sm" onClick={rebuild} disabled={busy}><RefreshCw /> {tr("重新統計", "Refresh")}</Button>
       </div>
       <p className="text-sm text-muted-foreground mb-4">

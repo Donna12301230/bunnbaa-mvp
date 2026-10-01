@@ -192,7 +192,7 @@ export default function VendorPortalPrep() {
   return (
     <VendorPortalLayout>
       <div className="print:hidden">
-        <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><ChefHat className="w-5 h-5 text-orange-500" /> {tr("每日備料", "Daily prep")}</h2>
+        <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-1 flex items-center gap-2"><ChefHat className="w-5 h-5 text-orange-500" /> {tr("每日備料", "Daily prep")}</h1>
         <p className="text-sm text-muted-foreground mb-4">{tr(`前一天 ${vendorCutoffTime(vendor)} 截單後自動產生：半成品份數、流程時間軸、出餐標籤與缺料警示。`, `Generated automatically after the ${vendorCutoffTime(vendor)} cutoff the day before.`)}</p>
         <div className="flex gap-2 mb-4 flex-wrap">
           {dates.map((d) => <Tag key={d} selected={date === d} onClick={() => setDate(d)}>{d === today ? tr("今天", "Today") : d < today ? tr("昨天", "Yesterday") : tr("下一個營業日", "Next day")} {d.slice(5)}</Tag>)}

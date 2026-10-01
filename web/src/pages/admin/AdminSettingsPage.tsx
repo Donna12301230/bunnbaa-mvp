@@ -150,7 +150,7 @@ function SettingsContent() {
 export default function AdminSettingsPage() {
   return (
     <AdminLayout>
-      <h2 className="text-lg font-bold mb-3">{tr("系統設定", "Settings")}</h2>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("系統設定", "Settings")}</h1>
       <RequireRealAdmin>
         <SettingsContent />
       </RequireRealAdmin>

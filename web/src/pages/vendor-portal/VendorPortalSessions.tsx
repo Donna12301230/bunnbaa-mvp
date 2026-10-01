@@ -48,9 +48,9 @@ export default function VendorPortalSessions() {
   return (
     <VendorPortalLayout>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <h2 className="text-xl font-bold flex items-center gap-2">
+        <h1 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-2">
           <CalendarDays className="w-5 h-5 text-orange-500" /> {tr("訂餐時段", "Pickup slots")}
-        </h2>
+        </h1>
         <Link href="/vendor-portal/settings">
           <Button variant="outline" size="sm"><Settings className="w-4 h-4 mr-1" /> {tr("調整時段／公休／份數上限", "Edit times / closures / limits")}</Button>
         </Link>

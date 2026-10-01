@@ -98,7 +98,7 @@ function DishesContent() {
 export default function AdminDishesPage() {
   return (
     <AdminLayout>
-      <h2 className="text-lg font-bold mb-3 flex items-center gap-2"><BookMarked className="w-5 h-5" /> {tr("菜色庫與模板", "Dishes & templates")}</h2>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3 flex items-center gap-2"><BookMarked className="w-5 h-5" /> {tr("菜色庫與模板", "Dishes & templates")}</h1>
       <RequireRealAdmin><DishesContent /></RequireRealAdmin>
     </AdminLayout>
   );

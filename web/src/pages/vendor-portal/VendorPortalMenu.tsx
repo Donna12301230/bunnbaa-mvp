@@ -243,7 +243,7 @@ export default function VendorPortalMenu() {
     <VendorPortalLayout>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-xl font-bold">{tr("菜單管理", "Menu")}</h2>
+          <h1 className="font-heading text-3xl md:text-4xl font-semibold">{tr("菜單管理", "Menu")}</h1>
           <p className="text-xs text-muted-foreground">{tr("主菜、配菜格與候選菜；配方在", "Mains, side slots and candidates; recipes live in")} <Link href="/vendor-portal/recipes" className="text-primary underline">{tr("配方與原物料", "Recipes")}</Link></p>
         </div>
         <div className="flex gap-2">

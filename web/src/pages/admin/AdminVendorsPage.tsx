@@ -172,7 +172,7 @@ export default function AdminVendorsPage() {
 
   return (
     <AdminLayout>
-      <h2 className="text-lg font-bold mb-3">{tr("待審核的廠商申請", "Pending vendor applications")} ({applications.length})</h2>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("待審核的廠商申請", "Pending vendor applications")} ({applications.length})</h1>
       {loadingApps ? (
         <SkeletonBlocks count={2} height={96} className="space-y-3 mb-8" />
       ) : applications.length === 0 ? (

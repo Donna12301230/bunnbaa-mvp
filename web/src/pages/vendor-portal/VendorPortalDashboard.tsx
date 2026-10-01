@@ -80,9 +80,9 @@ export default function VendorPortalDashboard() {
 
   return (
     <VendorPortalLayout>
-      <h2 className="text-xl font-bold mb-4">
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-4">
         {myVendor?.name ? `${myVendor.name} — ${tr("總覽", "Overview")}` : tr("廠商總覽", "Vendor overview")}
-      </h2>
+      </h1>
 
       {/* 統計卡片 */}
       {isLoading ? (
