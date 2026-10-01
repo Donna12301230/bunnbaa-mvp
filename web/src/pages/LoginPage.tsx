@@ -149,43 +149,41 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-background px-3 py-3 md:px-6 md:py-6">
-      <div className="mx-auto max-w-[1400px] grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-6 lg:gap-12 items-stretch lg:min-h-[calc(100vh-3rem)]">
+      <div className="mx-auto max-w-[1200px] grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-16 items-center lg:min-h-[calc(100vh-3rem)]">
 
-        {/* 左欄：品牌介紹（深棕色帶） */}
-        <div className="relative overflow-hidden rounded-[2rem] md:rounded-[2.75rem] bg-[var(--surface-inverse)] text-[var(--text-on-inverse)] p-7 md:p-12 flex flex-col gap-10">
-          <Link href="/" className="inline-flex items-center gap-3 w-fit rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe1a1]">
-            <span className="w-12 h-12 rounded-full bg-[#fdf0d2] p-1.5 flex items-center justify-center">
-              <img src="/飯飽R.png" alt="" className="w-full h-auto" />
-            </span>
-            <span className="text-sm font-semibold underline-offset-4 hover:underline">← {tr("回首頁", "Back home")}</span>
+        {/* 左欄：品牌介紹——沿用原本的大 Logo 風格（奶油底＋置中大標誌＋四張特色卡） */}
+        <div className="flex flex-col gap-8 py-4 md:py-8">
+          <Link href="/" className="inline-flex items-center gap-1.5 w-fit text-sm font-semibold text-muted-foreground hover:text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            ← {tr("回首頁", "Back home")}
           </Link>
 
-          <div className="mt-auto">
-            <p className="text-xs font-semibold tracking-[0.14em] uppercase opacity-80 mb-5">BunnBaa 飯飽</p>
-            <p className="font-heading font-semibold text-[clamp(48px,7vw,104px)] leading-[1.02] tracking-[-0.03em]">
-              {tr("越早訂，", "Book early,")}<br />{tr("越開心。", "eat happy.")}
-            </p>
-          </div>
+          <img
+            src="/飯飽R.png"
+            alt={tr("飯飽 BunnBaa：越早訂，越開心。", "BunnBaa: Book early, eat happy.")}
+            className="w-full max-w-[220px] md:max-w-[380px] h-auto mx-auto animate-[bb-page-in_900ms_cubic-bezier(0.16,1,0.3,1)_both] motion-reduce:animate-none"
+          />
 
           {/* Feature list */}
-          <ul className="grid grid-cols-2 gap-x-6 gap-y-5 border-t border-[#ffe1a1]/25 pt-8">
+          <ul className="grid grid-cols-2 gap-3 md:gap-4 max-w-[560px] w-full mx-auto">
             {[
               { icon: ShoppingBag, title: tr("線上預訂", "Order online"), desc: tr("輕鬆挑選、輕鬆下單", "Easy to browse and order") },
               { icon: Clock, title: tr("提前預訂", "Book ahead"), desc: tr("提前安排、省時省力", "Plan ahead, save time") },
               { icon: Tag, title: tr("早鳥優惠", "Early-bird deals"), desc: tr("越早訂購越划算", "The earlier, the cheaper") },
               { icon: Store, title: tr("多家廠商", "Many vendors"), desc: tr("周邊精選店家", "Hand-picked local spots") },
             ].map(({ icon: Icon, title, desc }) => (
-              <li key={title} className="flex items-start gap-3">
-                <Icon className="w-5 h-5 shrink-0 mt-0.5 text-[#f29e0c]" aria-hidden="true" />
+              <li key={title} className="flex items-start gap-3 bg-card rounded-2xl border border-ink p-3 md:p-4">
+                <span className="hidden sm:flex w-10 h-10 shrink-0 rounded-full bg-secondary border border-ink items-center justify-center">
+                  <Icon className="w-5 h-5" aria-hidden="true" />
+                </span>
                 <div>
                   <div className="font-semibold text-sm">{title}</div>
-                  <div className="text-xs opacity-80 mt-0.5">{desc}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{desc}</div>
                 </div>
               </li>
             ))}
           </ul>
 
-          <p className="text-xs opacity-70">
+          <p className="text-xs text-muted-foreground max-w-[560px] w-full mx-auto">
             © 2026 {tr("赫滋與羊國際藝術有限公司", "Herz & Baa International Arts Co., Ltd.")}
           </p>
         </div>
