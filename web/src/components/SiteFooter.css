@@ -1,22 +1,24 @@
 /* 全站共用頁尾。只用 tokens.css 的全域變數（除了 --sf-deep 這種頁尾自己的配色），
    不依賴 LandingPage.css 的 .bb-landing 作用域，才能在任何頁面單獨掛用。 */
 .site-footer {
-  --sf-deep: #5c3726;
+  --sf-deep: #73472d;  /* 溫暖褐色：--sf-text 5.2:1、--sf-heading 6.7:1 */
   --sf-heading: #fbead0;
   --sf-text: #e9cfa8;
   --sf-line: color-mix(in srgb, white 22%, transparent);
-  --sf-max: 1120px;
+  --sf-max: 1400px;
   --sf-gutter: var(--space-4);
 
-  width: 100%;
-  max-width: calc(var(--sf-max) + 2 * var(--sf-gutter));
-  margin: var(--space-6) auto var(--space-10);
-  padding: var(--space-10) var(--space-6) var(--space-8);
-  border-radius: 32px;
+  position: relative;
+  overflow: hidden;
+  width: calc(100% - 24px);
+  max-width: var(--sf-max);
+  margin: var(--space-6) auto 12px;
+  padding: var(--space-12) var(--space-6) 0;
+  border-radius: 40px;
   background: var(--sf-deep);
 }
 @media (min-width: 768px) {
-  .site-footer { --sf-gutter: var(--space-8); padding: var(--space-12) var(--space-10) var(--space-8); }
+  .site-footer { width: calc(100% - 48px); margin-bottom: 24px; padding: 72px var(--space-12) 0; border-radius: 64px; }
 }
 .site-footer a { text-decoration: none; }
 
@@ -26,11 +28,20 @@
 }
 .site-footer__brand { display: grid; gap: var(--space-3); align-content: start; }
 .site-footer__logo { display: inline-flex; font-size: 22px; font-weight: 700; letter-spacing: 0.01em; }
+.site-footer__tagline {
+  margin: 0 0 var(--space-3);
+  color: var(--sf-heading);
+  font-family: 'Fraunces', var(--font-heading);
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 600;
+  line-height: 1.15;
+}
 .site-footer__logo-bunn { color: var(--sf-heading); }
 .site-footer__logo-baa { color: var(--brand-orange); }
 .site-footer__muted { margin: 0; color: var(--sf-text); }
 .site-footer__email { display: block; }
 .site-footer__email:hover { color: var(--brand-orange); }
+.site-footer__email:focus-visible { outline: var(--focus-ring-width) solid var(--sf-heading); outline-offset: 4px; border-radius: 4px; }
 .site-footer__col-title {
   margin: 0 0 var(--space-3);
   padding-bottom: var(--space-2);
@@ -45,8 +56,34 @@
 .site-footer__col a { color: var(--sf-text); font-weight: 500; }
 .site-footer__col a:hover { color: var(--brand-orange); text-decoration: underline; }
 .site-footer__col a:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline: var(--focus-ring-width) solid var(--sf-heading);
   outline-offset: var(--focus-ring-offset);
 }
-.site-footer__bottom { margin-top: var(--space-10); padding-top: var(--space-6); border-top: 1px solid var(--sf-line); }
+.site-footer__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-12);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--sf-line);
+}
+.site-footer__top { color: var(--sf-text); font-size: var(--font-caption-size); font-weight: 600; }
+.site-footer__top:hover { color: var(--brand-orange); }
+.site-footer__top:focus-visible { outline: var(--focus-ring-width) solid var(--sf-heading); outline-offset: 4px; border-radius: 4px; }
+.site-footer__wordmark {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-6) 0 0;
+  font-family: 'Fraunces', var(--font-heading);
+  font-size: clamp(80px, 19vw, 300px);
+  font-weight: 700;
+  line-height: 0.78;
+  letter-spacing: -0.05em;
+  white-space: nowrap;
+  user-select: none;
+  /* 讓字的下緣切在頁尾底邊，像蓋印一樣 */
+  margin-bottom: -0.06em;
+}
+.site-footer__wordmark .site-footer__logo-bunn { color: color-mix(in srgb, var(--sf-heading) 92%, transparent); }
 .site-footer__caption { margin: 0; color: var(--sf-text); font-size: var(--font-caption-size); }

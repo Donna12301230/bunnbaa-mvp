@@ -1,25 +1,37 @@
 import { ReactNode } from "react";
 import { Search } from "lucide-react";
+import "./PageHero.css";
 
-// 抽自 TransferMarketPage 的頁首橫幅——轉讓市集／我的餐點／商家三個分頁共用，
-// 底色是 logo「飯」字色（--brand-rice）。右側 children 通常放 HeroSearch。
+// 各分頁共用的頁首（轉讓市集／我的餐點／商家／成長獎勵／關於我們／常見問題／聯絡／加入我們）。
+// 2026-10-01 全站改版：跟品牌形象頁同一套編輯式語彙——小標 eyebrow、大字襯線標題、
+// 奶油底加一顆緩慢變形的奶油黃色塊；右側 children 通常放 HeroSearch。
 export default function PageHero({
   title,
   description,
+  eyebrow,
   children,
 }: {
   title: string;
   description?: ReactNode;
+  /** 標題上方的小標（例：「Transfers · 轉讓」），沒給就不顯示 */
+  eyebrow?: string;
   children?: ReactNode;
 }) {
   return (
-    <section className="bg-rice px-4 md:px-6 py-10">
-      <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-6 flex-wrap">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-rice-foreground mb-1.5">{title}</h1>
-          {description && <p className="text-sm text-rice-foreground">{description}</p>}
+    <section className="bb-pagehero">
+      <div className="bb-pagehero__blob" aria-hidden="true" />
+      <div className="bb-pagehero__inner">
+        <div className="bb-pagehero__copy">
+          {eyebrow && (
+            <p className="bb-pagehero__eyebrow">
+              <span className="bb-pagehero__rule" aria-hidden="true" />
+              {eyebrow}
+            </p>
+          )}
+          <h1 className="bb-pagehero__title">{title}</h1>
+          {description && <p className="bb-pagehero__desc">{description}</p>}
         </div>
-        {children}
+        {children && <div className="bb-pagehero__aside">{children}</div>}
       </div>
     </section>
   );
@@ -39,15 +51,16 @@ export function HeroSearch({
   placeholder: string;
 }) {
   return (
-    <div className="flex items-center gap-2 bg-white rounded-xl p-1.5 pl-4 min-w-[300px]">
-      <Search className="w-4 h-4 text-gray-400 shrink-0" />
+    <div className="bb-herosearch">
+      <Search className="bb-herosearch__icon" aria-hidden="true" />
       <label htmlFor={id} className="sr-only">{label}</label>
       <input
         id={id}
+        type="search"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="flex-1 border-none outline-none bg-transparent text-sm py-2"
+        className="bb-herosearch__input"
       />
     </div>
   );

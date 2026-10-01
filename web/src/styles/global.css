@@ -186,3 +186,99 @@
     animation-iteration-count: infinite !important;
   }
 }
+
+/* ══ 全站頁面動態與共用頁面（2026-10-01 全站改版） ═══════════════════════
+   bb-page-enter：App.tsx 的 MarketplacePage 包住每一頁，換頁時內容淡入上移。
+   bb-route-fallback：路由拆包載入中的品牌標誌。bb-404：找不到頁面。 */
+@keyframes bb-page-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: none; }
+}
+.bb-page-enter { animation: bb-page-in 560ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* 動畫結束後不留 transform，否則 sticky／fixed 子元素會以這層為定位基準 */
+.bb-page-enter { animation-fill-mode: backwards; }
+
+@keyframes bb-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.bb-route-fallback {
+  display: grid;
+  place-items: center;
+  min-height: 70vh;
+}
+.bb-route-fallback img { width: 72px; height: auto; animation: bb-breathe 1.6s ease-in-out infinite; }
+
+.bb-404 {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 96px var(--space-5) 120px;
+  text-align: center;
+}
+.bb-404__code {
+  margin: 0;
+  font-family: 'Fraunces', var(--font-heading);
+  font-size: clamp(120px, 24vw, 240px);
+  font-weight: 600;
+  font-style: italic;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  color: var(--brand-orange);
+}
+.bb-404__code::before { content: attr(data-text); }
+.bb-404__title { margin: 0; font-family: var(--font-heading); font-size: clamp(28px, 4vw, 44px); font-weight: 600; color: var(--text); }
+.bb-404__body { margin: 0; max-width: 40ch; color: var(--text-secondary); }
+.bb-404__actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-6); margin-top: var(--space-4); }
+.bb-404__btn {
+  display: inline-flex;
+  align-items: center;
+  height: 52px;
+  padding-inline: 28px;
+  border-radius: 999px;
+  background: var(--brand-orange-strong);
+  color: var(--text-on-brand) !important;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: background var(--duration-base) var(--ease-standard);
+}
+.bb-404__btn:hover { background: var(--brand-orange-strong-hover); }
+.bb-404__link { color: var(--text) !important; font-weight: 600; }
+.bb-404__btn:focus-visible,
+.bb-404__link:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bb-page-enter, .bb-route-fallback img { animation: none; }
+}
+
+/* 細捲軸（側欄、橫向捲動列） */
+.bb-thin-scroll { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--border-ink) 35%, transparent) transparent; }
+.bb-thin-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
+.bb-thin-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: color-mix(in srgb, var(--border-ink) 35%, transparent); }
+/* 橫向捲動列右緣淡出，暗示還能往右滑 */
+.bb-fade-x { mask-image: linear-gradient(90deg, #000 calc(100% - 48px), transparent); }
+
+/* 付款結果「收據」卡：描邊＋上下打孔邊 */
+.bb-receipt {
+  position: relative;
+  padding: 40px 28px;
+  border: 1px solid var(--border-ink);
+  border-radius: 32px;
+  background: var(--surface);
+}
+@media (min-width: 640px) { .bb-receipt { padding: 48px 44px; } }
+.bb-receipt__check {
+  display: inline-grid;
+  place-items: center;
+  width: 80px;
+  height: 80px;
+  border: 1px solid var(--border-ink);
+  border-radius: 50%;
+  background: var(--surface-accent);
+  color: var(--text-on-accent);
+  animation: bb-pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes bb-pop { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .bb-receipt__check { animation: none; } }

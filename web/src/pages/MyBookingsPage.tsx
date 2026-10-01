@@ -61,7 +61,7 @@ const statusStyle = (status: string): { label: string; className: string } => {
     no_show: { label: tr("已登記未取餐", "No-show"), className: "bg-red-100 text-red-700" },
     charity: { label: tr("已轉為愛心餐", "Charity meal"), className: "bg-pink-100 text-pink-700" },
     cancelling: { label: tr("退款中", "Refunding"), className: "bg-gray-100 text-gray-700" },
-    cancelled: { label: tr("已取消・已退款", "Cancelled · refunded"), className: "bg-gray-100 text-gray-500" },
+    cancelled: { label: tr("已取消・已退款", "Cancelled · refunded"), className: "bg-gray-100 text-gray-700" },
   };
   return map[status] ?? { label: status, className: "bg-gray-100 text-gray-700" };
 };
@@ -349,9 +349,9 @@ export default function MyBookingsPage() {
     const canReview = REVIEW_ELIGIBLE.has(lock.status) && !reviewedIds.has(lock.id);
 
     return (
-      <article className="bg-card border border-border rounded-lg shadow-sm p-4 flex flex-col gap-2 max-w-sm">
+      <article className="bg-card border border-ink rounded-[1.75rem] p-5 flex flex-col gap-2.5 max-w-md overflow-hidden">
                       {imageOf(lock) && (
-                        <img src={imageOf(lock)} alt="" loading="lazy" className="-mx-4 -mt-4 mb-1 h-28 w-[calc(100%+2rem)] max-w-none rounded-t-lg object-cover" />
+                        <img src={imageOf(lock)} alt="" loading="lazy" className="-mx-5 -mt-5 mb-2 aspect-[16/9] w-[calc(100%+2.5rem)] max-w-none object-cover border-b border-ink" />
                       )}
                       <Badge variant="muted" className={`self-start ${statusInfo.className}`}>
                         {statusInfo.label}
@@ -538,10 +538,10 @@ export default function MyBookingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <MarketplaceHeader active="bookings" />
 
-      <PageHero title={tr("我的餐點", "My meals")} description={tr("週曆上點一筆訂單看詳情、出示取餐碼、截單前取消，或轉讓／贈送／捐為愛心餐。", "Tap an order to see details, show your pickup code, cancel before cutoff, or transfer / gift / donate it.")} />
+      <PageHero eyebrow={tr("我的預約", "Your bookings")} title={tr("我的餐點", "My meals")} description={tr("週曆上點一筆訂單看詳情、出示取餐碼、截單前取消，或轉讓／贈送／捐為愛心餐。", "Tap an order to see details, show your pickup code, cancel before cutoff, or transfer / gift / donate it.")} />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         {!authLoading && !uid ? (
@@ -563,7 +563,7 @@ export default function MyBookingsPage() {
         ) : (
           <>
             <div className="space-y-1">
-              <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-muted-foreground">
+              <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold tracking-[0.12em] uppercase text-muted-foreground pb-2">
                 {weekdayLabels().map((label) => (
                   <div key={label}>{label}</div>
                 ))}
@@ -577,11 +577,11 @@ export default function MyBookingsPage() {
                     return (
                       <div
                         key={dateStr}
-                        className={`min-h-[92px] rounded-lg border p-1.5 flex flex-col gap-1 ${
-                          isToday ? "border-orange-400 bg-orange-50/50" : "border-border bg-white"
+                        className={`min-h-[104px] rounded-2xl border p-2 flex flex-col gap-1 ${
+                          isToday ? "border-ink bg-secondary/60" : "border-border bg-card"
                         }`}
                       >
-                        <span className="text-micro font-semibold text-muted-foreground">{day.getDate()}</span>
+                        <span className={`font-heading text-sm font-semibold ${isToday ? "text-foreground" : "text-muted-foreground"}`}>{day.getDate()}{isToday && <span className="sr-only">{tr("（今天）", " (today)")}</span>}</span>
                         {dayLocks.map((lock) => {
                           const statusInfo = statusStyle(lock.status);
                           return (

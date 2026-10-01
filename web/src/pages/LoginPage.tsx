@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { tr } from "@/lib/i18n";
 import { MemberNotice, VendorNotice } from "@/components/TermsNotices";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -148,46 +148,51 @@ export default function LoginPage() {
   const isPendingVendor = vendorRegisterMutation.isPending;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+    <div className="min-h-screen bg-background px-3 py-3 md:px-6 md:py-6">
+      <div className="mx-auto max-w-[1200px] grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-16 items-center lg:min-h-[calc(100vh-3rem)]">
 
-        {/* 左欄：品牌介紹 */}
-        <div className="flex flex-col gap-6">
-          {/* Logo */}
-          <div>
-            <img src="/飯飽R.png" alt="飯飽BunnBaa" className="h-56 md:h-96 mx-auto" />
-          </div>
+        {/* 左欄：品牌介紹——沿用原本的大 Logo 風格（奶油底＋置中大標誌＋四張特色卡） */}
+        <div className="flex flex-col gap-8 py-4 md:py-8">
+          <Link href="/" className="inline-flex items-center gap-1.5 w-fit text-sm font-semibold text-muted-foreground hover:text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            ← {tr("回首頁", "Back home")}
+          </Link>
+
+          <img
+            src="/飯飽R.png"
+            alt={tr("飯飽 BunnBaa：越早訂，越開心。", "BunnBaa: Book early, eat happy.")}
+            className="w-full max-w-[220px] md:max-w-[380px] h-auto mx-auto animate-[bb-page-in_900ms_cubic-bezier(0.16,1,0.3,1)_both] motion-reduce:animate-none"
+          />
 
           {/* Feature list */}
-          <div className="grid grid-cols-2 gap-3">
+          <ul className="grid grid-cols-2 gap-3 md:gap-4 max-w-[560px] w-full mx-auto">
             {[
               { icon: ShoppingBag, title: tr("線上預訂", "Order online"), desc: tr("輕鬆挑選、輕鬆下單", "Easy to browse and order") },
               { icon: Clock, title: tr("提前預訂", "Book ahead"), desc: tr("提前安排、省時省力", "Plan ahead, save time") },
               { icon: Tag, title: tr("早鳥優惠", "Early-bird deals"), desc: tr("越早訂購越划算", "The earlier, the cheaper") },
               { icon: Store, title: tr("多家廠商", "Many vendors"), desc: tr("周邊精選店家", "Hand-picked local spots") },
             ].map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="flex items-start gap-3 bg-white rounded-xl p-3 shadow-sm">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Icon className="w-5 h-5 text-orange-500" />
-                </div>
+              <li key={title} className="flex items-start gap-3 bg-card rounded-2xl border border-ink p-3 md:p-4">
+                <span className="hidden sm:flex w-10 h-10 shrink-0 rounded-full bg-secondary border border-ink items-center justify-center">
+                  <Icon className="w-5 h-5" aria-hidden="true" />
+                </span>
                 <div>
-                  <div className="font-semibold text-sm text-gray-800">{title}</div>
+                  <div className="font-semibold text-sm">{title}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{desc}</div>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground max-w-[560px] w-full mx-auto">
             © 2026 {tr("赫滋與羊國際藝術有限公司", "Herz & Baa International Arts Co., Ltd.")}
           </p>
         </div>
 
         {/* 右欄：登入/註冊 */}
-        <div>
-          <Card className="shadow-xl border-0">
+        <div className="flex items-center">
+          <Card className="w-full rounded-[2rem] border border-ink shadow-none bg-card md:p-4">
             <CardHeader className="pb-2">
-              <CardTitle className="text-center text-xl">{tr("歡迎使用", "Welcome")}</CardTitle>
+              <CardTitle className="text-center font-heading text-[clamp(32px,4vw,48px)] font-semibold">{tr("歡迎使用", "Welcome")}</CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="login">
@@ -209,7 +214,7 @@ export default function LoginPage() {
                         <Label>{tr("密碼", "Password")}</Label>
                         <div className="relative mt-1">
                           <Input autoComplete="current-password" type={showPassword ? "text" : "password"} placeholder={tr("請輸入密碼", "Your password")} value={password} onChange={e => setPassword(e.target.value)} required className="pr-11" />
-                          <button type="button" aria-label={showPassword ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowPassword(v => !v)}>
+                          <button type="button" aria-label={showPassword ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowPassword(v => !v)}>
                             {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                           </button>
                         </div>
@@ -360,7 +365,7 @@ export default function LoginPage() {
                           <Label>{tr("密碼 *", "Password *")}</Label>
                           <div className="relative mt-1">
                             <Input autoComplete="new-password" type={showRegPassword ? "text" : "password"} placeholder={tr("至少 6 位", "At least 6 characters")} value={regPassword} onChange={e => setRegPassword(e.target.value)} required className="pr-11" />
-                            <button type="button" aria-label={showRegPassword ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showRegPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowRegPassword(v => !v)}>
+                            <button type="button" aria-label={showRegPassword ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showRegPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowRegPassword(v => !v)}>
                               {showRegPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
                           </div>
@@ -369,7 +374,7 @@ export default function LoginPage() {
                           <Label>{tr("確認密碼 *", "Confirm password *")}</Label>
                           <div className="relative mt-1">
                             <Input autoComplete="new-password" type={showRegConfirm ? "text" : "password"} placeholder={tr("再輸入一次", "Enter it again")} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required className="pr-11" />
-                            <button type="button" aria-label={showRegConfirm ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showRegConfirm} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowRegConfirm(v => !v)}>
+                            <button type="button" aria-label={showRegConfirm ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showRegConfirm} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowRegConfirm(v => !v)}>
                               {showRegConfirm ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
                           </div>
@@ -481,7 +486,7 @@ export default function LoginPage() {
                           <Label>{tr("密碼 *", "Password *")}</Label>
                           <div className="relative mt-1">
                             <Input autoComplete="new-password" type={showVendorPassword ? "text" : "password"} placeholder={tr("至少 6 位", "At least 6 characters")} value={vendorPassword} onChange={e => setVendorPassword(e.target.value)} required className="pr-11" />
-                            <button type="button" aria-label={showVendorPassword ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showVendorPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowVendorPassword(v => !v)}>
+                            <button type="button" aria-label={showVendorPassword ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showVendorPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowVendorPassword(v => !v)}>
                               {showVendorPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
                           </div>
@@ -490,7 +495,7 @@ export default function LoginPage() {
                           <Label>{tr("確認密碼 *", "Confirm password *")}</Label>
                           <div className="relative mt-1">
                             <Input autoComplete="new-password" type={showVendorConfirm ? "text" : "password"} placeholder={tr("再輸入一次", "Enter it again")} value={vendorConfirmPassword} onChange={e => setVendorConfirmPassword(e.target.value)} required className="pr-11" />
-                            <button type="button" aria-label={showVendorConfirm ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showVendorConfirm} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowVendorConfirm(v => !v)}>
+                            <button type="button" aria-label={showVendorConfirm ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showVendorConfirm} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowVendorConfirm(v => !v)}>
                               {showVendorConfirm ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
                           </div>

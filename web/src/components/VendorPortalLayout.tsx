@@ -56,7 +56,7 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
 
   if (subscription?.blocked) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <div className="bg-sidebar border-b border-sidebar-border px-4 h-12 flex items-center justify-between">
           <img src="/飯飽wordR.png" alt="飯飽BunnBaa" className="h-7" />
           <Link href="/home" className="flex items-center text-sm text-sidebar-primary opacity-80 hover:opacity-100">
@@ -64,10 +64,10 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
           </Link>
         </div>
         <div className="flex items-center justify-center min-h-[calc(100vh-3rem)] px-4">
-          <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center space-y-4">
+          <div className="bb-receipt max-w-md w-full text-center space-y-4">
             <AlertTriangle className="w-12 h-12 mx-auto text-amber-500" />
-            <h2 className="text-xl font-bold text-gray-800">{tr("帳號已暫停", "Account suspended")}</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="font-heading text-3xl font-semibold">{tr("帳號已暫停", "Account suspended")}</h2>
+            <p className="text-sm text-muted-foreground">
               {tr("您的訂閱已到期", "Your subscription expired")}{subscription.endDate ? `（${subscription.endDate.toLocaleDateString(tr("zh-TW", "en-US"))}）` : ""}{tr("，廠商後台功能暫時停用。", " and the vendor portal is paused.")}
               <br />{tr("所有店家資料、菜單及訂單記錄均已保留，續約後即可完整恢復。", "All your store data, menus and orders are kept and will be fully restored when you renew.")}
             </p>
@@ -86,28 +86,31 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Top bar */}
-      <div className="bg-sidebar border-b border-sidebar-border px-4 h-12 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <img src="/飯飽wordR.png" alt="飯飽BunnBaa" className="h-7" />
+      <div className="sticky top-0 z-40 bg-card/90 backdrop-blur-xl border-b border-border px-4 md:px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link href="/landing" className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <img src="/飯飽wordR.png" alt={tr("飯飽 BunnBaa 首頁", "BunnBaa home")} className="h-8" />
+          </Link>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground border border-ink">{tr("商家後台", "Vendor portal")}</span>
         </div>
-        <Link href="/home" className="flex items-center text-sm text-sidebar-primary opacity-80 hover:opacity-100">
-          <ArrowLeft className="w-4 h-4 mr-1" /> {tr("回首頁", "Home")}
+        <Link href="/home" className="flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("回首頁", "Home")}
         </Link>
       </div>
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-48 min-h-[calc(100vh-3rem)] bg-white border-r border-border p-3 hidden md:flex flex-col">
-          <nav className="space-y-1 flex-1">
+        <aside className="w-60 shrink-0 min-h-[calc(100vh-4rem)] border-r border-border p-4 hidden md:flex flex-col">
+          <nav className="space-y-1 flex-1 sticky top-20" aria-label={tr("商家後台", "Vendor portal")}>
             {navItems().map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href}>
+              <Link key={href} href={href} aria-current={location === href || location.startsWith(href) ? "page" : undefined} className="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <div className={cn(
-                  "flex items-center space-x-2 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors",
+                  "flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm cursor-pointer transition-colors",
                   location === href || location.startsWith(href)
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:bg-muted"
+                    ? "bg-secondary text-secondary-foreground font-semibold shadow-[inset_0_0_0_1px_var(--border-ink)]"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 )}>
                   <Icon className="w-4 h-4" />
                   <span>{label}</span>
@@ -116,14 +119,14 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
             ))}
           </nav>
           <div className="text-xs text-muted-foreground pt-3 border-t space-y-1">
-            <a href="mailto:herzbaa@gmail.com" className="block hover:text-orange-600 hover:underline">{tr("聯絡客服", "Contact support")}</a>
+            <a href="mailto:herzbaa@gmail.com" className="block hover:text-foreground hover:underline">{tr("聯絡客服", "Contact support")}</a>
           </div>
         </aside>
 
         {/* Mobile bottom nav */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border flex md:hidden z-50 overflow-x-auto">
+        <nav aria-label={tr("商家後台", "Vendor portal")} className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border flex md:hidden z-50 overflow-x-auto">
           {navItems().map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className="flex-1 min-w-[64px]">
+            <Link key={href} href={href} aria-current={location === href || location.startsWith(href) ? "page" : undefined} className="flex-1 min-w-[64px]">
               <div className={cn(
                 "flex flex-col items-center py-2 text-xs",
                 location === href || location.startsWith(href) ? "text-primary" : "text-muted-foreground"
@@ -133,10 +136,10 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
               </div>
             </Link>
           ))}
-        </div>
+        </nav>
 
         {/* Content */}
-        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
+        <main className="flex-1 min-w-0 p-4 md:p-8 pb-24 md:pb-10">
           {children}
         </main>
       </div>

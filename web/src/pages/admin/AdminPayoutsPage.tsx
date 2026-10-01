@@ -71,7 +71,7 @@ function PayoutsContent() {
 export default function AdminPayoutsPage() {
   return (
     <AdminLayout>
-      <h2 className="text-lg font-bold mb-3">{tr("撥款總覽", "Payouts")}</h2>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("撥款總覽", "Payouts")}</h1>
       <RequireRealAdmin>
         <PayoutsContent />
       </RequireRealAdmin>

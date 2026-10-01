@@ -63,25 +63,25 @@ export default function RewardsPage() {
   const pastCoupons = coupons.filter((c) => !ownedCoupons.includes(c));
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <MarketplaceHeader />
-      <PageHero title={tr("成長獎勵", "Rewards")} description={tr("每累計實付 100 元一張抽獎券；店家每週拿出營業額 10% 當回饋池，抽獎券滿 100 張就開獎，人人有獎。", "Every NT$100 you pay earns a ticket. Each week vendors put 10% of revenue into a reward pool; once 100 tickets are in, the draw opens and everyone wins.")} />
-      <div className="max-w-4xl mx-auto px-4 md:px-6 py-8 space-y-8">
+    <div className="min-h-screen bg-background">
+      <MarketplaceHeader active="rewards" />
+      <PageHero eyebrow={tr("人人有獎", "Everyone wins")} title={tr("成長獎勵", "Rewards")} description={tr("每累計實付 100 元一張抽獎券；店家每週拿出營業額 10% 當回饋池，抽獎券滿 100 張就開獎，人人有獎。", "Every NT$100 you pay earns a ticket. Each week vendors put 10% of revenue into a reward pool; once 100 tickets are in, the draw opens and everyone wins.")} />
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-12 space-y-14">
         {!user ? (
-          <EmptyState icon={<Trophy size={32} />} title={tr("請先登入", "Please sign in")} action={<Button asChild><Link href="/login">{tr("前往登入", "Sign in")}</Link></Button>} />
+          <EmptyState icon={<Trophy size={32} />} title={tr("請先登入", "Please sign in")} description={tr("登入後就能看到你的抽獎券、抽獎進度與折價券。", "Sign in to see your tickets, draw progress and coupons.")} action={<Button asChild><Link href="/login">{tr("前往登入", "Sign in")}</Link></Button>} />
         ) : (
           <>
             <section className="space-y-3">
-              <h2 className="text-lg font-bold flex items-center gap-2"><Ticket className="w-5 h-5 text-orange-500" /> {tr("我的抽獎券", "My tickets")}</h2>
+              <h2 className="font-heading text-3xl font-semibold flex items-center gap-3"><Ticket className="w-7 h-7 text-primary" aria-hidden="true" /> {tr("我的抽獎券", "My tickets")}</h2>
               {byVendor.length === 0 ? (
                 <EmptyState size="compact" icon={<Ticket size={32} />} title={tr("還沒有抽獎券", "No tickets yet")} description={tr("取餐完成（或便當轉為愛心餐）後，每累計實付 100 元就會拿到一張。", "You get one for every NT$100 paid once meals are picked up (or become charity meals).")} />
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {byVendor.map((g) => {
                     const st = statusOf(g.vendorId);
                     return (
-                      <div key={g.vendorId} className="bg-white rounded-xl border border-border p-4 space-y-2">
-                        <p className="font-semibold">{g.name || st?.vendor_name}</p>
+                      <div key={g.vendorId} className="bg-card rounded-[1.75rem] border border-ink p-6 space-y-3">
+                        <p className="font-heading text-xl font-semibold">{g.name || st?.vendor_name}</p>
                         <p className="text-sm">
                           {g.drawable > 0
                             ? tr(`${g.drawable} 張可以抽`, `${g.drawable} ready to draw`)
@@ -89,8 +89,8 @@ export default function RewardsPage() {
                         </p>
                         {st && !st.pool_open && (
                           <>
-                            <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                              <div className="h-full bg-orange-400" style={{ width: `${Math.min(100, (st.tickets_so_far / st.min_tickets) * 100)}%` }} />
+                            <div className="h-2.5 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={st.min_tickets} aria-valuenow={st.tickets_so_far} aria-label={tr("開獎進度", "Draw progress")}>
+                              <div className="h-full rounded-full bg-[#f29e0c] transition-[width] duration-700" style={{ width: `${Math.min(100, (st.tickets_so_far / st.min_tickets) * 100)}%` }} />
                             </div>
                             <p className="text-xs text-muted-foreground">
                               {st.paused ? tr("店家暫停參加本期", "Vendor paused this period") : tr(`全店再 ${st.amount_to_open} 元開獎（${st.tickets_so_far}/${st.min_tickets} 張）`, `NT$${st.amount_to_open} more to open (${st.tickets_so_far}/${st.min_tickets})`)}
@@ -111,14 +111,14 @@ export default function RewardsPage() {
             </section>
 
             <section className="space-y-3">
-              <h2 className="text-lg font-bold">{tr("我的折價券", "My coupons")}</h2>
+              <h2 className="font-heading text-3xl font-semibold">{tr("我的折價券", "My coupons")}</h2>
               {ownedCoupons.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{tr("目前沒有可用的折價券。", "No usable coupons right now.")}</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {ownedCoupons.map((c) => (
-                    <div key={c.id} className="rounded-xl border-2 border-dashed border-orange-300 bg-orange-50 p-4">
-                      <p className="text-2xl font-extrabold text-orange-600">{couponTitle(c.discount)}</p>
+                    <div key={c.id} className="rounded-[1.5rem] border-2 border-dashed border-ink bg-accent p-6">
+                      <p className="font-heading text-4xl font-semibold">{couponTitle(c.discount)}</p>
                       <p className="text-xs text-muted-foreground">{tr("（百元一折）", "(per NT$100)")}・{tierLabel(c.tier)}</p>
                       <p className="text-sm mt-1">{c.vendor_name}</p>
                       <p className="text-xs text-muted-foreground">{tr("到期", "Expires")} {new Date(millis(c.expires_at)).toLocaleDateString()}</p>
@@ -143,12 +143,12 @@ export default function RewardsPage() {
       <Dialog open={!!result} onOpenChange={(open) => !open && setResult(null)}>
         <DialogContent className="max-w-xs text-center">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-center gap-2"><PartyPopper className="w-5 h-5 text-orange-500" /> {tr("恭喜！", "Congrats!")}</DialogTitle>
+            <DialogTitle className="flex items-center justify-center gap-2"><PartyPopper className="w-5 h-5 text-primary" aria-hidden="true" /> {tr("恭喜！", "Congrats!")}</DialogTitle>
             <DialogDescription>{result?.vendor}</DialogDescription>
           </DialogHeader>
           {result && (
             <>
-              <p className="text-4xl font-extrabold text-orange-600">{couponTitle(result.discount)}</p>
+              <p className="font-heading text-6xl font-semibold">{couponTitle(result.discount)}</p>
               <p className="text-sm text-muted-foreground">{tr("（百元一折）", "(per NT$100)")}・{result.label}</p>
               <p className="text-xs text-muted-foreground">{tr(`${new Date(result.expires_at).toLocaleDateString()} 前有效，結帳時選用`, `Valid until ${new Date(result.expires_at).toLocaleDateString()} — apply it at checkout`)}</p>
             </>

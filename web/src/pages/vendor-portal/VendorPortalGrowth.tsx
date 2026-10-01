@@ -130,7 +130,7 @@ export default function VendorPortalGrowth() {
 
   return (
     <VendorPortalLayout>
-      <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><Trophy className="w-5 h-5 text-orange-500" /> {tr("成長獎勵・券負債", "Rewards & coupon liability")}</h2>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-1 flex items-center gap-2"><Trophy className="w-5 h-5 text-orange-500" /> {tr("成長獎勵・券負債", "Rewards & coupon liability")}</h1>
       <p className="text-sm text-muted-foreground mb-4">
         {tr(`每週一結算上一週：淨營業額 × ${Math.round((config?.rewardRate ?? 0.1) * 100)}% 生成回饋池，抽獎券滿 ${config?.minTicketsToOpen ?? 100} 張才開池（未達標結轉，不強制開池）。折價券於線上結帳時自動套用，店家不需人工收券；券發出後規則不可變更。`,
           `Settled every Monday: net revenue × ${Math.round((config?.rewardRate ?? 0.1) * 100)}% becomes the pool; it opens once ${config?.minTicketsToOpen ?? 100} tickets are in.`)}

@@ -39,9 +39,9 @@ export default function VendorPortalOrders() {
 
   return (
     <VendorPortalLayout>
-      <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-1 flex items-center gap-2">
         <ClipboardList className="w-5 h-5 text-orange-500" /> {tr("訂單管理", "Orders")}
-      </h2>
+      </h1>
       <p className="text-sm text-muted-foreground mb-4">
         {tr("消費者預付鎖定的訂單", "Meals customers have prepaid and locked")}{truncated ? tr("（只列最近 500 筆）", " (latest 500 only)") : ""}{tr("。", ".")}
       </p>

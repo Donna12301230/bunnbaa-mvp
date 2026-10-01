@@ -280,23 +280,43 @@ export default function HomePage() {
       <MarketplaceHeader active="plans" />
       <GrowthRewardTicker />
 
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 flex flex-col lg:flex-row gap-6">
-        {/* ── 左側：計畫工具箱 ── */}
-        <aside className="lg:w-72 shrink-0 space-y-4">
-          <h2 className="font-heading text-2xl font-semibold">{t("計畫工具箱", "Planner")}</h2>
-
-          {/* 對話式預購助理（AI）：用一句話找符合條件、還有名額的預購 */}
+      {/* ── 頁首：本頁 h1＋目前選的取餐日時段＋預購助理入口 ── */}
+      <section className="max-w-[1400px] mx-auto px-4 md:px-6 pt-10 md:pt-16 pb-2 flex flex-wrap items-end justify-between gap-6 bb-home-hero">
+        <div className="min-w-0">
+          <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground mb-4">
+            <span className="w-8 h-px bg-current opacity-60" aria-hidden="true" />
+            {t("今日菜單", "Today's menu")}
+          </p>
+          <h1 className="font-heading font-semibold text-[clamp(40px,6vw,84px)] leading-[1.04] tracking-[-0.025em]">
+            {t("今天想吃什麼？", "What's for lunch?")}
+          </h1>
+          <p className="mt-4 text-muted-foreground max-w-xl leading-relaxed">
+            {t(`選好取餐日與時段，越早訂越便宜（最高 ${discountText(Math.max(...VISIBLE_EARLY_BIRD_TIERS.map((x) => x.discountPercent)))}）。`, `Pick a pickup day and time — the earlier you book, the cheaper it gets.`)}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* 目前取餐時段；點了跳到側欄的計畫工具箱改時段（手機上側欄排在菜單後面） */}
+          <a href="#home-planner" onClick={(e) => { e.preventDefault(); document.getElementById("home-planner")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="inline-flex items-center gap-2 h-12 px-5 rounded-full border border-ink bg-card text-sm font-semibold hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Clock className="w-4 h-4 text-primary" aria-hidden="true" />
+            <span className="sr-only">{t("目前取餐時段（點擊修改）：", "Current pickup (tap to change): ")}</span>
+            {pickupDate.slice(5).replace("-", "/")}・{pickupWindow}
+          </a>
           <button
             type="button"
             onClick={() => setAssistantOpen(true)}
-            className="w-full text-left bg-card rounded-2xl border border-ink p-4 flex gap-3 items-center hover:border-primary transition-colors"
+            className="inline-flex items-center gap-2 h-12 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <Bot className="w-8 h-8 text-primary shrink-0" />
-            <span>
-              <span className="block text-sm font-semibold">{t("問問預購助理", "Ask the meal assistant")}</span>
-              <span className="block text-xs text-muted-foreground">{t("「下週一到五中午，預算 120，不吃牛」", "\"Weekday lunches next week, under NT$120, no beef\"")}</span>
-            </span>
+            <Bot className="w-4 h-4" aria-hidden="true" /> {t("問問預購助理", "Ask the meal assistant")}
           </button>
+        </div>
+      </section>
+
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 flex flex-col lg:flex-row gap-8">
+        {/* ── 左側：計畫工具箱（桌機 sticky，太長時自己捲） ── */}
+        <aside id="home-planner" className="order-2 lg:order-1 scroll-mt-20 lg:w-72 shrink-0 space-y-4 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 bb-thin-scroll">
+          <h2 className="font-heading text-2xl font-semibold">{t("計畫工具箱", "Planner")}</h2>
+
+          {/* 預購助理入口移到頁首（原本頁首、側欄各一顆，重複） */}
           <ShoppingAssistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
 
           <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
@@ -407,7 +427,7 @@ export default function HomePage() {
         </aside>
 
         {/* ── 右側：主內容 ── */}
-        <main className="flex-1 min-w-0 space-y-8">
+        <main className="order-1 lg:order-2 flex-1 min-w-0 space-y-12">
           {/* 今日推薦方案（單點型）——改成依商家分組的清單，取代原本一格一張大圖卡片
               （每個品項都要放大圖、徽章、價格，排成一片太雜亂），改成「哪些店家有什麼」：
               一家店一張卡片，底下用一行一行列出品項名稱＋價格＋按鈕。 */}
@@ -415,60 +435,81 @@ export default function HomePage() {
             <div className="flex items-baseline justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2.5">
                 <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground border border-ink">{t("單點型", "Single meal")}</span>
-                <h3 className="font-heading text-2xl font-semibold">{t("今日推薦方案", "Today's picks")}</h3>
+                <h2 className="font-heading text-3xl font-semibold">{t("今日推薦方案", "Today's picks")}</h2>
               </div>
-              <span className="text-sm text-muted-foreground font-semibold">{pickupDate}・{pickupWindow}</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-5">
               {vendorMealGroups.length === 0 && (
-                <p className="text-sm text-muted-foreground md:col-span-2">{t("這段期間沒有開放預購的品項，試著調整左側的預約日曆。", "Nothing is open for pre-order in this range — try adjusting the dates on the left.")}</p>
+                <p className="text-sm text-muted-foreground">{t("這段期間沒有開放預購的品項，試著調整左側的預約日曆。", "Nothing is open for pre-order in this range — try adjusting the dates on the left.")}</p>
               )}
+              {/* 一家店一列：店家資訊＋橫向捲動的品項照片卡（原本每家把所有品項直排，頁面非常長） */}
               {vendorMealGroups.map(({ vendor, items }) => (
-                <article key={vendor.id} className="bg-card rounded-2xl border border-ink p-4">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h4 className="font-heading text-lg font-semibold">{loc(vendor, "name")}</h4>
-                    {vendor.verified && (
-                      <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-ink">
-                        <BadgeCheck className="w-3 h-3" /> {t("認證商家", "Verified")}
-                      </span>
-                    )}
-                    {vendor.reliability_tone === "stable" && (
-                      <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-green-700 border border-ink">
-                        <CheckCircle2 className="w-3 h-3" /> {t("履約穩定", "Stable")}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground font-semibold mb-2">{t("取餐時段：", "Pickup: ")}{pickupDate}（{pickupWindow}）</p>
+                <article key={vendor.id} className="bg-card rounded-3xl border border-ink p-4 md:p-5" aria-label={loc(vendor, "name")}>
+                  <header className="flex items-center gap-3 flex-wrap mb-4">
+                    <span className="w-11 h-11 rounded-full overflow-hidden border border-ink bg-secondary shrink-0 flex items-center justify-center">
+                      {vendor.cover_image
+                        ? <img src={vendor.cover_image} alt="" loading="lazy" className="w-full h-full object-cover" />
+                        : <Store className="w-5 h-5 text-secondary-foreground/70" aria-hidden="true" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-heading text-xl font-semibold">{loc(vendor, "name")}</h3>
+                        {vendor.verified && (
+                          <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-ink">
+                            <BadgeCheck className="w-3 h-3" /> {t("認證商家", "Verified")}
+                          </span>
+                        )}
+                        {vendor.reliability_tone === "stable" && (
+                          <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-green-700 border border-ink">
+                            <CheckCircle2 className="w-3 h-3" /> {t("履約穩定", "Stable")}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{t(`${items.length} 項可預購`, `${items.length} items`)}・{t("取餐", "Pickup")} {pickupDate.slice(5).replace("-", "/")}（{pickupWindow}）</p>
+                    </div>
+                    <Link href={`/vendor/${vendor.id}`} className="text-sm font-semibold underline underline-offset-4 decoration-1 hover:decoration-2 shrink-0">
+                      {t("看店家", "View vendor")}
+                    </Link>
+                  </header>
 
-                  <div className="divide-y divide-border">
+                  <ul className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 bb-thin-scroll bb-fade-x">
                     {items.map((item) => {
                       const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
                       return (
-                        <div key={item.id} className="flex items-center justify-between gap-3 py-2.5">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-lg bg-secondary shrink-0 overflow-hidden flex items-center justify-center">
+                        <li key={item.id} className="shrink-0 w-[172px] md:w-[188px] snap-start">
+                          <button
+                            type="button"
+                            onClick={() => openItem(item, vendor)}
+                            className="group w-full text-left rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          >
+                            <span className="relative block aspect-[4/3] rounded-2xl overflow-hidden border border-ink bg-secondary">
                               {item.image ? (
-                                <img src={item.image} alt="" loading="lazy" className="w-full h-full object-cover" />
+                                <img src={item.image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]" />
                               ) : (
-                                <UtensilsCrossed className="w-4 h-4 text-secondary-foreground/60" strokeWidth={1.75} aria-hidden="true" />
+                                <span className="w-full h-full flex items-center justify-center">
+                                  <UtensilsCrossed className="w-7 h-7 text-secondary-foreground/50" strokeWidth={1.5} aria-hidden="true" />
+                                </span>
                               )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{loc(item, "name")}</p>
-                              <div>
-                                {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through mr-1.5">${item.price}</span>}
-                                <span className="font-heading text-lg font-semibold">${lockedPrice}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <Button size="sm" variant="outline" onClick={() => openItem(item, vendor)}>
-                            {isBento(item) ? t("選配菜", "Choose sides") : t("立即預付", "Prepay")}
-                          </Button>
-                        </div>
+                              {discountPercent > 0 && (
+                                <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-[#f29e0c] text-[#2b180d]">
+                                  {discountText(discountPercent)}
+                                </span>
+                              )}
+                            </span>
+                            <span className="block mt-2.5 text-sm font-semibold truncate">{loc(item, "name")}</span>
+                            <span className="flex items-baseline gap-1.5">
+                              {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through">${item.price}</span>}
+                              <span className="font-heading text-lg font-semibold">${lockedPrice}</span>
+                              <span className="ml-auto text-xs font-semibold text-primary underline underline-offset-4 decoration-1 group-hover:decoration-2">
+                                {isBento(item) ? t("選配菜", "Choose sides") : t("立即預付", "Prepay")}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
                       );
                     })}
-                  </div>
+                  </ul>
                 </article>
               ))}
             </div>
@@ -541,7 +582,7 @@ export default function HomePage() {
 
           {/* 合作店家與計畫 */}
           <section>
-            <h3 className="font-heading text-2xl font-semibold mb-3">{t("合作店家與計畫", "Vendors & meal plans")}</h3>
+            <h2 className="font-heading text-3xl font-semibold mb-4">{t("合作店家與計畫", "Vendors & meal plans")}</h2>
             <div className="space-y-4">
               {visiblePlanGroups.length === 0 && (
                 <p className="text-sm text-muted-foreground">{t("這段期間沒有開放取餐的合作店家計畫。", "No vendor plans have pickups in this range.")}</p>
@@ -595,13 +636,13 @@ export default function HomePage() {
           </section>
 
           {/* 同學轉讓保底專區（含轉讓優惠橫捲清單，併成同一區塊放最下面）；底色跟轉讓市集橫幅一樣用 logo「飯」字色 */}
-          <section className="rounded-3xl p-6 md:p-8 bg-rice text-rice-foreground space-y-5">
+          <section className="rounded-[2rem] p-6 md:p-10 bg-[var(--surface-inverse)] text-[var(--text-on-inverse)] space-y-6">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div className="flex items-center gap-3.5">
                 <Repeat className="w-7 h-7 shrink-0" />
                 <div>
-                  <h3 className="font-heading text-2xl font-semibold mb-1">{t("同學轉讓保底專區", "Classmate transfers")}</h3>
-                  <p className="text-sm max-w-xl">
+                  <h2 className="font-heading text-3xl font-semibold mb-1">{t("同學轉讓保底專區", "Classmate transfers")}</h2>
+                  <p className="text-sm max-w-xl opacity-90">
                     {t("臨時去不了？截單後也能安全轉讓給同學；逾時沒人接手會開放 $0 元領取，或直接捐為愛心餐，不浪費一份便當。", "Can't make it? Transfer your meal to a classmate, even after cutoff. Unclaimed transfers open for $0, or donate it as a charity meal — no meal wasted.")}
                   </p>
                 </div>
@@ -614,9 +655,9 @@ export default function HomePage() {
               </Link>
             </div>
 
-            <div className="flex gap-3 overflow-x-auto pb-1">
+            <div className="flex gap-3 overflow-x-auto pb-1 bb-thin-scroll rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe1a1]" tabIndex={0} role="region" aria-label={t("同學轉讓清單（可左右捲動）", "Classmate transfers (scrolls sideways)")}>
               {visibleTransfers.length === 0 && (
-                <p className="text-sm text-muted-foreground">{t("這段期間目前沒有同學轉讓的餐點。", "No transfers in this range right now.")}</p>
+                <p className="text-sm opacity-80">{t("這段期間目前沒有同學轉讓的餐點。", "No transfers in this range right now.")}</p>
               )}
               {visibleTransfers.map(tr_ => (
                 <div key={tr_.id} className="shrink-0 w-64 bg-card text-foreground rounded-2xl p-3 border border-ink">

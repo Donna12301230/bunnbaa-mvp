@@ -180,7 +180,7 @@ function LocksContent() {
 export default function AdminLocksPage() {
   return (
     <AdminLayout>
-      <h2 className="text-lg font-bold mb-3">{tr("訂單總覽", "All orders")}</h2>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("訂單總覽", "All orders")}</h1>
       <RequireRealAdmin>
         <LocksContent />
       </RequireRealAdmin>

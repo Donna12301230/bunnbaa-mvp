@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
   Search, Globe, User, ChevronDown, ClipboardList, Repeat,
@@ -82,7 +82,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-card border-b border-border">
+    <header className="sticky top-0 z-40 bg-card/90 backdrop-blur-xl backdrop-saturate-150 border-b border-border">
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 h-16 flex items-center gap-3 md:gap-6">
         <Button
           variant="ghost"
@@ -94,15 +94,10 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           <Menu />
         </Button>
 
-        <img
-          src="/飯飽wordR.png"
-          alt={t("首頁", "Home")}
-          role="button"
-          tabIndex={0}
-          className="h-8 shrink-0 cursor-pointer"
-          onClick={() => navigate("/landing")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") navigate("/landing"); }}
-        />
+        {/* 真正的連結（原本是 img role=button）：可中鍵開新分頁、螢幕閱讀器讀成連結 */}
+        <Link href="/landing" className="shrink-0 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <img src="/飯飽wordR.png" alt={t("飯飽 BunnBaa 首頁", "BunnBaa home")} className="h-8" />
+        </Link>
 
         <nav className="hidden md:flex items-center gap-6 shrink-0">
           {navItems.map(({ tab, href, label, icon: Icon }) => (
@@ -169,8 +164,10 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           </Button>
 
           {!user ? (
-            <Button size="sm"  onClick={() => navigate("/login")}>
-              {t("登入 / 註冊", "Sign in / Sign up")}
+            <Button size="sm" className="shrink-0 whitespace-nowrap" onClick={() => navigate("/login")}>
+              {/* 窄螢幕英文「Sign in / Sign up」會被切掉，只留「Sign in」 */}
+              <span className="sm:hidden">{t("登入", "Sign in")}</span>
+              <span className="hidden sm:inline">{t("登入 / 註冊", "Sign in / Sign up")}</span>
             </Button>
           ) : (
             <DropdownMenu>

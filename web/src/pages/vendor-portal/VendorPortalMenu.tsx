@@ -243,7 +243,7 @@ export default function VendorPortalMenu() {
     <VendorPortalLayout>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-xl font-bold">{tr("菜單管理", "Menu")}</h2>
+          <h1 className="font-heading text-3xl md:text-4xl font-semibold">{tr("菜單管理", "Menu")}</h1>
           <p className="text-xs text-muted-foreground">{tr("主菜、配菜格與候選菜；配方在", "Mains, side slots and candidates; recipes live in")} <Link href="/vendor-portal/recipes" className="text-primary underline">{tr("配方與原物料", "Recipes")}</Link></p>
         </div>
         <div className="flex gap-2">
@@ -310,23 +310,23 @@ export default function VendorPortalMenu() {
       ) : (() => {
         const categories = Array.from(new Set(items.map(i => i.category)));
         return (
-          <div className="space-y-5">
+          <div className="space-y-10">
             {categories.map(cat => (
               <div key={cat}>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{cat}</p>
-                <div className="space-y-2">
+                <h2 className="font-heading text-2xl font-semibold mb-3">{cat}</h2>
+                <div className="grid gap-4 xl:grid-cols-2">
                   {items.filter(i => i.category === cat).map(item => (
                     <Card key={item.id}>
-                      <CardContent className="p-3 flex items-center gap-3">
-                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-orange-50 shrink-0 flex items-center justify-center">
+                      <CardContent className="p-4 md:p-5 flex items-center gap-4">
+                        <div className="w-20 h-20 rounded-2xl overflow-hidden border border-ink bg-secondary shrink-0 flex items-center justify-center">
                           {item.image
                             ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                            : <UtensilsCrossed className="w-6 h-6 text-orange-200" />
+                            : <UtensilsCrossed className="w-6 h-6 text-secondary-foreground/50" aria-hidden="true" />
                           }
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium">{item.name}</span>
+                            <span className="font-heading text-lg font-semibold">{item.name}</span>
                             {!item.is_available && <Badge variant="secondary" className="text-xs">{tr("已下架", "Unavailable")}</Badge>}
                             {item.dietary_tags?.map(t => (
                               <Badge key={t} variant="outline" className="text-xs text-green-700 border-green-200">{tr(t, tagEn(t))}</Badge>

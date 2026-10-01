@@ -188,7 +188,7 @@ export default function VendorPortalRecipes() {
   return (
     <VendorPortalLayout>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-        <h2 className="text-xl font-bold flex items-center gap-2"><BookOpen className="w-5 h-5 text-orange-500" /> {tr("配方與原物料", "Recipes & ingredients")}</h2>
+        <h1 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-2"><BookOpen className="w-5 h-5 text-orange-500" /> {tr("配方與原物料", "Recipes & ingredients")}</h1>
         <Button variant="outline" onClick={() => setTemplateOpen(true)}><Wand2 /> {tr("從定式模板開店", "Start from a template")}</Button>
       </div>
       <p className="text-sm text-muted-foreground mb-4">{tr("品項 → 半成品 → 原物料。配方算出每日備料、叫貨量、成本與候選菜份量級距。", "Items → prepared components → raw ingredients. Recipes drive prep counts, purchasing, cost and portion levels.")}</p>

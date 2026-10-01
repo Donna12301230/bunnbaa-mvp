@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/firebase";
 import { avatarUrl } from "@/lib/avatar";
 import { slotLabel } from "@/lib/pickupSlots";
+import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { cn } from "@/lib/utils";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
@@ -162,7 +163,7 @@ function OrdersPanel({ uid }: { uid: string }) {
   const labels = orderStatusLabel();
 
   return (
-    <section className="bg-white rounded-xl border border-border overflow-hidden">
+    <section className="bg-card rounded-[1.75rem] border border-ink overflow-hidden">
       <div className="p-4 border-b border-border flex items-center justify-between gap-2">
         <h2 className="font-semibold">{tr("我的訂單", "My orders")}</h2>
         <Button asChild size="sm" variant="outline"><Link href="/my-bookings">{tr("查看完整我的餐點", "See full order history")}</Link></Button>
@@ -211,14 +212,14 @@ function OrdersPanel({ uid }: { uid: string }) {
 
 function AccountPanel({ user }: { user: UserProfile }) {
   return (
-    <section className="bg-white rounded-xl border border-border p-5">
-      <div className="flex items-center gap-4 mb-5">
-        <div className="w-14 h-14 rounded-full bg-orange-100 shrink-0 overflow-hidden">
+    <section className="bg-card rounded-[1.75rem] border border-ink p-6 md:p-8">
+      <div className="flex items-center gap-5 mb-6">
+        <div className="w-20 h-20 rounded-full bg-secondary border border-ink shrink-0 overflow-hidden">
           <img src={avatarUrl(user.id)} alt="" className="w-full h-full" />
         </div>
         <div>
-          <p className="font-semibold text-lg">{user.displayName || user.username}</p>
-          <span className="inline-block mt-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+          <p className="font-heading text-2xl font-semibold">{user.displayName || user.username}</p>
+          <span className="inline-block mt-1 text-xs font-semibold bg-secondary text-secondary-foreground border border-ink px-2.5 py-0.5 rounded-full">
             {roleLabel(user.role)}
           </span>
         </div>
@@ -249,8 +250,8 @@ function SidebarButton({ active, icon, label, onClick }: { active: boolean; icon
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors",
-        active ? "bg-orange-50 text-orange-700" : "text-muted-foreground hover:bg-gray-50 hover:text-foreground"
+        "w-full flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm font-medium text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        active ? "bg-secondary text-secondary-foreground shadow-[inset_0_0_0_1px_var(--border-ink)]" : "text-muted-foreground hover:bg-accent hover:text-foreground"
       )}
     >
       {icon} {label}
@@ -280,23 +281,21 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-40 bg-white border-b border-border">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-          <img src="/飯飽wordR.png" alt="飯飽BunnBaa" className="h-8" />
-          <button
-            onClick={() => navigate("/home")}
-            className="flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" /> {tr("回首頁", "Home")}
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background">
+      <MarketplaceHeader />
+      <section className="max-w-[1400px] mx-auto px-4 md:px-6 pt-10 md:pt-16">
+        <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground mb-4">
+          <span className="w-8 h-px bg-current opacity-60" aria-hidden="true" />{tr("會員專區", "Member area")}
+        </p>
+        <h1 className="font-heading font-semibold text-[clamp(40px,6vw,84px)] leading-[1.04] tracking-[-0.025em]">
+          {user ? tr(`嗨，${user.displayName || user.username}`, `Hi, ${user.displayName || user.username}`) : tr("會員中心", "My account")}
+        </h1>
+      </section>
 
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 flex flex-col md:flex-row gap-6">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-10 flex flex-col md:flex-row gap-8">
         {/* ── 左側：會員專區導覽 ── */}
         <aside className="md:w-56 shrink-0">
-          <div className="bg-white rounded-xl border border-border p-3 space-y-1 md:sticky md:top-20">
+          <nav aria-label={tr("會員專區", "Member area")} className="bg-card rounded-[1.5rem] border border-ink p-3 space-y-1 md:sticky md:top-24">
             <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tr("會員專區", "Member area")}</p>
             <SidebarButton active={tab === "account"} icon={<User className="w-4 h-4" />} label={tr("帳號資訊", "Account")} onClick={() => setTab("account")} />
             <SidebarButton active={tab === "orders"} icon={<ClipboardList className="w-4 h-4" />} label={tr("我的訂單", "My orders")} onClick={() => setTab("orders")} />
@@ -306,14 +305,14 @@ export default function ProfilePage() {
 
             <button
               onClick={() => navigate("/rewards")}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left text-muted-foreground hover:bg-gray-50 hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm font-medium text-left text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             >
               <History className="w-4 h-4" /> {tr("抽獎券與折價券", "Tickets & coupons")}
             </button>
             {user?.role === "customer" && (
               <button
                 onClick={() => comingSoon(tr("申請成為廠商", "Vendor applications"))}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left text-muted-foreground hover:bg-gray-50 hover:text-foreground transition-colors"
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm font-medium text-left text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               >
                 <Store className="w-4 h-4" /> {tr("申請成為廠商", "Become a vendor")}
               </button>
@@ -324,11 +323,11 @@ export default function ProfilePage() {
             <button
               onClick={() => logoutMutation.mutate()}
               disabled={logoutMutation.isPending}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left text-red-600 hover:bg-red-50 transition-colors"
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm font-medium text-left text-red-700 hover:bg-red-50 transition-colors"
             >
               <LogOut className="w-4 h-4" /> {tr("登出", "Sign out")}
             </button>
-          </div>
+          </nav>
         </aside>
 
         {/* ── 右側：內容 ── */}
