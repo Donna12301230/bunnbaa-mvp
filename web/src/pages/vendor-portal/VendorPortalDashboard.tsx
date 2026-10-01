@@ -88,45 +88,45 @@ export default function VendorPortalDashboard() {
       {isLoading ? (
         <SkeletonBlocks count={4} height={96} className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" />
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Card className="bg-accent">
             <CardHeader className="pb-1">
-              <CardTitle className="text-xs text-muted-foreground flex items-center gap-1">
-                <ClipboardList className="w-3.5 h-3.5" /> {tr("今日待取餐", "Awaiting pickup today")}
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                <ClipboardList className="w-4 h-4" /> {tr("今日待取餐", "Awaiting pickup today")}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{todayPending}</div>
+              <div className="font-heading text-5xl md:text-6xl font-semibold leading-none tracking-tight">{todayPending}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-1">
-              <CardTitle className="text-xs text-muted-foreground flex items-center gap-1">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" /> {tr("今日已取餐", "Picked up today")}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{todayDone}</div>
+              <div className="font-heading text-5xl md:text-6xl font-semibold leading-none tracking-tight">{todayDone}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-1">
-              <CardTitle className="text-xs text-muted-foreground flex items-center gap-1">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5" /> {tr("近期訂單數", "Recent orders")}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{locks.length}{locks.length >= 200 ? "+" : ""}</div>
+              <div className="font-heading text-5xl md:text-6xl font-semibold leading-none tracking-tight">{locks.length}{locks.length >= 200 ? "+" : ""}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-1">
-              <CardTitle className="text-xs text-muted-foreground flex items-center gap-1">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
                 <UtensilsCrossed className="w-3.5 h-3.5" /> {tr("菜單項目", "Menu items")}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{menuCount}</div>
+              <div className="font-heading text-5xl md:text-6xl font-semibold leading-none tracking-tight">{menuCount}</div>
             </CardContent>
           </Card>
         </div>
