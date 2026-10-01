@@ -79,7 +79,8 @@ Sep 29, 2026 · @Tom（Sep 30, 2026 修訂：對齊實作——保留鎖定早�
 | 愛心餐預約到場時限 | 預約後 10 分鐘 | 否 |
 | 愛心餐未領處理 | 釋出給下一位，不停權 | 否 |
 | 平台維護費 | 每月 NT$ 1,999（含稅），首月免費，不抽成 | 否 |
-| 人工時薪預設 | 基本工資時薪（上線前依勞動部公告確認） | 可調 |
+| 人工時薪 | 預設為當期基本工資時薪，由系統自動更新 | 只能調高，不得低於基本工資 |
+| 員工月薪 | 不得低於當期基本工資月薪 | 只能調高 |
 
 ## 3. 菜單、模板與配方
 
@@ -452,10 +453,10 @@ Sep 29, 2026 · @Tom（Sep 30, 2026 修訂：對齊實作——保留鎖定早�
 | 本月營收（已確定） | 本月取餐日、已付款訂單的實付金額合計（已扣早鳥折扣與折價券） |
 | 本月營收（預估） | 已確定 + 尚未下單日期的預測份數 × 近 4 週平均實付 |
 | 本月預計材料成本 | Σ（每份原物料用量 × 份數 × 最新單價），份數含已確定與預測，另加包材；與週叫貨單、每日備料用同一套配方計算 |
-| 備料人工 | 每日流程時間軸（第 5.4 節）的工時 × 時薪，依份數自動增減；時薪預設基本工資，店家可改 |
+| 備料人工 | 每日流程時間軸（第 5.4 節）的工時 × 時薪，依份數自動增減；時薪預設基本工資，店家只能調高 |
 | LINE Pay 手續費 | 實付金額 × 店家合約費率（店家設定，約 2–3%） |
 | 平台維護費 | 每月 NT$ 1,999（含稅；首月免費期間為 0） |
-| 員工固定薪資（選填） | 正職員工月薪，不論賣多少都要付 |
+| 員工固定薪資（選填） | 正職員工月薪，不論賣多少都要付；每人不得低於基本工資月薪 |
 | 其他固定成本（選填） | 房租、水電等；未填則不扣 |
 | **預估淨利** | 預估營收 − 材料成本（含包材）− 備料人工 − LINE Pay 手續費 − 平台維護費 − 員工固定薪資 − 其他固定成本 |
 | 老闆實際時薪 | 預估淨利 ÷ 老闆本月工時（店家自填每天工時）；老闆自己的時間不列入成本，改用這個數字呈現 |
@@ -464,6 +465,11 @@ Sep 29, 2026 · @Tom（Sep 30, 2026 修訂：對齊實作——保留鎖定早�
 - 同卡片顯示「本月預計備料清單」前 10 項（原物料、計量單位數量、預估金額），點開看完整清單，資料來源同第 5 節。
 - **每份毛利**：每個品項顯示「8 折後售價 − 單份材料成本」；若 8 折後毛利低於材料成本的 30%（或為負），標紅提醒店家調整原價或份量。
 - **損益兩平**：顯示「本月還要賣幾份才打平維護費、員工薪資與其他固定成本」，讓小店一眼知道目標。
+- **基本工資自動更新**：
+  - 平台在 `platformConfig/minimumWage` 存放基本工資（月薪、時薪、生效日），並保留歷史；資料以勞動部公告為準，由排程自動抓取政府公開資料更新，抓取失敗時通知平台管理者手動補登。
+  - 新的基本工資於公告的生效日（通常為 1 月 1 日）自動套用；店家設定的時薪或月薪低於新標準時，系統自動調到基本工資並通知店家「基本工資已調整，人工成本已自動更新」。
+  - 店家輸入時薪或月薪時，前台與後端都會檢查，低於基本工資即擋下並顯示「不得低於基本工資 NT$ X」。
+  - 計算某一天的人工成本時，使用該日當時生效的基本工資。
 - **依餐期拆分**：營收、材料與人工可依早／中／晚切換，看出哪個餐期最賺。
 - 預估數字標註「依預測計算，僅供參考」，月底以實際數字結算並保留歷史月份。
 
@@ -512,6 +518,7 @@ Sep 29, 2026 · @Tom（Sep 30, 2026 修訂：對齊實作——保留鎖定早�
 
 ```
 platformConfig/global            // 第 2 節全域參數
+platformConfig/minimumWage       // monthly, hourly, effectiveFrom, source, history[]（排程自動更新）
 platformConfig/growthReward      // rate, ticketUnit, tiers[], minTicketsToOpen ...
 dishLibrary/{dishId}             // 平台標準菜名、別名、類別、標籤
 templates/{templateId}           // 定式菜單模板
@@ -527,7 +534,7 @@ vendors/{vendorId}
   /prepPlans/{date}              // 每日半成品、時間軸、標籤清單
   /rewardPeriods/{periodId}      // status, netRevenue, carried, pool, tickets, allocation, remaining
   /revenueForecast/{month}       // confirmedRevenue, forecastRevenue, materialCost, laborCost, paymentFee, maintenanceFee, staffSalary, fixedCost, netProfit, ownerHourly, breakEvenQty, byMealPeriod{}, topIngredients[], itemMargins[]
-  fixedCosts, staffSalary, hourlyWage, ownerHoursPerDay, linePayFeeRate   // 店家自填（選填）
+  fixedCosts, staffSalary, hourlyWage, ownerHoursPerDay, linePayFeeRate   // 店家自填（選填）；hourlyWage／staffSalary 由後端驗證不得低於基本工資
   billing{ firstListedAt, freeUntil, nextDueAt, status: active | grace | suspended }   // 維護費計費
 
 pickupPoints/{pointId}           // type: counter | locker, vendorId, geohash, lockerConfig
@@ -580,6 +587,7 @@ disasterEvents/{eventId}         // type, counties, dates, source
 | `closeRewardPeriod` | 週一 00:10 | 判斷開池、執行分配演算法 |
 | `drawTicket` | Callable | Transaction 內不放回抽樣 |
 | `expireCoupons` / `closeDrawWindow` / `couponReminders` | 每日 | 過期、未抽作廢、到期提醒 |
+| `syncMinimumWage` | 每日 | 抓取勞動部基本工資公告，於生效日更新 `minimumWage`，並把低於新標準的店家時薪／月薪調高、通知店家 |
 | `billingCycle` | 每日 | 維護費到期扣款、寬限提醒、逾期暫停接單與恢復、開立電子發票 |
 | `buildRevenueForecast` | 每日 21:00（截單後） | 計算本月已確定／預估營收、預計材料成本、預估淨利（含人工與手續費）、老闆時薪、每份毛利與損益兩平份數，寫入 `revenueForecast` |
 | `pollDisasterFeeds` | 每 15 分 | 颱風警報與停班停課，觸發預警或取消退款 |
@@ -649,7 +657,9 @@ disasterEvents/{eventId}         // type, counties, dates, source
 - [ ] **開池門檻**：暫定 100 張抽獎券，營業額極低的店家可能長期不開池，上線後觀察。
 - [x] **平台收費**：第一階段不抽成，每月維護費 NT$ 1,999 含稅，首月（上架起 30 天）免費。
 - [ ] **繳費與逾期**：暫定信用卡定期扣款或銀行轉帳；逾期寬限 7 天後暫停接新訂單。
-- [ ] **人工成本**：暫定備料人工依流程時間軸工時 × 時薪自動計算，老闆工時不列成本、改顯示老闆實際時薪；基本工資數字上線前確認。
+- [x] **基本工資**：系統自動更新，店家時薪／月薪不得低於基本工資，只能調高。
+- [ ] **基本工資資料來源**：勞動部公告是否有可穩定抓取的開放資料格式，開發時確認；無法自動抓取時由平台管理者於公告後手動更新。
+- [ ] **人工成本**：暫定備料人工依流程時間軸工時 × 時薪自動計算，老闆工時不列成本、改顯示老闆實際時薪。
 - [ ] **愛心餐現場領取**：每人一份由店家判斷，是否需要登記（例如手寫份數）待確認。
 - [ ] **颱風資料來源**：中央氣象署與人事行政總處公開資料的格式、更新頻率待開發時確認。
 - [ ] **週菜單變更**：暫定週六 12:00 後不可變更下週主菜，只能等值替換配菜。
