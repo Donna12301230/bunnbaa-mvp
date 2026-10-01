@@ -34,6 +34,7 @@ export default function SiteFooter() {
           <span className="site-footer__logo">
             <span className="site-footer__logo-bunn">Bunn</span><span className="site-footer__logo-baa">Baa</span>
           </span>
+          <p className="site-footer__tagline">{t("越早訂，越開心。", "Book early, eat happy.")}</p>
           <p className="site-footer__muted">{t("赫滋與羊國際藝術有限公司", "Herz & Baa International Arts Co., Ltd.")}</p>
           <a href={`mailto:${PLATFORM_CONTACT_EMAIL}`} className="site-footer__muted site-footer__email">{PLATFORM_CONTACT_EMAIL}</a>
         </div>
@@ -50,7 +51,14 @@ export default function SiteFooter() {
       </div>
       <div className="site-footer__bottom">
         <p className="site-footer__caption">© {new Date().getFullYear()} {t("BunnBaa 飯飽・越早訂，越開心。", "BunnBaa · Book early, eat happy.")}</p>
+        <a href="#top" className="site-footer__top" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }}>
+          {t("回到頂端", "Back to top")} <span aria-hidden="true">↑</span>
+        </a>
       </div>
+      {/* 大字標誌：純裝飾 */}
+      <p className="site-footer__wordmark" aria-hidden="true">
+        <span className="site-footer__logo-bunn">Bunn</span><span className="site-footer__logo-baa">Baa</span>
+      </p>
     </footer>
   );
 }
