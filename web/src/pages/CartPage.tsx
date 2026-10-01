@@ -92,11 +92,18 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <MarketplaceHeader />
-      <div className="max-w-2xl mx-auto px-4 md:px-6 py-6 space-y-4">
-        <h1 className="text-2xl font-bold">{tr("購物車", "Cart")}</h1>
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 pt-10 md:pt-16 pb-16 space-y-8">
+        <div>
+          <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground mb-4">
+            <span className="w-8 h-px bg-current opacity-60" aria-hidden="true" />{tr("結帳", "Checkout")}
+          </p>
+          <h1 className="font-heading font-semibold text-[clamp(40px,6vw,84px)] leading-[1.04] tracking-[-0.025em]">
+            {tr("購物車", "Cart")}{lines.length > 0 && <span className="ml-3 align-top text-[0.4em] text-muted-foreground font-normal">{lines.reduce((n, l) => n + l.quantity, 0)}</span>}
+          </h1>
+        </div>
 
         {lines.length === 0 ? (
-          <div className="bg-white rounded-xl border border-border shadow-sm">
+          <div className="bg-card rounded-[2rem] border border-ink">
             <EmptyState
               icon={<ShoppingCart size={32} />}
               title={tr("購物車還是空的", "Your cart is empty")}
@@ -105,7 +112,9 @@ export default function CartPage() {
             />
           </div>
         ) : (
-          <>
+          /* 桌機兩欄：左邊餐點，右邊訂單明細（sticky） */
+          <div className="grid gap-8 lg:grid-cols-[1fr_420px] items-start">
+          <div className="space-y-4">
             {vendor && (
               <p className="text-sm text-muted-foreground">
                 {tr("來自 ", "From ")}<span className="font-semibold text-foreground">{loc(vendor, "name")}</span>
@@ -113,18 +122,18 @@ export default function CartPage() {
               </p>
             )}
 
-            <div className="bg-white rounded-xl border border-border divide-y divide-border">
+            <div className="bg-card rounded-[2rem] border border-ink divide-y divide-border overflow-hidden">
               {priced.map(({ line, unit, couponDiscount, problem }) => (
-                <div key={line.key} className="p-4 flex items-start gap-3">
+                <div key={line.key} className="p-5 md:p-6 flex items-start gap-4">
                   {line.menuItem.image ? (
-                    <img src={line.menuItem.image} alt="" className="w-14 h-14 shrink-0 rounded-lg object-cover" />
+                    <img src={line.menuItem.image} alt="" className="w-20 h-20 md:w-24 md:h-24 shrink-0 rounded-2xl border border-ink object-cover" />
                   ) : (
-                    <div className="w-14 h-14 shrink-0 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
-                      <UtensilsCrossed className="h-6 w-6 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                    <div className="w-20 h-20 md:w-24 md:h-24 shrink-0 rounded-2xl border border-ink bg-secondary flex items-center justify-center">
+                      <UtensilsCrossed className="h-6 w-6 text-secondary-foreground/50" strokeWidth={1.5} aria-hidden="true" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0 space-y-1">
-                    <p className="font-semibold text-sm">{loc(line.menuItem, "name")}</p>
+                    <p className="font-heading text-lg font-semibold">{loc(line.menuItem, "name")}</p>
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <CalendarDays className="w-3.5 h-3.5" /> {line.pickupDate}・{slotLabel(line.pickupWindow)}
                       {unit.discountPercent > 0 && <span className="text-green-700">・{tr("早鳥", "Early bird")} {discountText(unit.discountPercent)}</span>}
@@ -141,13 +150,13 @@ export default function CartPage() {
                     )}
                     {riceLabel(line.rice) && <p className="text-xs text-muted-foreground">{riceLabel(line.rice)}</p>}
                     {line.note && <p className="text-xs text-muted-foreground">{tr("備註：", "Note: ")}{line.note}</p>}
-                    <p className="text-sm font-bold text-orange-600">
+                    <p className="font-heading text-lg font-semibold">
                       NT${unit.subtotal}{line.quantity > 1 && ` × ${line.quantity}`}
                       {couponDiscount > 0 && <span className="ml-1.5 text-xs text-green-700">{tr(`折價券 −${couponDiscount}`, `coupon −${couponDiscount}`)}</span>}
                     </p>
                     {vendorCoupons.length > 0 && (
                       <label className="flex items-center gap-1.5 text-xs">
-                        <Ticket className="w-3.5 h-3.5 text-orange-500" />
+                        <Ticket className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
                         <select
                           className="h-8 rounded-md border border-input bg-background px-1.5 text-xs"
                           value={line.couponId ?? ""}
@@ -167,13 +176,13 @@ export default function CartPage() {
                     {problem && <p className="text-xs text-red-600">{problem}{tr("，請移除後重新選擇日期。", " — remove it and pick another date.")}</p>}
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-red-50 hover:text-red-600" onClick={() => remove(line.key)} aria-label={tr("移除", "Remove")}>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:bg-red-50 hover:text-red-700" onClick={() => remove(line.key)} aria-label={tr(`移除 ${loc(line.menuItem, "name")}`, `Remove ${loc(line.menuItem, "name")}`)}>
                       <Trash2 />
                     </Button>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => update(line.key, { quantity: line.quantity - 1 })} aria-label={tr("減少數量", "Decrease quantity")}><Minus /></Button>
+                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => update(line.key, { quantity: line.quantity - 1 })} aria-label={tr("減少數量", "Decrease quantity")}><Minus /></Button>
                       <span className="w-5 text-center text-sm font-medium">{line.quantity}</span>
-                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => update(line.key, { quantity: line.quantity + 1 })} aria-label={tr("增加數量", "Increase quantity")}><Plus /></Button>
+                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => update(line.key, { quantity: line.quantity + 1 })} aria-label={tr("增加數量", "Increase quantity")}><Plus /></Button>
                     </div>
                   </div>
                 </div>
@@ -191,8 +200,10 @@ export default function CartPage() {
               {tr("清空購物車", "Clear cart")}
             </Button>
 
-            <div className="bg-white rounded-xl border border-border p-4 space-y-3">
-              <h2 className="text-sm font-semibold">{tr("訂單明細", "Order summary")}</h2>
+          </div>
+
+            <div className="lg:sticky lg:top-24 bg-accent rounded-[2rem] border border-ink p-6 md:p-7 space-y-4">
+              <h2 className="font-heading text-2xl font-semibold">{tr("訂單明細", "Order summary")}</h2>
               <dl className="text-sm space-y-1.5">
                 {vendor?.address && (
                   <div className="flex justify-between gap-3">
@@ -205,11 +216,11 @@ export default function CartPage() {
                 {adjustTotal !== 0 && <div className="flex justify-between gap-3"><dt className="text-muted-foreground">{tr("加減飯菜", "Adjustments")}</dt><dd>{adjustTotal > 0 ? "+" : "−"}NT${Math.abs(adjustTotal)}</dd></div>}
                 {couponTotal > 0 && <div className="flex justify-between gap-3 text-green-700"><dt>{tr("折價券", "Coupons")}</dt><dd>−NT${couponTotal}</dd></div>}
               </dl>
-              <div className="flex items-center justify-between text-base font-bold pt-2 border-t border-border">
+              <div className="flex items-baseline justify-between font-bold pt-3 border-t border-ink/30">
                 <span>{tr("實付", "Total")}</span>
-                <span className="text-orange-600">NT${grandTotal}</span>
+                <span className="font-heading text-4xl">NT${grandTotal}</span>
               </div>
-              <label className="flex items-start gap-1.5 p-2 rounded-lg bg-muted border border-border cursor-pointer">
+              <label className="flex items-start gap-2 p-3 rounded-2xl bg-card border border-border cursor-pointer">
                 <Checkbox checked={ack} onCheckedChange={() => setAck((v) => !v)} className="mt-0.5 shrink-0" />
                 <span className="text-caption leading-relaxed text-muted-foreground">
                   {tr(
@@ -219,11 +230,11 @@ export default function CartPage() {
                 </span>
               </label>
               {blocked && <p className="text-xs text-red-600">{tr("有餐點已過截單或不能預訂，請先移除。", "Some meals are past cutoff — please remove them first.")}</p>}
-              <Button className="w-full" onClick={handleCheckout} disabled={checkingOut || !ack || !!blocked}>
+              <Button className="w-full h-13 min-h-[52px] rounded-full text-base" onClick={handleCheckout} disabled={checkingOut || !ack || !!blocked}>
                 {checkingOut ? tr("處理中…", "Working…") : grandTotal === 0 ? tr("折價券全額折抵，送出預購", "Covered by coupons — place order") : tr("送出預購並以 LINE Pay 付款", "Place order & pay with LINE Pay")}
               </Button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

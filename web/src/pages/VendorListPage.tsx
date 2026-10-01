@@ -1,7 +1,7 @@
 import { tr, loc } from "@/lib/i18n";
 import { useState } from "react";
 import { Link } from "wouter";
-import { MapPin, Phone, Store } from "lucide-react";
+import { ArrowUpRight, MapPin, Phone, Store } from "lucide-react";
 import { isClean } from "@/lib/searchFilter";
 import type { Vendor } from "@/types";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
@@ -51,36 +51,42 @@ export default function VendorListPage() {
             description={search || area ? tr("換個關鍵字或地區試試看。", "Try a different keyword or area.") : tr("新商家上架後會出現在這裡。", "New vendors will show up here.")}
           />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
             {filtered.map((vendor) => (
               <Link
                 key={vendor.id}
                 href={`/vendor/${vendor.id}`}
-                className="block bg-white rounded-xl border border-border p-4 shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                className="group block rounded-[1.75rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
               >
-                {vendor.cover_image ? (
-                  <img src={vendor.cover_image} alt="" className="w-full h-28 rounded-lg object-cover mb-3" />
-                ) : (
-                  <div className="w-full h-28 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center mb-3">
-                    <Store className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                <div className="relative aspect-[4/3] rounded-[1.75rem] overflow-hidden border border-ink bg-secondary">
+                  {vendor.cover_image ? (
+                    <img src={vendor.cover_image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.05] motion-reduce:transition-none" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Store className="h-12 w-12 text-secondary-foreground/60" strokeWidth={1.25} aria-hidden="true" />
+                    </div>
+                  )}
+                  {vendor.verified && (
+                    <span className="absolute top-3 left-3 text-caption font-bold px-2.5 py-1 rounded-full bg-card/95 border border-ink">{tr("認證商家", "Verified")}</span>
+                  )}
+                </div>
+                <div className="flex items-start gap-3 mt-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-heading text-xl font-semibold truncate">{loc(vendor, "name")}</h3>
+                    {vendor.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">{loc(vendor, "description")}</p>
+                    )}
+                    {vendor.address && (
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1.5">
+                        <MapPin className="w-3 h-3 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{vendor.address}</span>
+                      </p>
+                    )}
                   </div>
-                )}
-                <h3 className="font-semibold mb-1 truncate">{loc(vendor, "name")}</h3>
-                {vendor.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{loc(vendor, "description")}</p>
-                )}
-                {vendor.address && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <MapPin className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{vendor.address}</span>
-                  </div>
-                )}
-                {vendor.phone && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Phone className="w-3 h-3 shrink-0" />
-                    <span>{vendor.phone}</span>
-                  </div>
-                )}
+                  <span className="shrink-0 w-11 h-11 rounded-full border border-ink flex items-center justify-center transition-[background-color,transform] duration-500 group-hover:bg-secondary group-hover:rotate-45" aria-hidden="true">
+                    <ArrowUpRight className="w-5 h-5" />
+                  </span>
+                </div>
               </Link>
             ))}
           </div>

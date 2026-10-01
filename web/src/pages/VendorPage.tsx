@@ -114,68 +114,76 @@ export default function VendorPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Link href="/vendors" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="w-4 h-4" /> {tr("回商家清單", "Back to vendors")}
+    <div className="space-y-10">
+      <Link href="/vendors" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("回商家清單", "Back to vendors")}
       </Link>
 
-      <div>
+      {/* ── 店家頁首：大圖＋疊在圖上的店名（深色漸層保證白字對比） ── */}
+      <section className="relative overflow-hidden rounded-[2rem] border border-ink bg-secondary">
         {vendor.cover_image ? (
-          <img src={vendor.cover_image} alt="" className="w-full h-40 sm:h-48 rounded-xl object-cover" />
+          <img src={vendor.cover_image} alt="" className="w-full h-[260px] md:h-[420px] object-cover" />
         ) : (
-          <div className="w-full h-40 sm:h-48 rounded-xl bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
-            <Store className="h-12 w-12 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+          <div className="w-full h-[260px] md:h-[420px] flex items-center justify-center">
+            <Store className="h-14 w-14 text-secondary-foreground/60" strokeWidth={1.25} aria-hidden="true" />
           </div>
         )}
-
-        <div className="mt-4">
-          <h1 className="text-xl font-bold mb-1">{loc(vendor, "name")}</h1>
-          {rating && (
-            <span className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-1.5">
-              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-              <span className="font-medium text-foreground">{rating.average}</span>
-              ({rating.count}+)
-            </span>
+        <div className="absolute inset-0 bg-gradient-to-t from-[#1c110a]/85 via-[#1c110a]/25 to-transparent" aria-hidden="true" />
+        <div className="absolute inset-x-0 bottom-0 p-6 md:p-10 text-[#fff6e3]">
+          {vendor.verified && (
+            <span className="inline-block mb-3 text-caption font-bold px-2.5 py-1 rounded-full bg-[#ffe1a1] text-[#2b180d]">{tr("認證商家", "Verified")}</span>
           )}
-          {vendor.description && <p className="text-sm text-muted-foreground mb-3">{loc(vendor, "description")}</p>}
-          <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-            {vendor.address && (
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 shrink-0" /> {vendor.address}
-              </span>
-            )}
-            {vendor.phone && (
-              <span className="flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 shrink-0" /> {vendor.phone}
-              </span>
-            )}
-          </div>
+          <h1 className="font-heading font-semibold text-[clamp(36px,5.5vw,72px)] leading-[1.04] tracking-[-0.02em]">{loc(vendor, "name")}</h1>
+          {vendor.description && <p className="mt-2 max-w-2xl text-sm md:text-base opacity-90">{loc(vendor, "description")}</p>}
         </div>
+      </section>
 
-        {vendor.typhoon_notice?.dates?.length ? (
-          <div className="flex items-start gap-2 bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-800 mt-4">
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{tr(`颱風警報：${vendor.typhoon_notice.dates.join("、")} 的訂單可能因停班停課取消（會自動全額退款）。`, `Typhoon warning: orders on ${vendor.typhoon_notice.dates.join(", ")} may be cancelled (automatic full refund).`)}</span>
-          </div>
-        ) : null}
-
-        <div className="flex items-center justify-between gap-2 bg-orange-50 rounded-lg px-3 py-2 text-xs text-orange-900 mt-4">
-          <span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 shrink-0" />{tr("想吃的菜這家店沒有？許願看看，人數夠多店家就會考慮上架。", "Want a dish this vendor doesn't have? Make a wish — enough wishes and they may add it.")}</span>
-          <Button size="sm" variant="outline" className="shrink-0" onClick={() => setWishOpen(true)}>{tr("許願新菜", "Wish for a dish")}</Button>
-        </div>
-        <OpenWishDialog open={wishOpen} onOpenChange={setWishOpen} vendorId={vendor.id} vendorName={loc(vendor, "name")} />
-
+      {/* ── 店家資訊列 ── */}
+      <div className="flex flex-wrap gap-3 text-sm">
+        {rating && (
+          <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-ink bg-card">
+            <Star className="w-4 h-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+            <span className="font-semibold">{rating.average}</span>
+            <span className="text-muted-foreground">（{rating.count}+）</span>
+          </span>
+        )}
+        {vendor.address && (
+          <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-ink bg-card">
+            <MapPin className="w-4 h-4 shrink-0" aria-hidden="true" /> {vendor.address}
+          </span>
+        )}
         {vendor.phone && (
-          <div className="flex items-start gap-2 bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-800 mt-4">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>
-              {tr(`如有餐點變動，請致電 ${vendor.phone} 確認！`, `If your order changes, please call ${vendor.phone} to confirm.`)}
-            </span>
-          </div>
+          <a href={`tel:${vendor.phone}`} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-ink bg-card hover:bg-secondary transition-colors">
+            <Phone className="w-4 h-4 shrink-0" aria-hidden="true" /> {vendor.phone}
+          </a>
         )}
       </div>
 
+      {/* ── 提醒 ── */}
+      <div className="grid gap-3 md:grid-cols-2">
+        {vendor.typhoon_notice?.dates?.length ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 md:col-span-2">
+            <AlertTriangle className="w-5 h-5 shrink-0" aria-hidden="true" />
+            <span>{tr(`颱風警報：${vendor.typhoon_notice.dates.join("、")} 的訂單可能因停班停課取消（會自動全額退款）。`, `Typhoon warning: orders on ${vendor.typhoon_notice.dates.join(", ")} may be cancelled (automatic full refund).`)}</span>
+          </div>
+        ) : null}
+        <div className="flex items-center gap-4 rounded-2xl border border-ink bg-accent p-4 text-sm">
+          <Sparkles className="w-5 h-5 shrink-0 text-primary" aria-hidden="true" />
+          <span className="flex-1">{tr("想吃的菜這家店沒有？許願看看，人數夠多店家就會考慮上架。", "Want a dish this vendor doesn't have? Make a wish — enough wishes and they may add it.")}</span>
+          <Button size="sm" variant="outline" className="shrink-0" onClick={() => setWishOpen(true)}>{tr("許願新菜", "Wish for a dish")}</Button>
+        </div>
+        {vendor.phone && (
+          <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+            <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" />
+            <span>{tr(`如有餐點變動，請致電 ${vendor.phone} 確認！`, `If your order changes, please call ${vendor.phone} to confirm.`)}</span>
+          </div>
+        )}
+      </div>
+      <OpenWishDialog open={wishOpen} onOpenChange={setWishOpen} vendorId={vendor.id} vendorName={loc(vendor, "name")} />
+
+      {/* ── 菜單 ── */}
       <div>
+        <h2 className="font-heading text-3xl md:text-4xl font-semibold mb-6">{tr("菜單", "Menu")}</h2>
         {itemsLoading ? (
           <SkeletonBlocks count={2} height={72} className="space-y-1" />
         ) : items.length === 0 ? (
@@ -183,21 +191,22 @@ export default function VendorPage() {
         ) : (
           <>
             {categories.length > 1 && (
-              <div className="sticky top-16 z-10 -mx-3 md:-mx-4 mb-2 bg-gray-50/95 backdrop-blur-sm border-b border-border">
-                <div className="flex gap-5 overflow-x-auto px-3 md:px-4">
+              <div className="sticky top-16 z-10 -mx-4 md:-mx-6 mb-6 bg-background/90 backdrop-blur-md border-b border-border">
+                <div className="flex gap-2 overflow-x-auto px-4 md:px-6 py-3 bb-thin-scroll">
                   {categories.map(([category]) => (
                     <button
                       key={category}
                       type="button"
+                      aria-pressed={effectiveCategory === category}
                       onClick={() => {
                         setActiveCategory(category);
                         scrollToCategory(category);
                       }}
                       className={cn(
-                        "shrink-0 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                        "shrink-0 h-10 px-4 rounded-full text-sm font-semibold border transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         effectiveCategory === category
-                          ? "border-orange-500 text-orange-600"
-                          : "border-transparent text-muted-foreground hover:text-foreground"
+                          ? "border-ink bg-secondary text-secondary-foreground"
+                          : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                       )}
                     >
                       {category}
@@ -207,48 +216,54 @@ export default function VendorPage() {
               </div>
             )}
 
-            <div className="space-y-6">
+            <div className="space-y-12">
               {categories.map(([category, categoryItems]) => (
-                <section key={category} id={categoryAnchorId(category)} className="scroll-mt-32">
-                  <h3 className="font-semibold mb-1 pb-2 border-b-2 border-orange-500 inline-block">{category}</h3>
-                  <div className="divide-y divide-border">
+                <section key={category} id={categoryAnchorId(category)} className="scroll-mt-36">
+                  <h3 className="font-heading text-2xl font-semibold mb-4 flex items-baseline gap-3">
+                    {category}
+                    <span className="text-sm font-normal text-muted-foreground">{categoryItems.length}</span>
+                  </h3>
+                  <ul className="grid gap-x-10 md:grid-cols-2">
                     {categoryItems.map((item) => (
-                      <Link
-                        key={item.id}
-                        href={`/item/${item.id}`}
-                        className="flex items-center justify-between gap-3 py-4"
-                      >
-                        {item.image && (
-                          <img src={item.image} alt="" loading="lazy" className="w-16 h-16 rounded-lg object-cover shrink-0" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-semibold text-sm mb-0.5">{loc(item, "name")}</h4>
-                          {loc(item, "description") && (
-                            <p className="text-xs text-muted-foreground line-clamp-2 mb-1">{loc(item, "description")}</p>
-                          )}
-                          {item.dietary_tags?.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-1">
-                              {item.dietary_tags.map((tag) => (
-                                <span key={tag} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                  {tr(tag, tagEn(tag))}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          <span className="text-sm font-bold text-orange-600">NT${item.price}</span>
-                          {isBento(item) && <span className="ml-2 text-xs text-muted-foreground">{tr("可選配菜・加減飯", "Choose sides · rice")}</span>}
-                        </div>
+                      /* 整列是連結，「加入購物車」是旁邊的獨立按鈕（原本 button 包在 a 裡，互動元素不能巢狀） */
+                      <li key={item.id} className="flex items-center gap-4 py-5 border-b border-border">
+                        <Link href={`/item/${item.id}`} className="group flex items-center gap-4 min-w-0 flex-1 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                          <span className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border border-ink bg-secondary shrink-0 flex items-center justify-center">
+                            {item.image
+                              ? <img src={item.image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.08]" />
+                              : <UtensilsCrossed className="w-6 h-6 text-secondary-foreground/50" strokeWidth={1.5} aria-hidden="true" />}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-heading text-lg font-semibold group-hover:underline underline-offset-4 decoration-1">{loc(item, "name")}</span>
+                            {loc(item, "description") && (
+                              <span className="block text-sm text-muted-foreground line-clamp-2 mt-0.5">{loc(item, "description")}</span>
+                            )}
+                            {item.dietary_tags?.length > 0 && (
+                              <span className="flex flex-wrap gap-1 mt-1.5">
+                                {item.dietary_tags.map((tag) => (
+                                  <span key={tag} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                    {tr(tag, tagEn(tag))}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                            <span className="flex items-baseline gap-2 mt-1.5">
+                              <span className="font-heading text-xl font-semibold">NT${item.price}</span>
+                              {isBento(item) && <span className="text-xs text-muted-foreground">{tr("可選配菜・加減飯", "Choose sides · rice")}</span>}
+                            </span>
+                          </span>
+                        </Link>
                         <button
                           type="button"
                           onClick={(e) => quickAdd(e, item)}
-                          aria-label={tr("加入購物車", "Add to cart")}
-                          className="shrink-0 w-9 h-9 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 active:scale-95 transition-[transform,background-color]"
+                          aria-label={tr(`加入購物車：${loc(item, "name")}`, `Add to cart: ${loc(item, "name")}`)}
+                          className="shrink-0 w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary-hover active:scale-95 transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className="w-5 h-5" aria-hidden="true" />
                         </button>
-                      </Link>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </section>
               ))}
             </div>

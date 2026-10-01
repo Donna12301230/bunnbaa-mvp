@@ -135,23 +135,26 @@ export default function MenuItemPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
-      <Link href={`/vendor/${item.vendor_id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="w-4 h-4" /> {loc(vendor, "name") || tr("回商家頁", "Back to vendor")}
+    <div className="max-w-6xl mx-auto space-y-6">
+      <Link href={`/vendor/${item.vendor_id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {loc(vendor, "name") || tr("回商家頁", "Back to vendor")}
       </Link>
 
-      <div className="bg-white rounded-xl border border-border overflow-hidden">
-        {item.image ? (
-          <img src={item.image} alt={loc(item, "name")} className="w-full h-48 sm:h-64 object-cover" />
-        ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
-            <UtensilsCrossed className="h-14 w-14 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
-          </div>
-        )}
-        <div className="p-5 space-y-5">
+      {/* 桌機兩欄：左邊大圖（sticky），右邊選日期、配菜、數量 */}
+      <div className="grid gap-8 lg:gap-14 lg:grid-cols-[1.05fr_1fr] items-start">
+        <div className="lg:sticky lg:top-24">
+          {item.image ? (
+            <img src={item.image} alt={loc(item, "name")} className="w-full aspect-[4/3] lg:aspect-[4/5] rounded-[2rem] border border-ink object-cover" />
+          ) : (
+            <div className="w-full aspect-[4/3] lg:aspect-[4/5] rounded-[2rem] border border-ink bg-secondary flex items-center justify-center">
+              <UtensilsCrossed className="h-14 w-14 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
+            </div>
+          )}
+        </div>
+        <div className="space-y-8">
           <div>
-            <h1 className="text-xl font-bold mb-1">{loc(item, "name")}</h1>
-            <p className="text-sm text-muted-foreground">{loc(item, "description")}</p>
+            <h1 className="font-heading font-semibold text-[clamp(32px,4.4vw,56px)] leading-[1.06] tracking-[-0.02em] mb-3">{loc(item, "name")}</h1>
+            <p className="text-muted-foreground leading-relaxed">{loc(item, "description")}</p>
             {item.main?.name && <p className="text-sm mt-1">{tr("主菜：", "Main: ")}<strong>{item.main.name}</strong></p>}
             {(item.fixed?.length ?? 0) > 0 && <p className="text-sm">{tr("附：", "Comes with: ")}{item.fixed!.map((f) => f.name).join("、")}</p>}
             {(item.dietary_tags?.length > 0 || item.allergens?.length > 0) && (
@@ -164,7 +167,7 @@ export default function MenuItemPage() {
                   </div>
                 )}
                 {item.allergens?.length > 0 && (
-                  <p className="text-xs text-red-500">{tr("含過敏原：", "Contains: ")}{item.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</p>
+                  <p className="text-xs text-red-700">{tr("含過敏原：", "Contains: ")}{item.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</p>
                 )}
               </div>
             )}
@@ -172,8 +175,8 @@ export default function MenuItemPage() {
 
           {/* 取餐日（到下週五）＋早鳥折扣 */}
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold flex items-center gap-1.5"><CalendarDays className="w-4 h-4 text-orange-500" /> {tr("取餐日", "Pickup day")}</h2>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <h2 className="font-heading text-xl font-semibold flex items-center gap-2"><CalendarDays className="w-5 h-5 text-primary" aria-hidden="true" /> {tr("取餐日", "Pickup day")}</h2>
+            <div className="flex gap-2 overflow-x-auto pb-1 bb-thin-scroll">
               {dates.map((d) => {
                 const p = dateProblem(d);
                 const { discountPercent } = applyEarlyBirdPrice(item.price, d);
@@ -186,13 +189,13 @@ export default function MenuItemPage() {
                     title={p ?? undefined}
                     onClick={() => setDate(d)}
                     className={cn(
-                      "shrink-0 w-16 rounded-xl border px-1 py-2 text-center transition-colors",
-                      p ? "opacity-40 cursor-not-allowed bg-gray-50" : date === d ? "border-orange-500 bg-orange-50" : "border-border bg-white hover:bg-gray-50"
+                      "shrink-0 w-[72px] rounded-2xl border px-1 py-2.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      p ? "opacity-40 cursor-not-allowed bg-muted" : date === d ? "border-ink bg-secondary shadow-[inset_0_0_0_1px_var(--border-ink)]" : "border-border bg-card hover:border-ink"
                     )}
                   >
                     <div className="text-xs text-muted-foreground">{tr(`週${WEEKDAY_ZH[wd]}`, WEEKDAY_EN[wd])}</div>
                     <div className="text-sm font-semibold">{d.slice(5).replace("-", "/")}</div>
-                    <div className="text-micro text-orange-600">{p ? tr("截單", "Closed") : discountPercent > 0 ? discountText(discountPercent) : ""}</div>
+                    <div className="text-micro font-bold text-primary">{p ? tr("截單", "Closed") : discountPercent > 0 ? discountText(discountPercent) : ""}</div>
                   </button>
                 );
               })}
@@ -208,9 +211,11 @@ export default function MenuItemPage() {
                     type="button"
                     disabled={!s.open}
                     onClick={() => setWindow(s.window)}
+                    aria-checked={window === s.window}
+                    role="radio"
                     className={cn(
-                      "px-3 py-1.5 rounded-full border text-sm",
-                      !s.open ? "opacity-40 cursor-not-allowed" : window === s.window ? "border-orange-500 bg-orange-50 text-orange-700" : "border-border"
+                      "h-10 px-4 rounded-full border text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      !s.open ? "opacity-40 cursor-not-allowed" : window === s.window ? "border-ink bg-secondary text-secondary-foreground" : "border-border bg-card hover:border-ink"
                     )}
                   >
                     {slotLabel(s.window)}{s.remaining !== null && s.open ? tr(`（剩 ${s.remaining}）`, ` (${s.remaining} left)`) : ""}
@@ -229,13 +234,13 @@ export default function MenuItemPage() {
           {/* 配菜格：預設菜、候選菜許願、不要 */}
           {bento && (
             <section className="space-y-3">
-              <h2 className="text-sm font-semibold flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-orange-500" /> {tr("配菜（可許願）", "Sides (make a wish)")}</h2>
+              <h2 className="font-heading text-xl font-semibold flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" aria-hidden="true" /> {tr("配菜（可許願）", "Sides (make a wish)")}</h2>
               {item.slots!.map((slot, i) => (
-                <div key={i} className="rounded-lg border border-border p-3 space-y-1.5">
+                <div key={i} className="rounded-2xl border border-border bg-card p-4 space-y-2">
                   <label className="text-xs text-muted-foreground" htmlFor={`slot-${i}`}>{slot.category || tr(`配菜 ${i + 1}`, `Side ${i + 1}`)}</label>
                   <select
                     id={`slot-${i}`}
-                    className="w-full h-10 rounded-md border border-input bg-background px-2 text-sm"
+                    className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     value={String(choices[i] ?? "default")}
                     onChange={(e) => {
                       const v = e.target.value;
@@ -271,7 +276,7 @@ export default function MenuItemPage() {
 
           {bento && item.rice_component_id && (
             <section className="space-y-2">
-              <h2 className="text-sm font-semibold">{tr("飯量", "Rice")}</h2>
+              <h2 className="font-heading text-xl font-semibold">{tr("飯量", "Rice")}</h2>
               <div className="flex gap-2">
                 {([
                   ["normal", tr("一般", "Regular"), 0],
@@ -282,7 +287,8 @@ export default function MenuItemPage() {
                     key={value}
                     type="button"
                     onClick={() => setRice(value)}
-                    className={cn("flex-1 rounded-lg border py-2 text-sm", rice === value ? "border-orange-500 bg-orange-50" : "border-border")}
+                    aria-pressed={rice === value}
+                    className={cn("flex-1 h-12 rounded-full border text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", rice === value ? "border-ink bg-secondary" : "border-border bg-card hover:border-ink")}
                   >
                     {label}{price !== 0 && <span className="text-xs text-muted-foreground"> {price > 0 ? `+${price}` : price}</span>}
                   </button>
@@ -297,7 +303,7 @@ export default function MenuItemPage() {
           </div>
 
           {breakdown && (
-            <dl className="text-sm space-y-1 rounded-lg bg-gray-50 p-3">
+            <dl className="text-sm space-y-1.5 rounded-2xl border border-ink bg-accent p-5">
               <div className="flex justify-between"><dt className="text-muted-foreground">{tr("原價", "Price")}</dt><dd>NT${breakdown.listPrice}</dd></div>
               {breakdown.earlyBird > 0 && (
                 <div className="flex justify-between text-green-700"><dt>{tr(`早鳥 ${discountText(breakdown.discountPercent)}`, `Early bird ${discountText(breakdown.discountPercent)}`)}</dt><dd>−NT${breakdown.earlyBird}</dd></div>
@@ -305,18 +311,19 @@ export default function MenuItemPage() {
               {breakdown.adjust !== 0 && (
                 <div className="flex justify-between"><dt className="text-muted-foreground">{tr("加減飯菜", "Adjustments")}</dt><dd>{breakdown.adjust > 0 ? "+" : "−"}NT${Math.abs(breakdown.adjust)}</dd></div>
               )}
-              <div className="flex justify-between font-bold pt-1 border-t border-border"><dt>{tr("每份", "Each")}</dt><dd className="text-orange-600">NT${breakdown.total}</dd></div>
+              <div className="flex justify-between items-baseline font-bold pt-2 mt-1 border-t border-border"><dt>{tr("每份", "Each")}</dt><dd className="font-heading text-2xl">NT${breakdown.total}</dd></div>
               <p className="text-xs text-muted-foreground">{tr("有折價券可在購物車套用（每筆限一張）。", "Apply a coupon in your cart (one per meal).")}</p>
             </dl>
           )}
 
-          <div className="flex items-center justify-between pt-2 border-t border-border">
+          {/* 加入購物車列：手機上黏在畫面底部，不用捲回來找 */}
+          <div className="sticky bottom-0 z-10 -mx-4 px-4 md:mx-0 md:px-0 py-4 bg-background/95 backdrop-blur-md border-t border-border flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label={tr("減少數量", "Decrease quantity")} onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus /></Button>
+              <Button variant="outline" size="icon" className="h-11 w-11 rounded-full" aria-label={tr("減少數量", "Decrease quantity")} onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus /></Button>
               <span className="w-6 text-center font-medium bb-num" aria-live="polite">{qty}</span>
-              <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label={tr("增加數量", "Increase quantity")} onClick={() => setQty((q) => Math.min(20, q + 1))}><Plus /></Button>
+              <Button variant="outline" size="icon" className="h-11 w-11 rounded-full" aria-label={tr("增加數量", "Increase quantity")} onClick={() => setQty((q) => Math.min(20, q + 1))}><Plus /></Button>
             </div>
-            <Button onClick={handleAdd} disabled={!canAdd}>
+            <Button onClick={handleAdd} disabled={!canAdd} className="h-12 px-6 rounded-full text-base">
               <ShoppingCart /> {tr("加入購物車", "Add to cart")}{breakdown ? ` · NT$${breakdown.total * qty}` : ""}
             </Button>
           </div>

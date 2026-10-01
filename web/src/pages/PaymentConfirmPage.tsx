@@ -64,41 +64,49 @@ export default function PaymentConfirmPage() {
   }, [orderId]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <MarketplaceHeader />
-      <div className="max-w-lg mx-auto px-4 py-8 space-y-4">
+      <div className="max-w-xl mx-auto px-4 pt-12 md:pt-20 pb-16 space-y-6">
         {(status === "waiting-auth" || status === "confirming") && (
-          <div className="bg-white rounded-xl border border-border p-6 text-center text-muted-foreground">{tr("確認付款中…", "Confirming payment…")}</div>
+          <div className="bb-receipt text-center" role="status" aria-live="polite">
+            <img src="/飯飽R.png" alt="" width={72} height={64} className="mx-auto mb-4 animate-pulse motion-reduce:animate-none" />
+            <p className="font-heading text-2xl font-semibold">{tr("確認付款中…", "Confirming payment…")}</p>
+            <p className="text-sm text-muted-foreground mt-1">{tr("請不要關閉這個頁面。", "Please keep this page open.")}</p>
+          </div>
         )}
         {status === "done" && (
-          <div className="bg-white rounded-xl border border-border p-5 space-y-4">
-            <h1 className="text-xl font-bold flex items-center gap-2"><CheckCircle2 className="w-6 h-6 text-green-600" /> {tr("預購成功！", "You're all set!")}</h1>
-            <ul className="divide-y divide-border">
+          <div className="bb-receipt space-y-6">
+            <div className="text-center">
+              <span className="bb-receipt__check" aria-hidden="true"><CheckCircle2 className="w-9 h-9" /></span>
+              <h1 className="font-heading font-semibold text-[clamp(36px,6vw,56px)] leading-tight mt-4">{tr("預購成功！", "You're all set!")}</h1>
+              <p className="text-muted-foreground mt-1">{tr("越早訂，越開心。到時候見！", "Book early, eat happy — see you at pickup!")}</p>
+            </div>
+            <ul className="divide-y divide-dashed divide-border border-y border-dashed border-border">
               {locks.map((l) => (
-                <li key={l.id} className="py-2 text-sm">
-                  <div className="flex justify-between gap-2">
-                    <span className="font-semibold">{loc(l, "item_name")}</span>
-                    <span>NT${l.locked_price}</span>
+                <li key={l.id} className="py-4 text-sm">
+                  <div className="flex justify-between gap-2 items-baseline">
+                    <span className="font-heading text-lg font-semibold">{loc(l, "item_name")}</span>
+                    <span className="font-heading text-lg font-semibold">NT${l.locked_price}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{l.pickup_date}・{l.pickup_window}・{tr("取餐號", "Code")} {l.pickup_code}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{l.pickup_date}・{l.pickup_window}・{tr("取餐號", "Code")} <strong className="text-foreground">{l.pickup_code}</strong></p>
                   {(l.slots?.length ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground">{l.slots!.map(slotText).join("／")}{riceLabel(l.rice) ? `／${riceLabel(l.rice)}` : ""}</p>
                   )}
                 </li>
               ))}
             </ul>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               {tr(`取餐前一天 ${vendorCutoffTime(null)} 截單並判定配菜許願，未成立會改預設菜並通知你。取餐時到「我的餐點」出示 QR Code。`,
                 `Orders close at ${vendorCutoffTime(null)} the day before; side-dish wishes are decided then. Show your QR code from My meals at pickup.`)}
             </p>
-            <Button asChild className="w-full"><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
+            <Button asChild className="w-full h-12 rounded-full text-base"><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
           </div>
         )}
         {status === "error" && (
-          <div className="bg-white rounded-xl border border-border p-5 space-y-2">
-            <h1 className="text-lg font-bold">{tr("付款確認失敗", "Payment confirmation failed")}</h1>
+          <div className="bb-receipt space-y-3 text-center">
+            <h1 className="font-heading text-3xl font-semibold">{tr("付款確認失敗", "Payment confirmation failed")}</h1>
             <p className="text-sm text-muted-foreground">{errorMessage}</p>
-            <Link href="/my-bookings" className="text-sm text-primary underline">{tr("查看我的餐點", "View my meals")}</Link>
+            <Button asChild variant="outline" className="rounded-full"><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
           </div>
         )}
       </div>
