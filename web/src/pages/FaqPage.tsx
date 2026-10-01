@@ -1,5 +1,5 @@
 import { tr } from "@/lib/i18n";
-import { ChevronDown } from "lucide-react";
+import { Plus } from "lucide-react";
 import CustomerLayout from "@/components/CustomerLayout";
 import PageHero from "@/components/PageHero";
 import { Link } from "wouter";
@@ -66,24 +66,33 @@ const FAQS = [
 export default function FaqPage() {
   return (
     <CustomerLayout
-      active={undefined}
-      hero={<PageHero title={tr("常見問題", "FAQ")} description={tr("關於預購、取餐、退款最常被問到的問題。", "Answers to the questions we hear most about pre-ordering, pickup, and refunds.")} />}
+      active={null}
+      hero={<PageHero eyebrow={tr("支援", "Support")} title={tr("常見問題", "FAQ")} description={tr("關於預購、取餐、退款最常被問到的問題。", "Answers to the questions we hear most about pre-ordering, pickup, and refunds.")} />}
     >
-      <div className="max-w-2xl mx-auto space-y-2">
-        {FAQS.map(({ q, a }) => (
-          <details key={q} className="group bg-white rounded-xl border border-border px-4 py-3">
-            <summary className="flex items-center justify-between gap-3 cursor-pointer list-none font-medium text-sm">
-              {q}
-              <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-            </summary>
-            <p className="text-sm text-muted-foreground leading-relaxed mt-2">{a}</p>
-          </details>
-        ))}
+      {/* 桌機兩欄：左邊 sticky 的「找不到答案？」，右邊問答 */}
+      <div className="grid gap-10 lg:grid-cols-[320px_1fr] lg:gap-16 items-start py-4 md:py-8">
+        <aside className="lg:sticky lg:top-24 rounded-[1.75rem] border border-ink bg-accent p-7 space-y-3">
+          <p className="font-heading text-2xl font-semibold">{tr("沒找到你想問的？", "Didn't find your answer?")}</p>
+          <p className="text-sm text-muted-foreground">{tr("寫信給我們，通常 1～2 個工作天內回覆。", "Write to us — we usually reply within 1–2 business days.")}</p>
+          <Link href="/contact" className="inline-flex items-center h-11 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover transition-colors">
+            {tr("聯絡客服", "Contact support")}
+          </Link>
+        </aside>
 
-        <p className="text-sm text-muted-foreground text-center pt-4">
-          {tr("沒找到你想問的？", "Didn't find what you're looking for? ")}
-          <Link href="/contact" className="text-orange-600 hover:underline">{tr("聯絡客服", "Contact support")}</Link>
-        </p>
+        <div className="border-t border-ink">
+          {FAQS.map(({ q, a }, i) => (
+            <details key={q} className="group border-b border-ink">
+              <summary className="flex items-start gap-5 cursor-pointer list-none py-6 md:py-7 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                <span className="font-heading italic text-primary text-base w-7 shrink-0 pt-1" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+                <span className="flex-1 font-heading text-xl md:text-2xl font-semibold leading-snug">{q}</span>
+                <span className="w-10 h-10 shrink-0 rounded-full border border-ink flex items-center justify-center transition-[transform,background-color] duration-300 group-open:rotate-45 group-open:bg-secondary" aria-hidden="true">
+                  <Plus className="w-5 h-5" />
+                </span>
+              </summary>
+              <p className="text-muted-foreground leading-[1.85] pb-7 pl-12 pr-14 -mt-1">{a}</p>
+            </details>
+          ))}
+        </div>
       </div>
     </CustomerLayout>
   );

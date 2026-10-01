@@ -65,7 +65,7 @@ export default function RewardsPage() {
   return (
     <div className="min-h-screen bg-background">
       <MarketplaceHeader active="rewards" />
-      <PageHero title={tr("成長獎勵", "Rewards")} description={tr("每累計實付 100 元一張抽獎券；店家每週拿出營業額 10% 當回饋池，抽獎券滿 100 張就開獎，人人有獎。", "Every NT$100 you pay earns a ticket. Each week vendors put 10% of revenue into a reward pool; once 100 tickets are in, the draw opens and everyone wins.")} />
+      <PageHero eyebrow={tr("人人有獎", "Everyone wins")} title={tr("成長獎勵", "Rewards")} description={tr("每累計實付 100 元一張抽獎券；店家每週拿出營業額 10% 當回饋池，抽獎券滿 100 張就開獎，人人有獎。", "Every NT$100 you pay earns a ticket. Each week vendors put 10% of revenue into a reward pool; once 100 tickets are in, the draw opens and everyone wins.")} />
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-12 space-y-14">
         {!user ? (
           <EmptyState icon={<Trophy size={32} />} title={tr("請先登入", "Please sign in")} description={tr("登入後就能看到你的抽獎券、抽獎進度與折價券。", "Sign in to see your tickets, draw progress and coupons.")} action={<Button asChild><Link href="/login">{tr("前往登入", "Sign in")}</Link></Button>} />

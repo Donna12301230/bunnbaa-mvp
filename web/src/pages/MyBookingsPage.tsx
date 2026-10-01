@@ -541,7 +541,7 @@ export default function MyBookingsPage() {
     <div className="min-h-screen bg-background">
       <MarketplaceHeader active="bookings" />
 
-      <PageHero title={tr("我的餐點", "My meals")} description={tr("週曆上點一筆訂單看詳情、出示取餐碼、截單前取消，或轉讓／贈送／捐為愛心餐。", "Tap an order to see details, show your pickup code, cancel before cutoff, or transfer / gift / donate it.")} />
+      <PageHero eyebrow={tr("我的預約", "Your bookings")} title={tr("我的餐點", "My meals")} description={tr("週曆上點一筆訂單看詳情、出示取餐碼、截單前取消，或轉讓／贈送／捐為愛心餐。", "Tap an order to see details, show your pickup code, cancel before cutoff, or transfer / gift / donate it.")} />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         {!authLoading && !uid ? (

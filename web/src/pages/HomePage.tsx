@@ -295,11 +295,12 @@ export default function HomePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="inline-flex items-center gap-2 h-12 px-5 rounded-full border border-ink bg-card text-sm font-semibold">
+          {/* 目前取餐時段；點了跳到側欄的計畫工具箱改時段（手機上側欄排在菜單後面） */}
+          <a href="#home-planner" onClick={(e) => { e.preventDefault(); document.getElementById("home-planner")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="inline-flex items-center gap-2 h-12 px-5 rounded-full border border-ink bg-card text-sm font-semibold hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <Clock className="w-4 h-4 text-primary" aria-hidden="true" />
-            <span className="sr-only">{t("目前取餐時段：", "Current pickup: ")}</span>
+            <span className="sr-only">{t("目前取餐時段（點擊修改）：", "Current pickup (tap to change): ")}</span>
             {pickupDate.slice(5).replace("-", "/")}・{pickupWindow}
-          </span>
+          </a>
           <button
             type="button"
             onClick={() => setAssistantOpen(true)}
@@ -312,7 +313,7 @@ export default function HomePage() {
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 flex flex-col lg:flex-row gap-8">
         {/* ── 左側：計畫工具箱（桌機 sticky，太長時自己捲） ── */}
-        <aside className="lg:w-72 shrink-0 space-y-4 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 bb-thin-scroll">
+        <aside id="home-planner" className="order-2 lg:order-1 scroll-mt-20 lg:w-72 shrink-0 space-y-4 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 bb-thin-scroll">
           <h2 className="font-heading text-2xl font-semibold">{t("計畫工具箱", "Planner")}</h2>
 
           {/* 預購助理入口移到頁首（原本頁首、側欄各一顆，重複） */}
@@ -426,7 +427,7 @@ export default function HomePage() {
         </aside>
 
         {/* ── 右側：主內容 ── */}
-        <main className="flex-1 min-w-0 space-y-8">
+        <main className="order-1 lg:order-2 flex-1 min-w-0 space-y-12">
           {/* 今日推薦方案（單點型）——改成依商家分組的清單，取代原本一格一張大圖卡片
               （每個品項都要放大圖、徽章、價格，排成一片太雜亂），改成「哪些店家有什麼」：
               一家店一張卡片，底下用一行一行列出品項名稱＋價格＋按鈕。 */}
@@ -654,7 +655,7 @@ export default function HomePage() {
               </Link>
             </div>
 
-            <div className="flex gap-3 overflow-x-auto pb-1">
+            <div className="flex gap-3 overflow-x-auto pb-1 bb-thin-scroll rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe1a1]" tabIndex={0} role="region" aria-label={t("同學轉讓清單（可左右捲動）", "Classmate transfers (scrolls sideways)")}>
               {visibleTransfers.length === 0 && (
                 <p className="text-sm opacity-80">{t("這段期間目前沒有同學轉讓的餐點。", "No transfers in this range right now.")}</p>
               )}

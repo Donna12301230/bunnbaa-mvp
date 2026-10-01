@@ -141,8 +141,8 @@ export default function MenuItemPage() {
       </Link>
 
       {/* 桌機兩欄：左邊大圖（sticky），右邊選日期、配菜、數量 */}
-      <div className="grid gap-8 lg:gap-14 lg:grid-cols-[1.05fr_1fr] items-start">
-        <div className="lg:sticky lg:top-24">
+      <div className="grid grid-cols-1 gap-8 lg:gap-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] items-start">
+        <div className="min-w-0 lg:sticky lg:top-24">
           {item.image ? (
             <img src={item.image} alt={loc(item, "name")} className="w-full aspect-[4/3] lg:aspect-[4/5] rounded-[2rem] border border-ink object-cover" />
           ) : (
@@ -151,7 +151,7 @@ export default function MenuItemPage() {
             </div>
           )}
         </div>
-        <div className="space-y-8">
+        <div className="min-w-0 space-y-8">
           <div>
             <h1 className="font-heading font-semibold text-[clamp(32px,4.4vw,56px)] leading-[1.06] tracking-[-0.02em] mb-3">{loc(item, "name")}</h1>
             <p className="text-muted-foreground leading-relaxed">{loc(item, "description")}</p>
@@ -193,7 +193,7 @@ export default function MenuItemPage() {
                       p ? "opacity-40 cursor-not-allowed bg-muted" : date === d ? "border-ink bg-secondary shadow-[inset_0_0_0_1px_var(--border-ink)]" : "border-border bg-card hover:border-ink"
                     )}
                   >
-                    <div className="text-xs text-muted-foreground">{tr(`週${WEEKDAY_ZH[wd]}`, WEEKDAY_EN[wd])}</div>
+                    <div className={cn("text-xs", date === d && !p ? "text-foreground" : "text-muted-foreground")}>{tr(`週${WEEKDAY_ZH[wd]}`, WEEKDAY_EN[wd])}</div>
                     <div className="text-sm font-semibold">{d.slice(5).replace("-", "/")}</div>
                     <div className="text-micro font-bold text-primary">{p ? tr("截單", "Closed") : discountPercent > 0 ? discountText(discountPercent) : ""}</div>
                   </button>
@@ -303,7 +303,8 @@ export default function MenuItemPage() {
           </div>
 
           {breakdown && (
-            <dl className="text-sm space-y-1.5 rounded-2xl border border-ink bg-accent p-5">
+            <div className="text-sm rounded-2xl border border-ink bg-accent p-5">
+            <dl className="space-y-1.5">
               <div className="flex justify-between"><dt className="text-muted-foreground">{tr("原價", "Price")}</dt><dd>NT${breakdown.listPrice}</dd></div>
               {breakdown.earlyBird > 0 && (
                 <div className="flex justify-between text-green-700"><dt>{tr(`早鳥 ${discountText(breakdown.discountPercent)}`, `Early bird ${discountText(breakdown.discountPercent)}`)}</dt><dd>−NT${breakdown.earlyBird}</dd></div>
@@ -312,18 +313,19 @@ export default function MenuItemPage() {
                 <div className="flex justify-between"><dt className="text-muted-foreground">{tr("加減飯菜", "Adjustments")}</dt><dd>{breakdown.adjust > 0 ? "+" : "−"}NT${Math.abs(breakdown.adjust)}</dd></div>
               )}
               <div className="flex justify-between items-baseline font-bold pt-2 mt-1 border-t border-border"><dt>{tr("每份", "Each")}</dt><dd className="font-heading text-2xl">NT${breakdown.total}</dd></div>
-              <p className="text-xs text-muted-foreground">{tr("有折價券可在購物車套用（每筆限一張）。", "Apply a coupon in your cart (one per meal).")}</p>
             </dl>
+            <p className="mt-2 text-xs text-muted-foreground">{tr("有折價券可在購物車套用（每筆限一張）。", "Apply a coupon in your cart (one per meal).")}</p>
+            </div>
           )}
 
           {/* 加入購物車列：手機上黏在畫面底部，不用捲回來找 */}
-          <div className="sticky bottom-0 z-10 -mx-4 px-4 md:mx-0 md:px-0 py-4 bg-background/95 backdrop-blur-md border-t border-border flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="sticky bottom-0 z-10 -mx-4 px-4 md:mx-0 md:px-0 py-4 bg-background/95 backdrop-blur-md border-t border-border flex items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <Button variant="outline" size="icon" className="h-11 w-11 rounded-full" aria-label={tr("減少數量", "Decrease quantity")} onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus /></Button>
               <span className="w-6 text-center font-medium bb-num" aria-live="polite">{qty}</span>
               <Button variant="outline" size="icon" className="h-11 w-11 rounded-full" aria-label={tr("增加數量", "Increase quantity")} onClick={() => setQty((q) => Math.min(20, q + 1))}><Plus /></Button>
             </div>
-            <Button onClick={handleAdd} disabled={!canAdd} className="h-12 px-6 rounded-full text-base">
+            <Button onClick={handleAdd} disabled={!canAdd} className="h-12 px-5 sm:px-6 rounded-full text-base flex-1 sm:flex-none min-w-0">
               <ShoppingCart /> {tr("加入購物車", "Add to cart")}{breakdown ? ` · NT$${breakdown.total * qty}` : ""}
             </Button>
           </div>

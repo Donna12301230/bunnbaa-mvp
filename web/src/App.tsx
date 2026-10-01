@@ -66,7 +66,8 @@ function NotFound() {
     <>
     <MarketplaceHeader />
     <section className="bb-404">
-      <p className="bb-404__code" aria-hidden="true">404</p>
+      {/* 純裝飾大字：數字放在 CSS ::before，不進可及性樹 */}
+      <p className="bb-404__code" aria-hidden="true" data-text="404" />
       <h1 className="bb-404__title">{tr("這一頁還沒開飯。", "This page isn't on the menu.")}</h1>
       <p className="bb-404__body">{tr("找不到你要的頁面，可能是連結打錯了，或餐點已經下架。", "We couldn't find that page — the link may be wrong or the item is gone.")}</p>
       <div className="bb-404__actions">

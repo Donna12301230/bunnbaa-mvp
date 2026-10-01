@@ -228,6 +228,7 @@
   letter-spacing: -0.05em;
   color: var(--brand-orange);
 }
+.bb-404__code::before { content: attr(data-text); }
 .bb-404__title { margin: 0; font-family: var(--font-heading); font-size: clamp(28px, 4vw, 44px); font-weight: 600; color: var(--text); }
 .bb-404__body { margin: 0; max-width: 40ch; color: var(--text-secondary); }
 .bb-404__actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-6); margin-top: var(--space-4); }

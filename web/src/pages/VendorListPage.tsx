@@ -30,7 +30,7 @@ export default function VendorListPage() {
   return (
     <CustomerLayout
       hero={
-        <PageHero title={tr("商家", "Vendors")} description={tr("選一家商家看看他們的預購品項。", "Pick a vendor to see what you can pre-order.")}>
+        <PageHero eyebrow={tr("合作店家", "Partners")} title={tr("商家", "Vendors")} description={tr("選一家商家看看他們的預購品項。", "Pick a vendor to see what you can pre-order.")}>
           <HeroSearch id="vendorSearch" label={tr("搜尋商家", "Search vendors")} value={search} onChange={setSearch} placeholder={tr("搜尋商家名稱或介紹", "Search by name or description")} />
         </PageHero>
       }

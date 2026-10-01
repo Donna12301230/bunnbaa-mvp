@@ -198,6 +198,7 @@ export default function TransferMarketPage() {
       <MarketplaceHeader active="transfer" />
 
       <PageHero
+        eyebrow={tr("不浪費任何一份", "No meal wasted")}
         title={tr("轉讓市集", "Transfer market")}
         description={tr("同學安全轉讓已鎖定的便當，截單後也能轉；逾時沒人接手，系統會自動開放 $0 元供人領取。沒領到的便當會變成愛心餐。", "Pass locked meals between classmates, even after cutoff. If nobody takes one in time, anyone can claim it for $0. Unclaimed meals become charity meals.")}
       >
