@@ -183,6 +183,18 @@ function usePointerParallax<T extends HTMLElement>() {
   return ref;
 }
 
+/**
+ * 頁內跳轉：網站用 hash 路由（#/home），直接寫 href="#lp-how" 會被當成換頁到 /lp-how → 404。
+ * 攔下預設行為，改成捲動到目標並把焦點移過去（跳到主要內容時螢幕閱讀器才會跟上）。
+ */
+function jumpTo(e: React.MouseEvent, id: string) {
+  e.preventDefault();
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+  el.focus({ preventScroll: true });
+}
+
 // ── 小元件 ───────────────────────────────────────────────────────────────
 
 /** 進入視窗才觸發的數字滾動（AnimatedNumber 從 0 滾到目標值）。 */
@@ -427,10 +439,10 @@ function LandingContent() {
 
   return (
     <div className="bb-landing" ref={rootRef}>
-      <a href="#lp-main" className="lp-skip">{t("跳到主要內容", "Skip to content")}</a>
+      <a href="#lp-main" className="lp-skip" onClick={(e) => jumpTo(e, "lp-main")}>{t("跳到主要內容", "Skip to content")}</a>
       <MarketplaceHeader active="landing" />
 
-      <main id="lp-main">
+      <main id="lp-main" tabIndex={-1} className="outline-none">
         {/* ── Hero：標語 + 真實餐點拼貼 + 已鎖定票券 ── */}
         <section className="lp-hero" ref={heroRef} aria-labelledby="lp-hero-title">
           <div className="lp-container lp-hero__grid">
@@ -454,7 +466,7 @@ function LandingContent() {
               </p>
               <div className="lp-hero__cta" data-reveal style={{ "--d": "360ms" } as CSSProperties}>
                 <LinkButton href="/home" variant="primary" size="lg" rightIcon={<ArrowRight />} className="lp-magnet">{t("探索今日菜單", "Explore today's menu")}</LinkButton>
-                <a href="#lp-how" className="lp-textlink">{t("怎麼運作", "How it works")}<ArrowDown aria-hidden="true" /></a>
+                <a href="#lp-how" className="lp-textlink" onClick={(e) => jumpTo(e, "lp-how")}>{t("怎麼運作", "How it works")}<ArrowDown aria-hidden="true" /></a>
               </div>
               <dl className="lp-hero__proof" data-reveal style={{ "--d": "480ms" } as CSSProperties}>
                 <div><dt>{t("早鳥最高", "Up to")}</dt><dd>{isEn ? `${BEST_EARLY_BIRD}% off` : discountText(BEST_EARLY_BIRD)}</dd></div>
@@ -531,7 +543,7 @@ function LandingContent() {
         </section>
 
         {/* ── 怎麼運作：四步驟，捲動時連接線跟著畫出來 ── */}
-        <section className="lp-section lp-how" id="lp-how" aria-labelledby="lp-how-title">
+        <section className="lp-section lp-how" id="lp-how" tabIndex={-1} aria-labelledby="lp-how-title" style={{ outline: "none", scrollMarginTop: 72 }}>
           <div className="lp-container">
             <Eyebrow index="02">{t("怎麼運作", "How it works")}</Eyebrow>
             <MaskLines
