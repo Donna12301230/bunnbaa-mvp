@@ -52,7 +52,8 @@
   --text-on-accent: var(--cafe-ink);
 
   /* ── 字體：襯線標題，字重偏細、字級放大 ── */
-  --font-heading: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
+  /* Fraunces 只有拉丁字：英文與數字走 Fraunces，中文自動落到 Noto Serif TC */
+  --font-heading: 'Fraunces', 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
   --font-display-size: 40px; --font-display-weight: 600; --font-display-lh: 1.25;
   --font-h1-size: 28px;      --font-h1-weight: 600;
   --font-h2-size: 22px;      --font-h2-weight: 600;
@@ -335,3 +336,22 @@
 .bb-theme[data-look='cafe'] :is(.bb-modal__panel, .bb-sheet__panel, .bb-toast) {
   border: 1px solid var(--border-ink);
 }
+
+/* ── EmptyState：描邊圓章 + 大一號的襯線標題（2026-10-01 全站改版） ── */
+.bb-theme[data-look='cafe'] .bb-empty { padding-block: 72px; max-width: 460px; }
+.bb-theme[data-look='cafe'] .bb-empty__icon {
+  width: 104px;
+  height: 104px;
+  border: 1px solid var(--border-ink);
+  background: var(--surface-accent);
+  color: var(--text-on-accent);
+  box-shadow: 0 0 0 10px var(--bg), 0 0 0 11px color-mix(in srgb, var(--border-ink) 30%, transparent);
+}
+.bb-theme[data-look='cafe'] .bb-empty__title {
+  margin-top: var(--space-2);
+  font-family: var(--font-heading);
+  font-size: clamp(24px, 2.6vw, 32px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.bb-theme[data-look='cafe'] .bb-empty__desc { font-size: var(--font-body-size); }

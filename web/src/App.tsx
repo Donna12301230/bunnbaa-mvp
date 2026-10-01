@@ -2,7 +2,7 @@ import { tr, useI18n } from "@/lib/i18n";
 import { lazy, Suspense, useEffect, useRef } from "react";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Switch, Route, Link, Router, Redirect } from "wouter";
+import { Switch, Route, Link, Router, Redirect, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -11,61 +11,90 @@ import { ConfirmProvider } from "@/components/ConfirmDialog";
 import { SiteThemeRoot } from "@/lib/siteLook";
 import { useAuth } from "@/hooks/useAuth";
 
-import VendorRedeemPage from "./pages/VendorRedeemPage";
-import PaymentConfirmPage from "./pages/PaymentConfirmPage";
-import PaymentCancelPage from "./pages/PaymentCancelPage";
+const VendorRedeemPage = lazy(() => import("./pages/VendorRedeemPage"));
+const PaymentConfirmPage = lazy(() => import("./pages/PaymentConfirmPage"));
+const PaymentCancelPage = lazy(() => import("./pages/PaymentCancelPage"));
 
-import LoginPage from "./pages/LoginPage";
-import HomePage from "./pages/HomePage";
-import ProfilePage from "./pages/ProfilePage";
-import TransferMarketPage from "./pages/TransferMarketPage";
-import MyBookingsPage from "./pages/MyBookingsPage";
-import GiftClaimPage from "./pages/GiftClaimPage";
-import PickupProxyPage from "./pages/PickupProxyPage";
-import RewardsPage from "./pages/RewardsPage";
-import CartPage from "./pages/CartPage";
-import VendorListPage from "./pages/VendorListPage";
-import VendorPage from "./pages/VendorPage";
-import MenuItemPage from "./pages/MenuItemPage";
-import AboutPage from "./pages/AboutPage";
-import ContactPage from "./pages/ContactPage";
-import FaqPage from "./pages/FaqPage";
-import JoinUsPage from "./pages/JoinUsPage";
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const HomePage = lazy(() => import("./pages/HomePage"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const TransferMarketPage = lazy(() => import("./pages/TransferMarketPage"));
+const MyBookingsPage = lazy(() => import("./pages/MyBookingsPage"));
+const GiftClaimPage = lazy(() => import("./pages/GiftClaimPage"));
+const PickupProxyPage = lazy(() => import("./pages/PickupProxyPage"));
+const RewardsPage = lazy(() => import("./pages/RewardsPage"));
+const CartPage = lazy(() => import("./pages/CartPage"));
+const VendorListPage = lazy(() => import("./pages/VendorListPage"));
+const VendorPage = lazy(() => import("./pages/VendorPage"));
+const MenuItemPage = lazy(() => import("./pages/MenuItemPage"));
+const AboutPage = lazy(() => import("./pages/AboutPage"));
+const ContactPage = lazy(() => import("./pages/ContactPage"));
+const FaqPage = lazy(() => import("./pages/FaqPage"));
+const JoinUsPage = lazy(() => import("./pages/JoinUsPage"));
 import CustomerLayout from "./components/CustomerLayout";
+import MarketplaceHeader from "./components/MarketplaceHeader";
 import SiteFooter from "./components/SiteFooter";
 import { RequireVendorSignIn } from "./components/RequireRealAdmin";
-import AdminVendorsPage from "./pages/admin/AdminVendorsPage";
-import AdminAppealsPage from "./pages/admin/AdminAppealsPage";
-import AdminLocksPage from "./pages/admin/AdminLocksPage";
-import AdminPayoutsPage from "./pages/admin/AdminPayoutsPage";
-import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
-import AdminPlatformPage from "./pages/admin/AdminPlatformPage";
-import AdminDishesPage from "./pages/admin/AdminDishesPage";
-import { AdminAnomaliesPage, AdminDisastersPage } from "./pages/admin/AdminEventsPage";
-import VendorPortalDashboard from "./pages/vendor-portal/VendorPortalDashboard";
-import VendorPortalMenu from "./pages/vendor-portal/VendorPortalMenu";
-import VendorPortalOrders from "./pages/vendor-portal/VendorPortalOrders";
-import VendorPortalPrep from "./pages/vendor-portal/VendorPortalPrep";
-import VendorPortalGrowth from "./pages/vendor-portal/VendorPortalGrowth";
-import VendorPortalReports from "./pages/vendor-portal/VendorPortalReports";
-import VendorPortalSessions from "./pages/vendor-portal/VendorPortalSessions";
-import VendorPortalSessionSummary from "./pages/vendor-portal/VendorPortalSessionSummary";
-import VendorPortalSettings from "./pages/vendor-portal/VendorPortalSettings";
-import VendorPortalRecipes from "./pages/vendor-portal/VendorPortalRecipes";
-import VendorPortalPurchasing from "./pages/vendor-portal/VendorPortalPurchasing";
-import VendorPortalCharity from "./pages/vendor-portal/VendorPortalCharity";
-import VendorPortalInsights from "./pages/vendor-portal/VendorPortalInsights";
+const AdminVendorsPage = lazy(() => import("./pages/admin/AdminVendorsPage"));
+const AdminAppealsPage = lazy(() => import("./pages/admin/AdminAppealsPage"));
+const AdminLocksPage = lazy(() => import("./pages/admin/AdminLocksPage"));
+const AdminPayoutsPage = lazy(() => import("./pages/admin/AdminPayoutsPage"));
+const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
+const AdminPlatformPage = lazy(() => import("./pages/admin/AdminPlatformPage"));
+const AdminDishesPage = lazy(() => import("./pages/admin/AdminDishesPage"));
+const AdminAnomaliesPage = lazy(() => import("./pages/admin/AdminEventsPage").then((m) => ({ default: m.AdminAnomaliesPage })));
+const AdminDisastersPage = lazy(() => import("./pages/admin/AdminEventsPage").then((m) => ({ default: m.AdminDisastersPage })));
+const VendorPortalDashboard = lazy(() => import("./pages/vendor-portal/VendorPortalDashboard"));
+const VendorPortalMenu = lazy(() => import("./pages/vendor-portal/VendorPortalMenu"));
+const VendorPortalOrders = lazy(() => import("./pages/vendor-portal/VendorPortalOrders"));
+const VendorPortalPrep = lazy(() => import("./pages/vendor-portal/VendorPortalPrep"));
+const VendorPortalGrowth = lazy(() => import("./pages/vendor-portal/VendorPortalGrowth"));
+const VendorPortalReports = lazy(() => import("./pages/vendor-portal/VendorPortalReports"));
+const VendorPortalSessions = lazy(() => import("./pages/vendor-portal/VendorPortalSessions"));
+const VendorPortalSessionSummary = lazy(() => import("./pages/vendor-portal/VendorPortalSessionSummary"));
+const VendorPortalSettings = lazy(() => import("./pages/vendor-portal/VendorPortalSettings"));
+const VendorPortalRecipes = lazy(() => import("./pages/vendor-portal/VendorPortalRecipes"));
+const VendorPortalPurchasing = lazy(() => import("./pages/vendor-portal/VendorPortalPurchasing"));
+const VendorPortalCharity = lazy(() => import("./pages/vendor-portal/VendorPortalCharity"));
+const VendorPortalInsights = lazy(() => import("./pages/vendor-portal/VendorPortalInsights"));
 
 const DesignSystemPreview = lazy(() => import("./pages/DesignSystemPreview"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 
 function NotFound() {
   return (
-    <div style={{ padding: 40, textAlign: "center" }}>
-      <p>{tr("找不到這個頁面。", "Page not found.")}</p>
-      <Link href="/">{tr("回首頁", "Home")}</Link>
+    <>
+    <MarketplaceHeader />
+    <section className="bb-404">
+      <p className="bb-404__code" aria-hidden="true">404</p>
+      <h1 className="bb-404__title">{tr("這一頁還沒開飯。", "This page isn't on the menu.")}</h1>
+      <p className="bb-404__body">{tr("找不到你要的頁面，可能是連結打錯了，或餐點已經下架。", "We couldn't find that page — the link may be wrong or the item is gone.")}</p>
+      <div className="bb-404__actions">
+        <Link href="/home" className="bb-404__btn">{tr("看今日菜單", "See today's menu")}</Link>
+        <Link href="/" className="bb-404__link">{tr("回首頁", "Back home")}</Link>
+      </div>
+    </section>
+    </>
+  );
+}
+
+// 路由拆包（React.lazy）載入中的畫面：品牌標誌輕微呼吸，避免換頁時整片空白
+function RouteFallback() {
+  return (
+    <div className="bb-route-fallback" role="status" aria-live="polite">
+      <img src="/飯飽R.png" alt="" width={72} height={64} />
+      <span className="sr-only">{tr("載入中…", "Loading…")}</span>
     </div>
   );
+}
+
+// 換頁時捲回頂端（hash 路由不會自己做）。同一頁內的 #anchor 不在這裡處理。
+function ScrollToTopOnRouteChange() {
+  const [location] = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
 }
 
 // 全站共用外框：所有路由都包在這裡，頁尾（SiteFooter）統一在這裡掛一次，
@@ -74,7 +103,8 @@ function NotFound() {
 function MarketplacePage({ children }: { children: React.ReactNode }) {
   return (
     <div className="font-sans antialiased bg-background text-foreground">
-      {children}
+      {/* bb-page-enter：每次換頁內容淡入上移（global.css，尊重 reduced-motion） */}
+      <div className="bb-page-enter">{children}</div>
       <SiteFooter />
     </div>
   );
@@ -100,7 +130,7 @@ function useSyncUserLang(lang: "zh" | "en") {
 // 「首頁」、/home 標成「今日菜單」）。瀏覽本來就不用登入，登入從
 // LandingPage 上的「登入／註冊」按鈕自己點，/login 路由本身沒有動。
 function RootGate() {
-  return <Suspense fallback={null}><LandingPage /></Suspense>;
+  return <LandingPage />;
 }
 
 export default function App() {
@@ -113,6 +143,8 @@ export default function App() {
       <SiteThemeRoot>
       <ConfirmProvider>
       <Router hook={useHashLocation} key={lang}>
+        <ScrollToTopOnRouteChange />
+        <Suspense fallback={<RouteFallback />}>
         <Switch>
           {/* 根路徑：未登入 = 登入頁，已登入 = 首頁（與 bunnbaa.com 行為一致） */}
           {/* 不包 MarketplacePage：RootGate 一律顯示 LandingPage，LandingPage 自己有 SiteFooter，
@@ -268,18 +300,19 @@ export default function App() {
 
           {/* 設計系統預覽（tokens + 元件狀態一覽）；lazy 載入，不增加其他頁面的 bundle */}
           <Route path="/design-system">
-            <Suspense fallback={null}><DesignSystemPreview /></Suspense>
+            <DesignSystemPreview />
           </Route>
 
           {/* 品牌形象頁（版面參考 cafen，視覺全用設計系統）；lazy 載入 */}
           <Route path="/landing">
-            <Suspense fallback={null}><LandingPage /></Suspense>
+            <LandingPage />
           </Route>
 
           <Route>
             <MarketplacePage><NotFound /></MarketplacePage>
           </Route>
         </Switch>
+        </Suspense>
       </Router>
       </ConfirmProvider>
       <Toaster />

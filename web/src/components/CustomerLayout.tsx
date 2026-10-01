@@ -10,10 +10,10 @@ import MarketplaceHeader, { type MarketplaceTab } from "./MarketplaceHeader";
 // 常見問題等頁尾連結頁不屬於任何 tab，呼叫端傳 undefined。
 export default function CustomerLayout({ children, hero, active = "vendors" }: { children: ReactNode; hero?: ReactNode; active?: MarketplaceTab }) {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <MarketplaceHeader active={active} />
       {hero}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-3 md:px-4 py-3 md:py-6">
+      <main className="flex-1 max-w-[1400px] mx-auto w-full px-4 md:px-6 py-6 md:py-12">
         {children}
       </main>
     </div>
