@@ -49,22 +49,23 @@ export default function GiftClaimPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <MarketplaceHeader />
-      <div className="max-w-md mx-auto px-4 py-10">
+      <div className="max-w-xl mx-auto px-4 pt-12 md:pt-20 pb-16">
         {lock === undefined ? null : done ? (
           <EmptyState icon={<Gift size={32} />} title={tr("已收下！", "It's yours!")} description={tr("到「我的餐點」出示取餐碼即可取餐。", "Show the pickup code from My meals.")} action={<Button asChild><Link href="/my-bookings">{tr("前往我的餐點", "Go to My meals")}</Link></Button>} />
         ) : !lock || lock.status !== "for_gift" ? (
           <EmptyState icon={<Gift size={32} />} title={tr("這份贈送已經不存在", "This gift is no longer available")} description={tr("可能已被收下或贈送者取消了。", "It may have been accepted or cancelled.")} />
         ) : (
-          <div className="bg-white rounded-xl border border-border p-5 space-y-3">
-            <h1 className="text-xl font-bold flex items-center gap-2"><Gift className="w-5 h-5 text-pink-500" /> {tr("有同學送你一份便當", "A classmate gifted you a meal")}</h1>
-            <p className="font-semibold">{loc(lock, "item_name")}</p>
+          <div className="bb-receipt space-y-4 text-center">
+            <span className="bb-receipt__check" aria-hidden="true"><Gift className="w-9 h-9" /></span>
+            <h1 className="font-heading font-semibold text-[clamp(30px,5vw,44px)] leading-tight">{tr("有同學送你一份便當", "A classmate gifted you a meal")}</h1>
+            <p className="font-heading text-2xl font-semibold">{loc(lock, "item_name")}</p>
             <p className="text-sm text-muted-foreground">{lock.pickup_date}・{lock.pickup_window}</p>
             {(lock.slots?.length ?? 0) > 0 && (
               <ul className="text-xs text-muted-foreground">{lock.slots!.map((s, i) => <li key={i}>• {slotText(s)}</li>)}</ul>
             )}
-            <Button className="w-full" disabled={busy || lock.buyer_uid === user?.id} onClick={accept}>
+            <Button className="w-full h-12 rounded-full text-base" disabled={busy || lock.buyer_uid === user?.id} onClick={accept}>
               {busy ? tr("處理中…", "Working…") : lock.buyer_uid === user?.id ? tr("這是你送出的", "You sent this") : tr("接受贈送", "Accept gift")}
             </Button>
           </div>

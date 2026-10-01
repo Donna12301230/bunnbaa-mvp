@@ -194,7 +194,7 @@ export default function TransferMarketPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <MarketplaceHeader active="transfer" />
 
       <PageHero
@@ -218,7 +218,7 @@ export default function TransferMarketPage() {
           </Tag>
         </div>
 
-        {loading && <SkeletonBlocks count={3} height={240} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" />}
+        {loading && <SkeletonBlocks count={3} height={240} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" />}
 
         {!loading && browseTab === "browse" && (
           <>
@@ -229,30 +229,30 @@ export default function TransferMarketPage() {
             {activeListings.length === 0 ? (
               <EmptyState icon={<Repeat size={32} />} title={tr("目前沒有人轉讓", "Nothing up for transfer")} description={tr("稍後再回來看看，有新的轉讓會即時出現。", "Check back later — new transfers appear instantly.")} />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {activeListings.map(item => {
                   const deadline = deadlineOf(item);
                   return (
-                    <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
-                      <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                    <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
+                      <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
                         {imageOf(item) ? (
-                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />
                       ) : (
-                        <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                        <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
                       )}
                         {deadline && (
-                          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-rice text-rice-foreground">
+                          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 text-caption font-bold px-2.5 py-1 rounded-full bg-[var(--surface-inverse)] text-[var(--text-on-inverse)]">
                             <Clock className="w-3 h-3" /> {formatCountdown(deadline, now)}
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-col gap-2.5 p-4 flex-1">
-                        <h3 className="text-body font-bold leading-snug">{loc(item, "item_name")}</h3>
+                      <div className="flex flex-col gap-2.5 p-5 flex-1">
+                        <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                         </div>
                         <div className="flex items-center justify-between mt-auto pt-1.5">
-                          <span className="text-lg font-extrabold">${item.locked_price}</span>
+                          <span className="font-heading text-2xl font-semibold">${item.locked_price}</span>
                           <Button
                             size="sm"
                             disabled={claimingId === item.id}
@@ -270,35 +270,36 @@ export default function TransferMarketPage() {
 
             <div className="flex items-center gap-2.5 pt-2 flex-wrap">
               <Clock className="w-5 h-5" />
-              <h2 className="text-lg font-bold">{tr("已逾期・開放 $0 元領取", "Expired · free to claim")}</h2>
+              <h2 className="font-heading text-2xl md:text-3xl font-semibold">{tr("已逾期・開放 $0 元領取", "Expired · free to claim")}</h2>
               <span className="text-xs text-muted-foreground">{tr("取餐時段結束仍未被接手，系統自動開放給任何人免費領取，先到先得", "Not taken by the end of the pickup window, so anyone can claim it for free — first come, first served")}</span>
             </div>
 
             {expiredListings.length === 0 ? (
               <EmptyState size="compact" icon={<Clock size={32} />} title={tr("目前沒有逾期的項目", "No expired items")} />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              /* 逾期清單常有幾十筆：用較密的格線，頁面不會拉得太長 */
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {expiredListings.map(item => (
-                  <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
-                    <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                  <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
+                    <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
                       {imageOf(item) ? (
-                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />
                       ) : (
-                        <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                        <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
                       )}
-                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-rice text-rice-foreground">
+                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-[var(--surface-inverse)] text-[var(--text-on-inverse)]">
                         {tr("已逾期・開放中", "Expired · open")}
                       </span>
                     </div>
-                    <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <h3 className="text-body font-bold leading-snug">{loc(item, "item_name")}</h3>
+                    <div className="flex flex-col gap-2.5 p-5 flex-1">
+                      <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-1.5">
                         <div>
-                          <span className="text-xs text-gray-500 line-through mr-1.5">${item.locked_price}</span>
-                          <span className="text-lg font-extrabold">$0</span>
+                          <span className="text-xs text-muted-foreground line-through mr-1.5">${item.locked_price}</span>
+                          <span className="font-heading text-2xl font-semibold">$0</span>
                         </div>
                         <Button
                           size="sm"
@@ -330,26 +331,26 @@ export default function TransferMarketPage() {
                 action={<Button asChild variant="outline"><Link href="/my-bookings">{tr("前往我的餐點", "Go to My meals")}</Link></Button>}
               />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {myListings.map(item => (
-                  <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
-                    <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                  <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
+                    <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
                       {imageOf(item) ? (
-                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />
                       ) : (
-                        <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                        <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
                       )}
-                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-orange-500 text-white">
+                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-[#f29e0c] text-[#2b180d]">
                         {tr("轉讓中", "Listed")}
                       </span>
                     </div>
-                    <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <h3 className="text-body font-bold leading-snug">{loc(item, "item_name")}</h3>
+                    <div className="flex flex-col gap-2.5 p-5 flex-1">
+                      <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-1.5">
-                        <span className="text-lg font-extrabold">${item.locked_price}</span>
+                        <span className="font-heading text-2xl font-semibold">${item.locked_price}</span>
                         <Button
                           size="sm"
                           variant="outline"
@@ -367,28 +368,28 @@ export default function TransferMarketPage() {
             )}
             <div className="flex items-center gap-2.5 pt-2 flex-wrap">
               <Repeat className="w-5 h-5" />
-              <h2 className="text-lg font-bold">{tr("已被接手", "Taken over")}</h2>
+              <h2 className="font-heading text-2xl md:text-3xl font-semibold">{tr("已被接手", "Taken over")}</h2>
               <span className="text-xs text-muted-foreground">{tr("你轉讓或贈送出去、已經有人接手的項目", "Meals you transferred or gifted that someone has taken")}</span>
             </div>
 
             {handedOver.length === 0 ? (
               <EmptyState size="compact" icon={<Repeat size={32} />} title={tr("還沒有被接手的項目", "Nothing taken over yet")} />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {handedOver.map(item => (
-                  <article key={item.id} className="rounded-xl bg-white border border-border overflow-hidden flex flex-col">
-                    <div className="relative h-[130px] bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                  <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
+                    <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
                       {imageOf(item) ? (
-                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />
                       ) : (
-                        <UtensilsCrossed className="h-10 w-10 text-orange-400" strokeWidth={1.75} aria-hidden="true" />
+                        <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
                       )}
-                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-gray-200 text-gray-700">
+                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-card text-foreground border border-ink">
                         {tr("已被接手", "Taken over")}
                       </span>
                     </div>
-                    <div className="flex flex-col gap-2.5 p-4 flex-1">
-                      <h3 className="text-body font-bold leading-snug">{loc(item, "item_name")}</h3>
+                    <div className="flex flex-col gap-2.5 p-5 flex-1">
+                      <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                       </div>

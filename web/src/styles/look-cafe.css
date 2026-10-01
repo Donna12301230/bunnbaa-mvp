@@ -355,3 +355,12 @@
   letter-spacing: -0.01em;
 }
 .bb-theme[data-look='cafe'] .bb-empty__desc { font-size: var(--font-body-size); }
+
+/* ── Tailwind 舊卡片（bg-white rounded-xl border）全站統一：奶油白底、更大圓角 ──
+   （2026-10-01 全站改版；後台與尚未個別改版的頁面一次跟上新的視覺語彙） */
+:is(.bb-theme, .bb-look)[data-look='cafe'] .bg-white:is(.border, .border-2) {
+  background-color: var(--surface);
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .bg-white.rounded-xl:is(.border, .border-2) {
+  border-radius: 1.5rem;
+}

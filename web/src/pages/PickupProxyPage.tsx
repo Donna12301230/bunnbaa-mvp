@@ -11,13 +11,14 @@ import { tr } from "@/lib/i18n";
 export default function PickupProxyPage() {
   const { lockId, token } = useParams<{ lockId: string; token: string }>();
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <MarketplaceHeader />
-      <div className="max-w-sm mx-auto px-4 py-10">
-        <div className="bg-white rounded-xl border border-border p-5 space-y-2 text-center">
-          <h1 className="text-lg font-bold flex items-center justify-center gap-2"><Users className="w-5 h-5 text-orange-500" /> {tr("代領取餐", "Proxy pickup")}</h1>
-          <p className="text-xs text-muted-foreground">{tr("朋友請你幫忙帶便當。到店把這個 QR Code 給店員掃描即可。", "A friend asked you to pick up their meal. Show this QR code to the staff.")}</p>
-          <PickupQr lockId={lockId} shareToken={token} size={220} />
+      <div className="max-w-md mx-auto px-4 pt-12 md:pt-20 pb-16">
+        <div className="bb-receipt space-y-4 text-center">
+          <span className="bb-receipt__check" aria-hidden="true"><Users className="w-9 h-9" /></span>
+          <h1 className="font-heading font-semibold text-[clamp(30px,5vw,44px)] leading-tight">{tr("代領取餐", "Proxy pickup")}</h1>
+          <p className="text-sm text-muted-foreground">{tr("朋友請你幫忙帶便當。到店把這個 QR Code 給店員掃描即可。", "A friend asked you to pick up their meal. Show this QR code to the staff.")}</p>
+          <div className="flex justify-center pt-2"><PickupQr lockId={lockId} shareToken={token} size={240} /></div>
         </div>
       </div>
     </div>
