@@ -68,12 +68,13 @@ async function callerVendorId(request, requested) {
 async function notifyUser(uid, { title, body, link = null, kind = "general" }) {
   if (!uid) return;
   try {
-    await db().collection("notifications").add({
-      user_id: uid, title, body, link, kind, read: false, created_at: FieldValue.serverTimestamp(),
-    });
+    // 會員中心關掉的通知類別（例如愛心餐）：站內通知與推播都不送
     const prefs = await db().collection("users").doc(uid).get();
     const muted = prefs.exists ? prefs.data().muted_kinds || [] : [];
     if (muted.includes(kind)) return;
+    await db().collection("notifications").add({
+      user_id: uid, title, body, link, kind, read: false, created_at: FieldValue.serverTimestamp(),
+    });
     const tokenSnap = await db().collection("userTokens").doc(uid).get();
     const tokens = tokenSnap.exists ? tokenSnap.data().tokens || [] : [];
     for (const token of tokens.slice(-3)) {

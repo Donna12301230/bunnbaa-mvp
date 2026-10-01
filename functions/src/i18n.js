@@ -10,9 +10,14 @@ function withLang(handler) {
   return (request) => store.run({ lang: request?.data?.lang === "en" ? "en" : "zh" }, () => handler(request));
 }
 
+/** 排程裡依收件人的語言（users.lang）組通知：在 fn 內呼叫的 t() 用指定語言 */
+function inLang(lang, fn) {
+  return store.run({ lang: lang === "en" ? "en" : "zh" }, fn);
+}
+
 /** 依目前請求的語言挑字串 */
 function t(zh, en) {
   return store.getStore()?.lang === "en" ? en : zh;
 }
 
-module.exports = { withLang, t };
+module.exports = { withLang, inLang, t };
