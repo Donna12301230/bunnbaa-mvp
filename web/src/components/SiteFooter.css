@@ -1,7 +1,7 @@
 /* 全站共用頁尾。只用 tokens.css 的全域變數（除了 --sf-deep 這種頁尾自己的配色），
    不依賴 LandingPage.css 的 .bb-landing 作用域，才能在任何頁面單獨掛用。 */
 .site-footer {
-  --sf-deep: #3b2314;
+  --sf-deep: #73472d;  /* 溫暖褐色：--sf-text 5.2:1、--sf-heading 6.7:1 */
   --sf-heading: #fbead0;
   --sf-text: #e9cfa8;
   --sf-line: color-mix(in srgb, white 22%, transparent);

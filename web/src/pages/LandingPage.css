@@ -1,7 +1,8 @@
 /* ══════════════════════════════════════════════════════════════════════════
    品牌形象頁（#/、#/landing）— 2026-10-01 編輯式改版
    以 tokens.css／look-cafe.css 的變數為主；品牌頁專屬的只有：
-   · --lp-ink   深可可棕色帶（品牌故事、試算卡、收尾 CTA），奶油字 11.6:1
+   · --lp-ink   深可可棕：文字、按鈕、橘底上的字
+   · --lp-band  溫暖褐色大面積色帶（品牌故事、試算卡）：奶油字 6.2:1、奶油白 7.3:1、橘色大字 3.6:1
    · --lp-serif 拉丁字與數字用 Fraunces，中文自動落到 Noto Serif TC
    動態：[data-reveal] 只在 .lp-motion（JS 確認不是 reduced-motion 後才加）底下先藏起來，
    所以縮圖擷取、JS 沒跑、減少動態偏好時內容一律直接可見。
@@ -10,6 +11,7 @@
 .bb-landing {
   --lp-ink: #2b180d;
   --lp-ink-2: #3b2314;
+  --lp-band: #73472d;
   --lp-butter: #ffe1a1;
   --lp-orange: #f29e0c;
   --lp-heading: var(--text);
@@ -182,7 +184,7 @@
 .lp-eyebrow__index { font-family: var(--lp-serif); font-size: 15px; font-style: italic; letter-spacing: 0; color: var(--brand-orange-text); }
 .lp-eyebrow__rule { width: 40px; height: 1px; background: currentColor; opacity: 0.5; }
 .lp-eyebrow--invert { color: color-mix(in srgb, var(--lp-butter) 80%, transparent); }
-.lp-eyebrow--invert .lp-eyebrow__index { color: var(--lp-orange); }
+.lp-eyebrow--invert .lp-eyebrow__index { color: var(--lp-butter); }
 
 /* ── 按鈕／文字連結 ───────────────────────────────────────────────────── */
 .lp-pill { border-radius: var(--radius-full); }
@@ -504,7 +506,7 @@
 .lp-story {
   position: relative;
   margin-top: -14px;
-  background: var(--lp-ink);
+  background: var(--lp-band);
   color: var(--lp-butter);
   isolation: isolate;
 }
@@ -664,7 +666,7 @@
   isolation: isolate;
   padding: 32px;
   border-radius: 36px;
-  background: var(--lp-ink);
+  background: var(--lp-band);
   color: var(--lp-butter);
   box-shadow: 0 50px 80px -40px rgba(43, 24, 13, 0.6);
 }
@@ -685,7 +687,7 @@
 }
 .lp-sim__photo img { width: 100%; height: 100%; object-fit: cover; }
 .lp-sim__name { margin: 0; font-family: var(--font-heading); font-size: 20px; font-weight: 600; color: #fff6e3; }
-.lp-sim__vendor { margin: 2px 0 0; font-size: 14px; color: color-mix(in srgb, var(--lp-butter) 75%, transparent); }
+.lp-sim__vendor { margin: 2px 0 0; font-size: 14px; color: var(--lp-butter); }
 
 .lp-sim__readout {
   display: flex;
@@ -694,7 +696,7 @@
   gap: 8px 16px;
   margin-top: 36px;
 }
-.lp-sim__was { font-size: 16px; color: color-mix(in srgb, var(--lp-butter) 70%, transparent); text-decoration: line-through; }
+.lp-sim__was { font-size: 16px; color: var(--lp-butter); text-decoration: line-through; }
 .lp-sim__now {
   display: inline-flex;
   align-items: baseline;
@@ -753,7 +755,7 @@
   width: 32px;
   height: 32px;
   margin-top: -13px;
-  border: 4px solid var(--lp-ink);
+  border: 4px solid var(--lp-band);
   border-radius: 50%;
   background: var(--lp-butter);
   box-shadow: 0 0 0 1px var(--lp-butter);
@@ -762,7 +764,7 @@
 .lp-sim__range::-moz-range-thumb {
   width: 24px;
   height: 24px;
-  border: 4px solid var(--lp-ink);
+  border: 4px solid var(--lp-band);
   border-radius: 50%;
   background: var(--lp-butter);
   box-shadow: 0 0 0 1px var(--lp-butter);
@@ -785,7 +787,7 @@
   height: 34px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--lp-butter) 8%, transparent);
-  color: color-mix(in srgb, var(--lp-butter) 55%, transparent);
+  color: color-mix(in srgb, var(--lp-butter) 80%, transparent);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   transition: background 300ms var(--lp-ease-out), color 300ms;

@@ -46,7 +46,7 @@
   --skeleton-base: #f3e6d0;
 
   /* ── 色帶表面 ── */
-  --surface-inverse: var(--cafe-ink);
+  --surface-inverse: #73472d;                /* 大面積色帶改溫暖褐色（不用近黑的可可棕） */
   --text-on-inverse: var(--cafe-butter);     /* 11.6:1 */
   --surface-accent: var(--cafe-butter);
   --text-on-accent: var(--cafe-ink);
