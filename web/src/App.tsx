@@ -111,6 +111,15 @@ function MarketplacePage({ children }: { children: React.ReactNode }) {
   );
 }
 
+// 後台（平台管理 /admin、店家 /vendor-portal、取餐掃碼頁）：同樣外框，但不掛頁尾
+function BackOfficePage({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="font-sans antialiased bg-background text-foreground">
+      <div className="bb-page-enter">{children}</div>
+    </div>
+  );
+}
+
 // 登入中的使用者把介面語言存進 users/{uid}.lang，排程推播（取餐提醒）才知道要用哪種語言。
 // 只有跟已存的不同時才寫；失敗不影響使用（下次切換或登入再試）。
 function useSyncUserLang(lang: "zh" | "en") {
@@ -163,7 +172,7 @@ export default function App() {
             <Redirect to="/vendor-portal/dashboard" replace />
           </Route>
           <Route path="/lock/vendor/redeem">
-            <MarketplacePage><RequireVendorSignIn><VendorRedeemPage /></RequireVendorSignIn></MarketplacePage>
+            <BackOfficePage><RequireVendorSignIn><VendorRedeemPage /></RequireVendorSignIn></BackOfficePage>
           </Route>
           <Route path="/gift/:lockId">
             <MarketplacePage><GiftClaimPage /></MarketplacePage>
@@ -237,74 +246,74 @@ export default function App() {
             <MarketplacePage><JoinUsPage /></MarketplacePage>
           </Route>
           <Route path="/admin/vendors">
-            <MarketplacePage><AdminVendorsPage /></MarketplacePage>
+            <BackOfficePage><AdminVendorsPage /></BackOfficePage>
           </Route>
           <Route path="/admin/appeals">
-            <MarketplacePage><AdminAppealsPage /></MarketplacePage>
+            <BackOfficePage><AdminAppealsPage /></BackOfficePage>
           </Route>
           <Route path="/admin/locks">
-            <MarketplacePage><AdminLocksPage /></MarketplacePage>
+            <BackOfficePage><AdminLocksPage /></BackOfficePage>
           </Route>
           <Route path="/admin/payouts">
-            <MarketplacePage><AdminPayoutsPage /></MarketplacePage>
+            <BackOfficePage><AdminPayoutsPage /></BackOfficePage>
           </Route>
           <Route path="/admin/settings">
-            <MarketplacePage><AdminSettingsPage /></MarketplacePage>
+            <BackOfficePage><AdminSettingsPage /></BackOfficePage>
           </Route>
           <Route path="/admin/platform">
-            <MarketplacePage><AdminPlatformPage /></MarketplacePage>
+            <BackOfficePage><AdminPlatformPage /></BackOfficePage>
           </Route>
           <Route path="/admin/dishes">
-            <MarketplacePage><AdminDishesPage /></MarketplacePage>
+            <BackOfficePage><AdminDishesPage /></BackOfficePage>
           </Route>
           <Route path="/admin/anomalies">
-            <MarketplacePage><AdminAnomaliesPage /></MarketplacePage>
+            <BackOfficePage><AdminAnomaliesPage /></BackOfficePage>
           </Route>
           <Route path="/admin/disasters">
-            <MarketplacePage><AdminDisastersPage /></MarketplacePage>
+            <BackOfficePage><AdminDisastersPage /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/dashboard">
-            <MarketplacePage><VendorPortalDashboard /></MarketplacePage>
+            <BackOfficePage><VendorPortalDashboard /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/menu">
-            <MarketplacePage><VendorPortalMenu /></MarketplacePage>
+            <BackOfficePage><VendorPortalMenu /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/orders">
-            <MarketplacePage><VendorPortalOrders /></MarketplacePage>
+            <BackOfficePage><VendorPortalOrders /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/prep">
-            <MarketplacePage><VendorPortalPrep /></MarketplacePage>
+            <BackOfficePage><VendorPortalPrep /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/reports">
-            <MarketplacePage><VendorPortalReports /></MarketplacePage>
+            <BackOfficePage><VendorPortalReports /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/growth">
-            <MarketplacePage><VendorPortalGrowth /></MarketplacePage>
+            <BackOfficePage><VendorPortalGrowth /></BackOfficePage>
           </Route>
           {/* 舊版 mock 掃碼頁，已由真的核對取餐頁取代，保留路徑避免舊連結 404 */}
           <Route path="/vendor-portal/scan">
             <Redirect to="/lock/vendor/redeem" replace />
           </Route>
           <Route path="/vendor-portal/sessions/:sessionId/summary">
-            <MarketplacePage><VendorPortalSessionSummary /></MarketplacePage>
+            <BackOfficePage><VendorPortalSessionSummary /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/sessions">
-            <MarketplacePage><VendorPortalSessions /></MarketplacePage>
+            <BackOfficePage><VendorPortalSessions /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/settings">
-            <MarketplacePage><VendorPortalSettings /></MarketplacePage>
+            <BackOfficePage><VendorPortalSettings /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/recipes">
-            <MarketplacePage><VendorPortalRecipes /></MarketplacePage>
+            <BackOfficePage><VendorPortalRecipes /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/purchasing">
-            <MarketplacePage><VendorPortalPurchasing /></MarketplacePage>
+            <BackOfficePage><VendorPortalPurchasing /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/charity">
-            <MarketplacePage><VendorPortalCharity /></MarketplacePage>
+            <BackOfficePage><VendorPortalCharity /></BackOfficePage>
           </Route>
           <Route path="/vendor-portal/insights">
-            <MarketplacePage><VendorPortalInsights /></MarketplacePage>
+            <BackOfficePage><VendorPortalInsights /></BackOfficePage>
           </Route>
 
           {/* 設計系統預覽（tokens + 元件狀態一覽）；lazy 載入，不增加其他頁面的 bundle */}
