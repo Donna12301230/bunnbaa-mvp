@@ -136,7 +136,7 @@ async function mkBento(vendorId, extra = {}) {
     vendor_id: vendorId, name: "測試雞腿便當", name_en: "Test Chicken Bento", price: 100, category: "便當", available: true,
     main: { name: "滷雞腿" }, rice_component_id: "zz-rice",
     slots: [
-      { category: "青菜類", default: { name: "高麗菜" }, candidates: [{ name: "地瓜葉", portion_level: 0.75, weekly_cap: 1000, min_qty: 10 }] },
+      { category: "青菜類", default: { name: "高麗菜" }, candidates: [{ name: "地瓜葉", portion_level: 1, weekly_cap: 1000, min_qty: 10 }] },
       { category: "蛋豆類", default: { name: "滷蛋" } },
     ],
     ...extra,
@@ -241,7 +241,7 @@ function geohash(lat, lng, precision = 7) {
       if (!noshow) throw new Error("SKIP：前一案例沒跑");
       if (nowMinutes < 150) throw new Error("SKIP：00:30 + 2 小時還沒到");
       await runSchedule("charity.js", "closeCharity");
-      eq((await get(`vendors/${VN}/prepPlans/${TODAY}`)).charity_closed, true);
+      eq((await get(`vendors/${VN}/prepPlans/${TODAY}`)).charity_closed_breakfast, true); // v4 依餐期：00:00 時段歸早餐
       eq((await notes(`zz2-owner-noshow-${RUN}`, { title: /愛心餐已截止/ })).length, 1, "店家提醒");
       const R = await freshUser("late");
       const meal = (await get(`locks/${noshow.id}`)).charity_meal_id;
@@ -283,7 +283,7 @@ function geohash(lat, lng, precision = 7) {
       eq((await notes(P3.uid, { title: /都送出去了/ })).length, 0);
     });
 
-    await test("C-CHR-09 C-CHR-15", "預約逾時（排程）：釋出回 available、停權 7 天、再預約被擋；預約不影響口味分數", async () => {
+    await test("C-CHR-09 C-CHR-15", "預約逾時（排程）：釋出回 available、不停權、可以再預約；預約不影響口味分數", async () => {
       if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
       const VE = await mkVendor(vid("expire"));
       await mkBento(VE);
@@ -295,11 +295,11 @@ function geohash(lat, lng, precision = 7) {
       await runSchedule("charity.js", "expireCharityReservation");
       eq((await get(`charityReservations/${res}`)).status, "expired");
       eq((await get(`charityMeals/${meal}`)).status, "available");
-      const days = ((await get(`charityBans/${R2.uid}`)).until.toMillis() - Date.now()) / 86400000;
-      assert(days > 6.9 && days <= 7.01, `停權天數 ${days}`);
-      assert((await notes(R2.uid, { title: /逾時/ })).length === 1, "逾時通知");
-      const again = expectCode(await R2.call("reserveCharity", { meal_id: meal }), "permission-denied");
-      assert(/不影響一般訂餐/.test(again.message), again.message);
+      assert(!(await get(`charityBans/${R2.uid}`)), "v4 不再寫 charityBans");
+      const note = await notes(R2.uid, { title: /逾時/ });
+      assert(note.length === 1 && /釋出給下一位/.test(note[0].body), "逾時通知寫釋出、不寫停權");
+      const again = expectOk(await R2.call("reserveCharity", { meal_id: meal }), "逾時後可以再預約（C-CHR-18）");
+      eq((await get(`charityReservations/${again.reservation_id}`)).status, "reserved");
       assert(!(await get(`tasteProfiles/${R2.uid}`)), "預約愛心餐不應產生口味分數");
     });
   }
@@ -332,8 +332,8 @@ function geohash(lat, lng, precision = 7) {
     await db.doc(`vendors/${VP}/rewardPeriods/${P}`).set({ period_id: P, net_revenue: 100000, tickets: 1000 });
     eq(expectOk(await OWNER.call("triggerRewardPeriodNow", { vendor_id: VP, period_id: P }))[VP], "pooled");
     const p = await get(`vendors/${VP}/rewardPeriods/${P}`);
-    eq(p.pool, 10000); eq(p.leftover, 10);
-    eq(Object.fromEntries(Object.entries(p.allocation).sort()), { free: 2, t10: 5, t30: 11, t50: 27, t80: 163, t95: 792 });
+    eq(p.pool, 10000); eq(p.leftover, 20);
+    eq(Object.fromEntries(Object.entries(p.allocation).sort()), { free: 15, t50: 79, t95: 906 });
     const issued = await db.collection("coupons").where("vendor_id", "==", VP).where("pool_period", "==", P).get();
     eq(issued.size, 1000, "發出的券");
     const drawable = await db.collection("rewardTickets").where("vendor_id", "==", VP).where("status", "==", "drawable").get();
@@ -722,7 +722,9 @@ function geohash(lat, lng, precision = 7) {
     eq(list.board[0], { date: week, closed: false, confirmed: 1, forecast: 3 }, "週一：確定 1、預測 4−1");
     eq(list.board[1].forecast, 3, "週二：(0+4+4+4)/4 = 3");
     const ings = Object.fromEntries((await db.collection(`vendors/${VPU}/ingredients`).get()).docs.map((d) => [d.id, d.data()]));
-    assert(list.lines.length > 0 && list.lines.every((l) => ings[l.ingredient_id].frequency !== "monthly"), "週單不含 monthly");
+    // v4：久放品項（monthly）併入週單，只在庫存不夠時出現，一次週一到貨
+    const longLived = list.lines.filter((l) => ings[l.ingredient_id].frequency === "monthly");
+    assert(longLived.every((l) => l.long_lived && l.deliveries.length === 1 && l.deliveries[0].date === week), `久放品項：${JSON.stringify(longLived)}`);
     assert(list.lines.every((l) => l.by_day.length === 5 && l.by_day.every((d) => "confirmed" in d && "forecast" in d)), "每格分已確定與預測");
     const leg = list.lines.find((l) => l.ingredient_id === "chicken_leg");
     assert(leg && leg.order_units * leg.purchase_unit_size >= leg.need - leg.stock, "進料量依採購單位進位");
@@ -733,12 +735,9 @@ function geohash(lat, lng, precision = 7) {
     const weeklies = (await db.collection(`vendors/${VPU}/purchaseLists`).get()).docs.filter((d) => d.data().type === "weekly");
     eq(weeklies.length, 1, "同一週重跑只覆寫一張");
     eq((await get(`vendors/${VPU}`)).menu_locked_week, week, "下週主菜鎖定");
-    const m = expectOk(await OWNER.call("triggerPurchaseListNow", { vendor_id: VPU, type: "monthly" }));
-    const monthly = await get(`vendors/${VPU}/purchaseLists/monthly_${m.month}`);
-    assert(monthly.lines.length > 0 && monthly.lines.every((l) => ings[l.ingredient_id].frequency === "monthly"), "月單只含 monthly（V-PUR-07）");
   });
 
-  await test("V-PUR-04 V-PUR-06 V-PUR-07", "新店用自填預估；保存 ≤ 3 天的葉菜分批到貨、耐放的一次週一", async () => {
+  await test("V-PUR-04 V-PUR-06", "新店用自填預估；保存 ≤ 3 天的葉菜分批到貨、耐放的一次週一", async () => {
     const VPN = vid("purnew");
     await mkVendor(VPN);
     const ids = await cloneCatalog("cafe-renheya-demo", VPN);
@@ -842,8 +841,8 @@ function geohash(lat, lng, precision = 7) {
       } finally { await db.doc(`vendors/${VPL}`).update({ slot_capacity: 0 }); }
     });
 
-    await test("C-PLN-04", "到下週五排不滿 N 個營業日 → 被擋並提示", async () => {
-      const r = expectCode(await join(await plan({ days: 30 })), "invalid-argument");
+    await test("C-PLN-04", "30 天內排不滿 N 個營業日 → 被擋並提示", async () => {
+      const r = expectCode(await join(await plan({ days: 30 })), "invalid-argument"); // 30 天內最多 22 個營業日
       assert(/湊不滿/.test(r.message), r.message);
     });
 
@@ -901,10 +900,212 @@ function geohash(lat, lng, precision = 7) {
       await ref.set({ cutoffTime: flip }, { merge: true });
       const r = await U.call("createCartLinePayReservation", { lines: [line({ pickup_date: tomorrow, coupon_id: await coupon(U.uid, VO, 1000) })] });
       eq(r.ok, pastDefault, `截單改 ${flip} 後明天能不能訂`);
-      await ref.update({ charityBanDays: FieldValue.delete(), cutoffTime: FieldValue.delete() });
+      await ref.update({ bookingRangeDays: FieldValue.delete(), cutoffTime: FieldValue.delete() });
       const cfg = await loadPlatformConfig(db);
-      eq([cfg.charityBanDays, cfg.cutoffTime], [7, "20:00"], "缺欄位用預設");
+      eq([cfg.bookingRangeDays, cfg.cutoffTime], [30, "20:00"], "缺欄位用預設");
     } finally { await ref.set(original); }
+  });
+
+  // ════ v4（1002 規格）：主菜、第四道、改時段、依餐期轉愛心餐、維護費、基本工資、收益看板 ════
+  {
+    const VB = await mkVendor(vid("v4bento"), { pickup_windows: ["07:30-08:00", "11:00-11:30", "12:00-12:30"] });
+    const BENTO = await mkBento(VB, {
+      meal_periods: ["lunch"],
+      slots: [
+        { category: "青菜類", default: { name: "高麗菜" }, candidates: [
+          { name: "地瓜葉", portion_level: 1, weekly_cap: 1000, min_qty: 10 },
+          { name: "筊白筍", portion_level: 0.5, weekly_cap: 1000, min_qty: 1 },
+        ] },
+        { category: "蛋豆類", default: { name: "滷蛋" } },
+      ],
+    });
+    const U = await freshUser("v4");
+    const vline = (extra = {}) => ({ menu_item_id: BENTO, pickup_date: OPEN_DAY, pickup_window: "11:00-11:30", quantity: 1, rice: "normal", slots: [{ choice: "default" }, { choice: "default" }], ...extra });
+    /** 用全額折價券下單（不經 LINE Pay），回傳 { draft, lockId } */
+    const order = async (extra = {}) => {
+      const r = expectOk(await U.call("createCartLinePayReservation", { lines: [vline({ coupon_id: await coupon(U.uid, VB, 1000), ...extra })] }));
+      const draft = (await get(`payment_intents/${r.order_id}`)).lock_drafts[0];
+      const lockId = expectOk(await U.call("confirmLinePayPayment", { order_id: r.order_id })).lock_ids[0];
+      return { draft, lockId };
+    };
+
+    await test("C-BNT-14", "第四道「備案」：不加價、extra_side.mode=backup", async () => {
+      const { draft, lockId } = await order({ extra_side: { slot: 0, candidate: 1, mode: "backup" } });
+      eq([draft.adjust_amount, draft.extra_side.mode, draft.extra_side.dish], [0, "backup", "筊白筍"]);
+      eq((await get(`locks/${lockId}`)).extra_side.mode, "backup");
+    });
+
+    await test("C-BNT-15", "第四道「加菜」：+10、extra_side.mode=addon", async () => {
+      const { draft, lockId } = await order({ extra_side: { slot: 0, candidate: 1, mode: "addon" } });
+      eq([draft.adjust_amount, draft.extra_side.mode], [10, "addon"]);
+      eq((await get(`locks/${lockId}`)).extra_side.mode, "addon");
+    });
+
+    await test("C-MY-24 C-MY-25", "截單前改取餐時段：份數搬到新時段、meal_period 更新；額滿、沒供應的餐期被擋", async () => {
+      const { lockId } = await order();
+      const from = "11:00-11:30";
+      const to = "12:00-12:30";
+      const fromBefore = (await get(counterId(VB, OPEN_DAY, from))).count;
+      const toBefore = (await get(counterId(VB, OPEN_DAY, to)))?.count || 0;
+      const before = (await get(`locks/${lockId}`)).locked_price;
+      const r = expectOk(await U.call("updateLockChoices", { lock_id: lockId, pickup_window: to }));
+      eq(r.refunded, 0);
+      const l = await get(`locks/${lockId}`);
+      eq([l.pickup_window, l.meal_period, l.locked_price], [to, "lunch", before]);
+      eq([(await get(counterId(VB, OPEN_DAY, from))).count, (await get(counterId(VB, OPEN_DAY, to))).count], [fromBefore - 1, toBefore + 1], "份數搬家");
+      const bf = expectCode(await U.call("updateLockChoices", { lock_id: lockId, pickup_window: "07:30-08:00" }), "invalid-argument");
+      assert(/沒有供應早餐/.test(bf.message), bf.message);
+      await db.doc(`vendors/${VB}`).update({ slot_capacity: 1 });
+      await db.doc(counterId(VB, OPEN_DAY, from)).set({ count: 1 }, { merge: true });
+      try {
+        expectCode(await U.call("updateLockChoices", { lock_id: lockId, pickup_window: from }), "resource-exhausted");
+        eq([(await get(counterId(VB, OPEN_DAY, from))).count, (await get(counterId(VB, OPEN_DAY, to))).count], [1, toBefore + 1], "額滿不動份數");
+        eq((await get(`locks/${lockId}`)).pickup_window, to);
+      } finally { await db.doc(`vendors/${VB}`).update({ slot_capacity: 0 }); }
+    });
+
+    await test("C-BNT-19", "備案遞補：許願未成立 → 那格換成備案、backup_used、used_for_slot、推播寫「換成備案」", async () => {
+      // 地瓜葉要 10 份才成立（只有這一份）；備案筊白筍 1 份就成立
+      const { lockId } = await order({ slots: [{ choice: 0 }, { choice: "default" }], extra_side: { slot: 0, candidate: 1, mode: "backup" } });
+      expectOk(await OWNER.call("triggerLockOrdersNow", { vendor_id: VB, date: OPEN_DAY, force: true }));
+      const l = await get(`locks/${lockId}`);
+      eq([l.slots[0].resolved, l.slots[0].backup_used], ["筊白筍", true], "第一格遞補");
+      eq([l.extra_side.used_for_slot, l.extra_side.resolved], [0, "筊白筍"]);
+      const n = await notes(U.uid, { kind: "wish" });
+      assert(n.some((x) => /已幫你換成備案「筊白筍」/.test(x.body)), JSON.stringify(n.map((x) => x.body)));
+    });
+  }
+
+  await test("C-CHR-16 C-CHR-19", "早、午兩個餐期各自轉愛心餐（時鐘模擬 09:00、12:30）；重跑不重複", async () => {
+    if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
+    const owner = `zz2-owner-period-${RUN}`;
+    const VC = await mkVendor(vid("period"), { pickup_windows: ["07:30-08:00", "11:00-11:30"], owner_uid: owner });
+    await mkBento(VC);
+    const X = `zz2-px-${RUN}`;
+    const bf = await lock(X, VC, { pickup_date: TODAY, pickup_window: "07:30-08:00", locked_price: 80 });
+    const lu = await lock(X, VC, { pickup_date: TODAY, pickup_window: "11:00-11:30", locked_price: 80 });
+    // 排程在本機 process 內執行，只在這段把 Date.now 換成台北今天的指定時間
+    const realNow = Date.now;
+    const at = (hhmm) => () => Date.parse(`${TODAY}T${hhmm}:00+08:00`);
+    try {
+      Date.now = at("09:00");
+      await runSchedule("charity.js", "convertToCharity");
+      eq([(await get(`locks/${bf.id}`)).status, (await get(`locks/${lu.id}`)).status], ["charity", "locked"], "09:00 只轉早餐");
+      const plan = await get(`vendors/${VC}/prepPlans/${TODAY}`);
+      eq([plan.charity_converted_breakfast, plan.charity_converted_lunch ?? null, plan.charity_noshow_count], [true, null, 1]);
+      Date.now = at("12:30");
+      await runSchedule("charity.js", "convertToCharity");
+      await runSchedule("charity.js", "convertToCharity");
+    } finally { Date.now = realNow; }
+    eq((await get(`locks/${lu.id}`)).status, "charity", "12:30 轉午餐");
+    const plan = await get(`vendors/${VC}/prepPlans/${TODAY}`);
+    eq([plan.charity_converted_lunch, plan.charity_noshow_count], [true, 2], "重跑不重複計數");
+    eq((await db.collection("charityMeals").where("vendor_id", "==", VC).get()).size, 2, "兩份愛心餐、不重複");
+    const titles = (await notes(owner, { title: /未取餐已轉為愛心餐/ })).map((n) => n.title).sort();
+    eq(titles, ["午餐 1 份未取餐已轉為愛心餐", "早餐 1 份未取餐已轉為愛心餐"]);
+  });
+
+  await test("V-BIL-02 V-ACC-06", "billingCycle：到期 3 天 grace＋提醒一次；8 天 suspended＋通知、下單被擋", async () => {
+    const day = 86400000;
+    const [og, os] = [`zz2-owner-grace-${RUN}`, `zz2-owner-susp-${RUN}`];
+    const VGR = await mkVendor(vid("grace"), { owner_uid: og, subscription_end_date: Timestamp.fromMillis(Date.now() - 3 * day) });
+    const VSU = await mkVendor(vid("susp"), { owner_uid: os, subscription_end_date: Timestamp.fromMillis(Date.now() - 8 * day) });
+    await mkBento(VSU);
+    await runSchedule("finance.js", "billingCycle");
+    await runSchedule("finance.js", "billingCycle");
+    eq((await get(`vendors/${VGR}`)).billing.status, "grace");
+    eq((await get(`vendors/${VSU}`)).billing.status, "suspended");
+    eq((await notes(og, { title: /維護費已到期/ })).length, 1, "寬限提醒同一天只一次");
+    eq((await notes(os, { title: /已暫停接新訂單/ })).length, 1, "暫停通知只一次");
+    const U = await freshUser("susp");
+    const r = expectCode(await U.call("createCartLinePayReservation", { lines: [{ menu_item_id: `${VSU}-bento`, pickup_date: OPEN_DAY, pickup_window: WINDOW, quantity: 1, slots: [{ choice: "default" }, { choice: "default" }], coupon_id: await coupon(U.uid, VSU, 1000) }] }), "failed-precondition");
+    assert(/暫停接單/.test(r.message), r.message);
+  });
+
+  await test("V-WAGE-02", "updateVendorCosts：時薪、月薪低於基本工資被擋；高於可存", async () => {
+    const VW2 = await mkVendor(vid("wage"));
+    const wage = expectOk(await OWNER.call("updateVendorCosts", { vendor_id: VW2, fixed_costs: 0 })).minimum_wage;
+    assert(wage.hourly > 0 && wage.monthly > 0, JSON.stringify(wage));
+    const h = expectCode(await OWNER.call("updateVendorCosts", { vendor_id: VW2, hourly_wage: wage.hourly - 1 }), "invalid-argument");
+    assert(h.message.includes(String(wage.hourly)), h.message);
+    const m = expectCode(await OWNER.call("updateVendorCosts", { vendor_id: VW2, staff_salaries: [wage.monthly - 1] }), "invalid-argument");
+    assert(m.message.includes(String(wage.monthly)), m.message);
+    expectOk(await OWNER.call("updateVendorCosts", { vendor_id: VW2, hourly_wage: wage.hourly + 4, staff_salaries: [wage.monthly + 500] }));
+    const v = await get(`vendors/${VW2}`);
+    eq([v.hourly_wage, v.staff_salaries], [wage.hourly + 4, [wage.monthly + 500]]);
+  });
+
+  await test("V-REV-02", "本月收益看板：已確定營收與份數對得上、維護費 1,999、淨利＝營收 − 各項成本", async () => {
+    const VRV = await mkVendor(vid("rev"), { fixed_costs: 3000, staff_salaries: [30000], hourly_wage: 200 });
+    const ids = await cloneCatalog("cafe-renheya-demo", VRV);
+    const item = ids.classic || Object.values(ids)[0];
+    const month = TODAY.slice(0, 7);
+    const past = prevBusinessDays(3).filter((d) => d.startsWith(month));
+    const mk = (date, status, price) => lock(`zz2-rv-${RUN}`, VRV, { menu_item_id: item, pickup_date: date, pickup_window: "11:00-11:30", status, locked_price: price });
+    let expRevenue = 0;
+    let expQty = 0;
+    for (const d of past) { await mk(d, "fulfilled", 90); expRevenue += 90; expQty++; }
+    await mk(OPEN_DAY.startsWith(month) ? OPEN_DAY : TODAY, "locked", 80); expRevenue += 80; expQty++;
+    await mk(past[0] || TODAY, "cancelled", 500); // 取消的不算
+    const r = expectOk(await OWNER.call("refreshRevenueForecast", { vendor_id: VRV, month }));
+    eq([r.confirmed_revenue, r.confirmed_qty], [expRevenue, expQty], "已確定");
+    eq([r.maintenance_fee, r.staff_salary, r.other_fixed_costs, r.hourly_wage], [1999, 30000, 3000, 200]);
+    const net = r.revenue - r.material_cost - r.labor_cost - r.payment_fee - r.maintenance_fee - r.staff_salary - r.other_fixed_costs;
+    assert(Math.abs(net - r.net_profit) <= 3, `淨利 ${r.net_profit} vs 手算 ${net}`);
+    assert(r.material_cost > 0 && r.labor_cost > 0, `材料 ${r.material_cost}、人工 ${r.labor_cost}`);
+    eq(r.by_meal_period.lunch.qty, expQty, "依餐期");
+    eq((await get(`vendors/${VRV}/revenueForecast/${month}`)).net_profit, r.net_profit, "寫入 revenueForecast");
+  });
+
+  await test("C-CHR-19", "舊旗標相容：prepPlans 只有 reminder_sent／charity_converted／charity_closed → 午餐不再處理，早餐照常", async () => {
+    if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
+    const owner = `zz2-owner-legacy-${RUN}`;
+    const VL = await mkVendor(vid("legacy"), { pickup_windows: ["07:30-08:00", "11:00-11:30"], owner_uid: owner });
+    await mkBento(VL);
+    await db.doc(`vendors/${VL}/prepPlans/${TODAY}`).set({ reminder_sent: true, charity_converted: true, charity_closed: true });
+    const [XB, XL] = [`zz2-lgb-${RUN}`, `zz2-lgl-${RUN}`];
+    const bf = await lock(XB, VL, { pickup_date: TODAY, pickup_window: "07:30-08:00" });
+    const lu = await lock(XL, VL, { pickup_date: TODAY, pickup_window: "11:00-11:30" });
+    const realNow = Date.now;
+    const at = (hhmm) => () => Date.parse(`${TODAY}T${hhmm}:00+08:00`);
+    try {
+      Date.now = at("07:40"); // 早餐結束前 20 分
+      await runSchedule("orders.js", "pickupReminder");
+      Date.now = at("11:10"); // 午餐結束前 20 分
+      await runSchedule("orders.js", "pickupReminder");
+      Date.now = at("12:30");
+      await runSchedule("charity.js", "convertToCharity");
+      Date.now = at("14:00"); // 早餐截止 10:00、午餐截止 13:30 都過了
+      await runSchedule("charity.js", "closeCharity");
+    } finally { Date.now = realNow; }
+    eq([(await notes(XB, { title: /還沒取餐/ })).length, (await notes(XL, { title: /還沒取餐/ })).length], [1, 0], "取餐提醒：早餐有、午餐沿用舊旗標");
+    eq([(await get(`locks/${bf.id}`)).status, (await get(`locks/${lu.id}`)).status], ["charity", "locked"], "轉愛心餐：早餐轉、午餐沿用舊旗標");
+    const closed = (await notes(owner, { title: /愛心餐已截止/ })).map((n) => n.title);
+    eq(closed, ["早餐愛心餐已截止"], "截止：只有早餐");
+    const plan = await get(`vendors/${VL}/prepPlans/${TODAY}`);
+    eq([plan.reminder_sent_breakfast, plan.charity_converted_breakfast, plan.charity_closed_breakfast], [true, true, true]);
+    eq([plan.reminder_sent_lunch ?? null, plan.charity_converted_lunch ?? null, plan.charity_closed_lunch ?? null], [null, null, null]);
+  });
+
+  await test("V-ACC-06", "暫停接單（維護費逾期，即時判斷）：計畫下單被擋；已成立的訂單照常核銷、截單、取消", async () => {
+    const VS = await mkVendor(vid("suspall"), { subscription_end_date: Timestamp.fromMillis(Date.now() - 8 * 86400000) });
+    await mkBento(VS);
+    const U = await freshUser("suspall");
+    const planRef = db.collection("meal_plans").doc(uniq("zzmp"));
+    await planRef.set({ vendor_id: VS, name: "測試週餐", label: "週方案", days: 3, price_per_meal: 90, menu_item_id: `${VS}-bento` });
+    const p = expectCode(await U.call("createPlanLinePayReservation", { plan_id: planRef.id, start_date: OPEN_DAY, pickup_window: WINDOW }), "failed-precondition", "計畫");
+    assert(/暫停接單/.test(p.message), p.message);
+    // 已成立的訂單
+    const later = await lock(U.uid, VS, { pickup_date: OPEN_DAY });
+    const r = expectOk(await OWNER.call("triggerLockOrdersNow", { vendor_id: VS, date: OPEN_DAY, force: true }), "截單");
+    assert(!r.skipped && (await get(`vendors/${VS}/prepPlans/${OPEN_DAY}`))?.locked_at, "產生備料");
+    expectOk(await U.call("cancelLock", { lock_id: (await lock(U.uid, VS, { pickup_date: OPEN_DAY })).id }), "截單前取消");
+    if (TODAY_IS_BUSINESS) {
+      const today = await lock(U.uid, VS, { pickup_date: TODAY });
+      expectOk(await OWNER.call("completePickup", { vendor_id: VS, lock_id: today.id }), "核銷");
+      eq((await get(`locks/${today.id}`)).status, "fulfilled");
+    }
+    eq((await get(`locks/${later.id}`)).cutoff_done, true, "截單判定");
   });
 
   const pad = (s, n) => (s + " ".repeat(n)).slice(0, n);

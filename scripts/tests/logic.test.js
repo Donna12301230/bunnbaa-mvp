@@ -148,7 +148,7 @@ test("C-RWD-05", "頭獎保證：免費餐券算出 0 張且剩 ≥ 95 時先配
   const total = Object.values(r.counts).reduce((s, n) => s + n, 0);
   assert.equal(total, 100);
 });
-test("C-RWD-06", "第一階段只有 3 種券", () => {
+test("C-RWD-19", "第一階段只有 3 種券", () => {
   assert.deepEqual(Object.keys(rewards.allocatePool(10000, 1000).counts).sort(), ["free", "t50", "t95"]);
 });
 test("C-RWD-xx", "高階張數不超過抽獎券數、spent+leftover=pool", () => {
@@ -227,11 +227,11 @@ test("C-MEAL-02", "品項只供應午餐 → 早餐時段被擋；沒設餐期�
   assert.equal(pricing.validatePickup("2026-10-02", "11:00-11:30", v, CFG, NOW, lunchOnly), null);
   assert.equal(pricing.validatePickup("2026-10-02", "07:30-08:00", v, CFG, NOW, { name: "舊品項" }), null);
 });
-test("C-MEAL-03", "各餐期取餐範圍分開算（愛心餐、提醒、時間軸用）", () => {
+test("C-MEAL-08", "各餐期取餐範圍分開算（愛心餐、提醒、時間軸用）", () => {
   const v = { pickup_windows: ["07:30-08:00", "08:00-08:30", "11:30-12:00", "12:30-13:00", "17:00-18:00"] };
   assert.deepEqual(pricing.vendorPeriodRanges(v, CFG), { breakfast: "07:30-08:30", lunch: "11:30-13:00", dinner: "17:00-18:00" });
 });
-test("C-PLN-03", "計畫遇公休順延，順延的日期標示出來", () => {
+test("C-PLN-06", "計畫遇公休順延，順延的日期標示出來", () => {
   const v = { ...vendor, holidays: ["2026-10-05"] };
   const r = pricing.planPickupDates("2026-10-02", W, v, 3, CFG, NOW);
   assert.deepEqual(r.postponed, ["2026-10-06", "2026-10-07"]);
@@ -246,13 +246,13 @@ const bentoItem = {
     { category: "配菜3", default: { name: "辣炒年糕", component_id: "c3" } },
   ],
 };
-test("C-BNT-20", "主菜各自定價：選豬肉 → 原價 60；沒選預設第一道", () => {
+test("C-BNT-12 C-BNT-13", "主菜各自定價：選豬肉 → 原價 60；沒選預設第一道", () => {
   assert.equal(bento.resolveMain(bentoItem, 1).price, 60);
   assert.equal(bento.resolveMain(bentoItem, null).price, 50);
   assert.ok(bento.resolveMain(bentoItem, 5).problem);
   assert.equal(bento.resolveMain({ price: 80, main: { name: "排骨" } }).price, 80);
 });
-test("C-BNT-21", "第四道：加菜 +10、備案 0；要先選滿、不能重複、不能超過 4 道", () => {
+test("C-BNT-14～18", "第四道：加菜 +10、備案 0；要先選滿、不能重複、不能超過 4 道", () => {
   const full = bento.resolveChoices(bentoItem, []).slots;
   const addon = bento.resolveExtraSide(bentoItem, { slot: 0, candidate: 0, mode: "addon" }, full, CFG);
   assert.equal(addon.extra.dish, "苦瓜");
@@ -264,11 +264,11 @@ test("C-BNT-21", "第四道：加菜 +10、備案 0；要先選滿、不能重�
   const four = { ...bentoItem, slots: [...bentoItem.slots, { category: "配菜4", default: { name: "滷蛋" } }] };
   assert.ok(bento.resolveExtraSide(four, { slot: 0, candidate: 0, mode: "addon" }, bento.resolveChoices(four, []).slots, CFG).problem, "標準 4 道就不能再加");
 });
-test("C-BNT-22", "飯量：半碗 −5、一碗 0、一碗半 +10；少一道 −5", () => {
+test("C-PRC-10b", "飯量：半碗 −5、一碗 0、一碗半 +10；少一道 −5", () => {
   assert.equal(bento.adjustAmount({ rice: "less", removedCount: 0 }, CFG), -5);
   assert.equal(bento.adjustAmount({ rice: "add", removedCount: 1 }, CFG), 5);
 });
-test("V-PRP-20", "備料：選的主菜、備案遞補、第四道加菜都算進去", () => {
+test("V-PRP-11b", "備料：選的主菜、備案遞補、第四道加菜都算進去", () => {
   const comps = { rice: { portion_grams: 200 } };
   const slots = [
     { removed: false, wished: "苦瓜", resolved: "高麗菜", backup_used: true, resolved_component_id: "c2", portion_level: 1 },
@@ -335,15 +335,16 @@ test("F-21", "taipeiToday 以台北時間計（UTC 16:30 已是隔天）", () =>
 });
 
 // C-NAV-01 靜態檢查：前端不能再出現舊制早鳥文案（BUG-1 回歸）
-test("C-NAV-01", "web/src 沒有「最高 7 折」「提前 14 天」「最早 30 天」", () => {
+test("C-NAV-01", "web/src 畫面文字沒有「最高 7 折」「提前 14 天」（註解不算；1002 版起最遠 30 天是正確說法）", () => {
   const fs = require("node:fs");
-  const banned = /最高\s*7\s*折|提前\s*14\s*天|最早\s*30\s*天|up to 30% off/;
+  const banned = /最高\s*7\s*折|提前\s*14\s*天|up to 30% off/;
+  const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replace(/\s\/\/.*$/gm, "");
   const hits = [];
   const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (/\.(tsx?|json)$/.test(e.name) && banned.test(fs.readFileSync(p, "utf8"))) hits.push(path.relative(SRC, p));
+      else if (/\.(tsx?|json)$/.test(e.name) && banned.test(stripComments(fs.readFileSync(p, "utf8")))) hits.push(path.relative(SRC, p));
     }
   };
   walk(path.resolve(__dirname, "../../web/src"));

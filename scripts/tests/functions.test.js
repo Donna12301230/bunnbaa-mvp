@@ -111,7 +111,7 @@ async function setupFixtures(uids) {
     vendor_id: V1, name: "測試雞腿便當", price: 100, category: "便當", available: true,
     main: { name: "滷雞腿" }, rice_component_id: "zz-rice",
     slots: [
-      { category: "青菜類", default: { name: "高麗菜" }, candidates: [{ name: "地瓜葉", portion_level: 0.75, weekly_cap: 1000, min_qty: 10 }, { name: "筊白筍", portion_level: 0.5, weekly_cap: 1000, min_qty: 10 }] },
+      { category: "青菜類", default: { name: "高麗菜" }, candidates: [{ name: "地瓜葉", portion_level: 1, weekly_cap: 1000, min_qty: 10 }, { name: "筊白筍", portion_level: 0.5, weekly_cap: 1000, min_qty: 10 }] },
       { category: "蛋豆類", default: { name: "滷蛋" } },
     ],
   });
@@ -140,7 +140,7 @@ async function lock(buyer, extra = {}) {
 /** 已開池的一期：rewardPeriods.remaining 與對應張數的 issued 券 */
 async function issuePool(period, remaining) {
   await db.doc(`vendors/${V1}/rewardPeriods/${period}`).set({ period_id: period, status: "pooled", remaining, draw_deadline: Timestamp.fromMillis(Date.now() + 7 * 86400000) });
-  const discount = { free: 100, t10: 90, t30: 70, t50: 50, t80: 20, t95: 5 };
+  const discount = { free: 100, t50: 50, t95: 5 };
   for (const [tier, n] of Object.entries(remaining)) {
     for (let i = 0; i < n; i++) {
       await db.collection("coupons").doc(uniq("zzp")).set({ vendor_id: V1, pool_period: period, tier, discount: discount[tier], status: "issued" });
@@ -369,10 +369,21 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     eq(l.locked_price, price); eq(l.slots[0].wished, "筊白筍");
   });
 
-  await test("C-MY-18", "改成「不要」被擋", async () => {
-    const { id } = await lock(uids.A);
-    const r = expectCode(await A.call("updateLockChoices", { lock_id: id, slots: [{ choice: "none" }, { choice: "default" }] }), "invalid-argument");
-    assert(/取消後/.test(r.message), r.message);
+  await test("C-MY-18", "截單前改成「不要」：變便宜 → 金額 −5、回傳退差額", async () => {
+    // 早鳥 8 折的便當（100 → 80）；沒有 transaction_id 所以不會真的呼叫 LINE Pay 退款
+    const { id } = await lock(uids.A, { discount_percent: 20, early_bird_amount: 20, adjust_amount: 0 });
+    const r = expectOk(await A.call("updateLockChoices", { lock_id: id, slots: [{ choice: "none" }, { choice: "default" }] }));
+    eq([r.locked_price, r.refunded], [75, 5]);
+    const l = await get(`locks/${id}`);
+    eq([l.locked_price, l.adjust_amount, l.slots[0].removed], [75, -5, true]);
+  });
+
+  await test("C-MY-23", "截單前改成變貴（白飯一碗半）被擋，資料不變", async () => {
+    const { id } = await lock(uids.A, { discount_percent: 20, early_bird_amount: 20, adjust_amount: 0 });
+    const r = expectCode(await A.call("updateLockChoices", { lock_id: id, rice: "add" }), "failed-precondition");
+    assert(/補 NT\$ 10/.test(r.message), r.message);
+    const l = await get(`locks/${id}`);
+    eq([l.locked_price, l.rice], [80, "normal"]);
   });
 
   await test("C-MY-02", "本人取得 QR（簽章 token＋4 碼取餐號）；別人被擋", async () => {
@@ -519,14 +530,14 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
 
   // ════ 3.15 愛心餐 ════
   let meal = null;
-  await test("C-CHR-05", "預約愛心餐：reserved、30 分內到期、那份變 reserved", async () => {
+  await test("C-CHR-05", "預約愛心餐：reserved、10 分內到期、那份變 reserved", async () => {
     if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
     const { id } = await lock(uids.A, { pickup_date: TODAY });
     meal = expectOk(await A.call("donateLock", { lock_id: id })).meal_id;
     const r = expectOk(await B.call("reserveCharity", { meal_id: meal }));
     const res = await get(`charityReservations/${r.reservation_id}`);
     eq(res.status, "reserved"); eq(res.user_id, uids.B);
-    assert(res.expires_at.toMillis() - Date.now() <= 30 * 60000 + 5000, "到期時間應 ≤ 30 分");
+    assert(res.expires_at.toMillis() - Date.now() <= 10 * 60000 + 5000, "到期時間應 ≤ 10 分");
     eq((await get(`charityMeals/${meal}`)).status, "reserved");
     meal = { id: meal, res: r.reservation_id };
   });
@@ -556,12 +567,11 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     eq(rs.filter((r) => r.ok).length, 1);
   });
 
-  await test("C-CHR-09b", "被停權 7 天的人預約被擋、一般下單不受影響", async () => {
+  await test("C-CHR-09b", "愛心餐不停權：舊制 charityBans 還在也不擋預約（v4）", async () => {
     await db.doc(`charityBans/${uids.C}`).set({ until: Timestamp.fromMillis(Date.now() + 7 * 86400000) });
     try {
-      const r = expectCode(await C.call("reserveCharity", { vendor_id: V1 }), "permission-denied");
-      assert(/不影響一般訂餐/.test(r.message), r.message);
-      expectOk(await C.call("createCartLinePayReservation", { lines: [line({ coupon_id: await coupon(uids.C, V1, 100) })] }), "一般下單");
+      const r = await C.call("reserveCharity", { vendor_id: V1 });
+      assert(r.ok || r.code !== "permission-denied", `不應被停權擋下：${r.code} ${r.message}`);
     } finally { await db.doc(`charityBans/${uids.C}`).delete(); }
   });
 
@@ -577,7 +587,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   await test("C-RWD-06", "抽獎：coupons 一筆 owned、30 天到期、剩餘 −1", async () => {
     const period = mondayOf(addDays(TODAY, -7));
     const pRef = db.doc(`vendors/${V1}/rewardPeriods/${period}`);
-    await issuePool(period, { t80: 1, t95: 1 });
+    await issuePool(period, { t50: 1, t95: 1 });
     const tRef = db.collection("rewardTickets").doc(uniq("zzt"));
     await tRef.set({ vendor_id: V1, user_id: uids.A, period_id: period, pool_period: period, status: "drawable", created_at: Timestamp.now() });
     const r = expectOk(await A.call("drawTicket", { ticket_id: tRef.id }));
@@ -587,14 +597,14 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     const days = (cp.expires_at.toMillis() - Date.now()) / 86400000;
     assert(days > 29 && days <= 30.01, `到期天數 ${days}`);
     const rem = (await pRef.get()).data().remaining;
-    eq(rem.t80 + rem.t95, 1, "剩餘總張數");
+    eq(rem.t50 + rem.t95, 1, "剩餘總張數");
     expectCode(await A.call("drawTicket", { ticket_id: tRef.id }), "failed-precondition", "同一張再抽");
   });
 
   await test("C-RWD-07", "兩人同時抽最後一張：不超抽", async () => {
     const period = mondayOf(addDays(TODAY, -14));
     const pRef = db.doc(`vendors/${V1}/rewardPeriods/${period}`);
-    await issuePool(period, { t80: 1 });
+    await issuePool(period, { t50: 1 });
     const mk = async (uid) => { const ref = db.collection("rewardTickets").doc(uniq("zzt")); await ref.set({ vendor_id: V1, user_id: uid, period_id: period, pool_period: period, status: "drawable", created_at: Timestamp.now() }); return ref.id; };
     const [ta, tb] = [await mk(uids.A), await mk(uids.B)];
     const rs = await Promise.all([A.call("drawTicket", { ticket_id: ta }), B.call("drawTicket", { ticket_id: tb })]);
