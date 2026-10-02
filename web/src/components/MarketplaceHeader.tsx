@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
   Search, Globe, User, ChevronDown, ClipboardList, Repeat,
-  CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart, Trophy,
+  CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart, Trophy, Heart,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +21,8 @@ import { Input } from "@/components/ui/input";
 import AreaPicker from "@/components/AreaPicker";
 import { setLang, useI18n } from "@/lib/i18n";
 import { avatarUrl } from "@/lib/avatar";
+import { setSearchQuery, useSearchQuery } from "@/lib/searchQuery";
+import { isClean } from "@/lib/searchFilter";
 
 // 抽自 HomePage 的共用頂部列——依 UI草圖(Main/Marketplace/MyBookings 三頁共用同一組
 // 導覽)統一給三頁用:預購餐點(計畫方案首頁)／轉讓市集／我的餐點。也給
@@ -41,7 +43,9 @@ import { avatarUrl } from "@/lib/avatar";
 // 沒有任何地方能查看/結帳購物車,是斷掉的動線),見 CartPage.tsx。
 //
 // 2026-09-28:最前面加「首頁」分頁,連到品牌形象頁(/landing,LandingPage.tsx)。
-export type MarketplaceTab = "landing" | "plans" | "transfer" | "bookings" | "vendors" | "rewards";
+// 2026-10-02(1002 規格 §4.5):導覽列只留 4 個——預購餐點、我的餐點、我的最愛、成長獎勵。
+// 「商家」拿掉(跟預購餐點重複);「轉讓・愛心餐」併入我的餐點的分頁。搜尋框接上預購餐點頁的搜尋。
+export type MarketplaceTab = "landing" | "plans" | "transfer" | "bookings" | "vendors" | "rewards" | "favorites";
 
 interface NavItem {
   tab: MarketplaceTab;
@@ -55,7 +59,8 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
   const { user, isVendor, isAdmin } = useAuth();
   const { toast } = useToast();
   const { count: cartCount } = useCart();
-  const [searchInput, setSearchInput] = useState("");
+  const searchQuery = useSearchQuery();
+  const [searchInput, setSearchInput] = useState(searchQuery);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { t, lang } = useI18n();
 
@@ -68,13 +73,23 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
 
   const navItems: NavItem[] = [
     { tab: "plans", href: "/home", label: t("預購餐點", "Pre-order"), icon: ClipboardList },
-    { tab: "transfer", href: "/marketplace", label: t("轉讓・愛心餐", "Transfers"), icon: Repeat },
     isVendor
       ? { tab: "bookings", href: "/lock/vendor/redeem", label: t("核對取餐", "Redeem"), icon: QrCode }
       : { tab: "bookings", href: "/my-bookings", label: t("我的餐點", "My meals"), icon: CalendarDays },
-    { tab: "vendors", href: "/vendors", label: t("商家", "Vendors"), icon: Store },
+    { tab: "favorites", href: "/favorites", label: t("我的最愛", "Favorites"), icon: Heart },
     { tab: "rewards", href: "/rewards", label: t("成長獎勵", "Rewards"), icon: Trophy },
   ];
+
+  // 搜尋店家名稱、菜名、料理類型；結果顯示在預購餐點頁（分單點／方案兩組）
+  function submitSearch(value: string) {
+    const q = value.trim().slice(0, 30);
+    if (q && !isClean(q)) {
+      toast({ variant: "destructive", title: t("請換個關鍵字", "Please try another keyword") });
+      return;
+    }
+    setSearchQuery(q);
+    if (q && active !== "plans") navigate("/home");
+  }
 
   function go(href: string) {
     setMobileNavOpen(false);
@@ -120,9 +135,14 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           <Input
             type="search"
             value={searchInput}
-            onChange={e => setSearchInput(e.target.value)}
-            placeholder={t("搜尋餐廳、料理或菜餚", "Search restaurants, cuisines or dishes")}
-            aria-label={t("搜尋餐廳、料理或菜餚", "Search restaurants, cuisines or dishes")}
+            onChange={(e) => {
+              setSearchInput(e.target.value);
+              // 在預購餐點頁直接邊打邊篩；清空也立即恢復
+              if (active === "plans" || !e.target.value) submitSearch(e.target.value);
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter") submitSearch(searchInput); }}
+            placeholder={t("搜尋店家、菜名或料理類型", "Search vendors, dishes or cuisines")}
+            aria-label={t("搜尋店家、菜名或料理類型", "Search vendors, dishes or cuisines")}
             className="h-10 pl-9"
           />
         </div>

@@ -1,11 +1,11 @@
 import { tr } from "@/lib/i18n";
 import { useEffect } from "react";
 import { AlertTriangle, CalendarOff } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import PriceDateStrip from "@/components/PriceDateStrip";
 import { useSlotConflicts } from "@/hooks/useSlotConflicts";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
-import { maxPickupDateStr, slotLabel, todayStr } from "@/lib/pickupSlots";
-import type { Vendor } from "@/types";
+import { slotLabel } from "@/lib/pickupSlots";
+import type { MealPeriod, MenuItem, Vendor } from "@/types";
 
 interface PickupPickerProps {
   date: string;
@@ -16,13 +16,19 @@ interface PickupPickerProps {
   uid?: string | null;
   /** 有傳就照這家店的取餐時段／公休／份數上限；沒傳（首頁還沒選店）用預設時段 */
   vendor?: Vendor | null;
+  /** 只列這個品項供應餐期的時段 */
+  item?: Pick<MenuItem, "meal_periods"> | null;
+  period?: MealPeriod | null;
+  /** 有傳就在日期列標出每天價格 */
+  basePrice?: number | null;
+  dateLabel?: string;
 }
 
-// 取餐日期＋時段選擇。購物車結帳、首頁單點鎖定共用。
+// 取餐日期（價格日期列）＋時段選擇。品項頁、加入計畫共用。
 // 已開始、額滿、店休的時段不能選；選到的時段失效時自動跳到當天第一個還能選的。
-export default function PickupPicker({ date, window, onDateChange, onWindowChange, uid, vendor }: PickupPickerProps) {
+export default function PickupPicker({ date, window, onDateChange, onWindowChange, uid, vendor, item, period, basePrice, dateLabel }: PickupPickerProps) {
   const conflicts = useSlotConflicts(uid, date, window);
-  const { closedReason, slots } = useSlotAvailability(vendor, date);
+  const { closedReason, slots } = useSlotAvailability(vendor, date, item, period);
   const selectedOpen = slots.some((s) => s.window === window && s.open);
   const firstOpen = slots.find((s) => s.open)?.window;
 
@@ -32,18 +38,7 @@ export default function PickupPicker({ date, window, onDateChange, onWindowChang
 
   return (
     <div className="space-y-3">
-      <div>
-        <label htmlFor="pickup-date" className="text-xs text-muted-foreground block mb-1">{tr("取餐日期", "Pickup date")}</label>
-        <Input
-          id="pickup-date"
-          type="date"
-          value={date}
-          min={todayStr()}
-          max={maxPickupDateStr()}
-          onChange={(e) => e.target.value && onDateChange(e.target.value)}
-          className="h-10"
-        />
-      </div>
+      <PriceDateStrip value={date} onChange={onDateChange} vendor={vendor} basePrice={basePrice} label={dateLabel} />
 
       {closedReason ? (
         <div className="flex items-start gap-2 rounded-lg border border-border bg-gray-50 p-3 text-sm text-muted-foreground">

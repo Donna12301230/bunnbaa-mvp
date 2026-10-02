@@ -36,7 +36,17 @@ export interface Vendor {
   typhoon_notice?: { dates: string[]; event_id: string } | null;
   menu_locked_week?: string;
   rewards_paused_from?: string;
+  // 平台維護費（§1，functions/src/finance.js billingCycle 每天寫）
+  billing?: { status: "active" | "grace" | "suspended"; due_at?: unknown; grace_until?: unknown; fee?: number } | null;
+  // 收益看板成本參數（§9.3），由 updateVendorCosts 寫，薪資不得低於基本工資
+  hourly_wage?: number;
+  staff_salaries?: number[];
+  fixed_costs?: number;
+  owner_hours_per_day?: number;
+  linepay_fee_rate?: number;
 }
+
+export type MealPeriod = "breakfast" | "lunch" | "dinner";
 
 export interface MenuItem {
   id: string;
@@ -54,7 +64,11 @@ export interface MenuItem {
   dietary_tags: string[];
   created_at: unknown; // Firestore Timestamp
   // 便當（第一階段規格 §3）：沒有 slots 的是單品，不能加減飯菜
+  item_type?: "bento" | "single"; // 單品直接點選、不需組合
+  meal_periods?: MealPeriod[]; // 供應餐期（沒設＝店家所有時段）
   template?: string | null;
+  // 可選主菜，各自定價（便當價以所選主菜為準）；沒有 mains 時用 main＋price
+  mains?: BentoMain[];
   main?: { name: string; component_id?: string | null } | null;
   rice_component_id?: string | null;
   fixed?: { name: string; component_id?: string | null }[]; // 固定附餐（例：滷蛋），不能換也不能減
@@ -63,10 +77,20 @@ export interface MenuItem {
   component_id?: string | null; // 單品對應的半成品（備料用）
 }
 
+export interface BentoMain {
+  name: string;
+  component_id?: string | null;
+  price: number;
+  image_url?: string | null;
+  portion_text?: string | null; // 材料總和顯示用，例：「雞腿 1 塊」（店家菜單編輯時由配方帶出）
+}
+
 export interface BentoCandidate {
   name: string;
   component_id?: string | null;
-  portion_level: number; // 1 全份、0.75、0.5 半份（由成本推算，店家可微調）
+  image_url?: string | null; // 消費者點圖片選菜（§4.2）
+  portion_text?: string | null; // 材料總和顯示用，例：「苦瓜 60 克」
+  portion_level: number; // 1 全份、0.5 半份（第一階段只分兩級；由成本推算，店家可微調）
   weekly_cap?: number | null; // 本週供應上限
   min_qty?: number | null; // 成立最低量（沒設＝店家設定／平台預設）
   disabled?: boolean; // 成本比例 < 0.5，不得列為候選
@@ -74,8 +98,27 @@ export interface BentoCandidate {
 
 export interface BentoSlot {
   category: string; // 青菜類、肉類配菜、蛋豆類…候選菜只能同類別
-  default: { name: string; component_id?: string | null };
+  default: { name: string; component_id?: string | null; image_url?: string | null; portion_text?: string | null };
   candidates: BentoCandidate[];
+}
+
+/** 第四道配菜：備案（不加價，前三道沒成立時遞補）或加菜（+10） */
+export type ExtraSideMode = "backup" | "addon";
+export interface ExtraSideChoice {
+  slot: number;
+  candidate: number | null; // null＝那一格的預設菜
+  mode: ExtraSideMode;
+}
+export interface LockExtraSide {
+  slot: number;
+  candidate_index: number | null;
+  dish: string;
+  component_id?: string | null;
+  portion_level?: number;
+  mode: ExtraSideMode;
+  wished?: boolean;
+  resolved?: string | null;
+  used_for_slot?: number | null;
 }
 
 export type RiceOption = "add" | "normal" | "less";
@@ -93,6 +136,7 @@ export interface LockSlot {
   resolved: string | null; // 截單判定後的實際配菜
   portion_level: number | null;
   substituted_from?: string;
+  backup_used?: boolean; // 許願未成立，遞補第四道備案
 }
 
 export interface MealPlan {
@@ -108,6 +152,7 @@ export interface MealPlan {
   price_per_meal: number;
   fastest_booking: string;
   days: number; // 供餐天數，加入計畫時會生成這麼多筆 locks
+  menu_item_id?: string | null; // 計畫供應的品項（決定餐期與可選時段）
   created_at: unknown; // Firestore Timestamp
 }
 
@@ -156,7 +201,12 @@ export interface Lock {
   meal_plan_id?: string; // meal_plans 的 id，2026-09-28 之後加入的計畫才有
   // 第一階段規格：便當內容、金額拆解、取餐憑證
   menu_item_id?: string | null;
+  meal_period?: MealPeriod;
+  main_dish?: string | null;
+  main_index?: number | null;
   slots?: LockSlot[];
+  extra_side?: LockExtraSide | null;
+  plan_day?: number;
   rice?: RiceOption;
   list_price?: number;
   early_bird_amount?: number;

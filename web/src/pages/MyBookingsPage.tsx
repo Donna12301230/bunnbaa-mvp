@@ -20,10 +20,12 @@ import { httpsCallable } from "@/lib/callable";
 import PickupQr from "@/components/PickupQr";
 import EditWishesDialog from "@/components/EditWishesDialog";
 import { useConfirm } from "@/components/ConfirmDialog";
-import { riceLabel, slotText } from "@/lib/bento";
+import { extraSideText, riceLabel, slotText } from "@/lib/bento";
 import { isPastCutoff, todayStr } from "@/lib/pickupSlots";
 import type { Lock } from "@/types";
-import { EmptyState } from "@/components/ds";
+import { EmptyState, Tag } from "@/components/ds";
+import TransferMarketPage from "@/pages/TransferMarketPage";
+import CharityMealsSection from "@/components/CharityMealsSection";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { Link } from "wouter";
 
@@ -137,6 +139,15 @@ export default function MyBookingsPage() {
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Lock | null>(null);
+  // ?tab=market｜charity（通知、首頁連結帶進來）；讀完就清掉，之後重新整理停在使用者點的分頁
+  const [pageTab, setPageTab] = useState<"meals" | "market" | "charity">(() => {
+    const m = /tab=(market|charity)/.exec(`${window.location.search}${window.location.hash}`);
+    if (window.location.search) history.replaceState(history.state, "", window.location.pathname + window.location.hash);
+    return (m?.[1] as "market" | "charity" | undefined) ?? "meals";
+  });
+  function switchTab(tab: "meals" | "market" | "charity") {
+    setPageTab(tab);
+  }
   const confirm = useConfirm();
 
   useEffect(() => {
@@ -363,7 +374,9 @@ export default function MyBookingsPage() {
                       </p>
                       {(lock.slots?.length ?? 0) > 0 && (
                         <ul className="text-caption text-muted-foreground space-y-0.5">
+                          {lock.main_dish && <li>• {tr("主菜：", "Main: ")}{lock.main_dish}</li>}
                           {lock.slots!.map((slot, i) => <li key={i}>• {slotText(slot)}</li>)}
+                          {extraSideText(lock.extra_side) && <li>• {extraSideText(lock.extra_side)}</li>}
                           {riceLabel(lock.rice) && <li>• {riceLabel(lock.rice)}</li>}
                         </ul>
                       )}
@@ -386,17 +399,15 @@ export default function MyBookingsPage() {
                         return (
                           <div className="flex flex-col gap-2 pt-1">
                             {beforeCutoff ? (
-                              <p className="text-caption text-muted-foreground">{tr("取餐前一天截單前可免費取消、修改許願。", "Free cancellation and wish changes until the cutoff the day before.")}</p>
+                              <p className="text-caption text-muted-foreground">{tr("取餐前一天截單前可免費取消，或修改取餐時段、主菜、配菜、飯量。", "Until the cutoff the day before you can cancel for free, or change the pickup time, main, sides or rice.")}</p>
                             ) : (
                               <p className="text-caption text-muted-foreground">{tr("已截單，不能退款；可以轉讓、贈送或捐為愛心餐。", "Past cutoff — no refunds, but you can transfer, gift or donate it.")}</p>
                             )}
                             {lock.status === "locked" && beforeCutoff && (
                               <div className="flex gap-2">
-                                {lock.menu_item_id && (lock.slots?.length ?? 0) > 0 && (
-                                  <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => setEditing(lock)}>
-                                    <Pencil /> {tr("修改許願", "Edit wishes")}
-                                  </Button>
-                                )}
+                                <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => setEditing(lock)}>
+                                  <Pencil /> {lock.plan_id ? tr("改時段", "Change time") : tr("修改", "Change")}
+                                </Button>
                                 {isPayer && (
                                   <Button variant="outline" size="sm" className="flex-1 border-red-300 text-red-600 hover:bg-red-50" disabled={isBusy} onClick={() => handleCancel(lock)}>
                                     <XCircle /> {tr("取消退款", "Cancel")}
@@ -541,10 +552,21 @@ export default function MyBookingsPage() {
     <div className="min-h-screen bg-background">
       <MarketplaceHeader active="bookings" />
 
-      <PageHero eyebrow={tr("我的預約", "Your bookings")} title={tr("我的餐點", "My meals")} description={tr("週曆上點一筆訂單看詳情、出示取餐碼、截單前取消，或轉讓／贈送／捐為愛心餐。", "Tap an order to see details, show your pickup code, cancel before cutoff, or transfer / gift / donate it.")} />
+      <PageHero eyebrow={tr("我的預約", "Your bookings")} title={tr("我的餐點", "My meals")} description={tr("週曆上點一筆訂單看詳情、出示取餐碼、截單前修改或取消，或轉讓／贈送／捐為愛心餐。", "Tap an order to see details, show your pickup code, change or cancel before cutoff, or transfer / gift / donate it.")} />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
-        {!authLoading && !uid ? (
+        {/* 頁上方分頁：我的餐點｜轉讓市集｜附近愛心餐（§4.5：「轉讓・愛心餐」併入我的餐點） */}
+        <div className="flex gap-2 flex-wrap" role="tablist" aria-label={tr("我的餐點分頁", "My meals tabs")}>
+          <Tag selected={pageTab === "meals"} onClick={() => switchTab("meals")}>{tr("我的餐點", "My meals")}</Tag>
+          <Tag selected={pageTab === "market"} onClick={() => switchTab("market")}>{tr("轉讓市集", "Transfer market")}</Tag>
+          <Tag selected={pageTab === "charity"} onClick={() => switchTab("charity")}>{tr("附近愛心餐", "Charity meals nearby")}</Tag>
+        </div>
+
+        {pageTab === "market" ? (
+          <TransferMarketPage embedded />
+        ) : pageTab === "charity" ? (
+          <CharityMealsSection />
+        ) : !authLoading && !uid ? (
           <EmptyState
             icon={<ClipboardList size={32} />}
             title={tr("請先登入", "Please sign in")}

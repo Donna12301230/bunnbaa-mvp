@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import type { MenuItem, RiceOption, SlotChoice } from "@/types";
+import type { ExtraSideChoice, MenuItem, RiceOption, SlotChoice } from "@/types";
 
 // 購物車（存在 localStorage）。第一階段規格：每一行是一份（或多份同樣配置的）便當，
-// 各自帶取餐日期、時段、配菜選擇、加減飯、折價券——可預訂到下週五，一次結帳可以
+// 各自帶取餐日期、時段、主菜、配菜選擇（含第四道）、飯量、折價券——可預訂 30 天內，一次結帳可以
 // 跨好幾天，但只能同一家店（折價券只能在發券店家用）。
 // _v3：2026-09-30 改成便當格式，舊版購物車（沒有日期／配菜）直接丟掉。
 const CART_KEY = "bento_cart_v3";
@@ -14,6 +14,8 @@ export interface CartLine {
   pickupDate: string;
   pickupWindow: string;
   choices: SlotChoice[];
+  mainIndex?: number | null; // 選的主菜（menu_items.mains 的 index）
+  extraSide?: ExtraSideChoice | null; // 第四道：備案或加菜
   rice: RiceOption;
   quantity: number;
   note: string;
@@ -43,7 +45,8 @@ function save() {
 
 function sameConfig(a: Omit<CartLine, "key" | "quantity">, b: Omit<CartLine, "key" | "quantity">) {
   return a.menuItem.id === b.menuItem.id && a.pickupDate === b.pickupDate && a.pickupWindow === b.pickupWindow
-    && a.rice === b.rice && a.note === b.note && JSON.stringify(a.choices) === JSON.stringify(b.choices) && !a.couponId && !b.couponId;
+    && a.rice === b.rice && a.note === b.note && JSON.stringify(a.choices) === JSON.stringify(b.choices) && !a.couponId && !b.couponId
+    && (a.mainIndex ?? null) === (b.mainIndex ?? null) && JSON.stringify(a.extraSide ?? null) === JSON.stringify(b.extraSide ?? null);
 }
 
 export const cartStore = {

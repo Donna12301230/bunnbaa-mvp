@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { bookingProblem, isSlotStarted, vendorWindows } from "@/lib/pickupSlots";
-import type { Vendor } from "@/types";
+import { bookingProblem, isSlotStarted, itemWindows } from "@/lib/pickupSlots";
+import type { MealPeriod, MenuItem, Vendor } from "@/types";
 
 export interface SlotAvailability {
   window: string;
@@ -17,8 +17,14 @@ export interface SlotAvailability {
  * 某家店某一天每個取餐時段的狀態。份數來自 slot_counters（只有
  * confirmLinePayPayment 會寫，見 functions/src/index.js），伺服器結帳時會再擋一次，
  * 這裡只是讓消費者先看到。沒傳 vendor（例如首頁還沒選店）就用預設時段、不算份數。
+ * 給 item／period 只列品項供應餐期（或指定餐期）的時段。
  */
-export function useSlotAvailability(vendor: Vendor | null | undefined, pickupDate: string) {
+export function useSlotAvailability(
+  vendor: Vendor | null | undefined,
+  pickupDate: string,
+  item?: Pick<MenuItem, "meal_periods"> | null,
+  period?: MealPeriod | null
+) {
   const capacity = vendor?.slot_capacity && vendor.slot_capacity > 0 ? vendor.slot_capacity : null;
 
   const { data: booked = {} } = useQuery({
@@ -37,7 +43,7 @@ export function useSlotAvailability(vendor: Vendor | null | undefined, pickupDat
 
   // 非營業日、公休、停班停課、已截單、超出預訂範圍都算不能訂
   const closedReason = pickupDate ? bookingProblem(vendor, pickupDate) : null;
-  const slots: SlotAvailability[] = vendorWindows(vendor).map((window) => {
+  const slots: SlotAvailability[] = itemWindows(vendor, item, period).map((window) => {
     const started = isSlotStarted(pickupDate, window);
     const remaining = capacity === null ? null : Math.max(0, capacity - (booked[window] ?? 0));
     return { window, started, remaining, open: !closedReason && !started && remaining !== 0 };

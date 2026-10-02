@@ -2,12 +2,10 @@ import { tr } from "@/lib/i18n";
 
 // 成長獎勵券種（規格 §8.3）與分配演算法（§8.4），跟 functions/src/rewards.js 同一份，
 // 這裡只給商家後台試算與前台顯示用。
+// 第一階段只保留 3 種（免費餐券、半價券、保底九五折）；一折、三折、八折券列入後續改版。
 export const COUPON_TIERS = [
-  { code: "free", label: "零元券", labelEn: "Free meal", discount: 100, cost: 95, weight: 0.05 },
-  { code: "t10", label: "一折券", labelEn: "90% off", discount: 90, cost: 85, weight: 0.1 },
-  { code: "t30", label: "三折券", labelEn: "70% off", discount: 70, cost: 65, weight: 0.15 },
-  { code: "t50", label: "五折券", labelEn: "50% off", discount: 50, cost: 45, weight: 0.25 },
-  { code: "t80", label: "八折券", labelEn: "20% off", discount: 20, cost: 15, weight: 0.45 },
+  { code: "free", label: "免費餐券", labelEn: "Free meal", discount: 100, cost: 95, weight: 0.3 },
+  { code: "t50", label: "半價券", labelEn: "Half price", discount: 50, cost: 45, weight: 0.7 },
 ];
 export const BASE_TIER = { code: "t95", label: "九五折券", labelEn: "5% off", discount: 5 };
 export const ALL_TIERS = [...COUPON_TIERS, BASE_TIER];

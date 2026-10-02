@@ -1,43 +1,44 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import {
-  collection, doc, getDocs, limit, onSnapshot, orderBy, query, where,
-} from "firebase/firestore";
+import { collection, getDocs, limit, onSnapshot, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { useAuth } from "@/hooks/useAuth";
 import { httpsCallable } from "@/lib/callable";
 import {
-  Clock, CalendarDays, Rocket, Star, MapPin, Trophy,
-  BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store, Bot, UtensilsCrossed } from "lucide-react";
+  Clock, Star, MapPin, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, Store, Bot, UtensilsCrossed, Search, X,
+  Sunrise, Sun, Moon,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
-import GrowthRewardTicker from "@/components/GrowthRewardTicker";
 import { auth, db, functions } from "@/lib/firebase";
-import type { Vendor, MenuItem, MealPlan, Lock } from "@/types";
+import type { Vendor, MenuItem, MealPlan, Lock, MealPeriod, RewardStatus } from "@/types";
 import { summarizeRatings, useReviews } from "@/hooks/useReviews";
 import { areaLabel, setSelectedArea, useSelectedArea, vendorInArea } from "@/lib/location";
-import { applyEarlyBirdPrice, discountText, VISIBLE_EARLY_BIRD_TIERS, tierRangeText } from "@/lib/pricing";
-import type { RewardStatus } from "@/types";
+import { applyEarlyBirdPrice, discountText } from "@/lib/pricing";
 import { tr, useI18n, loc } from "@/lib/i18n";
-import { addDaysStr, DEFAULT_PICKUP_WINDOWS, maxPickupDateStr, nextAvailablePickup, openWindowsOn, planPickupDates, setPreferredPickup, slotLabel, todayStr, vendorClosedReason, vendorCutoffTime } from "@/lib/pickupSlots";
-import { isBento } from "@/lib/bento";
+import {
+  DEFAULT_PICKUP_WINDOWS, MEAL_PERIODS, bookableDateRange, itemWindows, mealPeriodLabel, nextAvailablePickup, openWindowsOn,
+  planPickupSchedule, setPreferredPickup, slotLabel, todayStr, addDaysStr, vendorClosedReason, vendorCutoffTime, servesPeriod,
+} from "@/lib/pickupSlots";
+import { isBento, itemMinPrice } from "@/lib/bento";
 import PickupPicker from "@/components/PickupPicker";
+import PriceDateStrip from "@/components/PriceDateStrip";
+import VendorCardHeader from "@/components/VendorCardHeader";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { useVendors } from "@/hooks/useVendors";
 import ShoppingAssistant from "@/components/ShoppingAssistant";
 import { avatarUrl } from "@/lib/avatar";
+import { matchesQuery, setSearchQuery, useSearchQuery } from "@/lib/searchQuery";
+import { cn } from "@/lib/utils";
 
 const bannedHint = () =>
   tr("您的帳號已被限制下單，請至會員中心提交解封申訴", "Your account can't place orders. Please submit an appeal from My account.");
-const EARLY_BIRD_ICONS = [Clock, CalendarDays, Rocket];
 
-// 取餐時段清單在 lib/pickupSlots.ts（pickup_window 用 ASCII 連字號，跟
-// discount_explanations 的 cacheKeyFor()/其他真實 locks 一致）。
+const PERIOD_ICONS: Record<MealPeriod, typeof Sun> = { breakfast: Sunrise, lunch: Sun, dinner: Moon };
 
 function formatResaleCountdown(deadline: Date, now: number): string {
   const diffMin = Math.round((deadline.getTime() - now) / 60000);
@@ -46,10 +47,6 @@ function formatResaleCountdown(deadline: Date, now: number): string {
   return tr(`${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`, `Ends in ${Math.floor(diffMin / 60)} h ${diffMin % 60} min`);
 }
 
-// 首頁模板 — 對應 UI草圖的 Main.dc.html（現在是合併版：原本 PlanSchedule.dc.html
-// 的「合作店家與計畫」已經整段併進 Main，這裡也已經做過）。
-// 排序只保留有資料能算的：草圖的「距離」沒有位置資料所以拿掉，「最快送達」改成
-// 最快可取餐日（平台是自取不外送），評分讀 reviews 的店家平均。
 const SORT_OPTIONS = [
   { id: "relevance", label: "相關性", labelEn: "Relevance" },
   { id: "earliest", label: "最快可取餐", labelEn: "Earliest pickup" },
@@ -58,11 +55,7 @@ const SORT_OPTIONS = [
 ] as const;
 type SortId = (typeof SORT_OPTIONS)[number]["id"];
 
-// 預約日曆最多看到下週五（第一階段規格的預訂範圍）
-const MAX_RANGE_DAYS = 14;
-
-
-// 消保法聲明（鎖定單點、加入計畫共用）
+// 消保法聲明（單點、加入計畫共用）
 function WaiverText() {
   const { t } = useI18n();
   return (
@@ -78,22 +71,23 @@ export default function HomePage() {
   const { toast } = useToast();
   const { isOrderBanned } = useAuth();
   const { t } = useI18n();
-  // 預約日曆：篩選「這段期間有開放取餐」的店家／品項／計畫，以及取餐日在期間內的轉讓
-  const [startDate, setStartDate] = useState(() => todayStr());
-  const [endDate, setEndDate] = useState(() => addDaysStr(todayStr(), 6));
-  const [pickupDate, setPickupDate] = useState(() => nextAvailablePickup()?.date ?? todayStr());
-  const [pickupWindow, setPickupWindow] = useState(() => nextAvailablePickup()?.window ?? DEFAULT_PICKUP_WINDOWS[0]);
+  const [location, navigate] = useLocation();
+  // 第二排「單點｜方案」是兩個獨立頁面（/home、/plans）
+  const mode: "single" | "plans" = location.startsWith("/plans") ? "plans" : "single";
+  const [period, setPeriod] = useState<MealPeriod>("lunch");
+  const [pickupDate, setPickupDate] = useState(() => nextAvailablePickup()?.date ?? addDaysStr(todayStr(), 1));
   const [selectedSort, setSelectedSort] = useState<SortId>("relevance");
-  const [, navigate] = useLocation();
   const [uid, setUid] = useState<string | null>(null);
   const requireLogin = useRequireLogin();
+  const searchQuery = useSearchQuery();
+  const searching = searchQuery.trim().length > 0;
   // 加入計畫確認視窗：開始日期＋時段由消費者選，送伺服器排日期、收款
-  const [planDialog, setPlanDialog] = useState<{ plan: MealPlan; vendor: Vendor } | null>(null);
+  const [planDialog, setPlanDialog] = useState<{ plan: MealPlan; vendor: Vendor; item: MenuItem | null } | null>(null);
   const [planStartDate, setPlanStartDate] = useState("");
   const [planWindow, setPlanWindow] = useState("");
   const [planAck, setPlanAck] = useState(false);
   const [joiningPlan, setJoiningPlan] = useState(false);
-  const [rewardStatuses, setRewardStatuses] = useState<RewardStatus[]>([]);
+  const [rewardStatuses, setRewardStatuses] = useState<Map<string, RewardStatus>>(new Map());
   const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
@@ -101,20 +95,16 @@ export default function HomePage() {
     return () => unsub();
   }, []);
 
-  // 成長獎勵（規格 §8）：公開進度 rewardStatus（只有抽獎券張數與開池狀態，不含營業額）
+  // 成長獎勵公開進度（「再 X 元開獎」寫在店家卡片的「看店家」前面）
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "rewardStatus"), (snap) => {
-      setRewardStatuses(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as RewardStatus));
-    }, () => setRewardStatuses([]));
+      setRewardStatuses(new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() } as RewardStatus])));
+    }, () => setRewardStatuses(new Map()));
     return () => unsub();
   }, []);
 
-  // 真實商家清單，「今日推薦鎖定方案」跟「合作店家與計畫」都要用（各自的
-  // 品項/方案是分開的子集合查詢，商家本身只查一次）。
   const { data: vendors = [] } = useVendors();
 
-  // 今日推薦鎖定方案（單點型）——真實 menu_items，早鳥折扣依 pickupDate 現算
-  // （跟左側「早鳥預約折扣」說明欄位同一套 web/src/lib/pricing.ts 規則）。
   const { data: lockMealCards = [] } = useQuery({
     queryKey: ["lockMealCards", vendors.map((v) => v.id).join(",")],
     queryFn: async () => {
@@ -129,8 +119,8 @@ export default function HomePage() {
     enabled: vendors.length > 0,
     staleTime: 5 * 60 * 1000,
   });
+  const itemsById = useMemo(() => new Map(lockMealCards.map(({ item }) => [item.id, item])), [lockMealCards]);
 
-  // 合作店家與計畫——真實 vendors + 各自的 meal_plans。
   const { data: vendorPlanGroups = [] } = useQuery({
     queryKey: ["vendorMealPlans", vendors.map((v) => v.id).join(",")],
     queryFn: async () => {
@@ -146,24 +136,16 @@ export default function HomePage() {
     staleTime: 15 * 60 * 1000,
   });
 
-  // 同學轉讓保底專區——真實 locks，跟 TransferMarketPage.tsx 同一套查詢慣例
-  // （vendor_id+created_at 索引，status 篩選交給前端做）。真實 Lock 沒有「原價/
-  // 轉讓價」兩個價格（平台不經手轉讓價），也沒有賣家姓名，卡片改顯示唯一的
-  // locked_price + resale_deadline 倒數。
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
   }, []);
 
-  // 所有商家的轉讓中鎖定。只用 status 單一等值（自動索引），排序交給前端，
-  // 不另外要求 status+created_at 複合索引；firestore.rules 也要求查詢帶 status 才能公開讀。
   const { data: transfers = [] } = useQuery({
     queryKey: ["homeTransferPreview"],
     queryFn: async () => {
-      const snap = await getDocs(
-        query(collection(db, "locks"), where("status", "==", "for_resale"), limit(200))
-      );
+      const snap = await getDocs(query(collection(db, "locks"), where("status", "==", "for_resale"), limit(200)));
       return snap.docs
         .map((d) => ({ id: d.id, ...d.data() }) as Lock & { created_at?: { toMillis?: () => number } })
         .sort((a, b) => (b.created_at?.toMillis?.() ?? 0) - (a.created_at?.toMillis?.() ?? 0))
@@ -175,35 +157,39 @@ export default function HomePage() {
   const { data: reviews = [] } = useReviews();
   const vendorRatings = useMemo(() => summarizeRatings(reviews, (r) => r.vendor_id), [reviews]);
   const planRatings = useMemo(() => summarizeRatings(reviews, (r) => r.meal_plan_id), [reviews]);
-
-  const rangeDates = useMemo(() => {
-    if (!startDate || !endDate || endDate < startDate) return [];
-    const dates: string[] = [];
-    for (let d = startDate; d <= endDate && dates.length < MAX_RANGE_DAYS; d = addDaysStr(d, 1)) dates.push(d);
-    return dates;
-  }, [startDate, endDate]);
-  const rangeInvalid = rangeDates.length === 0;
-  // 頂部列選的地區也一起篩（店家地址），跟預約日曆疊加
   const area = useSelectedArea();
-  const openInRange = (vendor: Vendor) =>
-    vendorInArea(vendor, area) && rangeDates.some((d) => openWindowsOn(vendor, d).length > 0);
+  const bookableDates = useMemo(() => bookableDateRange(), []);
 
-  const sortedMealCards = useMemo(() => {
-    const cards = lockMealCards.filter(({ vendor }) => openInRange(vendor));
+  // 餐期按鈕：沒有任何品項供應的變灰
+  const periodAvailable = useMemo(() => {
+    const set = new Set<MealPeriod>();
+    for (const { item, vendor } of lockMealCards) for (const p of MEAL_PERIODS) if (servesPeriod(vendor, item, p)) set.add(p);
+    return set;
+  }, [lockMealCards]);
+  useEffect(() => {
+    if (periodAvailable.size > 0 && !periodAvailable.has(period)) setPeriod(MEAL_PERIODS.find((p) => periodAvailable.has(p)) ?? "lunch");
+  }, [periodAvailable, period]);
+
+  /** 品項在目前餐期、選的日期能不能訂；搜尋時只要 30 天內任何一天能訂就算（只搜目前可預購的） */
+  const itemOpen = (vendor: Vendor, item: MenuItem | null) =>
+    searching
+      ? bookableDates.some((d) => openWindowsOn(vendor, d, new Date(), item, period).length > 0)
+      : openWindowsOn(vendor, pickupDate, new Date(), item, period).length > 0;
+
+  const itemMatches = (vendor: Vendor, item: MenuItem) =>
+    matchesQuery(searchQuery, vendor.name, vendor.name_en, vendor.item_focus, item.name, item.name_en, item.category, item.category_en,
+      item.main?.name, ...(item.mains || []).map((m) => m.name), ...(item.slots || []).flatMap((s) => [s.default?.name, ...(s.candidates || []).map((c) => c.name)]));
+
+  const vendorMealGroups = useMemo(() => {
+    const cards = lockMealCards.filter(({ item, vendor }) => vendorInArea(vendor, area) && servesPeriod(vendor, item, period) && itemOpen(vendor, item) && itemMatches(vendor, item));
     const earliest = (v: Vendor) => nextAvailablePickup(v)?.date ?? "9999-12-31";
     const rating = (v: Vendor) => vendorRatings.get(v.id)?.average ?? -1;
     if (selectedSort === "earliest") cards.sort((a, b) => earliest(a.vendor).localeCompare(earliest(b.vendor)));
-    if (selectedSort === "price") cards.sort((a, b) => applyEarlyBirdPrice(a.item.price, pickupDate).lockedPrice - applyEarlyBirdPrice(b.item.price, pickupDate).lockedPrice);
+    if (selectedSort === "price") cards.sort((a, b) => itemMinPrice(a.item) - itemMinPrice(b.item));
     if (selectedSort === "rating") cards.sort((a, b) => rating(b.vendor) - rating(a.vendor));
-    return cards;
-  }, [lockMealCards, rangeDates, area, selectedSort, vendorRatings, pickupDate]);
-
-  // 依商家分組（「哪些店家有什麼」），避免每個品項各自一張大圖卡片排成一片、太雜亂；
-  // 商家順序沿用 sortedMealCards 已經排好的順序（第一次出現該商家的位置）。
-  const vendorMealGroups = useMemo(() => {
     const groups: { vendor: Vendor; items: MenuItem[] }[] = [];
     const index = new Map<string, number>();
-    for (const { item, vendor } of sortedMealCards) {
+    for (const { item, vendor } of cards) {
       let i = index.get(vendor.id);
       if (i === undefined) {
         i = groups.length;
@@ -213,52 +199,56 @@ export default function HomePage() {
       groups[i].items.push(item);
     }
     return groups;
-  }, [sortedMealCards]);
+  }, [lockMealCards, area, period, pickupDate, selectedSort, vendorRatings, searchQuery]);
 
   const visiblePlanGroups = useMemo(() => {
-    const groups = vendorPlanGroups.filter((g) => {
-      const vendor = vendors.find((v) => v.id === g.vendorId);
-      return vendor ? openInRange(vendor) : false;
-    });
+    const groups = vendorPlanGroups
+      .map((g) => {
+        const plans = g.plans.filter((p) => {
+          const item = p.menu_item_id ? itemsById.get(p.menu_item_id) ?? null : null;
+          return servesPeriod(g.vendor, item, period) && itemOpen(g.vendor, item)
+            && matchesQuery(searchQuery, g.vendor.name, g.vendor.name_en, g.vendor.item_focus, p.name, p.name_en, p.label, p.description, item?.name);
+        });
+        return { ...g, plans };
+      })
+      .filter((g) => vendorInArea(g.vendor, area) && g.plans.length > 0);
     if (selectedSort === "rating") {
       groups.sort((a, b) => (vendorRatings.get(b.vendorId)?.average ?? -1) - (vendorRatings.get(a.vendorId)?.average ?? -1));
     }
+    if (selectedSort === "price") groups.sort((a, b) => Math.min(...a.plans.map((p) => p.price_per_meal)) - Math.min(...b.plans.map((p) => p.price_per_meal)));
     return groups;
-  }, [vendorPlanGroups, vendors, rangeDates, area, selectedSort, vendorRatings]);
+  }, [vendorPlanGroups, itemsById, area, period, pickupDate, selectedSort, vendorRatings, searchQuery]);
 
-  const visibleTransfers = transfers
-    .filter((t) => !area || vendorInArea(vendors.find((v) => v.id === t.vendor_id), area))
-    .filter((t) => rangeInvalid || (t.pickup_date >= rangeDates[0] && t.pickup_date <= rangeDates[rangeDates.length - 1]));
+  const visibleTransfers = transfers.filter((x) => !area || vendorInArea(vendors.find((v) => v.id === x.vendor_id), area));
 
-  // 便當要選配菜、加減飯，帶著左側選好的日期時段到品項頁組便當再加入購物車（規格 §4）
+  // 便當要選主菜、配菜、飯量，帶著選好的日期與餐期到品項頁組便當再加入購物車（規格 §4.2）
   function openItem(item: MenuItem, vendor: Vendor) {
-    if (!openWindowsOn(vendor, pickupDate).includes(pickupWindow)) {
+    const date = searching ? bookableDates.find((d) => openWindowsOn(vendor, d, new Date(), item, period).length > 0) ?? pickupDate : pickupDate;
+    const windows = openWindowsOn(vendor, date, new Date(), item, period);
+    if (windows.length === 0) {
       toast({
-        title: t("這家店這個時段不開放預購", "This vendor doesn't take pre-orders for that slot"),
-        description: vendorClosedReason(vendor, pickupDate) ?? t("可能已截單，請改選其他日期，或到品項頁選這家店的時段。", "It may be past cutoff — pick another date, or choose a slot on the item page."),
+        title: t("這家店這天不開放預購", "This vendor isn't taking pre-orders that day"),
+        description: vendorClosedReason(vendor, date) ?? t("可能已截單，請到品項頁改選其他日期。", "It may be past cutoff — choose another date on the item page."),
       });
     }
-    setPreferredPickup({ date: pickupDate, window: pickupWindow });
+    setPreferredPickup({ date, window: windows[0] ?? itemWindows(vendor, item, period)[0] ?? DEFAULT_PICKUP_WINDOWS[0] });
     navigate(`/item/${item.id}`);
   }
 
-  // 「計畫型」（訂閱制多日方案）沒有另外的 plan/subscription collection——付款
-  // 成功後 confirmLinePayPayment 一次寫入 N 筆 locks（plan_id＝這張訂單 id）。
-  // 2026-09-28 起改走伺服器 createPlanLinePayReservation：原本前端直接寫 locks，
-  // 不經付款、固定 12:00-13:00，也不看商家時段／公休／份數上限。
-  function openPlanDialog(vendorId: string, plan: MealPlan) {
+  // 計畫（§4.4）：下單時選第一天＋一個時段套用每一天，每天各自算早鳥、遇公休順延；之後到「我的餐點」個別改時段
+  function openPlanDialog(vendor: Vendor, plan: MealPlan) {
     if (!requireLogin() || !uid) return;
     if (isOrderBanned) {
       toast({ title: t("目前無法加入計畫", "Can't join a plan right now"), description: bannedHint(), variant: "destructive" });
       return;
     }
-    const vendor = vendors.find((v) => v.id === vendorId);
-    if (!vendor) return;
-    const next = nextAvailablePickup(vendor);
-    setPlanStartDate(next?.date ?? todayStr());
-    setPlanWindow(next?.window ?? DEFAULT_PICKUP_WINDOWS[0]);
+    const item = plan.menu_item_id ? itemsById.get(plan.menu_item_id) ?? null : null;
+    const windows = openWindowsOn(vendor, pickupDate, new Date(), item, period);
+    const next = windows.length > 0 ? { date: pickupDate, window: windows[0] } : nextAvailablePickup(vendor);
+    setPlanStartDate(next?.date ?? pickupDate);
+    setPlanWindow(next?.window ?? itemWindows(vendor, item, period)[0] ?? DEFAULT_PICKUP_WINDOWS[0]);
     setPlanAck(false);
-    setPlanDialog({ plan, vendor });
+    setPlanDialog({ plan, vendor, item });
   }
 
   async function handleJoinPlan(plan: MealPlan) {
@@ -269,213 +259,149 @@ export default function HomePage() {
       const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
       window.location.href = paymentUrl;
     } catch (err) {
-      // 伺服器的錯誤訊息已經是白話（封鎖、額滿、公休等），直接顯示
       toast({ title: t("加入計畫失敗", "Couldn't join the plan"), description: (err as Error).message, variant: "destructive" });
       setJoiningPlan(false);
     }
   }
 
+  const dateText = pickupDate.slice(5).replace("-", "/");
+
   return (
     <div className="min-h-screen bg-background">
       <MarketplaceHeader active="plans" />
-      <GrowthRewardTicker />
 
-      {/* ── 頁首：本頁 h1＋目前選的取餐日時段＋預購助理入口 ── */}
-      <section className="max-w-[1400px] mx-auto px-4 md:px-6 pt-10 md:pt-16 pb-2 flex flex-wrap items-end justify-between gap-6 bb-home-hero">
+      {/* ── 頁首 ── */}
+      <section className="max-w-[1400px] mx-auto px-4 md:px-6 pt-10 md:pt-14 pb-2 flex flex-wrap items-end justify-between gap-6 bb-home-hero">
         <div className="min-w-0">
           <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground mb-4">
             <span className="w-8 h-px bg-current opacity-60" aria-hidden="true" />
-            {t("今日菜單", "Today's menu")}
+            {t("越早訂，越開心。", "Book early, eat happy.")}
           </p>
-          <h1 className="font-heading font-semibold text-[clamp(40px,6vw,84px)] leading-[1.04] tracking-[-0.025em]">
-            {t("今天想吃什麼？", "What's for lunch?")}
+          <h1 className="font-heading font-semibold text-[clamp(36px,5.5vw,76px)] leading-[1.04] tracking-[-0.025em]">
+            {t("今天想吃什麼？", "What are you eating?")}
           </h1>
           <p className="mt-4 text-muted-foreground max-w-xl leading-relaxed">
-            {t(`選好取餐日與時段，越早訂越便宜（最高 ${discountText(Math.max(...VISIBLE_EARLY_BIRD_TIERS.map((x) => x.discountPercent)))}）。`, `Pick a pickup day and time — the earlier you book, the cheaper it gets.`)}
+            {t("明天 95 折、提前 2 天以上 8 折，最遠可訂 30 天後。", "Tomorrow 5% off, 2+ days ahead 20% off — book up to 30 days out.")}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* 目前取餐時段；點了跳到側欄的計畫工具箱改時段（手機上側欄排在菜單後面） */}
-          <a href="#home-planner" onClick={(e) => { e.preventDefault(); document.getElementById("home-planner")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="inline-flex items-center gap-2 h-12 px-5 rounded-full border border-ink bg-card text-sm font-semibold hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <Clock className="w-4 h-4 text-primary" aria-hidden="true" />
-            <span className="sr-only">{t("目前取餐時段（點擊修改）：", "Current pickup (tap to change): ")}</span>
-            {pickupDate.slice(5).replace("-", "/")}・{pickupWindow}
-          </a>
-          <button
-            type="button"
-            onClick={() => setAssistantOpen(true)}
-            className="inline-flex items-center gap-2 h-12 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <Bot className="w-4 h-4" aria-hidden="true" /> {t("問問預購助理", "Ask the meal assistant")}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setAssistantOpen(true)}
+          className="inline-flex items-center gap-2 h-12 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <Bot className="w-4 h-4" aria-hidden="true" /> {t("問問預購助理", "Ask the meal assistant")}
+        </button>
+        <ShoppingAssistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
       </section>
 
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 flex flex-col lg:flex-row gap-8">
-        {/* ── 左側：計畫工具箱（桌機 sticky，太長時自己捲） ── */}
-        <aside id="home-planner" className="order-2 lg:order-1 scroll-mt-20 lg:w-72 shrink-0 space-y-4 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 bb-thin-scroll">
-          <h2 className="font-heading text-2xl font-semibold">{t("計畫工具箱", "Planner")}</h2>
-
-          {/* 預購助理入口移到頁首（原本頁首、側欄各一顆，重複） */}
-          <ShoppingAssistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
-
-          <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
-            <h3 className="text-sm font-semibold flex items-center gap-1.5">
-              <CalendarDays className="w-4 h-4 text-primary" /> {t("預約日曆", "Date range")}
-            </h3>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1" htmlFor="home-range-start">{t("開始日期", "From")}</label>
-              <Input
-                id="home-range-start"
-                type="date"
-                value={startDate}
-                min={todayStr()}
-                max={maxPickupDateStr()}
-                onChange={e => setStartDate(e.target.value)}
-                className="h-10"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1" htmlFor="home-range-end">{t("結束日期", "To")}</label>
-              <Input
-                id="home-range-end"
-                type="date"
-                value={endDate}
-                min={startDate}
-                max={maxPickupDateStr()}
-                onChange={e => setEndDate(e.target.value)}
-                className="h-10"
-              />
-            </div>
-            <p className="text-xs text-center text-muted-foreground pt-1 border-t border-border">
-              {rangeInvalid ? t("結束日期要在開始日期之後", "The end date must be after the start date") : t("只顯示這段期間有開放取餐的店家與轉讓", "Only vendors and transfers with pickups in this range are shown")}
-            </p>
-            {area && (
-              <p className="text-xs text-center text-muted-foreground">
-                {t("地區：", "Area: ")}{areaLabel(area)}{" "}
-                <button type="button" className="text-primary underline" onClick={() => setSelectedArea(null)}>{t("清除", "Clear")}</button>
-              </p>
-            )}
+      <main className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 space-y-8">
+        {/* ── 第一排：餐期；第二排：單點｜方案 ── */}
+        <div className="space-y-3">
+          <div className="flex gap-2 flex-wrap" role="tablist" aria-label={t("餐期", "Meal")}>
+            {MEAL_PERIODS.map((p) => {
+              const Icon = PERIOD_ICONS[p];
+              const available = periodAvailable.size === 0 || periodAvailable.has(p);
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  role="tab"
+                  aria-selected={period === p}
+                  disabled={!available}
+                  onClick={() => setPeriod(p)}
+                  className={cn(
+                    "inline-flex items-center gap-2 h-11 px-6 rounded-full border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    period === p ? "bg-ink text-[var(--text-on-inverse)] border-ink" : "bg-card border-ink hover:bg-secondary",
+                    !available && "opacity-40 cursor-not-allowed hover:bg-card"
+                  )}
+                >
+                  <Icon className="w-4 h-4" aria-hidden="true" /> {mealPeriodLabel(p)}
+                </button>
+              );
+            })}
           </div>
-
-          <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
-            <h3 className="text-sm font-semibold">{t("取餐時段", "Pickup time")}</h3>
-            <label className="text-xs text-muted-foreground block -mt-1">{t("單點型鎖定用，選一個日期跟時段", "For single meals — choose a date and time")}</label>
-            <PickupPicker
-              date={pickupDate}
-              window={pickupWindow}
-              onDateChange={setPickupDate}
-              onWindowChange={setPickupWindow}
-              uid={uid}
-            />
-          </div>
-
-          <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
-            <h3 className="text-sm font-semibold">{t("早鳥預約折扣", "Early-bird discounts")}</h3>
-            <div className="space-y-2.5 text-sm">
-              {VISIBLE_EARLY_BIRD_TIERS.map((tier, i) => {
-                const Icon = EARLY_BIRD_ICONS[i] ?? Rocket;
-                return (
-                  <div key={tier.minDays} className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4 text-primary shrink-0" />
-                    <span className="flex-1 text-muted-foreground">{tierRangeText(tier)}</span>
-                    <span className="font-heading text-base font-semibold">{discountText(tier.discountPercent)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="bg-card rounded-2xl border border-ink p-4 space-y-2.5">
-            <h3 className="text-sm font-semibold flex items-center gap-1.5">
-              <Trophy className="w-4 h-4 text-primary" /> {t("成長獎勵抽獎", "Growth reward draw")}
-            </h3>
-            <p className="text-xs text-muted-foreground">{t("每累計實付 100 元一張抽獎券，店家每週拿營業額 10% 當回饋池，滿 100 張開獎、人人有獎。", "Every NT$100 you pay earns a ticket. Vendors put 10% of weekly revenue into a pool — 100 tickets opens the draw, and everyone wins.")}</p>
-            {rewardStatuses.slice(0, 5).map((st) => (
-              <div key={st.id} className="flex items-center gap-2 text-sm">
-                <span className="flex-1 truncate">{st.vendor_name || loc(vendors.find((v) => v.id === st.id), "name")}</span>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {st.pool_open ? t("開獎中", "Draw open") : t(`再 ${st.amount_to_open} 元開獎`, `NT$${st.amount_to_open} to open`)}
-                </span>
-              </div>
-            ))}
-            <Button asChild size="sm" variant="outline" className="w-full"><Link href="/rewards">{t("我的抽獎券與折價券", "My tickets & coupons")}</Link></Button>
-          </div>
-
-          <div className="bg-card rounded-2xl border border-ink p-4 space-y-3">
-            <h3 className="text-sm font-semibold flex items-center gap-1.5">
-              <SlidersHorizontal className="w-4 h-4 text-primary" /> {t("進階篩選", "Filters")}
-            </h3>
-            <p className="text-xs font-semibold text-muted-foreground">{t("排序依", "Sort by")}</p>
-            <div className="space-y-1.5">
-              {SORT_OPTIONS.map(opt => (
-                <label key={opt.id} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="sortBy"
-                    checked={selectedSort === opt.id}
-                    onChange={() => setSelectedSort(opt.id)}
-                    className="accent-primary w-4 h-4"
-                  />
-                  <span className={`text-sm ${selectedSort === opt.id ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
-                    {t(opt.label, opt.labelEn)}
-                  </span>
-                </label>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex rounded-full border border-ink p-1 bg-card" role="tablist" aria-label={t("單點或方案", "Single or plan")}>
+              {([["single", "/home", t("單點", "Single meals")], ["plans", "/plans", t("方案", "Meal plans")]] as const).map(([m, href, label]) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === m}
+                  onClick={() => navigate(href)}
+                  className={cn(
+                    "h-9 px-6 rounded-full text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {label}
+                </button>
               ))}
             </div>
+            <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+              {t("排序", "Sort")}
+              <select
+                value={selectedSort}
+                onChange={(e) => setSelectedSort(e.target.value as SortId)}
+                className="h-9 rounded-full border border-border bg-card px-3 text-sm text-foreground"
+              >
+                {SORT_OPTIONS.map((opt) => <option key={opt.id} value={opt.id}>{t(opt.label, opt.labelEn)}</option>)}
+              </select>
+            </label>
           </div>
-        </aside>
+          {area && (
+            <p className="text-xs text-muted-foreground">
+              {t("地區：", "Area: ")}{areaLabel(area)}{" "}
+              <button type="button" className="text-primary underline" onClick={() => setSelectedArea(null)}>{t("清除", "Clear")}</button>
+            </p>
+          )}
+        </div>
 
-        {/* ── 右側：主內容 ── */}
-        <main className="order-1 lg:order-2 flex-1 min-w-0 space-y-12">
-          {/* 今日推薦方案（單點型）——改成依商家分組的清單，取代原本一格一張大圖卡片
-              （每個品項都要放大圖、徽章、價格，排成一片太雜亂），改成「哪些店家有什麼」：
-              一家店一張卡片，底下用一行一行列出品項名稱＋價格＋按鈕。 */}
+        {/* ── 搜尋結果提示 ── */}
+        {searching && (
+          <div className="flex items-center gap-2 rounded-2xl border border-ink bg-card px-4 py-3 text-sm">
+            <Search className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+            <span className="flex-1">
+              {t(`搜尋「${searchQuery}」：單點 ${vendorMealGroups.reduce((s, g) => s + g.items.length, 0)} 項、方案 ${visiblePlanGroups.reduce((s, g) => s + g.plans.length, 0)} 個（只列目前可預購的）`,
+                `"${searchQuery}": ${vendorMealGroups.reduce((s, g) => s + g.items.length, 0)} meals, ${visiblePlanGroups.reduce((s, g) => s + g.plans.length, 0)} plans (bookable only)`)}
+            </span>
+            <button type="button" onClick={() => setSearchQuery("")} className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground">
+              <X className="w-3.5 h-3.5" /> {t("清除搜尋", "Clear")}
+            </button>
+          </div>
+        )}
+
+        {/* ── 價格日期列：全站選日期只用這一種 ── */}
+        {!searching && (
+          <div className="rounded-2xl border border-ink bg-card p-4">
+            <PriceDateStrip value={pickupDate} onChange={setPickupDate} />
+          </div>
+        )}
+
+        {/* ── 單點 ── */}
+        {(mode === "single" || searching) && (
           <section className="space-y-4">
-            <div className="flex items-baseline justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2.5">
-                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground border border-ink">{t("單點型", "Single meal")}</span>
-                <h2 className="font-heading text-3xl font-semibold">{t("今日推薦方案", "Today's picks")}</h2>
-              </div>
-            </div>
-
+            <h2 className="font-heading text-3xl font-semibold">
+              {searching ? t("單點", "Single meals") : t(`${mealPeriodLabel(period)}・單點`, `${mealPeriodLabel(period)} · single meals`)}
+            </h2>
             <div className="space-y-5">
               {vendorMealGroups.length === 0 && (
-                <p className="text-sm text-muted-foreground">{t("這段期間沒有開放預購的品項，試著調整左側的預約日曆。", "Nothing is open for pre-order in this range — try adjusting the dates on the left.")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {searching ? t("沒有符合的單點品項。", "No matching meals.") : t(`${dateText} 的${mealPeriodLabel(period)}沒有開放預購的品項，換一天或換個餐期試試。`, `Nothing open for ${mealPeriodLabel(period)} on ${dateText} — try another day or meal.`)}
+                </p>
               )}
-              {/* 一家店一列：店家資訊＋橫向捲動的品項照片卡（原本每家把所有品項直排，頁面非常長） */}
               {vendorMealGroups.map(({ vendor, items }) => (
                 <article key={vendor.id} className="bg-card rounded-3xl border border-ink p-4 md:p-5" aria-label={loc(vendor, "name")}>
-                  <header className="flex items-center gap-3 flex-wrap mb-4">
-                    <span className="w-11 h-11 rounded-full overflow-hidden border border-ink bg-secondary shrink-0 flex items-center justify-center">
-                      {vendor.cover_image
-                        ? <img src={vendor.cover_image} alt="" loading="lazy" className="w-full h-full object-cover" />
-                        : <Store className="w-5 h-5 text-secondary-foreground/70" aria-hidden="true" />}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-heading text-xl font-semibold">{loc(vendor, "name")}</h3>
-                        {vendor.verified && (
-                          <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-ink">
-                            <BadgeCheck className="w-3 h-3" /> {t("認證商家", "Verified")}
-                          </span>
-                        )}
-                        {vendor.reliability_tone === "stable" && (
-                          <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-green-700 border border-ink">
-                            <CheckCircle2 className="w-3 h-3" /> {t("履約穩定", "Stable")}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">{t(`${items.length} 項可預購`, `${items.length} items`)}・{t("取餐", "Pickup")} {pickupDate.slice(5).replace("-", "/")}（{pickupWindow}）</p>
-                    </div>
-                    <Link href={`/vendor/${vendor.id}`} className="text-sm font-semibold underline underline-offset-4 decoration-1 hover:decoration-2 shrink-0">
-                      {t("看店家", "View vendor")}
-                    </Link>
-                  </header>
-
+                  <VendorCardHeader
+                    vendor={vendor}
+                    reward={rewardStatuses.get(vendor.id)}
+                    subtitle={searching ? t(`${items.length} 項可預購`, `${items.length} items`) : `${t(`${items.length} 項可預購`, `${items.length} items`)}・${t("取餐", "Pickup")} ${dateText}`}
+                  />
                   <ul className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 bb-thin-scroll bb-fade-x">
                     {items.map((item) => {
-                      const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
+                      const base = itemMinPrice(item);
+                      const { lockedPrice, discountPercent } = applyEarlyBirdPrice(base, pickupDate);
+                      const hasMains = (item.mains || []).length > 1;
                       return (
                         <li key={item.id} className="shrink-0 w-[172px] md:w-[188px] snap-start">
                           <button
@@ -491,7 +417,7 @@ export default function HomePage() {
                                   <UtensilsCrossed className="w-7 h-7 text-secondary-foreground/50" strokeWidth={1.5} aria-hidden="true" />
                                 </span>
                               )}
-                              {discountPercent > 0 && (
+                              {discountPercent > 0 && !searching && (
                                 <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-[#f29e0c] text-[#2b180d]">
                                   {discountText(discountPercent)}
                                 </span>
@@ -499,10 +425,10 @@ export default function HomePage() {
                             </span>
                             <span className="block mt-2.5 text-sm font-semibold truncate">{loc(item, "name")}</span>
                             <span className="flex items-baseline gap-1.5">
-                              {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through">${item.price}</span>}
-                              <span className="font-heading text-lg font-semibold">${lockedPrice}</span>
+                              {discountPercent > 0 && !searching && <span className="text-xs text-muted-foreground line-through">${base}</span>}
+                              <span className="font-heading text-lg font-semibold">${searching ? base : lockedPrice}{hasMains ? t(" 起", "+") : ""}</span>
                               <span className="ml-auto text-xs font-semibold text-primary underline underline-offset-4 decoration-1 group-hover:decoration-2">
-                                {isBento(item) ? t("選配菜", "Choose sides") : t("立即預付", "Prepay")}
+                                {isBento(item) && item.item_type !== "single" ? t("組便當", "Build") : t("預訂", "Book")}
                               </span>
                             </span>
                           </button>
@@ -514,174 +440,177 @@ export default function HomePage() {
               ))}
             </div>
           </section>
+        )}
 
-          {/* 加入計畫確認彈窗——選第一天＋時段、預覽每天的取餐日，確認後前往 LINE Pay */}
-          <Dialog open={!!planDialog} onOpenChange={(open) => { if (!open && !joiningPlan) setPlanDialog(null); }}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
-              {planDialog && (() => {
-                const { plan, vendor } = planDialog;
-                const dates = planPickupDates(vendor, planStartDate, planWindow, plan.days);
-                return (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle>{loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-3 py-1">
-                      <p className="text-sm text-muted-foreground">
-                        {loc(vendor, "name")}・NT$ {plan.price_per_meal} × {plan.days} {t("餐", "meals")} = <strong className="text-foreground">NT$ {plan.price_per_meal * plan.days}</strong>
-                      </p>
-                      <div>
-                        <p className="text-xs font-semibold mb-2">{t("第一天取餐日期與每天的取餐時段", "First pickup date and daily pickup time")}</p>
-                        <PickupPicker
-                          date={planStartDate}
-                          window={planWindow}
-                          onDateChange={setPlanStartDate}
-                          onWindowChange={setPlanWindow}
-                          uid={uid}
-                          vendor={vendor}
-                        />
-                      </div>
-                      {dates ? (
-                        <div className="p-2.5 rounded-lg bg-muted border border-border text-caption leading-relaxed">
-                          <span className="font-semibold">{t("取餐日（遇公休自動順延）：", "Pickup days (skips closing days): ")}</span>
-                          {dates.map((d) => d.slice(5).replace("-", "/")).join(t("、", ", "))}
-                          <span className="text-muted-foreground">・{t("每天", "daily")} {slotLabel(planWindow)}</span>
-                        </div>
-                      ) : (
-                        <div className="flex gap-1.5 p-2.5 rounded-lg bg-red-50 border border-red-200 text-caption text-red-800">
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                          {t(`這個開始日期／時段排不滿 ${plan.days} 天（最遠只能預約到下週五），請改選其他日期或時段。`, `This start date and time can't fit ${plan.days} days (bookings go up to next Friday). Please pick another date or time.`)}
-                        </div>
-                      )}
-                      <label className="flex items-start gap-1.5 p-2 rounded-lg bg-muted border border-border cursor-pointer">
-                        <Checkbox checked={planAck} onCheckedChange={() => setPlanAck((v) => !v)} className="mt-0.5 shrink-0" />
-                        <span className="text-caption leading-relaxed text-muted-foreground">
-                          <WaiverText />
-                        </span>
-                      </label>
-                      <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
-                        <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
-                        <span className="text-caption leading-relaxed text-orange-900">
-                          {t("每一天都是獨立的一份，當天沒空可以單獨轉讓或捐為愛心餐；取餐時段結束 30 分鐘仍未取餐，將", "Each day is a separate meal you can transfer or donate on its own. If it isn't picked up 30 min after the window ends, it ")}<strong>{t("轉為愛心餐、開放給需要的人", "becomes a charity meal for someone in need")}</strong>
-                        </span>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setPlanDialog(null)} disabled={joiningPlan}>
-                        {t("取消", "Cancel")}
-                      </Button>
-                      <Button disabled={!dates || !planAck || joiningPlan} onClick={() => handleJoinPlan(plan)}>
-                        {joiningPlan ? t("前往付款中…", "Redirecting to payment…") : t("確認加入並付款", "Join & pay")}
-                      </Button>
-                    </DialogFooter>
-                  </>
-                );
-              })()}
-            </DialogContent>
-          </Dialog>
-
-          {/* 合作店家與計畫 */}
-          <section>
-            <h2 className="font-heading text-3xl font-semibold mb-4">{t("合作店家與計畫", "Vendors & meal plans")}</h2>
+        {/* ── 方案 ── */}
+        {(mode === "plans" || searching) && (
+          <section className="space-y-4">
+            <h2 className="font-heading text-3xl font-semibold">
+              {searching ? t("方案", "Meal plans") : t(`${mealPeriodLabel(period)}・方案`, `${mealPeriodLabel(period)} · meal plans`)}
+            </h2>
             <div className="space-y-4">
               {visiblePlanGroups.length === 0 && (
-                <p className="text-sm text-muted-foreground">{t("這段期間沒有開放取餐的合作店家計畫。", "No vendor plans have pickups in this range.")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {searching ? t("沒有符合的方案。", "No matching plans.") : t(`${dateText} 起的${mealPeriodLabel(period)}沒有可加入的方案。`, `No ${mealPeriodLabel(period)} plans start on ${dateText}.`)}
+                </p>
               )}
-              {visiblePlanGroups.map(group => (
-                <div key={group.vendorId} className="bg-accent rounded-3xl border border-ink p-5 grid grid-cols-1 md:grid-cols-[220px_1fr_1fr] gap-4">
-                  {/* 店家資訊 */}
-                  <Link href={`/vendor/${group.vendorId}`} className="flex md:flex-col gap-3 hover:opacity-90">
-                    {group.vendor.cover_image ? (
-                      <img src={group.vendor.cover_image} alt="" loading="lazy" className="w-20 h-20 md:w-full md:h-32 rounded-2xl border border-ink object-cover shrink-0" />
-                    ) : (
-                      <div className="w-20 h-20 md:w-full md:h-32 rounded-2xl bg-secondary border border-ink flex items-center justify-center shrink-0">
-                        <Store className="h-8 w-8 text-secondary-foreground/70" strokeWidth={1.75} aria-hidden="true" />
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="font-heading text-h3 mb-1 truncate">{loc(group.vendor, "name")}</p>
-                      {group.plans.map(p => (
-                        <div key={p.id} className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <span className="truncate">{loc(p, "label")}{t("：", ": ")}{loc(p, "name")}</span>
-                          {planRatings.get(p.id) ? (
-                            <span className="flex items-center gap-0.5 text-amber-500 shrink-0">
-                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {planRatings.get(p.id)!.average}
-                              <span className="text-muted-foreground">（{planRatings.get(p.id)!.count}）</span>
-                            </span>
-                          ) : (
-                            <span className="shrink-0">{t("尚無評分", "No ratings yet")}</span>
-                          )}
+              {visiblePlanGroups.map((group) => (
+                <article key={group.vendorId} className="bg-card rounded-3xl border border-ink p-4 md:p-5">
+                  <VendorCardHeader
+                    vendor={group.vendor}
+                    reward={rewardStatuses.get(group.vendorId)}
+                    subtitle={t(`${group.plans.length} 個方案・每天各自算早鳥、遇公休順延`, `${group.plans.length} plans · early-bird per day, skips closed days`)}
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {group.plans.map((plan) => {
+                      const firstPrice = applyEarlyBirdPrice(plan.price_per_meal, pickupDate).lockedPrice;
+                      return (
+                        <div key={plan.id} className="rounded-2xl border border-ink bg-accent p-4 flex flex-col">
+                          <p className="font-heading text-base font-semibold mb-0.5">{loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}</p>
+                          <p className="text-xs text-muted-foreground mb-3">{loc(plan, "description")}</p>
+                          <p className="text-sm mb-1">
+                            <span className="font-heading text-lg font-semibold">NT$ {firstPrice}</span>
+                            <span className="text-muted-foreground"> {t("/ 餐", "/ meal")}・{plan.days} {t("天", "days")}</span>
+                            {firstPrice < plan.price_per_meal && <span className="ml-1.5 text-xs text-muted-foreground line-through">NT$ {plan.price_per_meal}</span>}
+                          </p>
+                          <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
+                            {planRatings.get(plan.id) ? (
+                              <><Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {planRatings.get(plan.id)!.average}（{planRatings.get(plan.id)!.count}）</>
+                            ) : t("尚無評分", "No ratings yet")}
+                          </p>
+                          <Button className="mt-auto w-full text-sm" onClick={() => openPlanDialog(group.vendor, plan)}>
+                            {t("預約加入方案", "Join this plan")}
+                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  </Link>
-
-                  {/* 方案卡片 */}
-                  {group.plans.map(plan => (
-                    <div key={plan.id} className="bg-card rounded-2xl border border-ink p-4 flex flex-col">
-                      <p className="font-heading text-base font-semibold mb-0.5">{loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}</p>
-                      <p className="text-xs text-muted-foreground mb-3">{loc(plan, "description")}</p>
-                      <p className="font-heading text-lg font-semibold mb-2">{t(`NT$ ${plan.price_per_meal} / 餐起`, `From NT$ ${plan.price_per_meal} / meal`)}</p>
-                      <span className="inline-block w-fit text-xs bg-secondary text-secondary-foreground border border-ink px-2.5 py-0.5 rounded-full mb-3">
-                        {t("最快履約：", "Starts: ")}{loc(plan, "fastest_booking")}
-                      </span>
-                      <Button className="mt-auto w-full text-sm" onClick={() => openPlanDialog(group.vendorId, plan)}>
-                        {t("預約加入計畫", "Join this plan")}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                </article>
               ))}
             </div>
           </section>
+        )}
 
-          {/* 同學轉讓保底專區（含轉讓優惠橫捲清單，併成同一區塊放最下面）；底色跟轉讓市集橫幅一樣用 logo「飯」字色 */}
+        {/* 加入計畫確認：列出每天日期與價格（順延的標示），所有天數同一時段、之後可個別修改，確認後才付款 */}
+        <Dialog open={!!planDialog} onOpenChange={(open) => { if (!open && !joiningPlan) setPlanDialog(null); }}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+            {planDialog && (() => {
+              const { plan, vendor, item } = planDialog;
+              const schedule = planPickupSchedule(vendor, planStartDate, planWindow, plan.days);
+              const dayPrices = schedule?.dates.map((d) => ({ date: d, ...applyEarlyBirdPrice(plan.price_per_meal, d), postponed: schedule.postponed.includes(d) })) ?? [];
+              const total = dayPrices.reduce((s, d) => s + d.lockedPrice, 0);
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>{loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3 py-1">
+                    <p className="text-sm text-muted-foreground">
+                      {loc(vendor, "name")}・{t(`原價 NT$ ${plan.price_per_meal} × ${plan.days} 天，每天依提前天數各自打早鳥折扣`, `NT$ ${plan.price_per_meal} × ${plan.days} days, early-bird applied per day`)}
+                    </p>
+                    <PickupPicker
+                      date={planStartDate}
+                      window={planWindow}
+                      onDateChange={setPlanStartDate}
+                      onWindowChange={setPlanWindow}
+                      uid={uid}
+                      vendor={vendor}
+                      item={item}
+                      period={period}
+                      basePrice={plan.price_per_meal}
+                      dateLabel={t("第一天取餐日期", "First pickup date")}
+                    />
+                    {schedule ? (
+                      <div className="rounded-xl border border-border bg-muted p-3">
+                        <ul className="divide-y divide-border text-sm">
+                          {dayPrices.map((d, i) => (
+                            <li key={d.date} className="flex items-center gap-2 py-1.5">
+                              <span className="w-14 text-xs text-muted-foreground">{t(`第 ${i + 1} 天`, `Day ${i + 1}`)}</span>
+                              <span className="font-medium">{d.date.slice(5).replace("-", "/")}</span>
+                              {d.postponed && <span className="text-caption font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">{t("順延", "Postponed")}</span>}
+                              <span className="text-xs text-muted-foreground">{slotLabel(planWindow)}</span>
+                              <span className="ml-auto text-xs text-muted-foreground">{discountText(d.discountPercent)}</span>
+                              <span className="w-14 text-right font-semibold">${d.lockedPrice}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="flex justify-between pt-2 mt-1 border-t border-border text-sm font-semibold">
+                          <span>{t("合計", "Total")}</span><span>NT$ {total}</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex gap-1.5 p-2.5 rounded-lg bg-red-50 border border-red-200 text-caption text-red-800">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        {t(`這個開始日期／時段排不滿 ${plan.days} 天（最遠只能預訂 30 天內），請改選其他日期或時段。`, `This start date and time can't fit ${plan.days} days within the 30-day booking range. Please pick another date or time.`)}
+                      </div>
+                    )}
+                    <div className="flex gap-1.5 p-2.5 rounded-lg bg-secondary border border-border text-caption leading-relaxed">
+                      <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" />
+                      <span>{t("所有天數同一時段，之後可以到「我的餐點」個別修改某一天的取餐時段（截單前都可以改）。", "Every day uses the same pickup time; you can change any single day later in My meals (until that day's cutoff).")}</span>
+                    </div>
+                    <label className="flex items-start gap-1.5 p-2 rounded-lg bg-muted border border-border cursor-pointer">
+                      <Checkbox checked={planAck} onCheckedChange={() => setPlanAck((v) => !v)} className="mt-0.5 shrink-0" />
+                      <span className="text-caption leading-relaxed text-muted-foreground"><WaiverText /></span>
+                    </label>
+                    <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
+                      <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
+                      <span className="text-caption leading-relaxed text-orange-900">
+                        {t("每一天都是獨立的一份，當天沒空可以單獨轉讓或捐為愛心餐；取餐時段結束 30 分鐘仍未取餐，將", "Each day is a separate meal you can transfer or donate on its own. If it isn't picked up 30 min after the window ends, it ")}<strong>{t("轉為愛心餐、開放給需要的人", "becomes a charity meal for someone in need")}</strong>
+                      </span>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setPlanDialog(null)} disabled={joiningPlan}>{t("取消", "Cancel")}</Button>
+                    <Button disabled={!schedule || !planAck || joiningPlan} onClick={() => handleJoinPlan(plan)}>
+                      {joiningPlan ? t("前往付款中…", "Redirecting to payment…") : t(`確認並付款 NT$ ${total}`, `Confirm & pay NT$ ${total}`)}
+                    </Button>
+                  </DialogFooter>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+
+        {/* 同學轉讓（轉讓市集併入「我的餐點」，這裡只放預覽） */}
+        {mode === "single" && !searching && (
           <section className="rounded-[2rem] p-6 md:p-10 bg-[var(--surface-inverse)] text-[var(--text-on-inverse)] space-y-6">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div className="flex items-center gap-3.5">
                 <Repeat className="w-7 h-7 shrink-0" />
                 <div>
-                  <h2 className="font-heading text-3xl font-semibold mb-1">{t("同學轉讓保底專區", "Classmate transfers")}</h2>
+                  <h2 className="font-heading text-3xl font-semibold mb-1">{t("同學轉讓", "Classmate transfers")}</h2>
                   <p className="text-sm max-w-xl opacity-90">
-                    {t("臨時去不了？截單後也能安全轉讓給同學；逾時沒人接手會開放 $0 元領取，或直接捐為愛心餐，不浪費一份便當。", "Can't make it? Transfer your meal to a classmate, even after cutoff. Unclaimed transfers open for $0, or donate it as a charity meal — no meal wasted.")}
+                    {t("臨時去不了？截單後也能轉讓給同學，或捐為愛心餐，不浪費一份便當。", "Can't make it? Transfer your meal to a classmate even after cutoff, or donate it — no meal wasted.")}
                   </p>
                 </div>
               </div>
-              <Link
-                href="/marketplace"
-                className="shrink-0 text-sm font-bold px-5 py-2.5 rounded-full bg-secondary text-secondary-foreground border border-ink hover:bg-secondary/85 transition-colors"
-              >
+              <Link href="/my-bookings?tab=market" className="shrink-0 text-sm font-bold px-5 py-2.5 rounded-full bg-secondary text-secondary-foreground border border-ink hover:bg-secondary/85 transition-colors">
                 {t("前往轉讓市集", "Go to transfers")}
               </Link>
             </div>
-
             <div className="flex gap-3 overflow-x-auto pb-1 bb-thin-scroll rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe1a1]" tabIndex={0} role="region" aria-label={t("同學轉讓清單（可左右捲動）", "Classmate transfers (scrolls sideways)")}>
-              {visibleTransfers.length === 0 && (
-                <p className="text-sm opacity-80">{t("這段期間目前沒有同學轉讓的餐點。", "No transfers in this range right now.")}</p>
-              )}
-              {visibleTransfers.map(tr_ => (
-                <div key={tr_.id} className="shrink-0 w-64 bg-card text-foreground rounded-2xl p-3 border border-ink">
+              {visibleTransfers.length === 0 && <p className="text-sm opacity-80">{t("目前沒有同學轉讓的餐點。", "No transfers right now.")}</p>}
+              {visibleTransfers.map((x) => (
+                <div key={x.id} className="shrink-0 w-64 bg-card text-foreground rounded-2xl p-3 border border-ink">
                   <div className="flex items-center gap-2 mb-2">
-                    <img src={avatarUrl(tr_.buyer_uid)} alt="" className="w-6 h-6 rounded-full bg-secondary border border-ink shrink-0" />
-                    <span className="text-xs font-medium truncate">{t(`使用者 ${tr_.buyer_uid.slice(-6)} 轉讓`, `Transferred by user ${tr_.buyer_uid.slice(-6)}`)}</span>
+                    <img src={avatarUrl(x.buyer_uid)} alt="" className="w-6 h-6 rounded-full bg-secondary border border-ink shrink-0" />
+                    <span className="text-xs font-medium truncate">{t(`使用者 ${x.buyer_uid.slice(-6)} 轉讓`, `Transferred by user ${x.buyer_uid.slice(-6)}`)}</span>
                   </div>
-                  <p className="text-sm font-semibold line-clamp-1 mb-2">{loc(tr_, "item_name")}</p>
-                  <div className="flex items-baseline gap-1.5 mb-1">
-                    <span className="font-heading text-base font-semibold">{t("轉讓價", "Price")} ${tr_.locked_price}</span>
-                  </div>
+                  <p className="text-sm font-semibold line-clamp-1 mb-2">{loc(x, "item_name")}</p>
+                  <span className="font-heading text-base font-semibold">{t("轉讓價", "Price")} ${x.locked_price}</span>
                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-1.5 mt-1.5 border-t border-border">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {(tr_ as any).resale_deadline?.toDate ? formatResaleCountdown((tr_ as any).resale_deadline.toDate(), now) : "—"}
+                      {(x as any).resale_deadline?.toDate ? formatResaleCountdown((x as any).resale_deadline.toDate(), now) : "—"}
                     </span>
-                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {loc(vendors.find((v) => v.id === tr_.vendor_id), "name") || "—"}</span>
+                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {loc(vendors.find((v) => v.id === x.vendor_id), "name") || "—"}</span>
                   </div>
                 </div>
               ))}
             </div>
           </section>
-        </main>
-      </div>
+        )}
+      </main>
     </div>
   );
 }

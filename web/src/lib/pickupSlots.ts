@@ -1,11 +1,12 @@
 import { tr } from "@/lib/i18n";
-import type { BusinessHour, Vendor } from "@/types";
+import type { BusinessHour, MealPeriod, MenuItem, Vendor } from "@/types";
 import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
+import { EARLY_BIRD_TIERS } from "@/lib/pricing";
 
 // 取餐時段——跟 functions/src/pricing.js 是同一套規則（伺服器會再驗證一次），要改兩邊一起改。
-// 第一階段規格：只做午餐自取、營業日週一至週五、取餐日前一天 20:00 截單（店家可提前）、
-// 預訂開放到下週五。店家可以在後台「店家設定」自訂 pickup_windows（取餐時段內的小時段，
-// 整段最長 2 小時）／business_hours／holidays；沒設定的沿用預設。
+// 1002 規格：早／中／晚三個餐期（依取餐時段開始時間歸類）、只做自取、營業日週一至週五、
+// 取餐日前一天 20:00 截單（店家可提前）、預訂最遠 30 天。店家可以在後台「店家設定」自訂
+// pickup_windows（每個餐期一段、以 30 分鐘為一格，每段最長 2 小時）／business_hours／holidays。
 // window 用 ASCII 連字號（寫進 locks.pickup_window），畫面顯示用 slotLabel() 換成 en dash。
 // 日期一律以台北時間計（規格 §13）。
 export const DEFAULT_PICKUP_WINDOWS = ["11:00-11:30", "11:30-12:00", "12:00-12:30", "12:30-13:00"];
@@ -37,6 +38,55 @@ export function vendorWindows(vendor: MaybeSchedule): string[] {
   const own = vendor?.pickup_windows?.filter(isValidWindow) ?? [];
   const list = own.length > 0 ? own : DEFAULT_PICKUP_WINDOWS;
   return [...list].sort((a, b) => toMinutes(a.split("-")[0]) - toMinutes(b.split("-")[0]));
+}
+
+// ── 餐期（§2 餐期範圍） ──
+export const MEAL_PERIODS: MealPeriod[] = ["breakfast", "lunch", "dinner"];
+
+export function mealPeriodLabel(period: MealPeriod): string {
+  return { breakfast: tr("早餐", "Breakfast"), lunch: tr("午餐", "Lunch"), dinner: tr("晚餐", "Dinner") }[period];
+}
+
+/** 取餐時段屬於哪個餐期：依開始時間；都不在範圍內就歸最近的那一個 */
+export function mealPeriodOf(window: string): MealPeriod {
+  const start = toMinutes(window.split(/[-–]/)[0]);
+  let best: MealPeriod = "lunch";
+  let bestDistance = Infinity;
+  for (const period of MEAL_PERIODS) {
+    const [from, to] = DEFAULT_PLATFORM_CONFIG.mealPeriods[period].split("-").map(toMinutes);
+    if (start >= from && start < to) return period;
+    const distance = Math.min(Math.abs(start - from), Math.abs(start - to));
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = period;
+    }
+  }
+  return best;
+}
+
+/** 品項供應的餐期；沒設（舊資料）＝店家所有時段 */
+export function itemMealPeriods(item: Pick<MenuItem, "meal_periods"> | null | undefined): MealPeriod[] {
+  return (item?.meal_periods || []).filter((p): p is MealPeriod => MEAL_PERIODS.includes(p));
+}
+
+/** 這家店有供應的餐期（看取餐時段） */
+export function vendorMealPeriods(vendor: MaybeSchedule): MealPeriod[] {
+  const set = new Set(vendorWindows(vendor).map(mealPeriodOf));
+  return MEAL_PERIODS.filter((p) => set.has(p));
+}
+
+/** 品項可選的取餐時段（限品項供應的餐期；給 period 再限縮到該餐期） */
+export function itemWindows(vendor: MaybeSchedule, item?: Pick<MenuItem, "meal_periods"> | null, period?: MealPeriod | null): string[] {
+  const periods = itemMealPeriods(item);
+  return vendorWindows(vendor).filter((w) => {
+    const p = mealPeriodOf(w);
+    return (periods.length === 0 || periods.includes(p)) && (!period || p === period);
+  });
+}
+
+/** 品項是否供應某餐期（首頁依餐期分類） */
+export function servesPeriod(vendor: MaybeSchedule, item: Pick<MenuItem, "meal_periods"> | null | undefined, period: MealPeriod): boolean {
+  return itemWindows(vendor, item, period).length > 0;
 }
 
 /** 整個取餐時段（最早開始～最晚結束），例 "11:00-13:00" */
@@ -71,7 +121,7 @@ export function weekdayOf(dateStr: string): number {
 /** 這天店家有沒有休息：非營業日（週末）、特定公休日、每週營業時段裡那天沒開、停班停課。 */
 export function vendorClosedReason(vendor: MaybeSchedule, pickupDate: string): string | null {
   const weekday = weekdayOf(pickupDate);
-  if (!DEFAULT_PLATFORM_CONFIG.businessWeekdays.includes(weekday)) return tr("第一階段只做週一至週五午餐", "Weekday lunches only");
+  if (!DEFAULT_PLATFORM_CONFIG.businessWeekdays.includes(weekday)) return tr("第一階段只做週一至週五", "Weekdays only");
   if (vendor?.disaster_dates?.includes(pickupDate)) return tr("這天因停班停課暫停供餐", "No service (work suspension)");
   if (vendor?.holidays?.includes(pickupDate)) return tr("這天是店家公休日", "The vendor is closed on this day");
   const hours: BusinessHour | undefined = vendor?.business_hours?.find((h) => h.weekday === weekday);
@@ -96,14 +146,14 @@ export function mondayOf(dateStr: string): string {
   return addDaysStr(dateStr, wd === 0 ? -6 : 1 - wd);
 }
 
-/** 最遠可以預約到哪天：下週五（規格 §2） */
+/** 最遠可以預約到哪天：30 天後（規格 §2 預訂開放範圍） */
 export function maxPickupDateStr(now: Date = new Date()): string {
-  return addDaysStr(mondayOf(todayStr(now)), 11);
+  return addDaysStr(todayStr(now), DEFAULT_PLATFORM_CONFIG.bookingRangeDays);
 }
 
 /** 這天還能不能訂（營業、還沒截單、在預訂範圍內）；不能訂時回傳原因 */
 export function bookingProblem(vendor: MaybeSchedule, pickupDate: string, now: Date = new Date()): string | null {
-  if (pickupDate < todayStr(now) || pickupDate > maxPickupDateStr(now)) return tr("只能預訂到下週五", "You can book up to next Friday");
+  if (pickupDate < todayStr(now) || pickupDate > maxPickupDateStr(now)) return tr("最遠只能預訂 30 天內", "You can book up to 30 days ahead");
   const closed = vendorClosedReason(vendor, pickupDate);
   if (closed) return closed;
   if (isPastCutoff(pickupDate, vendor, now)) {
@@ -118,13 +168,19 @@ export function isSlotStarted(pickupDate: string, pickupWindow: string, now: Dat
   return new Date(`${pickupDate}T${start}:00+08:00`).getTime() <= now.getTime();
 }
 
-/** 這天還能訂的時段（不能訂回傳空陣列）。 */
-export function openWindowsOn(vendor: MaybeSchedule, pickupDate: string, now: Date = new Date()): string[] {
+/** 這天還能訂的時段（不能訂回傳空陣列）；給 item／period 會限縮到品項供應的餐期。 */
+export function openWindowsOn(
+  vendor: MaybeSchedule,
+  pickupDate: string,
+  now: Date = new Date(),
+  item?: Pick<MenuItem, "meal_periods"> | null,
+  period?: MealPeriod | null
+): string[] {
   if (bookingProblem(vendor, pickupDate, now)) return [];
-  return vendorWindows(vendor);
+  return itemWindows(vendor, item, period);
 }
 
-/** 可預訂的日期清單（今天～下週五，只含營業日；不管截單，截單的由 bookingProblem 標示） */
+/** 可預訂的日期清單（今天～30 天後，只含營業日；不管截單，截單的由 bookingProblem 標示） */
 export function bookableDateRange(now: Date = new Date()): string[] {
   const out: string[] = [];
   const last = maxPickupDateStr(now);
@@ -144,9 +200,9 @@ export function nextAvailablePickup(vendor?: MaybeSchedule, now: Date = new Date
 }
 
 /**
- * 計畫型（多日方案）的取餐日：從 startDate 起、同一個時段，跳過不能訂的日子，湊滿 days 天。
+ * 計畫型（多日方案）的取餐日：從 startDate 起、同一個時段，跳過不能訂的日子（遇公休順延），湊滿 days 天。
  * 跟 functions/src/pricing.js 的 planPickupDates 同一套規則，這裡只給確認視窗預覽用。
- * 起始日不能訂、或到下週五湊不滿時回傳 null。
+ * 起始日不能訂、或到 30 天後湊不滿時回傳 null。postponed＝因公休往後順延的日期。
  */
 export function planPickupDates(
   vendor: MaybeSchedule,
@@ -155,14 +211,31 @@ export function planPickupDates(
   days: number,
   now: Date = new Date()
 ): string[] | null {
-  if (!openWindowsOn(vendor, startDate, now).includes(pickupWindow)) return null;
+  return planPickupSchedule(vendor, startDate, pickupWindow, days, now)?.dates ?? null;
+}
+
+export function planPickupSchedule(
+  vendor: MaybeSchedule,
+  startDate: string,
+  pickupWindow: string,
+  days: number,
+  now: Date = new Date()
+): { dates: string[]; postponed: string[] } | null {
+  if (!vendorWindows(vendor).includes(pickupWindow) || bookingProblem(vendor, startDate, now)) return null;
   const last = maxPickupDateStr(now);
   const dates: string[] = [];
+  const postponed: string[] = [];
+  let skipped = false;
   for (let date = startDate; dates.length < days; date = addDaysStr(date, 1)) {
     if (date > last) return null;
-    if (openWindowsOn(vendor, date, now).includes(pickupWindow)) dates.push(date);
+    if (!bookingProblem(vendor, date, now)) {
+      dates.push(date);
+      if (skipped) postponed.push(date);
+    } else if (DEFAULT_PLATFORM_CONFIG.businessWeekdays.includes(weekdayOf(date))) {
+      skipped = true;
+    }
   }
-  return dates;
+  return { dates, postponed };
 }
 
 export function toMinutes(hhmm: string): number {
@@ -178,13 +251,37 @@ export function windowsOverlap(a: string, b: string): boolean {
   return toMinutes(aStart) < toMinutes(bEnd) && toMinutes(bStart) < toMinutes(aEnd);
 }
 
-/** 取餐時段整段長度（分鐘），店家設定要 ≤ 2 小時 */
+/** 取餐時段整段長度（分鐘），店家設定每個餐期要 ≤ 2 小時；回傳各餐期中最長的那段 */
 export function pickupRangeMinutes(windows: string[]): number {
   const valid = windows.filter(isValidWindow);
   if (valid.length === 0) return 0;
-  const starts = valid.map((w) => toMinutes(w.split("-")[0]));
-  const ends = valid.map((w) => toMinutes(w.split("-")[1]));
-  return Math.max(...ends) - Math.min(...starts);
+  let longest = 0;
+  for (const period of MEAL_PERIODS) {
+    const mine = valid.filter((w) => mealPeriodOf(w) === period);
+    if (mine.length === 0) continue;
+    const starts = mine.map((w) => toMinutes(w.split("-")[0]));
+    const ends = mine.map((w) => toMinutes(w.split("-")[1]));
+    longest = Math.max(longest, Math.max(...ends) - Math.min(...starts));
+  }
+  return longest;
+}
+
+/** 價格日期列（§4.5）：明天起 30 天，每天的早鳥折數、能不能訂 */
+export interface PriceDay {
+  date: string;
+  discountPercent: number;
+  problem: string | null;
+}
+export function priceDays(vendor: MaybeSchedule, now: Date = new Date()): PriceDay[] {
+  const out: PriceDay[] = [];
+  const today = todayStr(now);
+  const last = maxPickupDateStr(now);
+  for (let d = addDaysStr(today, 1); d <= last; d = addDaysStr(d, 1)) {
+    const days = Math.round((Date.parse(`${d}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
+    const tier = EARLY_BIRD_TIERS.find((t) => days >= t.minDays && days <= t.maxDays);
+    out.push({ date: d, discountPercent: tier?.discountPercent ?? 0, problem: bookingProblem(vendor, d, now) });
+  }
+  return out;
 }
 
 // 首頁先選的日期／時段，帶到品項頁（hash router 不方便帶 query string）

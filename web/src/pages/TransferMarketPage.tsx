@@ -46,11 +46,12 @@ function formatCountdown(deadline: Date, now: number): string {
   return tr(`${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`, `Ends in ${Math.floor(diffMin / 60)} h ${diffMin % 60} min`);
 }
 
-export default function TransferMarketPage() {
+// 1002 規格：導覽列的「轉讓・愛心餐」併入「我的餐點」，頁上方「轉讓市集」「附近愛心餐」分頁。
+// embedded＝放在我的餐點頁裡（不畫頁首、不含愛心餐分頁，愛心餐由我的餐點自己的分頁顯示）。
+export default function TransferMarketPage({ embedded = false }: { embedded?: boolean }) {
   const { toast } = useToast();
-  // 愛心餐也放在轉讓市集（使用者 2026-09-30 決定）；通知連結帶 ?tab=charity 直接開這個分頁
   const [browseTab, setBrowseTab] = useState<"browse" | "charity" | "mine">(() => {
-    if (!`${window.location.search}${window.location.hash}`.includes("tab=charity")) return "browse";
+    if (embedded || !`${window.location.search}${window.location.hash}`.includes("tab=charity")) return "browse";
     // 用過就清掉 ?tab=charity，免得之後再進轉讓市集還停在愛心餐分頁
     if (window.location.search) history.replaceState(history.state, "", window.location.pathname + window.location.hash);
     return "charity";
@@ -193,27 +194,31 @@ export default function TransferMarketPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <MarketplaceHeader active="transfer" />
+  const body = (
+      <div className={embedded ? "space-y-6" : "max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6"}>
+        {embedded && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground max-w-2xl">{tr("同學安全轉讓已鎖定的便當，截單後也能轉；逾時沒人接手，系統會自動開放 $0 元供人領取。", "Pass locked meals between classmates, even after cutoff. If nobody takes one in time, anyone can claim it for $0.")}</p>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={tr("搜尋餐點名稱", "Search by meal name")}
+              aria-label={tr("搜尋轉讓項目", "Search transfers")}
+              className="h-10 w-full sm:w-64 rounded-full border border-border bg-card px-4 text-sm"
+            />
+          </div>
+        )}
 
-      <PageHero
-        eyebrow={tr("不浪費任何一份", "No meal wasted")}
-        title={tr("轉讓市集", "Transfer market")}
-        description={tr("同學安全轉讓已鎖定的便當，截單後也能轉；逾時沒人接手，系統會自動開放 $0 元供人領取。沒領到的便當會變成愛心餐。", "Pass locked meals between classmates, even after cutoff. If nobody takes one in time, anyone can claim it for $0. Unclaimed meals become charity meals.")}
-      >
-        <HeroSearch id="marketplaceSearch" label={tr("搜尋轉讓項目", "Search transfers")} value={search} onChange={setSearch} placeholder={tr("搜尋餐點名稱", "Search by meal name")} />
-      </PageHero>
-
-      {/* ── Body ── */}
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         <div className="flex gap-2">
           <Tag selected={browseTab === "browse"} onClick={() => setBrowseTab("browse")}>
             {tr("瀏覽轉讓", "Browse")}
           </Tag>
-          <Tag selected={browseTab === "charity"} onClick={() => setBrowseTab("charity")}>
-            {tr("愛心餐", "Charity meals")}
-          </Tag>
+          {!embedded && (
+            <Tag selected={browseTab === "charity"} onClick={() => setBrowseTab("charity")}>
+              {tr("愛心餐", "Charity meals")}
+            </Tag>
+          )}
           <Tag selected={browseTab === "mine"} onClick={() => setBrowseTab("mine")}>
             {tr("我的轉讓", "My transfers")}
           </Tag>
@@ -402,6 +407,20 @@ export default function TransferMarketPage() {
           </>
         )}
       </div>
+  );
+
+  if (embedded) return body;
+  return (
+    <div className="min-h-screen bg-background">
+      <MarketplaceHeader active="bookings" />
+      <PageHero
+        eyebrow={tr("不浪費任何一份", "No meal wasted")}
+        title={tr("轉讓市集", "Transfer market")}
+        description={tr("同學安全轉讓已鎖定的便當，截單後也能轉；逾時沒人接手，系統會自動開放 $0 元供人領取。沒領到的便當會變成愛心餐。", "Pass locked meals between classmates, even after cutoff. If nobody takes one in time, anyone can claim it for $0. Unclaimed meals become charity meals.")}
+      >
+        <HeroSearch id="marketplaceSearch" label={tr("搜尋轉讓項目", "Search transfers")} value={search} onChange={setSearch} placeholder={tr("搜尋餐點名稱", "Search by meal name")} />
+      </PageHero>
+      {body}
     </div>
   );
 }

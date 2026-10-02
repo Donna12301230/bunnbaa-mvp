@@ -17,8 +17,8 @@ const PaymentCancelPage = lazy(() => import("./pages/PaymentCancelPage"));
 
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
+const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
-const TransferMarketPage = lazy(() => import("./pages/TransferMarketPage"));
 const MyBookingsPage = lazy(() => import("./pages/MyBookingsPage"));
 const GiftClaimPage = lazy(() => import("./pages/GiftClaimPage"));
 const PickupProxyPage = lazy(() => import("./pages/PickupProxyPage"));
@@ -192,11 +192,19 @@ export default function App() {
           <Route path="/home">
             <MarketplacePage><HomePage /></MarketplacePage>
           </Route>
+          {/* 預購餐點的「方案」頁（第二排「單點｜方案」是兩個獨立頁面） */}
+          <Route path="/plans">
+            <MarketplacePage><HomePage /></MarketplacePage>
+          </Route>
+          <Route path="/favorites">
+            <MarketplacePage><FavoritesPage /></MarketplacePage>
+          </Route>
           <Route path="/profile">
             <MarketplacePage><ProfilePage /></MarketplacePage>
           </Route>
+          {/* 轉讓市集併入「我的餐點」分頁（1002 規格 §4.5）；舊連結轉過去 */}
           <Route path="/marketplace">
-            <MarketplacePage><TransferMarketPage /></MarketplacePage>
+            <Redirect to={/tab=charity/.test(window.location.search + window.location.hash) ? "/my-bookings?tab=charity" : "/my-bookings?tab=market"} replace />
           </Route>
           <Route path="/my-bookings">
             <MarketplacePage><MyBookingsPage /></MarketplacePage>
