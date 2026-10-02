@@ -31,9 +31,10 @@ function mondayOf(dateStr) {
   return addDays(dateStr, wd === 0 ? -6 : 1 - wd);
 }
 
-/** 預訂開放到「下週五」（規格 §2） */
-function lastBookableDate(today = taipeiToday()) {
-  return addDays(mondayOf(today), 11);
+/** 預訂開放範圍：最遠提前 30 天（規格 §2「預訂開放範圍」） */
+const BOOKING_RANGE_DAYS = 30;
+function lastBookableDate(today = taipeiToday(), rangeDays = BOOKING_RANGE_DAYS) {
+  return addDays(today, rangeDays);
 }
 
 function at(dateStr, hhmm) {
@@ -57,6 +58,6 @@ function splitWindow(window) {
 }
 
 module.exports = {
-  taipeiToday, taipeiTime, addDays, daysBetween, weekdayOf, mondayOf, lastBookableDate,
+  taipeiToday, taipeiTime, addDays, daysBetween, weekdayOf, mondayOf, lastBookableDate, BOOKING_RANGE_DAYS,
   at, toMinutes, fromMinutes, splitWindow,
 };

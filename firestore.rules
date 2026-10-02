@@ -480,6 +480,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // 我的最愛（§4.5）：收藏的店家，僅本人可讀寫；也是口味偏好的正面訊號
+    match /users/{uid}/favorites/{vendorId} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create: if isSignedInUser() && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(['vendor_id', 'created_at'])
+                    && request.resource.data.vendor_id == vendorId
+                    && request.resource.data.created_at == request.time;
+      allow update: if false;
+    }
+
     // 口味偏好：僅本人可讀；本人只能寫主動設定（prefs）與過敏（allergies），分數由後端算
     match /tasteProfiles/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;

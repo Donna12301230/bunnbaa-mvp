@@ -22,8 +22,10 @@ function add(map, key, amount) {
 function componentPortionsForLock(lock, item, componentsById, config) {
   const out = new Map();
   if (!item) return out;
-  if (item.main?.component_id) add(out, item.main.component_id, 1);
-  if (!item.main?.component_id && item.component_id) add(out, item.component_id, 1); // 單品（非便當）
+  // 主菜：訂單選的（mains 各自定價）優先，舊資料用品項的固定主菜
+  const mainId = lock.main_component_id || item.main?.component_id || (Array.isArray(item.mains) ? item.mains[0]?.component_id : null);
+  if (mainId) add(out, mainId, 1);
+  if (!mainId && item.component_id) add(out, item.component_id, 1); // 單品（非便當）
   for (const f of item.fixed || []) add(out, f.component_id, 1); // 固定附餐（例：經典便當的滷蛋）
   const riceId = item.rice_component_id;
   if (riceId) {
@@ -38,12 +40,19 @@ function componentPortionsForLock(lock, item, componentsById, config) {
     : (item.slots || []).map((s) => ({ removed: false, wished: null, default_component_id: s.default?.component_id }));
   slots.forEach((slot, i) => {
     if (slot.removed) return;
+    if (slot.backup_used) {
+      add(out, slot.resolved_component_id, slot.portion_level ?? 1); // 許願未成立，遞補備案
+      return;
+    }
     const wishedOk = slot.wished && slot.resolved === slot.wished;
     const componentId = wishedOk
       ? slot.wished_component_id
       : slot.default_component_id || item.slots?.[i]?.default?.component_id;
     add(out, componentId, wishedOk ? slot.portion_level ?? 1 : 1);
   });
+  // 第四道「加菜」：四道都放進便當（「備案」只在遞補時用到，上面已算）
+  const extra = lock.extra_side;
+  if (extra?.mode === "addon") add(out, extra.resolved_component_id || extra.component_id, extra.portion_level ?? 1);
   return out;
 }
 
@@ -131,13 +140,16 @@ function buildLabels(locks, itemsById) {
     .map((lock) => {
       const item = itemsById[lock.menu_item_id];
       const sides = (lock.slots || []).map((s) => (s.removed ? `${s.category || "配菜"}：不要` : s.resolved || s.default_dish)).filter(Boolean);
-      const rice = lock.rice === "add" ? "加飯" : lock.rice === "less" ? "減飯" : null;
+      const extra = lock.extra_side;
+      if (extra?.mode === "addon" && (extra.resolved || extra.dish)) sides.push(`＋${extra.resolved || extra.dish}`);
+      const rice = lock.rice === "add" ? "白飯一碗半" : lock.rice === "less" ? "白飯半碗" : null;
       return {
         lock_id: lock.id,
         pickup_code: lock.pickup_code || lock.id.slice(-4).toUpperCase(),
         pickup_window: lock.pickup_window,
+        meal_period: lock.meal_period || null,
         item: lock.item_name || item?.name || "",
-        main: item?.main?.name || null,
+        main: lock.main_dish || item?.main?.name || null,
         fixed: (item?.fixed || []).map((f) => f.name),
         sides,
         rice,

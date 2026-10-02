@@ -19,11 +19,13 @@ const { inLang } = require("./i18n");
 const { loadPlatformConfig } = require("./config");
 const { requestPayment, confirmPayment, refundPayment } = require("./linePay");
 const {
-  validatePickup, planPickupDates, applyEarlyBirdPrice, vendorSlotCapacity, vendorPickupRange, cutoffAt, isPastCutoff,
+  validatePickup, planPickupDates, applyEarlyBirdPrice, vendorSlotCapacity, cutoffAt, isPastCutoff,
+  mealPeriodOf, mealPeriodLabel, vendorPeriodRanges, MEAL_PERIODS,
 } = require("./pricing");
-const { isBento, resolveChoices, adjustAmount, RICE_OPTIONS } = require("./bento");
+const { isBento, resolveChoices, resolveMain, resolveExtraSide, adjustAmount, RICE_OPTIONS } = require("./bento");
 const { ACTIVE_LOCK_STATUSES, componentPortions, rawNeeds, buildTimeline, buildLabels } = require("./prep");
 const { taipeiToday, taipeiTime, addDays, mondayOf, at, splitWindow } = require("./calendar");
+const { billingStateOf } = require("./finance").helpers;
 
 const APP_BASE_URL = () => process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
 const MAX_CART_UNITS = 50;
@@ -48,6 +50,10 @@ async function loadVendor(vendorId, cache) {
   if (vendor.status === "disabled") {
     throw new HttpsError("failed-precondition", t(`「${vendor.name}」目前暫停營業`, `${vendor.name} is temporarily closed`));
   }
+  // 維護費逾期超過寬限期（§1）：暫停接新訂單，已成立訂單照常出餐；即時算，不等每日排程
+  if (billingStateOf(vendor).status === "suspended") {
+    throw new HttpsError("failed-precondition", t(`「${vendor.name}」暫停接單中`, `${vendor.name} isn't taking new orders right now`));
+  }
   cache?.set(vendorId, vendor);
   return vendor;
 }
@@ -60,7 +66,8 @@ async function loadOrderableMenuItem(menuItemId) {
   if (item.is_available === false) {
     throw new HttpsError("failed-precondition", t(`「${item.name}」目前暫停供應`, `${item.name} is currently unavailable`));
   }
-  if (typeof item.price !== "number" || item.price <= 0) {
+  const hasMains = Array.isArray(item.mains) && item.mains.some((m) => Number(m?.price) > 0);
+  if (!hasMains && (typeof item.price !== "number" || item.price <= 0)) {
     throw new HttpsError("failed-precondition", t(`「${item.name}」沒有設定價格`, `${item.name} has no price set`));
   }
   return item;
@@ -97,6 +104,44 @@ async function loadUsableCoupon(couponId, uid, vendorId) {
 }
 
 /**
+ * 驗證並展開一份便當的選擇（主菜、飯量、配菜、第四道），下單與截單前修改共用。
+ * 回傳 { rice, resolved, extra, main, listPrice, adjust }；不合法丟 HttpsError。
+ */
+function resolveOrderChoices(item, line, config) {
+  const bento = isBento(item);
+  const rice = bento && item.rice_component_id && RICE_OPTIONS.includes(line.rice) ? line.rice : "normal";
+  const mainPick = resolveMain(item, line.main_index);
+  if (mainPick.problem) throw new HttpsError("invalid-argument", mainPick.problem);
+  const resolved = resolveChoices(item, line.slots);
+  if (resolved.problem) throw new HttpsError("invalid-argument", resolved.problem);
+  const extraPick = resolveExtraSide(item, line.extra_side, resolved.slots, config);
+  if (extraPick.problem) throw new HttpsError("invalid-argument", extraPick.problem);
+  const extra = extraPick.extra;
+  const adjust = adjustAmount({ rice, removedCount: resolved.removedCount, extraMode: extra?.mode }, config);
+  return { rice, resolved, extra, main: mainPick.main, listPrice: mainPick.price, adjust };
+}
+
+/** 這份便當的許願：每格選的候選菜＋第四道（候選菜）。sideWishes 計數、週上限都用這份 */
+function wishedEntries(slots, extra) {
+  const out = [];
+  (slots || []).forEach((slot, slotIdx) => {
+    if (slot.wished != null) out.push({ slot: slotIdx, candidate: slot.candidate_index, dish: slot.wished });
+  });
+  if (extra?.wished && extra.candidate_index != null) out.push({ slot: extra.slot, candidate: extra.candidate_index, dish: extra.dish });
+  return out;
+}
+
+/** sideWishes 計數 ±delta（下單 +1、取消／修改 −1） */
+function bumpWishes(batch, lock, delta) {
+  for (const w of wishedEntries(lock.slots, lock.extra_side)) {
+    batch.set(db().collection("sideWishes").doc(sideWishId(lock.vendor_id, lock.pickup_date, lock.menu_item_id, w.slot, w.candidate)), {
+      vendor_id: lock.vendor_id, date: lock.pickup_date, week: mondayOf(lock.pickup_date), item_id: lock.menu_item_id,
+      slot: w.slot, candidate: w.candidate, dish: w.dish, count: FieldValue.increment(delta),
+    }, { merge: true });
+  }
+}
+
+/**
  * 購物車一行 → 一份（或多份）鎖定草稿。價格：
  *   (品項原價 × 早鳥折數) ＋ 加減金額 − 折價券（每筆限一張，折抵 ≤ 小計）
  */
@@ -110,7 +155,7 @@ async function buildDrafts(line, ctx) {
   ctx.vendorId = vendor.id;
   const pickupDate = line.pickup_date;
   const pickupWindow = line.pickup_window;
-  const problem = validatePickup(pickupDate, pickupWindow, vendor, ctx.config);
+  const problem = validatePickup(pickupDate, pickupWindow, vendor, ctx.config, new Date(), item);
   if (problem) throw new HttpsError("invalid-argument", problem);
   if (Array.isArray(item.weekdays) && item.weekdays.length > 0) {
     const wd = new Date(`${pickupDate}T00:00:00Z`).getUTCDay();
@@ -122,26 +167,23 @@ async function buildDrafts(line, ctx) {
     throw new HttpsError("failed-precondition", t(`${pickupDate} 因停班停課暫停供餐`, `No service on ${pickupDate} (work suspension)`));
   }
 
-  const rice = isBento(item) && item.rice_component_id && RICE_OPTIONS.includes(line.rice) ? line.rice : "normal";
-  const resolved = resolveChoices(item, line.slots);
-  if (resolved.problem) throw new HttpsError("invalid-argument", resolved.problem);
-  const adjust = adjustAmount({ rice, removedCount: resolved.removedCount }, ctx.config);
+  const choice = resolveOrderChoices(item, line, ctx.config);
+  const { rice, resolved, extra, main, listPrice, adjust } = choice;
 
-  // 候選菜週供應上限（§4.3）
+  // 候選菜週供應上限（§4.3）；第四道選候選菜也算
   const week = mondayOf(pickupDate);
-  for (const [slotIdx, slot] of resolved.slots.entries()) {
-    if (slot.wished == null) continue;
-    const cand = item.slots[slotIdx].candidates[slot.candidate_index];
+  for (const w of wishedEntries(resolved.slots, extra)) {
+    const cand = item.slots[w.slot].candidates[w.candidate];
     if (!(cand.weekly_cap > 0)) continue;
-    const key = `${item.id}|${slotIdx}|${slot.candidate_index}|${week}`;
-    const already = ctx.wishTaken.get(key) ?? (await weeklyWishCount(vendor.id, week, item.id, slotIdx, slot.candidate_index));
+    const key = `${item.id}|${w.slot}|${w.candidate}|${week}`;
+    const already = ctx.wishTaken.get(key) ?? (await weeklyWishCount(vendor.id, week, item.id, w.slot, w.candidate));
     if (already + quantity > cand.weekly_cap) {
       throw new HttpsError("resource-exhausted", t(`「${cand.name}」本週已滿，請改選其他配菜`, `${cand.name} is full this week. Please choose another side.`));
     }
     ctx.wishTaken.set(key, already + quantity);
   }
 
-  const { discountPercent, lockedPrice: earlyPrice } = applyEarlyBirdPrice(item.price, pickupDate);
+  const { discountPercent, lockedPrice: earlyPrice } = applyEarlyBirdPrice(listPrice, pickupDate);
   const subtotal = Math.max(0, earlyPrice + adjust);
   const drafts = [];
   for (let i = 0; i < quantity; i++) {
@@ -164,11 +206,16 @@ async function buildDrafts(line, ctx) {
       item_name_en: item.name_en ?? null,
       pickup_window: pickupWindow,
       pickup_date: pickupDate,
+      meal_period: mealPeriodOf(pickupWindow, ctx.config),
       slots: resolved.slots,
+      extra_side: extra,
+      main_dish: main?.name || null,
+      main_component_id: main?.component_id || null,
+      main_index: main?.index ?? null,
       rice,
-      list_price: item.price,
+      list_price: listPrice,
       discount_percent: discountPercent,
-      early_bird_amount: item.price - earlyPrice,
+      early_bird_amount: listPrice - earlyPrice,
       adjust_amount: adjust,
       coupon_id: couponId,
       coupon_discount: couponDiscount,
@@ -289,7 +336,11 @@ exports.createCartLinePayReservation = onCall({}, async (request) => {
   return reserve(request, drafts, (d) => `${d.item_name} ${d.pickup_date}`);
 });
 
-/** 計畫型（多日方案）：同一時段連續 N 個營業日，價格用方案價，不再疊早鳥 */
+/**
+ * 計畫型（多日方案，§4.4）：同一時段連續 N 個營業日（遇公休順延）。每一天是獨立的 locks，
+ * 早鳥依各自天數計算（方案價 price_per_meal 當原價）；之後可在「我的餐點」個別改時段。
+ * preview=true 只回傳每天日期與價格（確認視窗用），不建立付款。
+ */
 exports.createPlanLinePayReservation = onCall({}, async (request) => {
   assertSignedInUser(request, "加入計畫");
   await assertNotBanned(request.auth.uid);
@@ -306,32 +357,52 @@ exports.createPlanLinePayReservation = onCall({}, async (request) => {
   }
   const ctx = await newContext(request);
   const vendor = await loadVendor(plan.vendor_id, ctx.vendorCache);
-  const { dates, problem } = planPickupDates(startDate, pickupWindow, vendor, plan.days, ctx.config);
+  let item = null;
+  if (plan.menu_item_id) {
+    const itemSnap = await db().collection("menu_items").doc(plan.menu_item_id).get();
+    item = itemSnap.exists ? { id: itemSnap.id, ...itemSnap.data() } : null;
+  }
+  const { dates, postponed, problem } = planPickupDates(startDate, pickupWindow, vendor, plan.days, ctx.config, new Date(), item);
   if (problem) throw new HttpsError("invalid-argument", problem);
   const planLabel = `${plan.label}：${plan.name}`;
   const planLabelEn = plan.name_en ? `${plan.label_en || plan.label}: ${plan.name_en}` : null;
   const draftId = db().collection("payment_intents").doc().id;
-  const drafts = dates.map((date, i) => ({
-    vendor_id: plan.vendor_id,
-    menu_item_id: plan.menu_item_id || null,
-    item_name: `${planLabel}・第${i + 1}/${plan.days}天`,
-    item_name_en: planLabelEn ? `${planLabelEn} · Day ${i + 1}/${plan.days}` : null,
-    pickup_window: pickupWindow,
-    pickup_date: date,
-    slots: [],
-    rice: "normal",
-    list_price: plan.price_per_meal,
-    discount_percent: 0,
-    early_bird_amount: 0,
-    adjust_amount: 0,
-    coupon_id: null,
-    coupon_discount: 0,
-    locked_price: plan.price_per_meal,
-    resellable: true,
-    plan_id: draftId,
-    plan_label: planLabel,
-    meal_plan_id: planId,
-  }));
+  const drafts = dates.map((date, i) => {
+    const { discountPercent, lockedPrice } = applyEarlyBirdPrice(plan.price_per_meal, date);
+    return {
+      vendor_id: plan.vendor_id,
+      menu_item_id: plan.menu_item_id || null,
+      item_name: `${planLabel}・第${i + 1}/${plan.days}天`,
+      item_name_en: planLabelEn ? `${planLabelEn} · Day ${i + 1}/${plan.days}` : null,
+      pickup_window: pickupWindow,
+      pickup_date: date,
+      meal_period: mealPeriodOf(pickupWindow, ctx.config),
+      slots: [],
+      extra_side: null,
+      rice: "normal",
+      list_price: plan.price_per_meal,
+      discount_percent: discountPercent,
+      early_bird_amount: plan.price_per_meal - lockedPrice,
+      adjust_amount: 0,
+      coupon_id: null,
+      coupon_discount: 0,
+      locked_price: lockedPrice,
+      resellable: true,
+      plan_id: draftId,
+      plan_label: planLabel,
+      plan_day: i + 1,
+      meal_plan_id: planId,
+    };
+  });
+  if (request.data?.preview) {
+    return {
+      days: drafts.map((d) => ({
+        date: d.pickup_date, list_price: d.list_price, discount_percent: d.discount_percent, price: d.locked_price,
+        postponed: postponed.includes(d.pickup_date),
+      })),
+      total: drafts.reduce((s, d) => s + d.locked_price, 0),
+    };
+  }
   await assertSlotsHaveRoom(drafts, ctx.vendorCache);
   return reserve(request, drafts, () => planLabel);
 });
@@ -481,15 +552,7 @@ exports.confirmLinePayPayment = onCall({}, async (request) => {
       cutoff_done: false,
       created_at: FieldValue.serverTimestamp(),
     });
-    (draft.slots || []).forEach((slot, slotIdx) => {
-      if (slot.wished == null) return;
-      const id = sideWishId(draft.vendor_id, draft.pickup_date, draft.menu_item_id, slotIdx, slot.candidate_index);
-      batch.set(db().collection("sideWishes").doc(id), {
-        vendor_id: draft.vendor_id, date: draft.pickup_date, week: mondayOf(draft.pickup_date),
-        item_id: draft.menu_item_id, slot: slotIdx, candidate: slot.candidate_index, dish: slot.wished,
-        count: FieldValue.increment(1),
-      }, { merge: true });
-    });
+    bumpWishes(batch, draft, 1);
   }
   batch.update(intentRef, { status: "confirmed", lock_ids: lockRefs.map((r) => r.id) });
   await batch.commit();
@@ -534,11 +597,7 @@ async function cancelAndRefund(lockRef, reason) {
       : { status: "owned", lock_id: FieldValue.delete(), redeemed_at: FieldValue.delete() });
   }
   batch.set(slotCounterRef(lock.vendor_id, lock.pickup_date, lock.pickup_window), { count: FieldValue.increment(-1) }, { merge: true });
-  (lock.slots || []).forEach((slot, slotIdx) => {
-    if (slot.wished == null) return;
-    batch.set(db().collection("sideWishes").doc(sideWishId(lock.vendor_id, lock.pickup_date, lock.menu_item_id, slotIdx, slot.candidate_index)),
-      { count: FieldValue.increment(-1) }, { merge: true });
-  });
+  bumpWishes(batch, lock, -1);
   await batch.commit();
   return true;
 }
@@ -574,7 +633,21 @@ exports.cancelLock = onCall({}, async (request) => {
   return { ok: true };
 });
 
-/** 截單前修改配菜選擇（許願／預設）。會改變金額的（加減飯、某格不要）請取消後重訂 */
+/** 鎖定目前的選擇 → resolveOrderChoices 吃的格式（沒送的欄位沿用原本的） */
+function currentChoices(lock) {
+  return {
+    rice: lock.rice || "normal",
+    main_index: lock.main_index ?? null,
+    slots: (lock.slots || []).map((s) => ({ choice: s.removed ? "none" : s.wished != null ? s.candidate_index : "default" })),
+    extra_side: lock.extra_side ? { slot: lock.extra_side.slot, candidate: lock.extra_side.candidate_index, mode: lock.extra_side.mode } : null,
+  };
+}
+
+/**
+ * 截單前修改（§4.1）：主菜、配菜、飯量、第四道與取餐時段（同一天）。
+ * 金額以下單時的早鳥折數重算：變便宜就退差額（LINE Pay 部分退款）；變貴要補差額，
+ * 第一階段請取消後重訂。計畫的每一天也用這支改時段。
+ */
 exports.updateLockChoices = onCall({}, async (request) => {
   assertSignedInUser(request, "修改訂單");
   const { ref, lock } = await loadOwnLock(request, request.data?.lock_id);
@@ -583,27 +656,91 @@ exports.updateLockChoices = onCall({}, async (request) => {
     db().collection("vendors").doc(lock.vendor_id).get(),
     db().collection("menu_items").doc(lock.menu_item_id || "_").get(),
   ]);
+  const vendor = { id: vendorSnap.id, ...vendorSnap.data() };
   const config = await loadPlatformConfig(db());
-  if (isPastCutoff(lock.pickup_date, vendorSnap.data(), config)) throw new HttpsError("failed-precondition", t("已經截單，不能修改", "Past cutoff"));
-  if (!itemSnap.exists) throw new HttpsError("failed-precondition", t("這個品項沒有配菜可選", "No sides to change"));
-  const item = { id: itemSnap.id, ...itemSnap.data() };
-  const resolved = resolveChoices(item, request.data?.slots);
-  if (resolved.problem) throw new HttpsError("invalid-argument", resolved.problem);
-  const sameRemoved = resolved.slots.every((s, i) => !!s.removed === !!lock.slots?.[i]?.removed);
-  if (!sameRemoved) throw new HttpsError("invalid-argument", t("「不要」會改變金額，請取消後重新下單", "Removing a side changes the price — cancel and re-order instead"));
-  const batch = db().batch();
-  const bump = (slots, delta) => slots.forEach((slot, slotIdx) => {
-    if (slot.wished == null) return;
-    batch.set(db().collection("sideWishes").doc(sideWishId(lock.vendor_id, lock.pickup_date, lock.menu_item_id, slotIdx, slot.candidate_index)), {
-      vendor_id: lock.vendor_id, date: lock.pickup_date, week: mondayOf(lock.pickup_date), item_id: lock.menu_item_id,
-      slot: slotIdx, candidate: slot.candidate_index, dish: slot.wished, count: FieldValue.increment(delta),
-    }, { merge: true });
+  if (isPastCutoff(lock.pickup_date, vendor, config)) throw new HttpsError("failed-precondition", t("已經截單，不能修改", "Past cutoff"));
+  const item = itemSnap.exists ? { id: itemSnap.id, ...itemSnap.data() } : null;
+  const data = request.data || {};
+
+  // 取餐時段
+  const newWindow = typeof data.pickup_window === "string" && data.pickup_window ? data.pickup_window : lock.pickup_window;
+  if (newWindow !== lock.pickup_window) {
+    const problem = validatePickup(lock.pickup_date, newWindow, vendor, config, new Date(), item);
+    if (problem) throw new HttpsError("invalid-argument", problem);
+  }
+
+  // 便當內容（計畫的每日餐點沒有選項，只能改時段）
+  const changesChoices = ["slots", "rice", "main_index", "extra_side"].some((k) => k in data);
+  const patch = { pickup_window: newWindow, meal_period: mealPeriodOf(newWindow, config) };
+  let newLocked = lock.locked_price;
+  let next = lock;
+  if (changesChoices) {
+    if (!item || lock.plan_id) throw new HttpsError("failed-precondition", t("這筆餐點沒有可修改的選項，只能改取餐時段", "Only the pickup time can be changed for this meal"));
+    const merged = { ...currentChoices(lock), ...Object.fromEntries(["slots", "rice", "main_index", "extra_side"].filter((k) => k in data).map((k) => [k, data[k]])) };
+    const choice = resolveOrderChoices(item, merged, config);
+    const early = Math.round(choice.listPrice * (1 - (lock.discount_percent || 0) / 100));
+    const subtotal = Math.max(0, early + choice.adjust);
+    let couponDiscount = 0;
+    if (lock.coupon_id) {
+      const coupon = (await db().collection("coupons").doc(lock.coupon_id).get()).data();
+      couponDiscount = Math.min(coupon?.discount || lock.coupon_discount || 0, subtotal);
+    }
+    newLocked = subtotal - couponDiscount;
+    if (newLocked > lock.locked_price) {
+      throw new HttpsError("failed-precondition", t(
+        `這樣改要補 NT$ ${newLocked - lock.locked_price}，第一階段請取消後重新下單`,
+        `This change costs NT$ ${newLocked - lock.locked_price} more — please cancel and re-order`
+      ));
+    }
+    Object.assign(patch, {
+      slots: choice.resolved.slots,
+      extra_side: choice.extra,
+      rice: choice.rice,
+      main_dish: choice.main?.name || null,
+      main_component_id: choice.main?.component_id || null,
+      main_index: choice.main?.index ?? null,
+      list_price: choice.listPrice,
+      early_bird_amount: choice.listPrice - early,
+      adjust_amount: choice.adjust,
+      coupon_discount: couponDiscount,
+      locked_price: newLocked,
+    });
+    next = { ...lock, ...patch };
+  }
+
+  const refund = lock.locked_price - newLocked;
+  if (refund > 0 && lock.transaction_id) {
+    try {
+      await refundPayment({ transactionId: lock.transaction_id, refundAmount: refund });
+    } catch (err) {
+      logger.error("partial refund failed", err);
+      throw new HttpsError("internal", t("退差額失敗，請稍後再試", "Refunding the difference failed. Please try again later."));
+    }
+    patch.refunded_amount = (lock.refunded_amount || 0) + refund;
+  }
+
+  // 換時段要搬份數（有上限的店家先檢查新時段還有沒有位子）
+  await db().runTransaction(async (tx) => {
+    if (newWindow !== lock.pickup_window) {
+      const toRef = slotCounterRef(lock.vendor_id, lock.pickup_date, newWindow);
+      const capacity = vendorSlotCapacity(vendor);
+      const toSnap = await tx.get(toRef);
+      const booked = toSnap.exists ? toSnap.data().count ?? 0 : 0;
+      if (capacity !== null && booked + 1 > capacity) {
+        throw new HttpsError("resource-exhausted", t(`${newWindow} 已額滿，請改選其他時段`, `${newWindow} is full`));
+      }
+      tx.set(toRef, { vendor_id: lock.vendor_id, pickup_date: lock.pickup_date, pickup_window: newWindow, count: booked + 1, updated_at: FieldValue.serverTimestamp() }, { merge: true });
+      tx.set(slotCounterRef(lock.vendor_id, lock.pickup_date, lock.pickup_window), { count: FieldValue.increment(-1) }, { merge: true });
+    }
+    tx.update(ref, patch);
   });
-  bump(lock.slots || [], -1);
-  bump(resolved.slots, 1);
-  batch.update(ref, { slots: resolved.slots });
-  await batch.commit();
-  return { ok: true };
+  if (changesChoices) {
+    const batch = db().batch();
+    bumpWishes(batch, lock, -1);
+    bumpWishes(batch, next, 1);
+    await batch.commit();
+  }
+  return { ok: true, locked_price: newLocked, refunded: Math.max(0, refund) };
 });
 
 /* ------------------------------------------------------------------ *
@@ -686,9 +823,13 @@ function lockSummary(id, lock, extra = {}) {
     item_name: lock.item_name,
     pickup_date: lock.pickup_date,
     pickup_window: lock.pickup_window,
+    main_dish: lock.main_dish || null,
     slots: (lock.slots || []).map((s) => ({
       category: s.category, removed: !!s.removed, dish: s.removed ? null : s.resolved || s.default_dish, wished: s.wished,
+      backup_used: !!s.backup_used,
     })),
+    extra_side: lock.extra_side ? { dish: lock.extra_side.resolved || lock.extra_side.dish, mode: lock.extra_side.mode, used: lock.extra_side.used_for_slot != null } : null,
+    adjust_amount: lock.adjust_amount || 0,
     rice: lock.rice || "normal",
     coupon_discount: lock.coupon_discount || 0,
     paid: lock.locked_price,
@@ -821,32 +962,76 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
   const catalog = await loadVendorCatalog(vendor.id);
   const minDefault = Number(vendor.candidate_min_qty) > 0 ? Number(vendor.candidate_min_qty) : config.candidateMinQty;
 
-  // 判定許願：達最低量者拿到許願菜；未達自動改預設菜並通知（預設菜照做）
+  // 判定許願（§4.3）：達最低量者拿到許願菜；未達者有備案換備案，沒有則換回預設菜並通知（預設菜照做）
   const batch = db().batch();
-  const failedWishes = new Map(); // uid -> [dish]
+  const failedWishes = new Map(); // uid -> [message]
   const wishResults = {};
+  const judge = (item, slotIdx, candIdx, dish) => {
+    const key = sideWishId(vendor.id, date, item?.id, slotIdx, candIdx);
+    const cand = item?.slots?.[slotIdx]?.candidates?.[candIdx];
+    const minQty = Number(cand?.min_qty) > 0 ? Number(cand.min_qty) : minDefault;
+    const count = wishCounts.get(key) || 0;
+    // 候選菜被停用（天災、菜價暴漲不得列為候選）＝沒供應
+    const ok = !cand?.disabled && count >= minQty;
+    wishResults[key] = { dish, count, min_qty: minQty, ok };
+    return { ok, count, minQty, cand };
+  };
   for (const lock of locks) {
     const item = catalog.itemsById[lock.menu_item_id];
+    const extra = lock.extra_side || null;
+    const extraJudge = extra?.wished ? judge(item, extra.slot, extra.candidate_index, extra.dish) : { ok: true };
+    let backupFree = extra?.mode === "backup" && extraJudge.ok;
+    let backupUsedFor = null;
+    const notes = [];
     const slots = (lock.slots || []).map((slot, slotIdx) => {
       if (slot.removed) return slot;
       if (slot.wished == null) return { ...slot, resolved: slot.default_dish };
-      const key = sideWishId(vendor.id, date, lock.menu_item_id, slotIdx, slot.candidate_index);
-      const cand = item?.slots?.[slotIdx]?.candidates?.[slot.candidate_index];
-      const minQty = Number(cand?.min_qty) > 0 ? Number(cand.min_qty) : minDefault;
-      const ok = (wishCounts.get(key) || 0) >= minQty;
-      wishResults[key] = { dish: slot.wished, count: wishCounts.get(key) || 0, min_qty: minQty, ok };
-      if (!ok) failedWishes.set(lock.buyer_uid, [...(failedWishes.get(lock.buyer_uid) || []), slot.wished]);
+      const { ok, count, minQty, cand } = judge(item, slotIdx, slot.candidate_index, slot.wished);
       // 份量級距以截單當下的品項設定為準（菜價變動後會重算，§11），截單後鎖定
-      return { ...slot, resolved: ok ? slot.wished : slot.default_dish, portion_level: ok ? cand?.portion_level ?? slot.portion_level ?? 1 : 1 };
+      if (ok) return { ...slot, resolved: slot.wished, portion_level: cand?.portion_level ?? slot.portion_level ?? 1 };
+      const short = Math.max(0, minQty - count);
+      if (backupFree) {
+        backupFree = false;
+        backupUsedFor = slotIdx;
+        notes.push(t(`「${slot.wished}」這次差 ${short} 人未成立，已幫你換成備案「${extra.dish}」`, `${slot.wished} was ${short} short — swapped to your backup ${extra.dish}`));
+        return { ...slot, resolved: extra.dish, resolved_component_id: extra.component_id || null, backup_used: true, portion_level: extra.portion_level ?? 1 };
+      }
+      notes.push(t(`「${slot.wished}」這次差 ${short} 人未成立，已幫你換回「${slot.default_dish}」`, `${slot.wished} was ${short} short — swapped back to ${slot.default_dish}`));
+      return { ...slot, resolved: slot.default_dish, portion_level: 1 };
     });
+    let extraSide = extra;
+    if (extra) {
+      if (extra.mode === "addon") {
+        // 加菜選的候選菜沒成立：改放那一格的預設菜（一樣是第四道，不退價差）
+        const fallback = item?.slots?.[extra.slot]?.default;
+        extraSide = extraJudge.ok
+          ? { ...extra, resolved: extra.dish }
+          : { ...extra, resolved: fallback?.name || null, resolved_component_id: fallback?.component_id || null, portion_level: 1 };
+        if (!extraJudge.ok) notes.push(t(`加菜「${extra.dish}」未成立，已改為「${fallback?.name || "預設菜"}」`, `Add-on ${extra.dish} didn't make it — you'll get ${fallback?.name || "the default"}`));
+      } else {
+        extraSide = { ...extra, resolved: backupUsedFor != null ? extra.dish : null, used_for_slot: backupUsedFor };
+      }
+    }
+    if (notes.length > 0) failedWishes.set(lock.buyer_uid, [...(failedWishes.get(lock.buyer_uid) || []), ...notes]);
     lock.slots = slots;
-    batch.update(lock.ref, { slots, cutoff_done: true });
+    lock.extra_side = extraSide;
+    batch.update(lock.ref, { slots, extra_side: extraSide, cutoff_done: true });
   }
 
   const portions = componentPortions(locks, catalog.itemsById, catalog.componentsById, config);
   const needs = rawNeeds(portions, catalog.componentsById, catalog.ingredientsById);
-  const range = vendorPickupRange(vendor);
-  const timeline = buildTimeline(portions, catalog.componentsById, splitWindow(range).start);
+  // 時間軸依每個餐期的取餐開始時間分別往回推（§5.2）
+  const periodRanges = vendorPeriodRanges(vendor, config);
+  const timelines = {};
+  for (const period of MEAL_PERIODS) {
+    const periodLocks = locks.filter((l) => (l.meal_period || mealPeriodOf(l.pickup_window, config)) === period);
+    if (periodLocks.length === 0 || !periodRanges[period]) continue;
+    const periodPortions = componentPortions(periodLocks, catalog.itemsById, catalog.componentsById, config);
+    timelines[period] = { ...buildTimeline(periodPortions, catalog.componentsById, splitWindow(periodRanges[period]).start), range: periodRanges[period], order_count: periodLocks.length };
+  }
+  const firstPeriod = MEAL_PERIODS.find((p) => timelines[p]);
+  const range = firstPeriod ? periodRanges[firstPeriod] : Object.values(periodRanges)[0] || "";
+  const timeline = firstPeriod ? timelines[firstPeriod] : buildTimeline(portions, catalog.componentsById, splitWindow(range).start);
   const labels = buildLabels(locks, catalog.itemsById);
   const shortages = await shortageFor(vendor.id, date, needs, catalog.ingredientsById);
   const componentList = [...portions].map(([id, n]) => ({
@@ -864,6 +1049,8 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
     components: componentList,
     raw_needs: Object.fromEntries([...needs].map(([k, v]) => [k, Math.round(v * 10) / 10])),
     timeline,
+    timelines,
+    period_ranges: periodRanges,
     labels,
     shortages,
     wish_results: wishResults,
@@ -872,11 +1059,11 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
   }, { merge: true });
   await batch.commit();
 
-  for (const [uid, dishes] of failedWishes) {
+  for (const [uid, notes] of failedWishes) {
     await notifyUser(uid, {
       kind: "wish",
       title: t("配菜許願未成立", "Side-dish wish didn't make it"),
-      body: t(`${date} 的「${dishes.join("、")}」未達最低份數，已改為預設配菜，訂單照常成立。`, `Your wish for ${dishes.join(", ")} on ${date} didn't reach the minimum; you'll get the default side.`),
+      body: t(`${date}：${notes.join("；")}。訂單照常成立。`, `${date}: ${notes.join("; ")}. Your order stands.`),
       link: "/my-bookings",
     });
   }
@@ -913,42 +1100,60 @@ exports.triggerLockOrdersNow = onCall({}, async (request) => {
  * 取餐提醒（取餐時段結束前 30 分）
  * ------------------------------------------------------------------ */
 
-async function activeLocksOn(vendorId, date) {
+/** 某天、某店還要出餐的鎖定；給 period 就只取那個餐期的 */
+async function activeLocksOn(vendorId, date, period = null, config = null) {
   const snap = await db().collection("locks").where("vendor_id", "==", vendorId).where("pickup_date", "==", date).get();
-  return snap.docs.filter((d) => ACTIVE_LOCK_STATUSES.includes(d.data().status));
+  return snap.docs.filter((d) => {
+    const lock = d.data();
+    if (!ACTIVE_LOCK_STATUSES.includes(lock.status)) return false;
+    return !period || (lock.meal_period || mealPeriodOf(lock.pickup_window, config || undefined)) === period;
+  });
 }
 
-/** 取餐時段的起訖時間點（今天） */
-function todayRange(vendor, date) {
-  const { start, end } = splitWindow(vendorPickupRange(vendor));
-  return { start: at(date, start), end: at(date, end) };
+/** 這家店今天各餐期的取餐時段起訖時間點：[{ period, label, start, end }]（早、中、晚各自計算，§7） */
+function periodRangesOn(vendor, date, config) {
+  return Object.entries(vendorPeriodRanges(vendor, config || undefined)).map(([period, range]) => {
+    const { start, end } = splitWindow(range);
+    return { period, label: mealPeriodLabel(period), start: at(date, start), end: at(date, end), endText: end };
+  });
+}
+
+/** 某個取餐時段所屬餐期的起訖時間點（捐出、轉愛心餐依這個判斷） */
+function todayRange(vendor, date, window = null, config = null) {
+  const ranges = periodRangesOn(vendor, date, config);
+  const period = window ? mealPeriodOf(window, config || undefined) : null;
+  const hit = ranges.find((r) => r.period === period) || ranges[ranges.length - 1];
+  return { start: hit.start, end: hit.end, period: hit.period };
 }
 
 exports.pickupReminder = onSchedule({ schedule: "every 5 minutes", timeZone: "Asia/Taipei", region: REGION }, async () => {
   const today = taipeiToday();
+  const config = await loadPlatformConfig(db());
   await forEachVendor("pickupReminder", async (vendor) => {
-    const { end } = todayRange(vendor, today);
-    const minutesLeft = (end.getTime() - Date.now()) / 60000;
-    if (minutesLeft > 30 || minutesLeft < 0) return;
-    const planRef = db().collection("vendors").doc(vendor.id).collection("prepPlans").doc(today);
-    const plan = await planRef.get();
-    if (plan.exists && plan.data().reminder_sent) return;
-    await planRef.set({ reminder_sent: true }, { merge: true });
-    const endsAt = splitWindow(vendorPickupRange(vendor)).end;
-    for (const doc of await activeLocksOn(vendor.id, today)) {
-      const lock = doc.data();
-      // 排程不在請求內，依收件人的 users.lang 決定語言
-      const lang = (await db().collection("users").doc(lock.buyer_uid).get()).data()?.lang;
-      await inLang(lang, () => notifyUser(lock.buyer_uid, {
-        kind: "pickup",
-        title: t("還沒取餐喔", "You haven't picked up yet"),
-        body: t(`「${lock.item_name}」取餐到 ${endsAt}，來不了可以按「捐為愛心餐」。`, `${lock.item_name_en || lock.item_name} — pickup ends at ${endsAt}. Can't make it? Tap "Donate" to give it to someone in need.`),
-        link: "/my-bookings",
-      }));
+    for (const { period, end, endText } of periodRangesOn(vendor, today, config)) {
+      const minutesLeft = (end.getTime() - Date.now()) / 60000;
+      if (minutesLeft > 30 || minutesLeft < 0) continue;
+      const planRef = db().collection("vendors").doc(vendor.id).collection("prepPlans").doc(today);
+      const plan = await planRef.get();
+      const flag = `reminder_sent_${period}`;
+      if (plan.exists && (plan.data()[flag] || (period === "lunch" && plan.data().reminder_sent))) continue;
+      await planRef.set({ [flag]: true }, { merge: true });
+      const endsAt = endText;
+      for (const doc of await activeLocksOn(vendor.id, today, period, config)) {
+        const lock = doc.data();
+        // 排程不在請求內，依收件人的 users.lang 決定語言
+        const lang = (await db().collection("users").doc(lock.buyer_uid).get()).data()?.lang;
+        await inLang(lang, () => notifyUser(lock.buyer_uid, {
+          kind: "pickup",
+          title: t("還沒取餐喔", "You haven't picked up yet"),
+          body: t(`「${lock.item_name}」取餐到 ${endsAt}，來不了可以按「捐為愛心餐」。`, `${lock.item_name_en || lock.item_name} — pickup ends at ${endsAt}. Can't make it? Tap "Donate" to give it to someone in need.`),
+          link: "/my-bookings",
+        }));
+      }
     }
   });
 });
 
 module.exports.helpers = {
-  cancelAndRefund, activeLocksOn, todayRange, runLockOrders, sideWishId, taipeiTime,
+  cancelAndRefund, activeLocksOn, todayRange, periodRangesOn, runLockOrders, sideWishId, taipeiTime,
 };

@@ -1,5 +1,6 @@
-// 採購與備料三區（規格 §5）：每月備料（小盤商）、本週進料（週六 12:00 鎖定）、每日備料（截單後，orders.js）。
-// 每個原物料依 frequency 歸區：monthly → 月叫貨單；weekly／daily → 週叫貨單（daily 另外在每日缺料提醒）。
+// 採購與備料兩區（規格 §5）：每週進料（週六 12:00 鎖定）、每日備料（截單後，orders.js）。
+// 米、油、調味料、乾貨、包材等久放品項（frequency: monthly）也併入每週進料，低於安全庫存才列入叫貨單，
+// 一次補足 LONG_LIVED_WEEKS 週的量。每月備料列入第二階段（purchaseLists.type 預留）。
 //
 // 進料量 = 已確定用量 + 預測用量 × (1 + 安全庫存) − 目前庫存，依採購單位進位。
 // 預測：過去 4 週同星期幾平均份數，排除停班日、國定假日（店家公休）與店家標記的異常週；
@@ -11,6 +12,7 @@ const { componentPortions, rawNeeds, roundToPurchaseUnit, splitDeliveries, ACTIV
 const { taipeiToday, addDays, mondayOf, weekdayOf } = require("./calendar");
 
 const HISTORY_STATUSES = [...ACTIVE_LOCK_STATUSES, "fulfilled", "resold_and_fulfilled", "charity"];
+const LONG_LIVED_WEEKS = 4;
 
 function safetyRate(vendor, config) {
   const own = Number(vendor.safety_stock_rate);
@@ -123,7 +125,7 @@ async function buildWeekly(vendor, weekStart) {
   const { stock, counted } = await currentStock(vendor.id, weekStart);
   const lines = [];
   for (const ing of Object.values(catalog.ingredientsById)) {
-    if (ing.frequency === "monthly") continue;
+    const longLived = ing.frequency === "monthly";
     const byDay = perDay.map((d) => {
       const confirmed = d.confirmedNeeds.get(ing.id) || 0;
       const fc = d.forecastNeeds.get(ing.id) || 0;
@@ -132,14 +134,19 @@ async function buildWeekly(vendor, weekStart) {
     const need = byDay.reduce((s, d) => s + d.amount, 0);
     if (need <= 0) continue;
     const have = Math.max(0, Number(stock.get(ing.id)) || 0);
-    const { units, amount } = roundToPurchaseUnit(Math.max(0, need - have), ing);
-    // 分日到貨：只把要叫的量按每日需求比例分配
-    const scale = need > 0 ? Math.max(0, need - have) / need : 0;
-    const deliveries = splitDeliveries(byDay.map((d) => ({ date: d.date, amount: d.amount * scale })), ing)
-      .map((d) => ({ date: d.date, units: roundToPurchaseUnit(d.amount, ing).units }));
+    // 久放品項：庫存撐得過本週（含安全庫存）就不叫；不夠時一次補 4 週
+    if (longLived && have >= need) continue;
+    const want = longLived ? need * LONG_LIVED_WEEKS : need;
+    const { units, amount } = roundToPurchaseUnit(Math.max(0, want - have), ing);
+    // 分日到貨：只把要叫的量按每日需求比例分配；久放品項週一一次到
+    const scale = need > 0 ? Math.max(0, want - have) / need : 0;
+    const deliveries = longLived
+      ? [{ date: byDay[0]?.date, units }]
+      : splitDeliveries(byDay.map((d) => ({ date: d.date, amount: d.amount * scale })), ing)
+        .map((d) => ({ date: d.date, units: roundToPurchaseUnit(d.amount, ing).units }));
     lines.push({
       ingredient_id: ing.id, name: ing.name, unit: ing.unit || "g", purchase_unit_label: ing.purchase_unit_label || ing.unit || "",
-      purchase_unit_size: Number(ing.purchase_unit_size) || 1, supplier_id: ing.supplier_id || null, frequency: ing.frequency || "weekly",
+      purchase_unit_size: Number(ing.purchase_unit_size) || 1, supplier_id: ing.supplier_id || null, frequency: ing.frequency || "weekly", long_lived: longLived,
       by_day: byDay.map(({ date, confirmed, forecast: f }) => ({ date, confirmed, forecast: f })),
       need: Math.round(need), stock: Math.round(have), order_units: units, order_amount: amount,
       deliveries: deliveries.filter((d) => d.units > 0), unit_price: Number(ing.unit_price) || 0,
@@ -157,52 +164,6 @@ async function buildWeekly(vendor, weekStart) {
   return { lines: lines.length, uncounted: !counted };
 }
 
-async function buildMonthly(vendor, month) {
-  const config = await loadPlatformConfig(db());
-  const catalog = await loadVendorCatalog(vendor.id);
-  const forecast = await forecastByWeekday(vendor, mondayOf(taipeiToday()));
-  const safety = safetyRate(vendor, config);
-  const first = `${month}-01`;
-  const daysInMonth = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
-  const excluded = excludedDates(vendor);
-  const needs = new Map();
-  let businessDays = 0;
-  for (let i = 0; i < daysInMonth; i++) {
-    const date = addDays(first, i);
-    const wd = weekdayOf(date);
-    if (!config.businessWeekdays.includes(wd) || excluded.has(date)) continue;
-    businessDays++;
-    const predicted = forecastLocks(forecast(wd), new Map());
-    const n = rawNeeds(componentPortions(predicted, catalog.itemsById, catalog.componentsById, config), catalog.componentsById, catalog.ingredientsById);
-    for (const [k, v] of n) needs.set(k, (needs.get(k) || 0) + v);
-  }
-  const { stock, counted } = await currentStock(vendor.id, mondayOf(addDays(taipeiToday(), 7)));
-  const lines = [];
-  for (const ing of Object.values(catalog.ingredientsById)) {
-    if (ing.frequency !== "monthly") continue;
-    const need = (needs.get(ing.id) || 0) * (1 + safety);
-    const have = Math.max(0, Number(stock.get(ing.id)) || 0);
-    const { units, amount } = roundToPurchaseUnit(Math.max(0, need - have), ing);
-    lines.push({
-      ingredient_id: ing.id, name: ing.name, unit: ing.unit || "g", purchase_unit_label: ing.purchase_unit_label || ing.unit || "",
-      purchase_unit_size: Number(ing.purchase_unit_size) || 1, supplier_id: ing.supplier_id || null, frequency: "monthly",
-      need: Math.round(need), stock: Math.round(have), order_units: units, order_amount: amount,
-      unit_price: Number(ing.unit_price) || 0, est_cost: Math.round(units * (Number(ing.unit_price) || 0)),
-    });
-  }
-  lines.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
-  await db().collection("vendors").doc(vendor.id).collection("purchaseLists").doc(`monthly_${month}`).set({
-    type: "monthly", month, business_days: businessDays, safety_rate: safety, lines, uncounted: !counted,
-    est_total: lines.reduce((s, l) => s + l.est_cost, 0), generated_at: FieldValue.serverTimestamp(),
-  });
-  return { lines: lines.length };
-}
-
-function nextMonthOf(today) {
-  const [y, m] = today.split("-").map(Number);
-  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
-}
-
 exports.buildWeeklyPurchase = onSchedule({ schedule: "0 12 * * 6", timeZone: "Asia/Taipei", region: REGION }, async () => {
   const weekStart = mondayOf(addDays(taipeiToday(), 7));
   await forEachVendor("buildWeeklyPurchase", async (vendor) => {
@@ -215,22 +176,12 @@ exports.buildWeeklyPurchase = onSchedule({ schedule: "0 12 * * 6", timeZone: "As
   });
 });
 
-exports.buildMonthlyPurchase = onSchedule({ schedule: "0 9 25 * *", timeZone: "Asia/Taipei", region: REGION }, async () => {
-  const month = nextMonthOf(taipeiToday());
-  await forEachVendor("buildMonthlyPurchase", async (vendor) => {
-    await buildMonthly(vendor, month);
-    await notifyVendor(vendor.id, { title: "下個月小盤商叫貨單已產生", body: `${month} 的米、油、調味料、包材`, link: "/vendor-portal/purchasing" });
-  });
-});
-
-/** 店家在後台按「重新產生」：週（預設下週，週六前可先試算）或月 */
+/** 店家在後台按「重新產生」：週叫貨單（預設下週，週六前可先試算） */
 exports.triggerPurchaseListNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const vendor = { id: vendorId, ...(await db().collection("vendors").doc(vendorId).get()).data() };
-  if (request.data?.type === "monthly") {
-    const month = request.data?.month || nextMonthOf(taipeiToday());
-    return { month, ...(await buildMonthly(vendor, month)) };
-  }
   const weekStart = request.data?.week_start || mondayOf(addDays(taipeiToday(), 7));
   return { week_start: weekStart, ...(await buildWeekly(vendor, weekStart)) };
 });
+
+module.exports.helpers = { forecastByWeekday, forecastLocks, excludedDates, HISTORY_STATUSES };

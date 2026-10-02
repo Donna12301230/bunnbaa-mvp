@@ -53,8 +53,9 @@ exports.onLockCreatedTaste = onDocumentCreated({ document: "locks/{lockId}", reg
   const tagsOf = (componentId) => dishTags(catalog.componentsById[componentId], catalog.ingredientsById);
   const deltas = new Map();
   const add = (tags, w) => tags.forEach((tag) => deltas.set(tag, (deltas.get(tag) || 0) + w));
-  const lockTags = new Set(tagsOf(item.main?.component_id));
-  add(tagsOf(item.main?.component_id), SIGNAL.purchase);
+  const mainId = lock.main_component_id || item.main?.component_id;
+  const lockTags = new Set(tagsOf(mainId));
+  add(tagsOf(mainId), SIGNAL.purchase);
   (lock.slots || []).forEach((slot, i) => {
     const defaultTags = tagsOf(slot.default_component_id || item.slots?.[i]?.default?.component_id);
     if (slot.removed) {
@@ -70,8 +71,36 @@ exports.onLockCreatedTaste = onDocumentCreated({ document: "locks/{lockId}", reg
       defaultTags.forEach((x) => lockTags.add(x));
     }
   });
+  // 第四道（加菜／備案）：選了就算正面訊號；候選菜算許願
+  const extra = lock.extra_side;
+  if (extra?.component_id) {
+    const w = tagsOf(extra.component_id);
+    add(w, extra.wished ? SIGNAL.side_wish : SIGNAL.purchase);
+    if (extra.mode === "addon") w.forEach((x) => lockTags.add(x));
+  }
   await event.data.ref.update({ tags: [...lockTags] });
   await bumpTaste(lock.payer_uid || lock.buyer_uid, deltas);
+});
+
+/**
+ * 收藏店家（我的最愛，§4.5、§10）：與購買同等的正面訊號。依這家店供應中的主菜與預設配菜標籤
+ * 平均分配 +2，避免菜色多的店一次灌太多分。
+ */
+exports.onFavoriteCreated = onDocumentCreated({ document: "users/{uid}/favorites/{vendorId}", region: REGION }, async (event) => {
+  const { uid, vendorId } = event.params;
+  const catalog = await loadVendorCatalog(vendorId);
+  const items = Object.values(catalog.itemsById).filter((i) => i.is_available !== false);
+  if (items.length === 0) return;
+  const tagsOf = (componentId) => dishTags(catalog.componentsById[componentId], catalog.ingredientsById);
+  const deltas = new Map();
+  const share = SIGNAL.purchase / items.length;
+  for (const item of items) {
+    const mainIds = Array.isArray(item.mains) && item.mains.length > 0 ? item.mains.map((m) => m.component_id) : [item.main?.component_id || item.component_id];
+    const tags = new Set(mainIds.flatMap((id) => tagsOf(id)));
+    (item.slots || []).forEach((slot) => tagsOf(slot.default?.component_id).forEach((x) => tags.add(x)));
+    tags.forEach((tag) => deltas.set(tag, (deltas.get(tag) || 0) + share));
+  }
+  await bumpTaste(uid, deltas);
 });
 
 /**
@@ -101,7 +130,7 @@ exports.recordItemView = onCall({}, async (request) => {
   const tagsOf = (componentId) => dishTags(catalog.componentsById[componentId], catalog.ingredientsById);
   const deltas = new Map();
   const add = (tags) => tags.forEach((tag) => deltas.set(tag, (deltas.get(tag) || 0) + SIGNAL.view));
-  add(tagsOf(menuItem.main?.component_id));
+  add(tagsOf(menuItem.main?.component_id || menuItem.mains?.[0]?.component_id));
   (menuItem.slots || []).forEach((slot) => add(tagsOf(slot.default?.component_id)));
   await bumpTaste(uid, deltas);
   return { ok: true };

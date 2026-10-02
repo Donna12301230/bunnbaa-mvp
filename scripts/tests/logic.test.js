@@ -40,14 +40,14 @@ test("C-PRC-03", "2 天後 8 折", () => {
   assert.equal(pricing.validatePickup("2026-10-02", W, vendor, CFG, NOW), null);
   assert.equal(pricing.applyEarlyBirdPrice(100, "2026-10-02", NOW).lockedPrice, 80);
 });
-test("C-PRC-04", "下週五（最遠）8 折", () => {
-  assert.equal(cal.lastBookableDate("2026-09-30"), "2026-10-09");
-  assert.equal(pricing.validatePickup("2026-10-09", W, vendor, CFG, NOW), null);
-  assert.equal(pricing.applyEarlyBirdPrice(100, "2026-10-09", NOW).lockedPrice, 80);
+test("C-PRC-04", "最遠 30 天後（10/30 週五）8 折", () => {
+  assert.equal(cal.lastBookableDate("2026-09-30"), "2026-10-30");
+  assert.equal(pricing.validatePickup("2026-10-30", W, vendor, CFG, NOW), null);
+  assert.equal(pricing.applyEarlyBirdPrice(100, "2026-10-30", NOW).lockedPrice, 80);
+  assert.equal(pricing.applyEarlyBirdPrice(100, "2026-10-16", NOW).lockedPrice, 80, "提前 14 天以上仍是 8 折（7 折列後續改版）");
 });
-test("C-PRC-05", "下週六以後不能選", () => {
-  assert.notEqual(pricing.validatePickup("2026-10-10", W, vendor, CFG, NOW), null);
-  assert.notEqual(pricing.validatePickup("2026-10-12", W, vendor, CFG, NOW), null);
+test("C-PRC-05", "超過 30 天不能選", () => {
+  assert.notEqual(pricing.validatePickup("2026-11-02", W, vendor, CFG, NOW), null);
 });
 test("C-PRC-06", "週六訂下週一到五 8 折", () => {
   const sat = new Date("2026-10-03T10:00:00+08:00");
@@ -123,10 +123,11 @@ test("C-BNT-06", "rice 只接受 add/normal/less", () => {
 test("C-BNT-xx", "不存在的候選 index 被擋", () => {
   assert.ok(bento.resolveChoices(item, [{ choice: 5 }]).problem);
 });
-test("C-BNT-09", "份量級距 1.2/1.6/2.5 倍 → 3/4、半份、不能列", () => {
-  assert.equal(bento.portionLevelFor(10, 12), 0.75);
+test("C-BNT-09", "份量級距只分全份／半份：比例 ≥0.75 全份、0.5–0.75 半份、<0.5 不能列", () => {
+  assert.equal(bento.portionLevelFor(10, 12), 1);
   assert.equal(bento.portionLevelFor(10, 16), 0.5);
   assert.equal(bento.portionLevelFor(10, 25), null);
+  assert.equal(bento.portionLabel(0.75), "半份");
 });
 test("C-BNT-11", "沒有 slots 的舊品項不能加減", () => {
   assert.equal(bento.isBento({}), false);
@@ -134,20 +135,21 @@ test("C-BNT-11", "沒有 slots 的舊品項不能加減", () => {
 });
 
 // 3.14 回饋池
-test("C-RWD-04", "規格 §8.4 範例：池 10000、1000 張", () => {
+test("C-RWD-04", "規格 §8.4 範例：池 10000、1000 張 → 免費 15、半價 79、保底 906，餘 20", () => {
   const r = rewards.allocatePool(10000, 1000);
-  assert.deepEqual(
-    { free: r.counts.free, t10: r.counts.t10, t30: r.counts.t30, t50: r.counts.t50, t80: r.counts.t80, t95: r.counts.t95 },
-    { free: 2, t10: 5, t30: 11, t50: 27, t80: 163, t95: 792 }
-  );
-  assert.equal(r.leftover, 10);
+  assert.deepEqual(r.counts, { free: 15, t50: 79, t95: 906 });
+  assert.equal(r.spent, 9980);
+  assert.equal(r.leftover, 20);
 });
-test("C-RWD-05", "頭獎保證：零元券算出 0 張且剩 ≥ 95 時先配 1 張", () => {
-  // N=200、P=2800 → budget=1800，free floor(90/95)=0，加權後剩 110 ≥ 95 → 補 1 張
-  const r = rewards.allocatePool(2800, 200);
+test("C-RWD-05", "頭獎保證：免費餐券算出 0 張且剩 ≥ 95 時先配 1 張", () => {
+  // N=100、P=800 → budget=300，free floor(90/95)=0、t50 floor(210/45)=4（180）→ 剩 120 ≥ 95 → 補 1 張免費
+  const r = rewards.allocatePool(800, 100);
   assert.equal(r.counts.free, 1);
   const total = Object.values(r.counts).reduce((s, n) => s + n, 0);
-  assert.equal(total, 200);
+  assert.equal(total, 100);
+});
+test("C-RWD-06", "第一階段只有 3 種券", () => {
+  assert.deepEqual(Object.keys(rewards.allocatePool(10000, 1000).counts).sort(), ["free", "t50", "t95"]);
 });
 test("C-RWD-xx", "高階張數不超過抽獎券數、spent+leftover=pool", () => {
   for (const [p, n] of [[10000, 100], [5000, 1000], [123456, 1234], [999, 100]]) {
@@ -158,7 +160,7 @@ test("C-RWD-xx", "高階張數不超過抽獎券數、spent+leftover=pool", () =
   }
 });
 test("C-RWD-07", "pickTier 只抽剩餘 > 0 的等級", () => {
-  assert.equal(rewards.pickTier({ free: 0, t80: 1 }, () => 0.99), "t80");
+  assert.equal(rewards.pickTier({ free: 0, t50: 1 }, () => 0.99), "t50");
   assert.equal(rewards.pickTier({ free: 0 }), null);
 });
 
@@ -210,6 +212,108 @@ test("V-PRP-14", "出餐標籤不含姓名", () => {
   const labels = prep.buildLabels([{ id: "abcd1234", pickup_code: "A1B2", buyer_name: "王小明", slots: [], note: "x" }], {});
   assert.ok(!JSON.stringify(labels).includes("王小明"));
   assert.equal(labels[0].pickup_code, "A1B2");
+});
+
+// ── 2026-10-02 規格（技術規格1002.md）新增 ──
+test("C-MEAL-01", "餐期依取餐開始時間歸類：早 06:00–10:30／中 10:30–14:00／晚 16:30–20:00", () => {
+  assert.equal(pricing.mealPeriodOf("07:30-08:00", CFG), "breakfast");
+  assert.equal(pricing.mealPeriodOf("10:30-11:00", CFG), "lunch");
+  assert.equal(pricing.mealPeriodOf("17:00-17:30", CFG), "dinner");
+});
+test("C-MEAL-02", "品項只供應午餐 → 早餐時段被擋；沒設餐期的舊品項不擋", () => {
+  const v = { ...vendor, pickup_windows: ["07:30-08:00", "11:00-11:30"] };
+  const lunchOnly = { name: "雞腿便當", meal_periods: ["lunch"] };
+  assert.match(pricing.validatePickup("2026-10-02", "07:30-08:00", v, CFG, NOW, lunchOnly), /早餐/);
+  assert.equal(pricing.validatePickup("2026-10-02", "11:00-11:30", v, CFG, NOW, lunchOnly), null);
+  assert.equal(pricing.validatePickup("2026-10-02", "07:30-08:00", v, CFG, NOW, { name: "舊品項" }), null);
+});
+test("C-MEAL-03", "各餐期取餐範圍分開算（愛心餐、提醒、時間軸用）", () => {
+  const v = { pickup_windows: ["07:30-08:00", "08:00-08:30", "11:30-12:00", "12:30-13:00", "17:00-18:00"] };
+  assert.deepEqual(pricing.vendorPeriodRanges(v, CFG), { breakfast: "07:30-08:30", lunch: "11:30-13:00", dinner: "17:00-18:00" });
+});
+test("C-PLN-03", "計畫遇公休順延，順延的日期標示出來", () => {
+  const v = { ...vendor, holidays: ["2026-10-05"] };
+  const r = pricing.planPickupDates("2026-10-02", W, v, 3, CFG, NOW);
+  assert.deepEqual(r.postponed, ["2026-10-06", "2026-10-07"]);
+});
+const bentoItem = {
+  price: 0,
+  mains: [{ name: "雞肉", component_id: "m1", price: 50 }, { name: "豬肉", component_id: "m2", price: 60 }],
+  rice_component_id: "rice",
+  slots: [
+    { category: "配菜1", default: { name: "茄子", component_id: "c1" }, candidates: [{ name: "苦瓜", component_id: "c9", portion_level: 1 }] },
+    { category: "配菜2", default: { name: "高麗菜", component_id: "c2" } },
+    { category: "配菜3", default: { name: "辣炒年糕", component_id: "c3" } },
+  ],
+};
+test("C-BNT-20", "主菜各自定價：選豬肉 → 原價 60；沒選預設第一道", () => {
+  assert.equal(bento.resolveMain(bentoItem, 1).price, 60);
+  assert.equal(bento.resolveMain(bentoItem, null).price, 50);
+  assert.ok(bento.resolveMain(bentoItem, 5).problem);
+  assert.equal(bento.resolveMain({ price: 80, main: { name: "排骨" } }).price, 80);
+});
+test("C-BNT-21", "第四道：加菜 +10、備案 0；要先選滿、不能重複、不能超過 4 道", () => {
+  const full = bento.resolveChoices(bentoItem, []).slots;
+  const addon = bento.resolveExtraSide(bentoItem, { slot: 0, candidate: 0, mode: "addon" }, full, CFG);
+  assert.equal(addon.extra.dish, "苦瓜");
+  assert.equal(bento.adjustAmount({ rice: "normal", removedCount: 0, extraMode: "addon" }, CFG), 10);
+  assert.equal(bento.adjustAmount({ rice: "normal", removedCount: 0, extraMode: "backup" }, CFG), 0);
+  assert.ok(bento.resolveExtraSide(bentoItem, { slot: 1, candidate: null, mode: "addon" }, full, CFG).problem, "高麗菜已在便當裡");
+  const missing = bento.resolveChoices(bentoItem, [{ choice: "none" }]).slots;
+  assert.ok(bento.resolveExtraSide(bentoItem, { slot: 0, candidate: 0, mode: "backup" }, missing, CFG).problem, "沒選滿不能加第四道");
+  const four = { ...bentoItem, slots: [...bentoItem.slots, { category: "配菜4", default: { name: "滷蛋" } }] };
+  assert.ok(bento.resolveExtraSide(four, { slot: 0, candidate: 0, mode: "addon" }, bento.resolveChoices(four, []).slots, CFG).problem, "標準 4 道就不能再加");
+});
+test("C-BNT-22", "飯量：半碗 −5、一碗 0、一碗半 +10；少一道 −5", () => {
+  assert.equal(bento.adjustAmount({ rice: "less", removedCount: 0 }, CFG), -5);
+  assert.equal(bento.adjustAmount({ rice: "add", removedCount: 1 }, CFG), 5);
+});
+test("V-PRP-20", "備料：選的主菜、備案遞補、第四道加菜都算進去", () => {
+  const comps = { rice: { portion_grams: 200 } };
+  const slots = [
+    { removed: false, wished: "苦瓜", resolved: "高麗菜", backup_used: true, resolved_component_id: "c2", portion_level: 1 },
+    { removed: false, default_component_id: "c2" },
+    { removed: false, default_component_id: "c3" },
+  ];
+  const lock = { rice: "normal", main_component_id: "m2", slots, extra_side: { mode: "addon", component_id: "c9", portion_level: 1 } };
+  const p = prep.componentPortionsForLock(lock, bentoItem, comps, CFG);
+  assert.equal(p.get("m2"), 1);
+  assert.equal(p.has("m1"), false);
+  assert.equal(p.get("c2"), 2);
+  assert.equal(p.get("c9"), 1);
+  const label = prep.buildLabels([{ id: "x", pickup_code: "1234", main_dish: "豬肉", rice: "less", slots, extra_side: { mode: "addon", dish: "苦瓜" } }], {})[0];
+  assert.equal(label.main, "豬肉");
+  assert.equal(label.rice, "白飯半碗");
+  assert.ok(label.sides.includes("＋苦瓜"));
+});
+
+let fin;
+try { fin = req("finance.js").helpers; } catch (e) { fin = null; }
+test("V-BIL-01", "維護費：到期前 active、寬限 7 天 grace、之後 suspended；舊資料不擋", () => {
+  if (!fin) throw new Error("finance.js 無法載入");
+  const due = Date.parse("2026-10-10T00:00:00+08:00");
+  const v = { subscription_status: "active", subscription_end_date: { toMillis: () => due } };
+  assert.equal(fin.billingStateOf(v, due - 1, CFG).status, "active");
+  assert.equal(fin.billingStateOf(v, due + 3 * 86400000, CFG).status, "grace");
+  assert.equal(fin.billingStateOf(v, due + 8 * 86400000, CFG).status, "suspended");
+  assert.equal(fin.billingStateOf({}, due, CFG).status, "active");
+  assert.equal(fin.billingStateOf({ ...v, subscription_status: "cancelled" }, due + 1, CFG).status, "suspended");
+});
+test("V-WAGE-01", "基本工資：依生效日取值；低於標準的時薪／月薪自動上調", () => {
+  if (!fin) throw new Error("finance.js 無法載入");
+  const { DEFAULT_MINIMUM_WAGE, wageOn } = req("config.js");
+  assert.equal(wageOn(DEFAULT_MINIMUM_WAGE, "2025-06-01").hourly, 190);
+  assert.equal(wageOn(DEFAULT_MINIMUM_WAGE, "2026-10-02").hourly, 196);
+  const { patch } = fin.raiseToMinimum({ hourly_wage: 190, staff_salaries: [28000, 35000] }, { hourly: 196, monthly: 29500 });
+  assert.equal(patch.hourly_wage, 196);
+  assert.deepEqual(patch.staff_salaries, [29500, 35000]);
+  assert.deepEqual(fin.raiseToMinimum({ hourly_wage: 200, staff_salaries: [30000] }, { hourly: 196, monthly: 29500 }).patch, {});
+});
+test("V-REV-01", "材料成本＝用量 ÷ 採購單位 × 單價；時間軸工時含裝盒", () => {
+  if (!fin) throw new Error("finance.js 無法載入");
+  assert.equal(fin.needsCost(new Map([["egg", 20]]), { egg: { purchase_unit_size: 10, unit_price: 60 } }), 120);
+  const tl = { slots: [{ start: "09:00", end: "09:30" }, { start: "10:00", end: "10:20" }], overnight: [] };
+  assert.equal(fin.timelineMinutes(tl, {}), 70);
 });
 
 // V-PRP-03 預測區間
