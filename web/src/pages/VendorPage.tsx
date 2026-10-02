@@ -91,8 +91,10 @@ export default function VendorPage() {
     if (cartVendorId && cartVendorId !== item.vendor_id) {
       toast({
         title: tr("購物車裡有別家商家的品項", "Your cart has items from another vendor"),
-        description: tr("加入這項會清空目前的購物車（一次只能跟一家商家預購）。", "Adding this will clear your cart (you can only pre-order from one vendor at a time)."),
+        description: tr("一次只能跟一家商家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
+        variant: "destructive",
       });
+      return;
     }
     add({ menuItem: item, vendorId: item.vendor_id, pickupDate: next.date, pickupWindow: next.window, choices: [], rice: "normal", quantity: 1, note: "", couponId: null });
     toast({ title: tr("已加入購物車", "Added to cart"), description: `${loc(item, "name")}・${next.date} ${next.window}` });

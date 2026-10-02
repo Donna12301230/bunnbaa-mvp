@@ -222,7 +222,7 @@ service cloud.firestore {
     // locks docs. Known gap: only Cloud Functions (admin SDK) can delete/replace
     // one, so after a gift/free-claim/resale handoff the previous buyer's stale
     // token is left in place instead of being handed to the new buyer — same
-    // pre-existing gap as claimResoldLock. Harmless for now since reminders are
+    // gap claimResoldLock used to have (it now deletes the token). Harmless for now since reminders are
     // dormant pending VAPID key + Blaze deploy (TODO.md 卡點 1). The buyer creates
     // one for a lock they own; only that buyer or
     // an admin can read it; Cloud Functions (admin SDK) manage the rest.

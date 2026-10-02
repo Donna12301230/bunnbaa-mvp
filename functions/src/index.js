@@ -191,6 +191,8 @@ exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
       share_token: require("crypto").randomBytes(12).toString("hex"),
       qr_nonce: FieldValue.delete(),
     });
+    // 原持有人的取餐提醒推播 token，接手後就不該再提醒他
+    tx.delete(db.collection("lock_tokens").doc(lockId));
   });
   // AI 轉讓媒合的影響指標：接手的人是不是被通知的會員（失敗不影響接手）
   await recordMatchedClaim(lockId, request.auth.uid).catch((err) => logger.warn(`recordMatchedClaim ${lockId}`, err));

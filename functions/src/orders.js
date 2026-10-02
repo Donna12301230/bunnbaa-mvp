@@ -15,6 +15,7 @@ const {
   REGION, db, onCall, HttpsError, logger, FieldValue, t, isEmulator, assertSignedInUser, assertAdminOrVendorOwner,
   callerVendorId, notifyUser, notifyVendor, loadVendorCatalog, forEachVendor,
 } = require("./common");
+const { inLang } = require("./i18n");
 const { loadPlatformConfig } = require("./config");
 const { requestPayment, confirmPayment, refundPayment } = require("./linePay");
 const {
@@ -933,14 +934,17 @@ exports.pickupReminder = onSchedule({ schedule: "every 5 minutes", timeZone: "As
     const plan = await planRef.get();
     if (plan.exists && plan.data().reminder_sent) return;
     await planRef.set({ reminder_sent: true }, { merge: true });
+    const endsAt = splitWindow(vendorPickupRange(vendor)).end;
     for (const doc of await activeLocksOn(vendor.id, today)) {
       const lock = doc.data();
-      await notifyUser(lock.buyer_uid, {
+      // 排程不在請求內，依收件人的 users.lang 決定語言
+      const lang = (await db().collection("users").doc(lock.buyer_uid).get()).data()?.lang;
+      await inLang(lang, () => notifyUser(lock.buyer_uid, {
         kind: "pickup",
         title: t("還沒取餐喔", "You haven't picked up yet"),
-        body: t(`「${lock.item_name}」取餐到 ${splitWindow(vendorPickupRange(vendor)).end}，來不了可以按「捐為愛心餐」。`, `${lock.item_name} — pickup ends at ${splitWindow(vendorPickupRange(vendor)).end}.`),
+        body: t(`「${lock.item_name}」取餐到 ${endsAt}，來不了可以按「捐為愛心餐」。`, `${lock.item_name_en || lock.item_name} — pickup ends at ${endsAt}. Can't make it? Tap "Donate" to give it to someone in need.`),
         link: "/my-bookings",
-      });
+      }));
     }
   });
 });

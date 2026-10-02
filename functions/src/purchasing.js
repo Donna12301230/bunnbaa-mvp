@@ -17,10 +17,10 @@ function safetyRate(vendor, config) {
   return own >= 0 && own <= 1 ? own : config.safetyStockRate;
 }
 
-async function excludedDates(vendor) {
-  const events = await db().collection("disasterEvents").get();
+// 停班日只看這家店的 disaster_dates（停班事件處理時只寫給受影響縣市／區的店）；
+// 不能拿 disasterEvents 全部的日期，否則別縣市停班、颱風警報都會讓這家店被當成沒營業、預測變 0。
+function excludedDates(vendor) {
   const set = new Set([...(vendor.holidays || []), ...(vendor.disaster_dates || [])]);
-  events.docs.forEach((d) => (d.data().dates || []).forEach((x) => set.add(x)));
   for (const week of vendor.anomaly_weeks || []) for (let i = 0; i < 7; i++) set.add(addDays(week, i));
   return set;
 }
@@ -30,7 +30,7 @@ async function excludedDates(vendor) {
  * 報廢（愛心餐報廢）份數從歷史扣掉，避免下週多做（§7.5）。
  */
 async function forecastByWeekday(vendor, referenceMonday) {
-  const excluded = await excludedDates(vendor);
+  const excluded = excludedDates(vendor);
   const from = addDays(referenceMonday, -28);
   const snap = await db().collection("locks").where("vendor_id", "==", vendor.id)
     .where("pickup_date", ">=", from).where("pickup_date", "<", referenceMonday).get();
@@ -105,7 +105,7 @@ async function buildWeekly(vendor, weekStart) {
   const forecast = await forecastByWeekday(vendor, mondayOf(taipeiToday()));
   const safety = safetyRate(vendor, config);
   const days = [0, 1, 2, 3, 4].map((i) => addDays(weekStart, i)).filter((d) => config.businessWeekdays.includes(weekdayOf(d)));
-  const excluded = await excludedDates(vendor);
+  const excluded = excludedDates(vendor);
   const perDay = [];
   const board = [];
   for (const date of days) {
@@ -164,7 +164,7 @@ async function buildMonthly(vendor, month) {
   const safety = safetyRate(vendor, config);
   const first = `${month}-01`;
   const daysInMonth = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
-  const excluded = await excludedDates(vendor);
+  const excluded = excludedDates(vendor);
   const needs = new Map();
   let businessDays = 0;
   for (let i = 0; i < daysInMonth; i++) {

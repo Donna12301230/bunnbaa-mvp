@@ -167,6 +167,68 @@ const results = [];
     await assertSucceeds(updateDoc(doc(ADMIN, "anomalies/a1"), { status: "reviewed", note: "ok" }));
     await assertFails(updateDoc(doc(ADMIN, "anomalies/a1"), { type: "x" }));
   });
+  // 前端實際送出的寫入（MyBookingsPage、TransferMarketPage、ProfilePage、subscription.ts、TasteAndNotifySection）
+  const seed = (p, data) => env.withSecurityRulesDisabled((c) => setDoc(doc(c.firestore(), p), data));
+  const windowEnd = (daysAhead) => { // MyBookingsPage.pickupWindowEnd：取餐日 13:00（台北）
+    const d = new Date(Date.now() + daysAhead * 86400000 + 8 * 3600000).toISOString().slice(0, 10);
+    return Timestamp.fromDate(new Date(`${d}T13:00:00+08:00`));
+  };
+  await t("C-MY-03", "上架轉讓：取餐日在 3 天後（期限＝取餐時段結束）", async () => {
+    await seed("locks/lList3d", { buyer_uid: "userA", vendor_id: "v1", status: "locked", locked_price: 80 });
+    await assertSucceeds(updateDoc(doc(A, "locks/lList3d"), { status: "for_resale", resale_deadline: windowEnd(3) }));
+  });
+  await t("C-MY-03b", "上架轉讓：取餐日是明天（期限在 24 小時內）", async () => {
+    await seed("locks/lList1d", { buyer_uid: "userA", vendor_id: "v1", status: "locked", locked_price: 80 });
+    await assertSucceeds(updateDoc(doc(A, "locks/lList1d"), { status: "for_resale", resale_deadline: Timestamp.fromMillis(Date.now() + 20 * 3600000) }));
+  });
+  await t("C-MY-05", "贈送：只能改 status=for_gift", async () => {
+    await seed("locks/lGive", { buyer_uid: "userA", vendor_id: "v1", status: "locked", locked_price: 80 });
+    await assertFails(updateDoc(doc(A, "locks/lGive"), { status: "for_gift", locked_price: 0 }));
+    await assertSucceeds(updateDoc(doc(A, "locks/lGive"), { status: "for_gift" }));
+  });
+  await t("C-MY-08", "還沒人接手時取消轉讓／贈送 → 回到 locked；別人不能替我取消", async () => {
+    await seed("locks/lCxR", { buyer_uid: "userA", vendor_id: "v1", status: "for_resale", resale_deadline: in24h(), locked_price: 80 });
+    await seed("locks/lCxG", { buyer_uid: "userA", vendor_id: "v1", status: "for_gift", locked_price: 80 });
+    await assertFails(updateDoc(doc(B, "locks/lCxR"), { status: "locked" }));
+    await assertSucceeds(updateDoc(doc(A, "locks/lCxR"), { status: "locked" }));
+    await assertSucceeds(updateDoc(doc(A, "locks/lCxG"), { status: "locked" }));
+  });
+  await t("C-MKT-05", "轉讓期限過後：別人免費領取（locked_price=0、buyer=B）", async () => {
+    await seed("locks/lExp", { buyer_uid: "userA", vendor_id: "v1", status: "for_resale", resale_deadline: Timestamp.fromMillis(Date.now() - 60000), locked_price: 80 });
+    await assertFails(updateDoc(doc(B, "locks/lExp"), { status: "locked", buyer_uid: "userB", locked_price: 10, transferred_from_uids: ["userA"] }));
+    await assertSucceeds(updateDoc(doc(B, "locks/lExp"), { status: "locked", buyer_uid: "userB", locked_price: 0, transferred_from_uids: ["userA"] }));
+  });
+  await t("C-MY-11", "已取餐評分允許；評價公開可讀", async () => {
+    await seed("locks/lRev", { buyer_uid: "userA", vendor_id: "v1", status: "fulfilled", locked_price: 80, item_name: "便當" });
+    await assertSucceeds(setDoc(doc(A, "reviews/lRev"), review(null, { comment: "好吃，推薦" })));
+    await assertSucceeds(getDoc(doc(ANON, "reviews/lRev")));
+  });
+  await t("C-AUTH-08", "被封鎖過的帳號也能改顯示名稱", async () => {
+    await seed("users/userBan", { display_name: "舊", lang: "zh", orderBanned: true });
+    const BAN = env.authenticatedContext("userBan", tok("ban@test")).firestore();
+    await assertSucceeds(updateDoc(doc(BAN, "users/userBan"), { display_name: "新名字" }));
+  });
+  await t("C-BAN-04", "被封鎖的會員可以送出申訴", async () => {
+    const BAN = env.authenticatedContext("userBan", tok("ban@test")).firestore();
+    await assertSucceeds(addDoc(collection(BAN, "ban_appeals"), { buyer_uid: "userBan", username: "ban@test", display_name: "新名字", reason: "已改進", status: "pending", created_at: serverTimestamp() }));
+  });
+  await t("C-AUTH-07", "註冊後送廠商申請：只能建立自己的 vendor_applications", async () => {
+    await assertSucceeds(setDoc(doc(A, "vendor_applications/userA"), { store_name: "A 店", phone: "0912", email: "a@test", status: "pending", created_at: serverTimestamp() }));
+    await assertFails(setDoc(doc(A, "vendor_applications/userB"), { store_name: "冒名", phone: "", email: "", status: "pending", created_at: serverTimestamp() }));
+  });
+  await t("C-TST-01", "口味偏好與過敏原：本人可寫可讀，別人讀不到", async () => {
+    await assertSucceeds(setDoc(doc(A, "tasteProfiles/userA"), { prefs: { spicy: true, no_beef: true }, allergies: ["花生"] }, { merge: true }));
+    await assertSucceeds(getDoc(doc(A, "tasteProfiles/userA")));
+    await assertFails(getDoc(doc(B, "tasteProfiles/userA")));
+  });
+  await t("C-MTC-06 C-CHR-13", "會員可以關掉通知類別（muted_kinds）", () => assertSucceeds(updateDoc(doc(A, "users/userA"), { muted_kinds: ["charity", "resale_match"] })));
+  await t("V-ACC-04", "訂閱中商家：申請取消 → 撤回，兩個轉換都允許", async () => {
+    await seed("vendors/vSub", { name: "訂閱店", owner_uid: "owner1", subscription_status: "active", subscription_end_date: Timestamp.fromMillis(Date.now() + 10 * 86400000) });
+    await assertSucceeds(updateDoc(doc(OWNER, "vendors/vSub"), { subscription_status: "cancelled", cancelled_from: "active", cancel_requested_at: serverTimestamp() }));
+    const { deleteField } = require("firebase/firestore");
+    await assertSucceeds(updateDoc(doc(OWNER, "vendors/vSub"), { subscription_status: "active", cancelled_from: deleteField(), cancel_requested_at: deleteField() }));
+  });
+
   await t("N-SEC-04", "draws/reviews 公開內容無完整 uid", async () => {
     const d = (await getDoc(doc(ANON, "draws/d1"))).data();
     if (d.buyer_uid) throw new Error("draws 有 buyer_uid");
