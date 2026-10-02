@@ -40,7 +40,7 @@ const TICKER: Bi[] = [
   { zh: "每 100 元一張抽獎券，人人有獎", en: "A reward ticket every NT$100 — everyone wins" },
 ];
 
-// 早鳥最高折扣（預訂到下週五，看得到的階梯），跟 lib/pricing 同一套級距與四捨五入
+// 早鳥最高折扣（預訂 30 天內的階梯），跟 lib/pricing 同一套級距與四捨五入
 const BEST_EARLY_BIRD = Math.max(...VISIBLE_EARLY_BIRD_TIERS.map((t) => t.discountPercent));
 const earlyBird = (price: number, pct = BEST_EARLY_BIRD) => Math.round(price * (1 - pct / 100));
 const discountFor = (days: number) => EARLY_BIRD_TIERS.find((t) => days >= t.minDays && days <= t.maxDays)?.discountPercent ?? 0;
@@ -423,7 +423,7 @@ function LandingContent() {
   const galleryTiles = withPhoto.slice(0, 8).map((m, i) => ({ item: m, shape: GALLERY_SHAPES[i % GALLERY_SHAPES.length] }));
 
   const steps = [
-    { icon: <CalendarCheck />, title: t("提前預約", "Book ahead"), body: t(`挑好明天到下週五的午餐，越早訂越便宜，最高 ${discountText(BEST_EARLY_BIRD)}。`, `Pick lunch for any day up to next Friday — the earlier, the cheaper, up to ${BEST_EARLY_BIRD}% off.`) },
+    { icon: <CalendarCheck />, title: t("提前預約", "Book ahead"), body: t(`挑好明天起 30 天內的早、中、晚餐，越早訂越便宜，最高 ${discountText(BEST_EARLY_BIRD)}。`, `Pick breakfast, lunch or dinner up to 30 days ahead — the earlier, the cheaper, up to ${BEST_EARLY_BIRD}% off.`) },
     { icon: <Wallet />, title: t("鎖定付款", "Lock it in"), body: t("LINE Pay 預付鎖定，店家照單備餐，不怕賣完。", "Prepay with LINE Pay. The vendor preps to order, so it never sells out on you.") },
     { icon: <QrCode />, title: t("準時取餐", "Grab & go"), body: t("取餐前推播提醒，出示 QR code，免排隊。", "Get a reminder before pickup, show your QR code, skip the queue.") },
     { icon: <HeartHandshake />, title: t("去不了也不浪費", "Never wasted"), body: t("臨時有事就轉讓給同學、送給朋友，或捐成愛心餐。", "Plans changed? Transfer it, gift it, or donate it as a charity meal.") },

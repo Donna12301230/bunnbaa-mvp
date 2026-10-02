@@ -8,15 +8,15 @@ const FAQS = [
   {
     q: tr("要怎麼預購餐點？", "How do I pre-order a meal?"),
     a: tr(
-      "在「商家」頁選一家店、點便當選取餐日（可訂到下週五）、配菜（可許願候選菜或選「不要」）與加減飯，加入購物車後用 LINE Pay 結帳。取餐前一天 20:00 截單。",
-      "Go to Vendors, pick a store and a bento, then choose the pickup day (up to next Friday), sides (wish for a candidate or remove one) and rice. Check out with LINE Pay. Orders close at 20:00 the day before."
+      "在「預購餐點」選早餐／午餐／晚餐與單點或方案，點便當後在價格日期列選取餐日（最遠 30 天），點圖片選主菜、配菜（候選菜點了就是許願）與飯量，加入購物車後用 LINE Pay 結帳。取餐前一天 20:00 截單，截單前可修改或取消。",
+      "Go to Pre-order, pick a meal and a bento, then choose the pickup day (up to 30 days ahead), main, sides (tapping a candidate is a wish) and rice. Check out with LINE Pay. Orders close at 20:00 the day before."
     ),
   },
   {
     q: tr("早鳥折扣怎麼算？", "How does the early-bird discount work?"),
     a: tr(
-      "越早訂，越開心：訂明天的 95 折，提前 2 天以上 8 折（預訂範圍到下週五）。加飯 +10、減飯 −5、某格配菜不要 −5，直接反映在金額上。",
-      "Book early, save more: 5% off for tomorrow, 20% off 2+ days ahead (you can book up to next Friday). Extra rice +10, less rice −5, and removing a side −5."
+      "越早訂，越開心：訂明天的 95 折，提前 2 天以上 8 折（最遠 30 天）。白飯一碗半 +10、半碗 −5、配菜少一道 −5、第四道加菜 +10（設為備案不加價），直接反映在金額上。",
+      "Book early, save more: 5% off for tomorrow, 20% off 2+ days ahead (up to 30 days). 1.5 bowls of rice +10, half a bowl −5, one fewer side −5, a 4th add-on side +10 (free as a backup)."
     ),
   },
   {

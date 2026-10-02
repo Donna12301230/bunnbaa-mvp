@@ -20,7 +20,7 @@ export default function GrowthRewardTicker() {
   const [bigWins, setBigWins] = useState<BigWin[]>([]);
 
   useEffect(() => {
-    // 2026-09-30 起抽獎改成回饋池折價券（規格 §8），頭獎是零元券 tier "free"
+    // 2026-09-30 起抽獎改成回饋池折價券（規格 §8），頭獎是免費餐券 tier "free"
     const unsub = onSnapshot(query(collection(db, "draws"), where("tier", "==", "free")), (snap) => {
       setBigWins(snap.docs.slice(0, 20).map((d) => ({ id: d.id, ...(d.data() as any) }) as BigWin));
     });
@@ -38,7 +38,7 @@ export default function GrowthRewardTicker() {
           <span key={`${win.id}-${i}`} className="inline-flex items-center gap-2 text-sm md:text-base font-bold text-rice-foreground shrink-0">
             <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-amber-200 shrink-0" />
             {tr(
-              `使用者 ${win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} 剛抽中零元券（折 100 元）！`,
+              `使用者 ${win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} 剛抽中免費餐券（折 100 元）！`,
               `User ${win.buyer_tag ?? win.buyer_uid?.slice(-6) ?? "—"} just won a NT$100-off coupon!`
             )}
           </span>

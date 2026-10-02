@@ -8,7 +8,7 @@ export interface EarlyBirdTier {
   discountPercent: number; // 折扣百分比，例：5 代表 95 折
 }
 
-// 1002 規格：明天 95 折、提前 2–30 天 8 折；預訂最遠 30 天。提前 14 天以上 7 折列為後續改版，
+// 1002 規格：明天 95 折、提前 2–30 天 8 折；預訂最遠 30 天。14 天以上的 7 折列為後續改版，
 // 到時候在這裡加第三階、把第二階 maxDays 改成 13 即可。
 export const EARLY_BIRD_TIERS: EarlyBirdTier[] = [
   { minDays: 0, maxDays: 1, discountPercent: 5 },

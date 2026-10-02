@@ -13,17 +13,42 @@ import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
-import { addDaysStr, bookableDateRange, cutoffAt, isPastCutoff, todayStr, vendorCutoffTime } from "@/lib/pickupSlots";
+import { MEAL_PERIODS, addDaysStr, bookableDateRange, cutoffAt, isPastCutoff, mealPeriodLabel, todayStr, vendorCutoffTime } from "@/lib/pickupSlots";
+import type { MealPeriod } from "@/types";
 import { PENDING_STATUSES } from "@/lib/lockOutcome";
 import { tr } from "@/lib/i18n";
 import type { Lock } from "@/types";
+
+interface Timeline {
+  overnight: { component_id: string; task: string }[];
+  slots: { start: string; end: string; equipment: string; component_id: string; task: string }[];
+  packing: { start: string; task: string };
+}
+
+function TimelineTable({ timeline }: { timeline: Timeline }) {
+  return (
+    <table className="w-full">
+      <tbody>
+        {timeline.overnight.length > 0 && (
+          <tr className="align-top"><td className="pr-3 py-1 font-semibold whitespace-nowrap">{tr("前一晚", "Night before")}</td><td className="py-1">{timeline.overnight.map((o) => o.task).join("、")}</td></tr>
+        )}
+        {timeline.slots.map((s, i) => (
+          <tr key={i} className="align-top"><td className="pr-3 py-1 font-mono whitespace-nowrap">{s.start}</td><td className="py-1">{s.task} <span className="text-xs text-muted-foreground">（{s.equipment}）</span></td></tr>
+        ))}
+        <tr className="align-top"><td className="pr-3 py-1 font-mono">{timeline.packing.start}</td><td className="py-1">{tr("裝盒、貼出餐標籤", "Pack & label")}</td></tr>
+      </tbody>
+    </table>
+  );
+}
 
 interface PrepPlan {
   date: string;
   order_count: number;
   pickup_range: string;
   components: { component_id: string; name: string; portions: number }[];
-  timeline: { overnight: { component_id: string; task: string }[]; slots: { start: string; end: string; equipment: string; component_id: string; task: string }[]; packing: { start: string; task: string } };
+  timeline: Timeline;
+  // 1002 規格 §5.2：時間軸依每個餐期的取餐開始時間分別往回推
+  timelines?: Partial<Record<MealPeriod, Timeline & { range: string; order_count: number }>>;
   labels: { lock_id: string; pickup_code: string; pickup_window: string; item: string; main: string | null; fixed?: string[]; sides: string[]; rice: string | null; note: string | null }[];
   shortages: { ingredient_id: string; name: string; unit: string; need: number; have: number; short: number }[];
   wish_results: Record<string, { dish: string; count: number; min_qty: number; ok: boolean }>;
@@ -257,19 +282,18 @@ export default function VendorPortalPrep() {
               </CardContent>
             </Card>
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-base">{tr(`流程時間軸（取餐 ${plan.pickup_range}）`, `Timeline (pickup ${plan.pickup_range})`)}</CardTitle></CardHeader>
-              <CardContent className="text-sm">
-                <table className="w-full">
-                  <tbody>
-                    {plan.timeline.overnight.length > 0 && (
-                      <tr className="align-top"><td className="pr-3 py-1 font-semibold whitespace-nowrap">{tr("前一晚", "Night before")}</td><td className="py-1">{plan.timeline.overnight.map((o) => o.task).join("、")}</td></tr>
-                    )}
-                    {plan.timeline.slots.map((s, i) => (
-                      <tr key={i} className="align-top"><td className="pr-3 py-1 font-mono whitespace-nowrap">{s.start}</td><td className="py-1">{s.task} <span className="text-xs text-muted-foreground">（{s.equipment}）</span></td></tr>
-                    ))}
-                    <tr className="align-top"><td className="pr-3 py-1 font-mono">{plan.timeline.packing.start}</td><td className="py-1">{tr("裝盒、貼出餐標籤", "Pack & label")}</td></tr>
-                  </tbody>
-                </table>
+              <CardHeader className="pb-2"><CardTitle className="text-base">{plan.timelines && Object.keys(plan.timelines).length > 0 ? tr("流程時間軸（依餐期）", "Timeline (by meal)") : tr(`流程時間軸（取餐 ${plan.pickup_range}）`, `Timeline (pickup ${plan.pickup_range})`)}</CardTitle></CardHeader>
+              <CardContent className="text-sm space-y-4">
+                {plan.timelines && Object.keys(plan.timelines).length > 0 ? (
+                  MEAL_PERIODS.filter((p) => plan.timelines![p]).map((p) => (
+                    <div key={p}>
+                      <p className="font-semibold mb-1">{mealPeriodLabel(p)}・{tr(`取餐 ${plan.timelines![p]!.range}・${plan.timelines![p]!.order_count} 份`, `pickup ${plan.timelines![p]!.range} · ${plan.timelines![p]!.order_count} meals`)}</p>
+                      <TimelineTable timeline={plan.timelines![p]!} />
+                    </div>
+                  ))
+                ) : (
+                  <TimelineTable timeline={plan.timeline} />
+                )}
                 <p className="text-xs text-muted-foreground mt-2">{tr("排程依製程時間、設備容量、可提前時間倒推計算，不使用 AI。", "Scheduled backwards from pickup by prep time, equipment and lead time — no AI.")}</p>
               </CardContent>
             </Card>

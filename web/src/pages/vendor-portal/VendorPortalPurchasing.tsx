@@ -143,12 +143,11 @@ export default function VendorPortalPurchasing() {
     <VendorPortalLayout>
       <div className="print:hidden">
         <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-1 flex items-center gap-2"><ShoppingBasket className="w-5 h-5 text-orange-500" /> {tr("採購與叫貨", "Purchasing")}</h1>
-        <p className="text-sm text-muted-foreground mb-4">{tr("週叫貨單每週六 12:00 鎖定產生、月叫貨單每月 25 日產生。先在週六 12:00 前盤點，只改有差異的項目。", "Weekly lists are generated Saturdays at 12:00, monthly on the 25th. Count stock before Saturday noon — only change what differs.")}</p>
+        <p className="text-sm text-muted-foreground mb-4">{tr("採購只分每週進料與每日備料：週叫貨單每週六 12:00 鎖定產生；米、油、調味料、乾貨、包材等久放品項也併在週叫貨單，低於安全庫存才列入。先在週六 12:00 前盤點，只改有差異的項目。", "Weekly lists are generated Saturdays at 12:00. Long-shelf-life items (rice, oil, seasonings, packaging) are included only when below safety stock. Count stock before Saturday noon — only change what differs.")}</p>
       </div>
       <Tabs defaultValue="weekly">
         <TabsList className="print:hidden">
           <TabsTrigger value="weekly">{tr("本週進料", "Weekly")}</TabsTrigger>
-          <TabsTrigger value="monthly">{tr("每月備料", "Monthly")}</TabsTrigger>
           <TabsTrigger value="count">{tr("盤點", "Stock count")}{counted?.counted ? " ✓" : ""}</TabsTrigger>
         </TabsList>
 
@@ -203,19 +202,6 @@ export default function VendorPortalPurchasing() {
                 </Card>
               )}
             </>
-          )}
-        </TabsContent>
-
-        <TabsContent value="monthly" className="space-y-4">
-          <div className="flex gap-2 print:hidden">
-            <Button size="sm" variant="outline" onClick={() => regenerate("monthly")} disabled={busy}><RefreshCw /> {monthly ? tr("重新產生", "Regenerate") : tr("試算", "Preview")}</Button>
-            {monthly && <Button size="sm" variant="outline" onClick={() => shareLine(monthly)}><MessageCircle /> LINE</Button>}
-            {monthly && <Button size="sm" variant="outline" onClick={() => window.print()}><Printer /> PDF</Button>}
-          </div>
-          {!monthly ? (
-            <EmptyState size="compact" icon={<ShoppingBasket size={32} />} title={tr(`${month} 月叫貨單尚未產生`, `No list for ${month}`)} description={tr("米、油、調味料、乾貨、便當盒與包材，每月 25 日自動產生。", "Rice, oil, seasonings, dry goods and packaging — generated on the 25th.")} />
-          ) : (
-            <Card><CardHeader className="pb-2"><CardTitle className="text-base">{tr(`${month} 月小盤商叫貨單（${monthly.business_days} 個營業日）`, `${month} supplier list`)}</CardTitle></CardHeader><CardContent>{listTable(monthly)}</CardContent></Card>
           )}
         </TabsContent>
 

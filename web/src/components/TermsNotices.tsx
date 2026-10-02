@@ -16,7 +16,7 @@ export function MemberNotice() {
       </ul>
       <p className="font-semibold">3. Ordering rules</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>Phase 1 covers weekday (Mon–Fri) lunch pickup only. You can book up to next Friday; orders close at <span className="font-semibold">20:00 the day before pickup</span> (a vendor may close earlier).</li>
+        <li>Phase 1 covers weekday (Mon–Fri) breakfast, lunch and dinner pickup. You can book up to 30 days ahead; orders close at <span className="font-semibold">20:00 the day before pickup</span> (a vendor may close earlier).</li>
         <li>Side-dish wishes are decided at cutoff. If a wish doesn't reach the minimum, you get the default side and the order still stands.</li>
         <li>If you have allergies or special dietary needs, note them on your order and confirm directly with the vendor.</li>
         <li><span className="font-semibold">Meals not picked up 30 minutes after the pickup window become charity meals</span>: no refund, but reward tickets are still issued. Before pickup you can donate a meal yourself.</li>
@@ -47,7 +47,7 @@ export function MemberNotice() {
       </ul>
       <p className="font-semibold">三、訂餐規範</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>第一階段只做週一至週五午餐自取。可預訂至下週五，<span className="font-semibold">取餐日前一天 20:00 截單</span>（店家可提前截單）。</li>
+        <li>第一階段只做週一至週五早、中、晚餐自取。最遠可預訂 30 天後，<span className="font-semibold">取餐日前一天 20:00 截單</span>（店家可提前截單）。</li>
         <li>配菜許願於截單時判定，未達最低量自動改為預設配菜，訂單照常成立。</li>
         <li>如對餐點有過敏或特殊飲食需求，請於備註欄位說明，並直接與廠商確認。</li>
         <li><span className="font-semibold">取餐時段結束 30 分鐘後仍未取餐，便當將轉為愛心餐</span>，不退款但照常發放抽獎券；取餐前也可主動「捐為愛心餐」。</li>

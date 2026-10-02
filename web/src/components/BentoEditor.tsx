@@ -2,41 +2,59 @@ import { Plus, Trash2, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ImageThumbUpload } from "@/components/ImageUploadField";
 import { componentCost, portionLabel, portionLevelFor } from "@/lib/bento";
 import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
+import { MEAL_PERIODS, mealPeriodLabel } from "@/lib/pickupSlots";
 import { tr } from "@/lib/i18n";
-import type { BentoSlot, Component, Ingredient } from "@/types";
+import type { BentoMain, BentoSlot, Component, Ingredient, MealPeriod } from "@/types";
 
 export interface BentoForm {
-  bento: boolean;
-  mainName: string;
-  mainComponentId: string;
+  itemType: "bento" | "single";
+  mealPeriods: MealPeriod[];
+  mains: BentoMain[];
   riceComponentId: string;
   componentId: string; // 單品對應的半成品
   weekdays: number[];
   slots: BentoSlot[];
 }
 
-export const EMPTY_BENTO: BentoForm = { bento: false, mainName: "", mainComponentId: "", riceComponentId: "", componentId: "", weekdays: [], slots: [] };
+export const EMPTY_BENTO: BentoForm = { itemType: "single", mealPeriods: ["lunch"], mains: [], riceComponentId: "", componentId: "", weekdays: [], slots: [] };
 
 const CATEGORIES = ["青菜類", "肉類配菜", "蛋豆類", "根莖類", "其他"];
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WD = ["日", "一", "二", "三", "四", "五", "六"];
 
+/** 材料總和顯示用的份量文字（§4.2），由配方帶出：例「茄子 80 克」「豬肉 2 片」 */
+export function portionTextFor(component: Component | undefined, ingredientsById: Record<string, Ingredient>, fallback: string): string {
+  if (!component?.ingredients?.length) return fallback;
+  const main = [...component.ingredients].sort((a, b) => (b.grams || 0) - (a.grams || 0))[0];
+  const ing = ingredientsById[main.ingredient_id];
+  if (!ing) return fallback;
+  const unit = ing.unit === "g" ? "克" : ing.unit === "ml" ? "毫升" : ing.unit;
+  return `${fallback} ${Math.round((main.grams || 0) * 10) / 10} ${unit}`;
+}
+
 /**
- * 便當結構編輯（規格 §3.2、§3.3）：主菜固定一道；每個配菜格有類別、預設菜與最多 3 道候選菜
- * （只能同類別）；候選菜不加價，改以份量平衡成本——比例 ≥1 全份、0.75–1 為 3/4、0.5–0.75 半份、
- * 低於 0.5 不得列為候選。系統依配方成本計算，店家可微調。
+ * 品項結構編輯（1002 規格 §3.2、§3.3）：
+ * - 品項類型：便當（可自組：白飯＋主菜＋配菜）或單品（直接點選，例如鹹粥、蛋餅）
+ * - 供應餐期（早／中／晚，可多選）；取餐時段在店家設定裡依餐期設定
+ * - 主菜可列多道、各自定價，便當價格以所選主菜為準；每道菜都要有照片（消費者點圖片選菜）
+ * - 配菜格：預設菜＋最多 3 道候選菜（同類別），候選菜不加價，改以份量平衡成本：
+ *   比例 ≥ 0.75 全份、0.5–0.75 半份、低於 0.5 不得列為候選
  */
-export default function BentoEditor({ value, onChange, components, ingredientsById }: {
+export default function BentoEditor({ value, onChange, components, ingredientsById, vendorId }: {
   value: BentoForm;
   onChange: (v: BentoForm) => void;
   components: Component[];
   ingredientsById: Record<string, Ingredient>;
+  vendorId: string | undefined;
 }) {
   const byId = Object.fromEntries(components.map((c) => [c.id, c]));
   const cost = (id?: string | null) => (id ? componentCost(byId[id], ingredientsById) : 0);
   const setSlot = (i: number, slot: BentoSlot) => onChange({ ...value, slots: value.slots.map((s, j) => (j === i ? slot : s)) });
+  const setMain = (i: number, main: BentoMain) => onChange({ ...value, mains: value.mains.map((m, j) => (j === i ? main : m)) });
+  const isBento = value.itemType === "bento";
 
   function recalc() {
     onChange({
@@ -60,65 +78,111 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
 
   return (
     <div className="border rounded-lg p-3 space-y-3 bg-orange-50/40">
-      <label className="flex items-center gap-2 text-sm font-semibold">
-        <input type="checkbox" checked={value.bento} onChange={(e) => onChange({ ...value, bento: e.target.checked, slots: e.target.checked && value.slots.length === 0 ? [{ category: "青菜類", default: { name: "" }, candidates: [] }] : value.slots })} />
-        {tr("這是便當（主菜＋配菜格，可加減飯菜、許願）", "This is a bento (main + side slots, rice options, wishes)")}
-      </label>
+      <div className="flex flex-wrap gap-4 text-sm">
+        <fieldset className="flex items-center gap-3">
+          <legend className="sr-only">{tr("品項類型", "Item type")}</legend>
+          <span className="text-xs font-semibold">{tr("品項類型", "Type")}</span>
+          {(["bento", "single"] as const).map((type) => (
+            <label key={type} className="flex items-center gap-1">
+              <input
+                type="radio"
+                name="item-type"
+                checked={value.itemType === type}
+                onChange={() => onChange({
+                  ...value,
+                  itemType: type,
+                  slots: type === "bento" && value.slots.length === 0 ? [{ category: "青菜類", default: { name: "" }, candidates: [] }] : value.slots,
+                  mains: type === "bento" && value.mains.length === 0 ? [{ name: "", component_id: null, price: 0 }] : value.mains,
+                })}
+              />
+              {type === "bento" ? tr("便當（可自組）", "Bento (build your own)") : tr("單品（直接點選）", "Single item")}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset className="flex items-center gap-3">
+          <legend className="sr-only">{tr("供應餐期", "Meal periods")}</legend>
+          <span className="text-xs font-semibold">{tr("供應餐期", "Served at")}</span>
+          {MEAL_PERIODS.map((p) => (
+            <label key={p} className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={value.mealPeriods.includes(p)}
+                onChange={(e) => onChange({ ...value, mealPeriods: e.target.checked ? MEAL_PERIODS.filter((x) => x === p || value.mealPeriods.includes(x)) : value.mealPeriods.filter((x) => x !== p) })}
+              />
+              {mealPeriodLabel(p)}
+            </label>
+          ))}
+        </fieldset>
+      </div>
+      {value.mealPeriods.length === 0 && <p className="text-xs text-red-600">{tr("至少勾一個餐期；取餐時段到「店家設定」依餐期設定。", "Pick at least one meal period.")}</p>}
 
-      {!value.bento ? (
+      <div>
+        <Label className="text-xs">{tr("週菜單輪替：只在這幾天供應（都不勾＝每天）", "Weekly rotation: served only on (none = every day)")}</Label>
+        <div className="flex gap-2 text-sm">
+          {WEEKDAYS.map((d) => (
+            <label key={d} className="flex items-center gap-1">
+              <input type="checkbox" checked={value.weekdays.includes(d)} onChange={(e) => onChange({ ...value, weekdays: e.target.checked ? [...value.weekdays, d].sort() : value.weekdays.filter((x) => x !== d) })} />
+              {tr(`週${WD[d]}`, ["", "Mon", "Tue", "Wed", "Thu", "Fri"][d])}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {!isBento ? (
         <div className="flex items-center gap-2">
           <Label className="shrink-0 text-xs">{tr("對應半成品（備料用）", "Prep component")}</Label>
           {compSelect(value.componentId, (id) => onChange({ ...value, componentId: id }))}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2">
-            <div><Label className="text-xs">{tr("主菜名稱（固定、不可減）", "Main dish (fixed)")}</Label><Input className="h-9" value={value.mainName} onChange={(e) => onChange({ ...value, mainName: e.target.value })} /></div>
-            <div><Label className="text-xs">{tr("主菜半成品", "Main component")}</Label>{compSelect(value.mainComponentId, (id, name) => onChange({ ...value, mainComponentId: id, mainName: value.mainName || name || "" }))}</div>
-            <div className="col-span-2"><Label className="text-xs">{tr("主食半成品（加飯＋10／減飯−5 作用在這裡）", "Staple component (extra/less rice)")}</Label>{compSelect(value.riceComponentId, (id) => onChange({ ...value, riceComponentId: id }), tr("沒有主食（不能加減飯）", "No staple"))}</div>
+          <div className="rounded-md border border-border bg-white p-2 space-y-2">
+            <p className="text-xs font-semibold">{tr("主菜（消費者單選，各自定價，便當價以所選主菜為準）", "Mains (customer picks one; each has its own price)")}</p>
+            {value.mains.map((m, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <ImageThumbUpload vendorId={vendorId} value={m.image_url} onChange={(url) => setMain(i, { ...m, image_url: url || null })} label={tr("主菜照片", "Main photo")} />
+                <Input className="h-9 w-28" placeholder={tr("主菜名", "Main")} value={m.name} onChange={(e) => setMain(i, { ...m, name: e.target.value })} />
+                {compSelect(m.component_id, (id, name) => setMain(i, { ...m, component_id: id || null, name: m.name || name || "" }))}
+                <Input className="h-9 w-20" type="number" min={1} placeholder={tr("價格", "Price")} value={m.price || ""} onChange={(e) => setMain(i, { ...m, price: Number(e.target.value) })} />
+                <span className="text-xs text-muted-foreground w-14 shrink-0">{tr("成本", "cost")} {cost(m.component_id).toFixed(1)}</span>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" disabled={value.mains.length <= 1} onClick={() => onChange({ ...value, mains: value.mains.filter((_, j) => j !== i) })}><Trash2 className="w-3.5 h-3.5" /></Button>
+              </div>
+            ))}
+            <Button size="sm" variant="outline" onClick={() => onChange({ ...value, mains: [...value.mains, { name: "", component_id: null, price: 0 }] })}><Plus /> {tr("主菜", "Main")}</Button>
           </div>
 
-          <div>
-            <Label className="text-xs">{tr("週菜單輪替：只在這幾天供應（都不勾＝每天）", "Weekly rotation: served only on (none = every day)")}</Label>
-            <div className="flex gap-2 text-sm">
-              {WEEKDAYS.map((d) => (
-                <label key={d} className="flex items-center gap-1">
-                  <input type="checkbox" checked={value.weekdays.includes(d)} onChange={(e) => onChange({ ...value, weekdays: e.target.checked ? [...value.weekdays, d].sort() : value.weekdays.filter((x) => x !== d) })} />
-                  {tr(`週${WD[d]}`, ["", "Mon", "Tue", "Wed", "Thu", "Fri"][d])}
-                </label>
-              ))}
-            </div>
-          </div>
+          <div><Label className="text-xs">{tr("白飯半成品（半碗 −5／一碗／一碗半 +10 作用在這裡）", "Rice component (half −5 / one / 1.5 +10)")}</Label>{compSelect(value.riceComponentId, (id) => onChange({ ...value, riceComponentId: id }), tr("沒有白飯（不能選飯量）", "No rice"))}</div>
 
           {value.slots.map((slot, i) => (
             <div key={i} className="rounded-md border border-border bg-white p-2 space-y-2">
               <div className="flex gap-2 items-center">
-                <span className="text-xs font-semibold shrink-0">{tr(`配菜格 ${i + 1}`, `Slot ${i + 1}`)}</span>
+                <span className="text-xs font-semibold shrink-0">{tr(`配菜 ${i + 1}`, `Side ${i + 1}`)}</span>
                 <select className="h-9 rounded-md border border-input px-2 text-sm" value={slot.category} onChange={(e) => setSlot(i, { ...slot, category: e.target.value })}>
                   {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                 </select>
                 <Button variant="ghost" size="icon" className="ml-auto h-8 w-8" onClick={() => onChange({ ...value, slots: value.slots.filter((_, j) => j !== i) })}><Trash2 className="w-3.5 h-3.5" /></Button>
               </div>
-              <div className="flex gap-2">
-                <Input className="h-9 w-32" placeholder={tr("預設菜", "Default")} value={slot.default.name} onChange={(e) => setSlot(i, { ...slot, default: { ...slot.default, name: e.target.value } })} />
-                {compSelect(slot.default.component_id, (id, name) => setSlot(i, { ...slot, default: { name: slot.default.name || name || "", component_id: id || null } }))}
+              <div className="flex gap-2 items-center">
+                <ImageThumbUpload vendorId={vendorId} value={slot.default.image_url} onChange={(url) => setSlot(i, { ...slot, default: { ...slot.default, image_url: url || null } })} label={tr("預設菜照片", "Default photo")} />
+                <Input className="h-9 w-28" placeholder={tr("預設菜", "Default")} value={slot.default.name} onChange={(e) => setSlot(i, { ...slot, default: { ...slot.default, name: e.target.value } })} />
+                {compSelect(slot.default.component_id, (id, name) => setSlot(i, { ...slot, default: { ...slot.default, name: slot.default.name || name || "", component_id: id || null } }))}
                 <span className="text-xs self-center text-muted-foreground w-14">NT${cost(slot.default.component_id).toFixed(1)}</span>
               </div>
               {slot.candidates.map((c, ci) => (
-                <div key={ci} className="flex gap-2 items-center pl-3">
-                  <Input className="h-9 w-28" placeholder={tr("候選菜", "Candidate")} value={c.name} onChange={(e) => setSlot(i, { ...slot, candidates: slot.candidates.map((x, k) => (k === ci ? { ...x, name: e.target.value } : x)) })} />
+                <div key={ci} className="flex gap-2 items-center pl-3 flex-wrap">
+                  <ImageThumbUpload vendorId={vendorId} value={c.image_url} onChange={(url) => setSlot(i, { ...slot, candidates: slot.candidates.map((x, k) => (k === ci ? { ...x, image_url: url || null } : x)) })} label={tr("候選菜照片", "Candidate photo")} />
+                  <Input className="h-9 w-24" placeholder={tr("候選菜", "Candidate")} value={c.name} onChange={(e) => setSlot(i, { ...slot, candidates: slot.candidates.map((x, k) => (k === ci ? { ...x, name: e.target.value } : x)) })} />
                   {compSelect(c.component_id, (id, name) => setSlot(i, { ...slot, candidates: slot.candidates.map((x, k) => (k === ci ? { ...x, component_id: id || null, name: x.name || name || "" } : x)) }))}
                   <select
                     className="h-9 rounded-md border border-input px-1 text-xs"
-                    value={c.portion_level}
+                    value={c.portion_level < 1 ? 0.5 : 1}
                     title={tr("份量級距（系統依成本計算，可微調）", "Portion level")}
                     onChange={(e) => setSlot(i, { ...slot, candidates: slot.candidates.map((x, k) => (k === ci ? { ...x, portion_level: Number(e.target.value) } : x)) })}
                   >
-                    {[1, 0.75, 0.5].map((l) => <option key={l} value={l}>{portionLabel(l)}</option>)}
+                    {[1, 0.5].map((l) => <option key={l} value={l}>{portionLabel(l)}</option>)}
                   </select>
                   <Input className="h-9 w-16" type="number" placeholder={tr("週上限", "Cap")} title={tr("本週供應上限（依週進料庫存）", "Weekly cap")} value={c.weekly_cap ?? ""} onChange={(e) => setSlot(i, { ...slot, candidates: slot.candidates.map((x, k) => (k === ci ? { ...x, weekly_cap: e.target.value ? Number(e.target.value) : null } : x)) })} />
                   <Input className="h-9 w-16" type="number" placeholder={tr("最低", "Min")} title={tr(`成立最低量（空白＝店家設定，預設 ${DEFAULT_PLATFORM_CONFIG.candidateMinQty}）`, "Minimum to happen")} value={c.min_qty ?? ""} onChange={(e) => setSlot(i, { ...slot, candidates: slot.candidates.map((x, k) => (k === ci ? { ...x, min_qty: e.target.value ? Number(e.target.value) : null } : x)) })} />
-                  {c.disabled && <span className="text-xs text-red-600 shrink-0">{tr("成本過高", "too costly")}</span>}
+                  {c.disabled && <span className="text-xs text-red-600 shrink-0">{tr("成本過高，不得列為候選", "too costly")}</span>}
                   <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setSlot(i, { ...slot, candidates: slot.candidates.filter((_, k) => k !== ci) })}><Trash2 className="w-3.5 h-3.5" /></Button>
                 </div>
               ))}
@@ -129,11 +193,14 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
               )}
             </div>
           ))}
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => onChange({ ...value, slots: [...value.slots, { category: "青菜類", default: { name: "" }, candidates: [] }] })}><Plus /> {tr("配菜格", "Slot")}</Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" variant="outline" disabled={value.slots.length >= DEFAULT_PLATFORM_CONFIG.maxSides} onClick={() => onChange({ ...value, slots: [...value.slots, { category: "青菜類", default: { name: "" }, candidates: [] }] })}><Plus /> {tr("配菜", "Side")}</Button>
             <Button size="sm" variant="outline" onClick={recalc}><Calculator /> {tr("依成本計算份量級距", "Calculate portion levels")}</Button>
           </div>
-          <p className="text-xs text-muted-foreground">{tr("份量比例＝預設菜單份成本 ÷ 候選菜單份成本；截單後份量鎖定。", "Portion ratio = default cost ÷ candidate cost; locked at cutoff.")}</p>
+          <p className="text-xs text-muted-foreground">
+            {tr(`標準配菜數＝上面的配菜數（建議 3 道）；消費者最多選 ${DEFAULT_PLATFORM_CONFIG.maxSides} 道，第四道可選「備案」（不加價，許願沒成立時遞補）或「加菜」+${DEFAULT_PLATFORM_CONFIG.addonSidePrice}。份量比例＝預設菜單份成本 ÷ 候選菜單份成本；截單後份量鎖定。`,
+              `Standard sides = the sides above (3 recommended). Customers can pick up to ${DEFAULT_PLATFORM_CONFIG.maxSides}; the 4th is a free backup or a +${DEFAULT_PLATFORM_CONFIG.addonSidePrice} add-on.`)}
+          </p>
         </>
       )}
     </div>

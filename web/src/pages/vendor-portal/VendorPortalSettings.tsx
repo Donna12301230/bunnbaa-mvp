@@ -20,7 +20,7 @@ import { ImageUploadField } from "@/components/ImageUploadField";
 import { format, parseISO } from "date-fns";
 import { deleteField, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { DEFAULT_PICKUP_WINDOWS, MAX_HOLIDAYS, MAX_PICKUP_RANGE_MINUTES, MAX_PICKUP_WINDOWS, isValidWindow, pickupRangeMinutes, slotLabel, windowsOverlap } from "@/lib/pickupSlots";
+import { DEFAULT_PICKUP_WINDOWS, MAX_HOLIDAYS, MAX_PICKUP_RANGE_MINUTES, MAX_PICKUP_WINDOWS, isValidWindow, mealPeriodLabel, mealPeriodOf, pickupRangeMinutes, slotLabel, windowsOverlap } from "@/lib/pickupSlots";
 import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -75,8 +75,8 @@ function pickupWindowsProblem(windows: string[]): string | null {
       if (windowsOverlap(windows[i], windows[j])) return tr(`取餐時段「${slotLabel(windows[i])}」跟「${slotLabel(windows[j])}」重疊了`, `Pickup times ${slotLabel(windows[i])} and ${slotLabel(windows[j])} overlap`);
     }
   }
-  // 第一階段規格 §2：取餐時段可調，但整段不可超過 2 小時
-  if (pickupRangeMinutes(windows) > MAX_PICKUP_RANGE_MINUTES) return tr("整個取餐時段（最早到最晚）不可超過 2 小時", "The whole pickup window can't exceed 2 hours");
+  // 1002 規格 §2：每個餐期一段取餐時段，每段不超過 2 小時（早餐、午餐、晚餐各自算）
+  if (pickupRangeMinutes(windows) > MAX_PICKUP_RANGE_MINUTES) return tr("每個餐期的取餐時段（最早到最晚）不可超過 2 小時", "Each meal's pickup window can't exceed 2 hours");
   return null;
 }
 
@@ -489,12 +489,13 @@ export default function VendorPortalSettings() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              {tr("消費者預購時只能選這些時段；上面設定為休息的星期、公休日當天不開放預購。", "Customers can only choose these times. Closed weekdays and closing days aren't open for pre-orders.")}
+              {tr("消費者預購時只能選這些時段（以 30 分鐘為一格）；依開始時間歸早餐 06:00–10:30／午餐 10:30–14:00／晚餐 16:30–20:00，每個餐期整段不超過 2 小時。品項在菜單設定供應哪些餐期。休息的星期、公休日不開放預購。", "Customers can only choose these times (30-minute slots). Each slot belongs to breakfast 06:00–10:30, lunch 10:30–14:00 or dinner 16:30–20:00 by its start time; each meal's window is at most 2 hours.")}
             </p>
             {[...pickupWindows.keys()].map(i => {
               const [start, end] = pickupWindows[i].split("-");
               return (
                 <div key={i} className="flex items-center gap-1.5">
+                  <span className="w-10 text-xs font-semibold text-muted-foreground">{isValidWindow(pickupWindows[i]) ? mealPeriodLabel(mealPeriodOf(pickupWindows[i])) : ""}</span>
                   <Input type="time" value={start} aria-label={tr(`第 ${i + 1} 個時段開始`, `Pickup time ${i + 1} start`)}
                     onChange={e => setWindowPart(i, 0, e.target.value)} className="h-10 w-[6.8rem] px-2" />
                   <span className="text-muted-foreground text-xs">─</span>

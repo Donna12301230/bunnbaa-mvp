@@ -17,8 +17,8 @@ const VALUES = [
     icon: CalendarClock,
     title: tr("越早訂越划算", "Book early, save more"),
     body: tr(
-      "最晚前一天 20:00 預訂，可訂到下週五，提前 2 天以上 8 折；店家依確定訂單備料，不浪費。",
-      "Order by 20:00 the day before, up to next Friday, and get 20% off 2+ days ahead. Vendors prep only what's ordered."
+      "最晚前一天 20:00 預訂，最遠可訂 30 天後；明天 95 折、提前 2 天以上 8 折；店家依確定訂單備料，不浪費。",
+      "Order by 20:00 the day before, up to 30 days ahead — 5% off tomorrow, 20% off 2+ days ahead. Vendors prep only what's ordered."
     ),
   },
   {

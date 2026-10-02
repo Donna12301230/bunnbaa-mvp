@@ -35,7 +35,10 @@ const ING_CATEGORIES = ["雞", "豬", "牛", "海鮮", "素", "蛋", "豆", "葉
 const EQUIPMENT = ["炒鍋", "電鍋", "炸鍋", "烤箱", "滷鍋", "蒸籠", "湯鍋", "工作台"];
 const METHODS = ["炸", "滷", "烤", "炒", "蒸", "煮", "涼拌"];
 const FLAVORS = ["辣", "清淡", "甜"];
-const FREQ_LABEL: Record<string, string> = { monthly: "每月（小盤商）", weekly: "每週進料", daily: "每日補貨" };
+// 1002 規格 §5：採購只分每週進料與每日備料；米、油、調味料、乾貨、包材等久放品項（monthly）併入每週，低於安全庫存才叫
+const FREQ_LABEL: Record<string, string> = { monthly: "久放品項（低於安全庫存才叫）", weekly: "每週進料", daily: "每日補貨" };
+// 計量單位由店家自訂（§3.2），這些只是建議
+const UNIT_SUGGESTIONS = ["克", "片", "顆", "塊", "毫升", "支", "張", "g", "ml", "個"];
 
 interface TemplateDoc {
   id: string;
@@ -281,9 +284,9 @@ export default function VendorPortalRecipes() {
                   {ING_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                 </select></div>
               <div><Label>{tr("用量單位", "Unit")}</Label>
-                <select className="w-full h-10 rounded-md border border-input px-2 text-sm" value={ing.unit} onChange={(e) => setIng({ ...ing, unit: e.target.value })}>
-                  <option value="g">g</option><option value="個">個</option><option value="ml">ml</option>
-                </select></div>
+                <Input list="ing-unit-suggestions" value={ing.unit} maxLength={6} onChange={(e) => setIng({ ...ing, unit: e.target.value.trim() })} placeholder={tr("克、片、顆…", "g, slice, piece…")} />
+                <datalist id="ing-unit-suggestions">{UNIT_SUGGESTIONS.map((u) => <option key={u} value={u} />)}</datalist>
+                <span className="text-micro text-muted-foreground">{tr("以片、顆計的熟成率填 1、損耗率填 0", "For pieces, set yield 1 and loss 0")}</span></div>
               <div><Label>{tr("採購單位名稱", "Purchase unit")}</Label><Input value={ing.purchase_unit_label} onChange={(e) => setIng({ ...ing, purchase_unit_label: e.target.value })} placeholder={tr("盒、公斤、袋", "box, kg, bag")} /></div>
               <div><Label>{tr(`每採購單位 = 幾 ${ing.unit}`, `Units per purchase unit (${ing.unit})`)}</Label><Input type="number" value={ing.purchase_unit_size} onChange={(e) => setIng({ ...ing, purchase_unit_size: Number(e.target.value) })} /></div>
               <div><Label>{tr("最新單價（每採購單位）", "Latest price (per purchase unit)")}</Label><Input type="number" value={ing.unit_price} onChange={(e) => setIng({ ...ing, unit_price: Number(e.target.value) })} /></div>

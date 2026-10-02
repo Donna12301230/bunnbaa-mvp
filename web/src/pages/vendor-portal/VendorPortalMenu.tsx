@@ -25,7 +25,7 @@ import { tr } from "@/lib/i18n";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState, Switch, Tag } from "@/components/ds";
-import BentoEditor, { EMPTY_BENTO, type BentoForm } from "@/components/BentoEditor";
+import BentoEditor, { EMPTY_BENTO, portionTextFor, type BentoForm } from "@/components/BentoEditor";
 import { useVendorCatalog } from "@/hooks/useVendorCatalog";
 import { addDaysStr, mondayOf, todayStr } from "@/lib/pickupSlots";
 import { Link } from "wouter";
@@ -102,22 +102,40 @@ export default function VendorPortalMenu() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!myVendor) throw new Error(tr("這個帳號還沒綁定商家，請聯絡平台", "This account isn't linked to a vendor yet. Please contact the platform"));
+      if (bento.mealPeriods.length === 0) throw new Error(tr("請至少勾選一個供應餐期", "Pick at least one meal period"));
+      const comps = Object.fromEntries((catalog?.components ?? []).map((c) => [c.id, c]));
+      const withPortion = (componentId: string | null | undefined, name: string) =>
+        portionTextFor(componentId ? comps[componentId] : undefined, catalog?.ingredientsById ?? {}, name);
+      const mains = bento.mains.filter((m) => m.name && m.price > 0).map((m) => ({
+        name: m.name, component_id: m.component_id || null, price: m.price, image_url: m.image_url || null, portion_text: withPortion(m.component_id, m.name),
+      }));
+      if (bento.itemType === "bento" && mains.length === 0) throw new Error(tr("便當至少要有一道有價格的主菜", "A bento needs at least one main with a price"));
       const data = {
         vendor_id: myVendor.id,
         name: form.name,
         description: form.description,
-        price: Number(form.price),
+        // 便當有多道主菜時，price 存最低主菜價（卡片「$50 起」、舊程式相容）
+        price: bento.itemType === "bento" && mains.length > 0 ? Math.min(...mains.map((m) => m.price)) : Number(form.price),
         category: form.category,
         is_available: form.isAvailable,
         image: form.image || null, // Firestore SDK throws on `undefined` field values
         allergens: form.allergens,
         dietary_tags: form.dietaryTags,
-        // 便當結構（規格 §3.2）
-        main: bento.bento && bento.mainName ? { name: bento.mainName, component_id: bento.mainComponentId || null } : null,
-        rice_component_id: bento.bento ? bento.riceComponentId || null : null,
-        slots: bento.bento ? bento.slots.filter((sl) => sl.default.name).map((sl) => ({ ...sl, candidates: sl.candidates.filter((c) => c.name) })) : [],
-        weekdays: bento.bento ? bento.weekdays : [],
-        component_id: !bento.bento ? bento.componentId || null : null,
+        // 品項結構（1002 規格 §3.2）：類型、供應餐期、主菜（各自定價）、配菜，每道菜有照片與份量文字
+        item_type: bento.itemType,
+        meal_periods: bento.mealPeriods,
+        mains: bento.itemType === "bento" ? mains : [],
+        main: bento.itemType === "bento" && mains[0] ? { name: mains[0].name, component_id: mains[0].component_id || null } : null,
+        rice_component_id: bento.itemType === "bento" ? bento.riceComponentId || null : null,
+        slots: bento.itemType === "bento"
+          ? bento.slots.filter((sl) => sl.default.name).map((sl) => ({
+            ...sl,
+            default: { ...sl.default, image_url: sl.default.image_url || null, portion_text: withPortion(sl.default.component_id, sl.default.name) },
+            candidates: sl.candidates.filter((c) => c.name).map((c) => ({ ...c, image_url: c.image_url || null, portion_text: withPortion(c.component_id, c.name) })),
+          }))
+          : [],
+        weekdays: bento.weekdays,
+        component_id: bento.itemType === "single" ? bento.componentId || null : null,
       };
       const original = editId ? items.find((i) => i.id === editId) ?? null : null;
       const english = englishOverrides(form, original);
@@ -220,10 +238,11 @@ export default function VendorPortalMenu() {
     setActiveDraft(null);
     setEditId(item.id);
     setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [], nameEn: item.name_en ?? "", descriptionEn: item.description_en ?? "" });
+    const isBentoItem = item.item_type ? item.item_type === "bento" : (item.slots?.length ?? 0) > 0;
     setBento({
-      bento: (item.slots?.length ?? 0) > 0,
-      mainName: item.main?.name ?? "",
-      mainComponentId: item.main?.component_id ?? "",
+      itemType: isBentoItem ? "bento" : "single",
+      mealPeriods: item.meal_periods?.length ? item.meal_periods : ["lunch"],
+      mains: item.mains?.length ? item.mains : isBentoItem && item.main?.name ? [{ name: item.main.name, component_id: item.main.component_id ?? null, price: item.price, image_url: item.image }] : [],
       riceComponentId: item.rice_component_id ?? "",
       componentId: item.component_id ?? "",
       weekdays: item.weekdays ?? [],
@@ -341,7 +360,7 @@ export default function VendorPortalMenu() {
                             </div>
                           )}
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-orange-600 font-semibold text-sm">NT$ {item.price}</span>
+                            <span className="text-orange-600 font-semibold text-sm">NT$ {item.price}{(item.mains?.length ?? 0) > 1 ? tr(" 起", "+") : ""}</span>
                             {item.allergens?.length > 0 && (
                               <span className="text-xs text-red-500">{tr("含：", "Contains: ")}{item.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</span>
                             )}
@@ -412,8 +431,8 @@ export default function VendorPortalMenu() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>{tr("價格 (NT$) *", "Price (NT$) *")}</Label>
-                <Input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+                <Label>{bento.itemType === "bento" ? tr("價格（便當依主菜定價，下方設定）", "Price (set per main below)") : tr("價格 (NT$) *", "Price (NT$) *")}</Label>
+                <Input type="number" value={form.price} disabled={bento.itemType === "bento"} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
               </div>
               <div>
                 <Label>{tr("分類", "Category")}</Label>
@@ -450,10 +469,10 @@ export default function VendorPortalMenu() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">{tr("點選含有的過敏原成分，將顯示於消費者菜單頁面。", "Select the allergens this item contains; they're shown on the customer menu.")}</p>
             </div>
-            {nextWeekLocked && bento.bento && (
+            {nextWeekLocked && bento.itemType === "bento" && (
               <p className="text-xs text-amber-700 bg-amber-50 rounded p-2">{tr("下週叫貨單已產生，下週主菜已鎖定；請只做等值的配菜替換。", "Next week's purchase list is out, so mains are locked — only swap sides for equivalents.")}</p>
             )}
-            <BentoEditor value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} />
+            <BentoEditor value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} />
             <ImageUploadField label={tr("品項圖片", "Item photo")} vendorId={VENDOR_ID} value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
           </div>
           <DialogFooter>
@@ -461,7 +480,7 @@ export default function VendorPortalMenu() {
             <Button
               
               onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending || !form.name || !form.price}
+              disabled={saveMutation.isPending || !form.name || (bento.itemType !== "bento" && !form.price)}
             >
               {saveMutation.isPending ? tr("儲存中...", "Saving...") : tr("儲存", "Save")}
             </Button>

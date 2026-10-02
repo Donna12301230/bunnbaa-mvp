@@ -222,7 +222,7 @@ export default function CartPage() {
                 )}
                 <div className="flex justify-between gap-3"><dt className="text-muted-foreground">{tr("原價小計", "Subtotal")}</dt><dd>NT${listTotal}</dd></div>
                 {earlyTotal > 0 && <div className="flex justify-between gap-3 text-green-700"><dt>{tr("早鳥折扣", "Early-bird discount")}</dt><dd>−NT${earlyTotal}</dd></div>}
-                {adjustTotal !== 0 && <div className="flex justify-between gap-3"><dt className="text-muted-foreground">{tr("加減飯菜", "Adjustments")}</dt><dd>{adjustTotal > 0 ? "+" : "−"}NT${Math.abs(adjustTotal)}</dd></div>}
+                {adjustTotal !== 0 && <div className="flex justify-between gap-3"><dt className="text-muted-foreground">{tr("加減選項", "Adjustments")}</dt><dd>{adjustTotal > 0 ? "+" : "−"}NT${Math.abs(adjustTotal)}</dd></div>}
                 {couponTotal > 0 && <div className="flex justify-between gap-3 text-green-700"><dt>{tr("折價券", "Coupons")}</dt><dd>−NT${couponTotal}</dd></div>}
               </dl>
               <div className="flex items-baseline justify-between font-bold pt-3 border-t border-ink/30">

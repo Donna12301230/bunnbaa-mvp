@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, X } from "lucide-react";
+import { ImagePlus, Upload, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
@@ -19,7 +19,7 @@ interface Props {
   onChange: (url: string) => void;
 }
 
-export function ImageUploadField({ label, vendorId, value, onChange }: Props) {
+function useImageUpload(vendorId: string | undefined, onChange: (url: string) => void) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -42,6 +42,36 @@ export function ImageUploadField({ label, vendorId, value, onChange }: Props) {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
+  return { fileInputRef, uploading, handleFile };
+}
+
+/** 菜單編輯的每道菜照片（§3.2「每道菜都要有照片」）：小縮圖，點了上傳，右上角可移除 */
+export function ImageThumbUpload({ vendorId, value, onChange, label }: { vendorId: string | undefined; value: string | null | undefined; onChange: (url: string) => void; label: string }) {
+  const { fileInputRef, uploading, handleFile } = useImageUpload(vendorId, onChange);
+  return (
+    <span className="relative shrink-0">
+      <button
+        type="button"
+        disabled={uploading || !vendorId}
+        onClick={() => fileInputRef.current?.click()}
+        title={label}
+        aria-label={label}
+        className="w-9 h-9 rounded-md border border-input bg-muted overflow-hidden flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {value ? <img src={value} alt="" className="w-full h-full object-cover" /> : <ImagePlus className={`w-4 h-4 text-muted-foreground ${uploading ? "animate-pulse" : ""}`} />}
+      </button>
+      {value && (
+        <button type="button" onClick={() => onChange("")} aria-label={tr("移除圖片", "Remove image")} className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-surface-dark/80 text-white flex items-center justify-center">
+          <X className="w-2.5 h-2.5" />
+        </button>
+      )}
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+    </span>
+  );
+}
+
+export function ImageUploadField({ label, vendorId, value, onChange }: Props) {
+  const { fileInputRef, uploading, handleFile } = useImageUpload(vendorId, onChange);
 
   return (
     <div className="space-y-1">

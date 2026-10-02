@@ -62,7 +62,7 @@ function PlatformContent() {
             ))}
           </tbody>
         </table>
-        <p className="text-xs text-muted-foreground">{tr("營業日（週一至週五）、預訂開放範圍（至下週五）、週進料鎖定（週六 12:00）、月叫貨單（每月 25 日）為第一階段固定規則，由排程決定。", "Business days, booking range, weekly lock and monthly list day are fixed in phase 1.")}</p>
+        <p className="text-xs text-muted-foreground">{tr("營業日（週一至週五）、餐期範圍（早 06:00–10:30／中 10:30–14:00／晚 16:30–20:00）、預訂開放範圍（30 天）、早鳥級距（明天 95 折／提前 2–30 天 8 折）、週進料鎖定（週六 12:00）為第一階段固定規則。基本工資在 platformConfig/minimumWage（依生效日自動套用）。", "Business days, meal periods, the 30-day booking range, early-bird tiers and the weekly lock are fixed in phase 1.")}</p>
         <Button onClick={save} disabled={saving}>{saving ? tr("儲存中…", "Saving…") : tr("儲存", "Save")}</Button>
       </CardContent>
     </Card>

@@ -14,6 +14,8 @@ import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { db } from "@/lib/firebase";
 import { todayStr } from "@/lib/pickupSlots";
 import type { Lock } from "@/types";
+import RevenueDashboardCard from "@/components/RevenueDashboardCard";
+import { AlertTriangle } from "lucide-react";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/dashboard.tsx.
 // 2026-09-28 改讀真實資料：統計跟今日時段都從這家店的 locks 算（跟 VendorPortalPrep／
@@ -83,6 +85,23 @@ export default function VendorPortalDashboard() {
       <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-4">
         {myVendor?.name ? `${myVendor.name} — ${tr("總覽", "Overview")}` : tr("廠商總覽", "Vendor overview")}
       </h1>
+
+      {/* 平台維護費（§1）：寬限期每天提醒；逾期暫停接新訂單，已成立訂單照常出餐 */}
+      {myVendor?.billing?.status === "grace" && (
+        <div className="mb-4 flex gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          {tr("本期平台維護費 NT$ 1,999（含稅）已到期，寬限 7 天內繳清即可；逾期將暫停接新訂單。繳費請聯絡平台（信用卡定期扣款或銀行轉帳）。", "Your NT$ 1,999 platform fee is due. Pay within the 7-day grace period or new orders will be paused.")}
+        </div>
+      )}
+      {myVendor?.billing?.status === "suspended" && (
+        <div className="mb-4 flex gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          {tr("維護費逾期，已暫停接新訂單；已成立的訂單請照常出餐。繳清後立即恢復。", "New orders are paused because the platform fee is overdue. Keep serving existing orders; paying restores ordering right away.")}
+        </div>
+      )}
+
+      {/* 第一張卡：本月收益看板（§9.3） */}
+      <RevenueDashboardCard vendor={myVendor} />
 
       {/* 統計卡片 */}
       {isLoading ? (

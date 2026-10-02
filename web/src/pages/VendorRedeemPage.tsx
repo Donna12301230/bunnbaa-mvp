@@ -153,7 +153,9 @@ export default function VendorRedeemPage() {
               </ul>
             )}
             {s.sides && s.sides.length > 0 && <p className="text-sm">{s.sides.join("、")}</p>}
-            {s.rice && s.rice !== "normal" && <p className="text-sm font-semibold">{s.rice === "add" ? tr("加飯", "Extra rice") : tr("減飯", "Less rice")}</p>}
+            {s.main_dish && <p className="text-sm">{tr("主菜：", "Main: ")}<strong>{s.main_dish}</strong></p>}
+            {s.extra_side && <p className="text-sm">{s.extra_side.mode === "addon" ? tr(`加菜：${s.extra_side.dish}`, `Add-on: ${s.extra_side.dish}`) : s.extra_side.used ? tr(`備案已遞補：${s.extra_side.dish}`, `Backup used: ${s.extra_side.dish}`) : tr(`備案（未用到）：${s.extra_side.dish}`, `Backup (unused): ${s.extra_side.dish}`)}</p>}
+            {s.rice && s.rice !== "normal" && <p className="text-sm font-semibold">{s.rice === "add" ? tr("白飯一碗半", "1.5 bowls of rice") : tr("白飯半碗", "Half bowl of rice")}</p>}
             {s.note && <p className="text-sm text-amber-700">{tr("備註：", "Note: ")}{s.note}</p>}
             {s.kind === "lock" && (
               <p className="text-sm text-muted-foreground">

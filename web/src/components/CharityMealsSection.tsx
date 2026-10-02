@@ -20,7 +20,7 @@ const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?
 
 /**
  * 轉讓市集裡的「愛心餐」分頁（規格 §7，使用者 2026-09-30 決定放在轉讓市集）。
- * 未取餐或主動捐出的便當，當天現場領取：線上預約（手機驗證、每人每天 1 份、30 分鐘內到場）
+ * 未取餐或主動捐出的便當，當天現場領取：線上預約（手機驗證、每人每天 1 份、10 分鐘內到場；逾時釋出給下一位、不停權）
  * 或現場先到先領。依距離排序、顯示剩餘份數、截止時間、步行時間，走不到的標「來不了」。
  * 愛心餐的預約、領取、瀏覽紀錄一律不進入統計與推薦（§10.3）。
  */
@@ -103,7 +103,7 @@ export default function CharityMealsSection() {
     setBusy(vendorId);
     try {
       await httpsCallable(functions, "reserveCharity")({ vendor_id: vendorId });
-      toast({ title: tr("已預約，請在 30 分鐘內到場", "Reserved — please arrive within 30 minutes") });
+      toast({ title: tr("已預約，請在 10 分鐘內到場出示 QR code", "Reserved — please arrive within 10 minutes") });
     } catch (err) {
       toast({ title: tr("預約失敗", "Couldn't reserve"), description: (err as Error).message, variant: "destructive" });
     } finally {
@@ -116,7 +116,7 @@ export default function CharityMealsSection() {
       <div className="rounded-[1.75rem] bg-accent border border-ink p-6 text-sm space-y-2">
         <p className="font-heading text-2xl font-semibold flex items-center gap-2"><HeartHandshake className="w-6 h-6 text-primary" aria-hidden="true" /> {tr("愛心餐", "Charity meals")}</p>
         <p className="text-xs leading-relaxed">
-          {tr("沒有被領取或同學主動捐出的便當，當天開放給需要的人。可以線上預約（手機驗證帳號、每人每天 1 份、30 分鐘內到場），或直接到店現場領取（未被預約的份數先到先領、不需帳號）。取餐時段結束 2 小時後截止。",
+          {tr("沒有被領取或同學主動捐出的便當，當天開放給需要的人。可以線上預約（手機驗證帳號、每人每天 1 份、預約後 10 分鐘內到場，逾時自動釋出給下一位、不停權），或直接到店現場領取（未被預約的份數先到先領、不需帳號）。取餐時段結束 2 小時後截止。",
             "Meals not picked up, or donated by classmates, are open to anyone in need on the same day. Reserve online (phone-verified account, one per day, arrive within 30 min) or just walk in — unreserved meals are first come, first served. Closes 2 hours after the pickup window.")}
         </p>
       </div>

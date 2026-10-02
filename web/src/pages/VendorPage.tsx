@@ -251,7 +251,7 @@ export default function VendorPage() {
                             )}
                             <span className="flex items-baseline gap-2 mt-1.5">
                               <span className="font-heading text-xl font-semibold">NT${item.price}</span>
-                              {isBento(item) && <span className="text-xs text-muted-foreground">{tr("可選配菜・加減飯", "Choose sides · rice")}</span>}
+                              {isBento(item) && <span className="text-xs text-muted-foreground">{tr("點圖選主菜、配菜、飯量", "Pick main, sides & rice")}</span>}
                             </span>
                           </span>
                         </Link>

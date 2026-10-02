@@ -14,12 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Banknote, ShoppingBag, TrendingUp, Users, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
+import RevenueCostChart from "@/components/RevenueCostChart";
 
 // 設計系統圖表色（index.css --chart-*），由深到淺；走 CSS 變數才會跟著深色模式切換
 const COLORS = [
@@ -29,7 +26,6 @@ const COLORS = [
   "color-mix(in srgb, var(--chart-2) 35%, var(--card))",
   "color-mix(in srgb, var(--chart-2) 20%, var(--card))",
 ];
-const AXIS_TICK = { fontSize: 12, fill: "var(--muted-foreground)" };
 
 function ItemRankList({ items }: { items: { name: string; qty: number; revenue: number }[] }) {
   if (items.length === 0) return <EmptyState size="compact" icon={<ShoppingBag size={32} />} title={tr("這段期間沒有銷售紀錄", "No sales in this period")} />;
@@ -184,21 +180,6 @@ export default function VendorPortalReports() {
     );
   }
 
-  function RevenueChart({ data }: { data: { date: string; revenue: number }[] }) {
-    if (data.length === 0) return <EmptyState size="compact" icon={<TrendingUp size={32} />} title={tr("這段期間沒有營收紀錄", "No revenue in this period")} />;
-    return (
-      <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-          <XAxis dataKey="date" tick={AXIS_TICK} />
-          <YAxis tick={AXIS_TICK} />
-          <Tooltip formatter={(v: number) => [`NT$ ${v}`, tr("收入", "Revenue")]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-          <Bar dataKey="revenue" radius={[4, 4, 0, 0]} fill="var(--chart-1)" />
-        </BarChart>
-      </ResponsiveContainer>
-    );
-  }
-
   return (
     <VendorPortalLayout>
       <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-5 flex items-center gap-2">
@@ -261,10 +242,10 @@ export default function VendorPortalReports() {
           <StatCards stats={stats} />
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">{tr(`每日收入（最近 ${REPORT_DAYS} 天，依取餐日）`, `Daily revenue (last ${REPORT_DAYS} days, by pickup date)`)}</CardTitle>
+              <CardTitle className="text-base">{tr(`每日收入與材料成本（最近 ${REPORT_DAYS} 天，依取餐日）`, `Daily revenue vs material cost (last ${REPORT_DAYS} days, by pickup date)`)}</CardTitle>
             </CardHeader>
             <CardContent>
-              <RevenueChart data={stats.revenueByDate} />
+              <RevenueCostChart vendorId={VENDOR_ID} />
             </CardContent>
           </Card>
           <Card>
