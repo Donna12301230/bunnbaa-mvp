@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { httpsCallable } from "@/lib/callable";
 import {
   Clock, CalendarDays, Rocket, Star, MapPin, Trophy,
-  BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store, Bot, UtensilsCrossed } from "lucide-react";
+  BadgeCheck, CheckCircle2, AlertTriangle, Repeat, SlidersHorizontal, Store, Bot, UtensilsCrossed, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { useVendors } from "@/hooks/useVendors";
 import ShoppingAssistant from "@/components/ShoppingAssistant";
 import { avatarUrl } from "@/lib/avatar";
+import { useCart } from "@/hooks/useCart";
 
 const bannedHint = () =>
   tr("您的帳號已被限制下單，請至會員中心提交解封申訴", "Your account can't place orders. Please submit an appeal from My account.");
@@ -78,6 +79,7 @@ export default function HomePage() {
   const { toast } = useToast();
   const { isOrderBanned } = useAuth();
   const { t } = useI18n();
+  const { add: addToCart, vendorId: cartVendorId } = useCart();
   // 預約日曆：篩選「這段期間有開放取餐」的店家／品項／計畫，以及取餐日在期間內的轉讓
   const [startDate, setStartDate] = useState(() => todayStr());
   const [endDate, setEndDate] = useState(() => addDaysStr(todayStr(), 6));
@@ -242,6 +244,25 @@ export default function HomePage() {
     navigate(`/item/${item.id}`);
   }
 
+  // 全站「加入購物車」統一行為（跟 VendorPage.tsx 的 quickAdd 同一套邏輯）：
+  // 便當要選配菜、加減飯，跳到品項頁組；單品用左側選好的日期時段直接加入，不用跳頁。
+  function quickAdd(item: MenuItem, vendor: Vendor) {
+    if (isBento(item) || !openWindowsOn(vendor, pickupDate).includes(pickupWindow)) {
+      openItem(item, vendor);
+      return;
+    }
+    if (cartVendorId && cartVendorId !== item.vendor_id) {
+      toast({
+        title: t("購物車裡有別家商家的品項", "Your cart has items from another vendor"),
+        description: t("一次只能跟一家商家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
+        variant: "destructive",
+      });
+      return;
+    }
+    addToCart({ menuItem: item, vendorId: item.vendor_id, pickupDate, pickupWindow, choices: [], rice: "normal", quantity: 1, note: "", couponId: null });
+    toast({ title: t("已加入購物車", "Added to cart"), description: `${loc(item, "name")}・${pickupDate} ${pickupWindow}` });
+  }
+
   // 「計畫型」（訂閱制多日方案）沒有另外的 plan/subscription collection——付款
   // 成功後 confirmLinePayPayment 一次寫入 N 筆 locks（plan_id＝這張訂單 id）。
   // 2026-09-28 起改走伺服器 createPlanLinePayReservation：原本前端直接寫 locks，
@@ -280,7 +301,8 @@ export default function HomePage() {
       <MarketplaceHeader active="plans" />
       <GrowthRewardTicker />
 
-      {/* ── 頁首：本頁 h1＋目前選的取餐日時段＋預購助理入口 ── */}
+      {/* ── 頁首：本頁 h1＋預購助理入口（唯一主要 CTA）＋目前取餐時段（降成小狀態列，
+          不跟主要 CTA 搶視覺權重；原本兩顆同等大小的藥丸按鈕容易讓人不知道先點哪個） ── */}
       <section className="max-w-[1400px] mx-auto px-4 md:px-6 pt-10 md:pt-16 pb-2 flex flex-wrap items-end justify-between gap-6 bb-home-hero">
         <div className="min-w-0">
           <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground mb-4">
@@ -293,27 +315,28 @@ export default function HomePage() {
           <p className="mt-4 text-muted-foreground max-w-xl leading-relaxed">
             {t(`選好取餐日與時段，越早訂越便宜（最高 ${discountText(Math.max(...VISIBLE_EARLY_BIRD_TIERS.map((x) => x.discountPercent)))}）。`, `Pick a pickup day and time — the earlier you book, the cheaper it gets.`)}
           </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* 目前取餐時段；點了跳到側欄的計畫工具箱改時段（手機上側欄排在菜單後面） */}
-          <a href="#home-planner" onClick={(e) => { e.preventDefault(); document.getElementById("home-planner")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="inline-flex items-center gap-2 h-12 px-5 rounded-full border border-ink bg-card text-sm font-semibold hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <Clock className="w-4 h-4 text-primary" aria-hidden="true" />
-            <span className="sr-only">{t("目前取餐時段（點擊修改）：", "Current pickup (tap to change): ")}</span>
-            {pickupDate.slice(5).replace("-", "/")}・{pickupWindow}
-          </a>
+          {/* 目前取餐時段；點了跳到側欄的計畫工具箱改時段 */}
           <button
             type="button"
-            onClick={() => setAssistantOpen(true)}
-            className="inline-flex items-center gap-2 h-12 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            onClick={() => document.getElementById("home-planner")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="mt-2.5 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
           >
-            <Bot className="w-4 h-4" aria-hidden="true" /> {t("問問預購助理", "Ask the meal assistant")}
+            <Clock className="w-3.5 h-3.5" aria-hidden="true" />
+            {t(`取餐：${pickupDate.slice(5).replace("-", "/")}・${pickupWindow}（點擊修改）`, `Pickup: ${pickupDate.slice(5).replace("-", "/")} · ${pickupWindow} (tap to change)`)}
           </button>
         </div>
+        <button
+          type="button"
+          onClick={() => setAssistantOpen(true)}
+          className="shrink-0 inline-flex items-center gap-2 h-12 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <Bot className="w-4 h-4" aria-hidden="true" /> {t("問問預購助理", "Ask the meal assistant")}
+        </button>
       </section>
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 flex flex-col lg:flex-row gap-8">
         {/* ── 左側：計畫工具箱（桌機 sticky，太長時自己捲） ── */}
-        <aside id="home-planner" className="order-2 lg:order-1 scroll-mt-20 lg:w-72 shrink-0 space-y-4 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 bb-thin-scroll">
+        <aside id="home-planner" className="scroll-mt-20 lg:w-72 shrink-0 space-y-4 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 bb-thin-scroll">
           <h2 className="font-heading text-2xl font-semibold">{t("計畫工具箱", "Planner")}</h2>
 
           {/* 預購助理入口移到頁首（原本頁首、側欄各一顆，重複） */}
@@ -427,7 +450,7 @@ export default function HomePage() {
         </aside>
 
         {/* ── 右側：主內容 ── */}
-        <main className="order-1 lg:order-2 flex-1 min-w-0 space-y-12">
+        <main className="flex-1 min-w-0 space-y-12">
           {/* 今日推薦方案（單點型）——改成依商家分組的清單，取代原本一格一張大圖卡片
               （每個品項都要放大圖、徽章、價格，排成一片太雜亂），改成「哪些店家有什麼」：
               一家店一張卡片，底下用一行一行列出品項名稱＋價格＋按鈕。 */}
@@ -478,34 +501,47 @@ export default function HomePage() {
                       const { lockedPrice, discountPercent } = applyEarlyBirdPrice(item.price, pickupDate);
                       return (
                         <li key={item.id} className="shrink-0 w-[172px] md:w-[188px] snap-start">
-                          <button
-                            type="button"
-                            onClick={() => openItem(item, vendor)}
-                            className="group w-full text-left rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          >
-                            <span className="relative block aspect-[4/3] rounded-2xl overflow-hidden border border-ink bg-secondary">
-                              {item.image ? (
-                                <img src={item.image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]" />
-                              ) : (
-                                <span className="w-full h-full flex items-center justify-center">
-                                  <UtensilsCrossed className="w-7 h-7 text-secondary-foreground/50" strokeWidth={1.5} aria-hidden="true" />
+                          <div className="group w-full text-left">
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => openItem(item, vendor)}
+                                className="block w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              >
+                                <span className="relative block aspect-[4/3] rounded-2xl overflow-hidden border border-ink bg-secondary">
+                                  {item.image ? (
+                                    <img src={item.image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]" />
+                                  ) : (
+                                    <span className="w-full h-full flex items-center justify-center">
+                                      <UtensilsCrossed className="w-7 h-7 text-secondary-foreground/50" strokeWidth={1.5} aria-hidden="true" />
+                                    </span>
+                                  )}
+                                  {discountPercent > 0 && (
+                                    <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-[#f29e0c] text-[#2b180d]">
+                                      {discountText(discountPercent)}
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                              {discountPercent > 0 && (
-                                <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-[#f29e0c] text-[#2b180d]">
-                                  {discountText(discountPercent)}
-                                </span>
-                              )}
-                            </span>
-                            <span className="block mt-2.5 text-sm font-semibold truncate">{loc(item, "name")}</span>
-                            <span className="flex items-baseline gap-1.5">
-                              {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through">${item.price}</span>}
-                              <span className="font-heading text-lg font-semibold">${lockedPrice}</span>
-                              <span className="ml-auto text-xs font-semibold text-primary underline underline-offset-4 decoration-1 group-hover:decoration-2">
-                                {isBento(item) ? t("選配菜", "Choose sides") : t("立即預付", "Prepay")}
+                              </button>
+                              {/* 全站統一的「加入購物車」動作（跟商家頁同一顆圓形 + 圖示）：便當類點了會跳去選配菜，
+                                  單品直接加進購物車，不用另外寫「選配菜」「立即預付」這種各頁不一樣的字 */}
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); quickAdd(item, vendor); }}
+                                aria-label={t(`加入購物車：${loc(item, "name")}`, `Add to cart: ${loc(item, "name")}`)}
+                                className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm hover:bg-primary-hover active:scale-95 transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              >
+                                <Plus className="w-4 h-4" aria-hidden="true" />
+                              </button>
+                            </div>
+                            <button type="button" onClick={() => openItem(item, vendor)} className="block w-full text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                              <span className="block mt-2.5 text-sm font-semibold truncate">{loc(item, "name")}</span>
+                              <span className="flex items-baseline gap-1.5">
+                                {discountPercent > 0 && <span className="text-xs text-muted-foreground line-through">${item.price}</span>}
+                                <span className="font-heading text-lg font-semibold">${lockedPrice}</span>
                               </span>
-                            </span>
-                          </button>
+                            </button>
+                          </div>
                         </li>
                       );
                     })}
