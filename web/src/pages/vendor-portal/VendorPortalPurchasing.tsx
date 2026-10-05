@@ -286,10 +286,12 @@ export default function VendorPortalPurchasing() {
             <span className="print:hidden text-muted-foreground">{open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}</span>
           </button>
           <span className="print:hidden">{stepper(l.ingredient_id, l.purchase_unit_size, l.purchase_unit_label)}</span>
+          <span className="ml-auto sm:ml-0 flex items-center gap-x-3">
           <span className="w-20 text-right">
             {enough ? <span className="text-sm text-muted-foreground">{tr("夠了", "Enough")}</span> : <span className="text-lg font-bold">{units} <span className="text-sm font-medium">{l.purchase_unit_label}</span></span>}
           </span>
           <span className={cn("w-16 text-right text-sm", enough && "text-muted-foreground")}>{enough ? "—" : `NT$${costOf(l)}`}</span>
+          </span>
         </div>
         {open && (
           <div className="bg-orange-50/60 rounded-md px-3 py-2 mb-2 text-xs space-y-1 print:hidden">

@@ -125,11 +125,11 @@ export function MarginBar({ cost, price }: { cost: number; price: number }) {
   return (
     <div className="space-y-0.5" aria-label={tr(`成本 ${costPct}%，毛利 ${100 - costPct}%`, `Cost ${costPct}%, margin ${100 - costPct}%`)}>
       <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-green-200">
-        <div className={cn("h-full", low ? "bg-orange-500" : "bg-rose-400")} style={{ width: `${costPct}%` }} />
+        <div className={cn("h-full", low ? "bg-red-500" : "bg-rose-400")} style={{ width: `${costPct}%` }} />
         <div className="h-full flex-1 bg-green-500" />
       </div>
       <div className="flex justify-between text-[11px]">
-        <span className={low ? "text-orange-700 font-semibold" : "text-rose-700"}>{tr("成本", "Cost")} {costPct}%</span>
+        <span className={low ? "text-red-700 font-semibold" : "text-rose-700"}>{tr("成本", "Cost")} {costPct}%</span>
         <span className="text-green-700 font-semibold">{tr("毛利", "Margin")} {100 - costPct}%</span>
       </div>
     </div>
