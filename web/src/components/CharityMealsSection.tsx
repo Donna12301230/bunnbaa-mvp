@@ -116,7 +116,7 @@ export default function CharityMealsSection() {
       <div className="rounded-[1.75rem] bg-accent border border-ink p-6 text-sm space-y-2">
         <p className="font-heading text-2xl font-semibold flex items-center gap-2"><HeartHandshake className="w-6 h-6 text-primary" aria-hidden="true" /> {tr("愛心餐", "Charity meals")}</p>
         <p className="text-xs leading-relaxed">
-          {tr("沒有被領取或同學主動捐出的便當，當天開放給需要的人。可以線上預約（手機驗證帳號、每人每天 1 份、預約後 10 分鐘內到場，逾時自動釋出給下一位、不停權），或直接到店現場領取（未被預約的份數先到先領、不需帳號）。取餐時段結束 2 小時後截止。",
+          {tr("沒有被領取或訂購人主動捐出的便當，當天開放給需要的人。可以線上預約（手機驗證帳號、每人每天 1 份、預約後 10 分鐘內到場，逾時自動釋出給下一位、不停權），或直接到店現場領取（未被預約的份數先到先領、不需帳號）。取餐時段結束 2 小時後截止。",
             "Meals not picked up, or donated by classmates, are open to anyone in need on the same day. Reserve online (phone-verified account, one per day, arrive within 30 min) or just walk in — unreserved meals are first come, first served. Closes 2 hours after the pickup window.")}
         </p>
       </div>

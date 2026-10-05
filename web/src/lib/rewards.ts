@@ -15,7 +15,7 @@ export function tierLabel(code: string): string {
   return t ? tr(t.label, t.labelEn) : code;
 }
 
-/** 前台主標「折 N 元」、副標「（百元一折）」 */
+/** 前台主標「折 N 元」（1002 規格 §8.3），副標是券名 */
 export function couponTitle(discount: number): string {
   return tr(`折 ${discount} 元`, `NT$${discount} off`);
 }

@@ -119,7 +119,7 @@ export default function RewardsPage() {
                   {ownedCoupons.map((c) => (
                     <div key={c.id} className="rounded-[1.5rem] border-2 border-dashed border-ink bg-accent p-6">
                       <p className="font-heading text-4xl font-semibold">{couponTitle(c.discount)}</p>
-                      <p className="text-xs text-muted-foreground">{tr("（百元一折）", "(per NT$100)")}・{tierLabel(c.tier)}</p>
+                      <p className="text-xs text-muted-foreground">{tierLabel(c.tier)}</p>
                       <p className="text-sm mt-1">{c.vendor_name}</p>
                       <p className="text-xs text-muted-foreground">{tr("到期", "Expires")} {new Date(millis(c.expires_at)).toLocaleDateString()}</p>
                     </div>
@@ -149,7 +149,7 @@ export default function RewardsPage() {
           {result && (
             <>
               <p className="font-heading text-6xl font-semibold">{couponTitle(result.discount)}</p>
-              <p className="text-sm text-muted-foreground">{tr("（百元一折）", "(per NT$100)")}・{result.label}</p>
+              <p className="text-sm text-muted-foreground">{result.label}</p>
               <p className="text-xs text-muted-foreground">{tr(`${new Date(result.expires_at).toLocaleDateString()} 前有效，結帳時選用`, `Valid until ${new Date(result.expires_at).toLocaleDateString()} — apply it at checkout`)}</p>
             </>
           )}

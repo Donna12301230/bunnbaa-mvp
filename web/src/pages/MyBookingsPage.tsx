@@ -375,7 +375,7 @@ export default function MyBookingsPage() {
     const canReview = REVIEW_ELIGIBLE.has(lock.status) && !reviewedIds.has(lock.id);
 
     return (
-      <article className="bg-card border border-ink rounded-[1.75rem] p-5 flex flex-col gap-2.5 max-w-md overflow-hidden">
+      <article key={lock.id} className="bg-card border border-ink rounded-[1.75rem] p-5 flex flex-col gap-2.5 max-w-md overflow-hidden">
                       {imageOf(lock) && (
                         <img src={imageOf(lock)} alt="" loading="lazy" className="-mx-5 -mt-5 mb-2 aspect-[16/9] w-[calc(100%+2.5rem)] max-w-none object-cover border-b border-ink" />
                       )}

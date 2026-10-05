@@ -198,7 +198,7 @@ export default function TransferMarketPage({ embedded = false }: { embedded?: bo
       <div className={embedded ? "space-y-6" : "max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6"}>
         {embedded && (
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground max-w-2xl">{tr("同學安全轉讓已鎖定的便當，截單後也能轉；逾時沒人接手，系統會自動開放 $0 元供人領取。", "Pass locked meals between classmates, even after cutoff. If nobody takes one in time, anyone can claim it for $0.")}</p>
+            <p className="text-sm text-muted-foreground max-w-2xl">{tr("安全轉讓已鎖定的餐點，截單後也能轉；逾時沒人接手，系統會自動開放 $0 元供人領取。", "Pass locked meals between classmates, even after cutoff. If nobody takes one in time, anyone can claim it for $0.")}</p>
             <input
               type="search"
               value={search}
@@ -416,7 +416,7 @@ export default function TransferMarketPage({ embedded = false }: { embedded?: bo
       <PageHero
         eyebrow={tr("不浪費任何一份", "No meal wasted")}
         title={tr("轉讓市集", "Transfer market")}
-        description={tr("同學安全轉讓已鎖定的便當，截單後也能轉；逾時沒人接手，系統會自動開放 $0 元供人領取。沒領到的便當會變成愛心餐。", "Pass locked meals between classmates, even after cutoff. If nobody takes one in time, anyone can claim it for $0. Unclaimed meals become charity meals.")}
+        description={tr("安全轉讓已鎖定的餐點，截單後也能轉；逾時沒人接手，系統會自動開放 $0 元供人領取。沒領到的便當會變成愛心餐。", "Pass locked meals between classmates, even after cutoff. If nobody takes one in time, anyone can claim it for $0. Unclaimed meals become charity meals.")}
       >
         <HeroSearch id="marketplaceSearch" label={tr("搜尋轉讓項目", "Search transfers")} value={search} onChange={setSearch} placeholder={tr("搜尋餐點名稱", "Search by meal name")} />
       </PageHero>
