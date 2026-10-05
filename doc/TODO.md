@@ -45,7 +45,7 @@ emulator 端對端測試已跑過：截單判定許願、備料清單／時間�
 ### 交付
 - [ ] 整合測試：消費者、商家、管理員三條線端到端各跑一次
 - [ ] 錄 Demo（3 分鐘腳本見 v6 §8）
-- [ ] 撰寫英文版 Proposal
+- [ ] 撰寫英文版 Proposal（初稿：投影片 https://claude.ai/artifact/FCk692pY4uC2KmKJ2qHzQD ；表單文字與 Demo 腳本見 [Submission_EN.md](Submission_EN.md)；方括號處待補）
 
 ### 測試文件未完成項目（2026-10-05 盤點）
 [測試文件.md](測試文件.md) 約 430 案例：PASS 203、作廢 4，其餘未完成（空白 135、只過伺服器／邏輯層 約 70、v4 待重測、BLOCKED、FAIL）。案例細節看測試文件，測完直接改該案例的結果欄。
