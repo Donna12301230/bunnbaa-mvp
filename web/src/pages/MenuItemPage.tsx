@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, query, where } from "firebase/firestore";
 import { AlertTriangle, ArrowLeft, Check, ChevronUp, Info, Minus, Plus, ShoppingCart, UtensilsCrossed } from "lucide-react";
 import { auth, db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
@@ -113,6 +113,15 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     queryFn: async () => {
       const snap = await getDoc(doc(db, "vendors", item!.vendor_id));
       return snap.exists() ? ({ id: snap.id, ...snap.data() } as Vendor) : null;
+    },
+    enabled: !!item,
+  });
+
+  const { data: relatedItems = [] } = useQuery({
+    queryKey: ["vendorItemsRelated", item?.vendor_id],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "menu_items"), where("vendor_id", "==", item!.vendor_id), where("is_available", "==", true)));
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as MenuItem).filter((x) => x.id !== item!.id);
     },
     enabled: !!item,
   });
@@ -526,6 +535,26 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
           </div>
         </div>
       </div>
+
+      {/* 同一商店的其他品項（頁面模式才顯示；彈窗模式不另外跳頁） */}
+      {!dialog && relatedItems.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-heading text-xl font-semibold">{tr("同一家店的其他品項", "More from this vendor")}</h2>
+          <ul className="flex gap-4 overflow-x-auto pb-2">
+            {relatedItems.map((r) => (
+              <li key={r.id} className="shrink-0 w-40">
+                <Link href={`/item/${r.id}`} className="block group">
+                  <span className="block aspect-[4/3] rounded-2xl overflow-hidden border border-ink bg-secondary">
+                    {r.image && <img src={r.image} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" />}
+                  </span>
+                  <span className="block mt-2 text-sm font-semibold truncate">{loc(r, "name")}</span>
+                  <span className="block text-sm text-muted-foreground">NT${r.price}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* 點商品圖片放大 */}
       <Dialog open={imageOpen} onOpenChange={setImageOpen}>
