@@ -9,7 +9,7 @@ import { auth, db, functions } from "../lib/firebase";
 import { registerForPickupReminders } from "../lib/messaging";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
-import { extraSideText, riceLabel, slotText } from "@/lib/bento";
+import { customOptionTexts, extraSideText, riceLabel, slotText } from "@/lib/bento";
 import { vendorCutoffTime } from "@/lib/pickupSlots";
 import type { Lock } from "@/types";
 
@@ -97,6 +97,7 @@ export default function PaymentConfirmPage() {
                         l.main_dish ? `${tr("主菜：", "Main: ")}${l.main_dish}` : null,
                         ...l.slots!.map(slotText),
                         extraSideText(l.extra_side),
+                        ...customOptionTexts(l.custom_options),
                         riceLabel(l.rice),
                       ].filter(Boolean).join("／")}
                     </p>

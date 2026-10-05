@@ -46,6 +46,7 @@ export interface PickupSummary {
   main_dish?: string | null;
   slots?: { category: string; removed: boolean; dish: string | null; wished: string | null; backup_used?: boolean }[];
   extra_side?: { dish: string; mode: "backup" | "addon"; used: boolean } | null;
+  custom_options?: { label: string; choice: string; price?: number }[];
   adjust_amount?: number;
   sides?: string[];
   rice?: string;

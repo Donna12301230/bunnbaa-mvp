@@ -16,6 +16,7 @@ export interface CartLine {
   choices: SlotChoice[];
   mainIndex?: number | null; // 選的主菜（menu_items.mains 的 index）
   extraSide?: ExtraSideChoice | null; // 第四道：備案或加菜
+  customPicks?: number[]; // 店家自訂欄位：每個欄位選的選項 index
   rice: RiceOption;
   quantity: number;
   note: string;
@@ -46,7 +47,8 @@ function save() {
 function sameConfig(a: Omit<CartLine, "key" | "quantity">, b: Omit<CartLine, "key" | "quantity">) {
   return a.menuItem.id === b.menuItem.id && a.pickupDate === b.pickupDate && a.pickupWindow === b.pickupWindow
     && a.rice === b.rice && a.note === b.note && JSON.stringify(a.choices) === JSON.stringify(b.choices) && !a.couponId && !b.couponId
-    && (a.mainIndex ?? null) === (b.mainIndex ?? null) && JSON.stringify(a.extraSide ?? null) === JSON.stringify(b.extraSide ?? null);
+    && (a.mainIndex ?? null) === (b.mainIndex ?? null) && JSON.stringify(a.extraSide ?? null) === JSON.stringify(b.extraSide ?? null)
+    && JSON.stringify(a.customPicks ?? []) === JSON.stringify(b.customPicks ?? []);
 }
 
 export const cartStore = {

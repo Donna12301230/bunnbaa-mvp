@@ -7,7 +7,7 @@ import { componentCost, portionLabel, portionLevelFor } from "@/lib/bento";
 import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
 import { MEAL_PERIODS, mealPeriodLabel } from "@/lib/pickupSlots";
 import { tr } from "@/lib/i18n";
-import type { BentoMain, BentoSlot, Component, Ingredient, MealPeriod } from "@/types";
+import type { BentoCustomField, BentoMain, BentoSlot, Component, Ingredient, MealPeriod } from "@/types";
 
 export interface BentoForm {
   itemType: "bento" | "single";
@@ -17,9 +17,10 @@ export interface BentoForm {
   componentId: string; // 單品對應的半成品
   weekdays: number[];
   slots: BentoSlot[];
+  customFields: BentoCustomField[]; // 配菜下方店家自訂的下拉欄位
 }
 
-export const EMPTY_BENTO: BentoForm = { itemType: "single", mealPeriods: ["lunch"], mains: [], riceComponentId: "", componentId: "", weekdays: [], slots: [] };
+export const EMPTY_BENTO: BentoForm = { itemType: "single", mealPeriods: ["lunch"], mains: [], riceComponentId: "", componentId: "", weekdays: [], slots: [], customFields: [] };
 
 const CATEGORIES = ["青菜類", "肉類配菜", "蛋豆類", "根莖類", "其他"];
 const WEEKDAYS = [1, 2, 3, 4, 5];
@@ -52,6 +53,7 @@ export function portionTextFor(component: Component | undefined, ingredientsById
  * - 主菜可列多道、各自定價，便當價格以所選主菜為準；每道菜都要有照片（消費者點圖片選菜）
  * - 配菜格：預設菜＋最多 3 道候選菜（同類別），候選菜不加價，改以份量平衡成本：
  *   比例 ≥ 0.75 全份、0.5–0.75 半份、低於 0.5 不得列為候選
+ * - 自訂欄位：配菜下方再加店家自己的下拉選單（例：湯品、飲料、辣度），選項可加減價，第一個選項是預設
  */
 export default function BentoEditor({ value, onChange, components, ingredientsById, vendorId }: {
   value: BentoForm;
@@ -63,6 +65,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
   const byId = Object.fromEntries(components.map((c) => [c.id, c]));
   const cost = (id?: string | null) => (id ? componentCost(byId[id], ingredientsById) : 0);
   const setSlot = (i: number, slot: BentoSlot) => onChange({ ...value, slots: value.slots.map((s, j) => (j === i ? slot : s)) });
+  const setCustom = (i: number, field: BentoCustomField) => onChange({ ...value, customFields: value.customFields.map((f, j) => (j === i ? field : f)) });
   const setMain = (i: number, main: BentoMain) => onChange({ ...value, mains: value.mains.map((m, j) => (j === i ? main : m)) });
   const isBento = value.itemType === "bento";
 
@@ -207,6 +210,27 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
             <Button size="sm" variant="outline" disabled={value.slots.length >= DEFAULT_PLATFORM_CONFIG.maxSides} onClick={() => onChange({ ...value, slots: [...value.slots, { category: "青菜類", default: { name: "" }, candidates: [] }] })}><Plus /> {tr("配菜", "Side")}</Button>
             <Button size="sm" variant="outline" onClick={recalc}><Calculator /> {tr("依成本計算份量級距", "Calculate portion levels")}</Button>
           </div>
+          {value.customFields.map((field, i) => (
+            <div key={i} className="rounded-md border border-border bg-white p-2 space-y-2">
+              <div className="flex gap-2 items-center">
+                <span className="text-xs font-semibold shrink-0">{tr("自訂欄位", "Custom field")}</span>
+                <Input className="h-9 w-40" placeholder={tr("欄位名稱（例：湯品）", "Name (e.g. Soup)")} value={field.label} onChange={(e) => setCustom(i, { ...field, label: e.target.value })} />
+                <Button variant="ghost" size="icon" className="ml-auto h-8 w-8" aria-label={tr("刪除欄位", "Remove field")} onClick={() => onChange({ ...value, customFields: value.customFields.filter((_, j) => j !== i) })}><Trash2 className="w-3.5 h-3.5" /></Button>
+              </div>
+              {field.options.map((opt, oi) => (
+                <div key={oi} className="flex gap-2 items-center pl-3">
+                  <Input className="h-9 w-40" placeholder={oi === 0 ? tr("選項（第一個是預設）", "Option (first = default)") : tr("選項", "Option")} value={opt.name} onChange={(e) => setCustom(i, { ...field, options: field.options.map((o, k) => (k === oi ? { ...o, name: e.target.value } : o)) })} />
+                  <Input className="h-9 w-24" type="number" step={1} placeholder={tr("加減價", "± price")} title={tr("加減價（0＝不加價，可填負數）", "Price change (0 = free, negative allowed)")} value={opt.price || ""} onChange={(e) => setCustom(i, { ...field, options: field.options.map((o, k) => (k === oi ? { ...o, price: Math.round(Number(e.target.value) || 0) } : o)) })} />
+                  {oi === 0 && <span className="text-xs text-muted-foreground shrink-0">{tr("預設", "default")}</span>}
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={tr("刪除選項", "Remove option")} disabled={field.options.length <= 1} onClick={() => setCustom(i, { ...field, options: field.options.filter((_, k) => k !== oi) })}><Trash2 className="w-3.5 h-3.5" /></Button>
+                </div>
+              ))}
+              <Button size="sm" variant="outline" className="ml-3" onClick={() => setCustom(i, { ...field, options: [...field.options, { name: "", price: 0 }] })}><Plus /> {tr("選項", "Option")}</Button>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" onClick={() => onChange({ ...value, customFields: [...value.customFields, { label: "", options: [{ name: "", price: 0 }, { name: "", price: 0 }] }] })}>
+            <Plus /> {tr("自訂欄位（例：湯品、飲料、辣度）", "Custom field (e.g. soup, drink, spice)")}
+          </Button>
           <p className="text-xs text-muted-foreground">
             {tr(`標準配菜數＝上面的配菜數（建議 3 道）；消費者最多選 ${DEFAULT_PLATFORM_CONFIG.maxSides} 道，第四道可選「備案」（不加價，許願沒成立時遞補）或「加菜」+${DEFAULT_PLATFORM_CONFIG.addonSidePrice}。份量比例＝預設菜單份成本 ÷ 候選菜單份成本；截單後份量鎖定。`,
               `Standard sides = the sides above (3 recommended). Customers can pick up to ${DEFAULT_PLATFORM_CONFIG.maxSides}; the 4th is a free backup or a +${DEFAULT_PLATFORM_CONFIG.addonSidePrice} add-on.`)}

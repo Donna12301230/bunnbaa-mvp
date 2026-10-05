@@ -17,6 +17,7 @@ import { completePickup, PENDING_STATUSES, type PickupSummary } from "@/lib/lock
 import { todayStr } from "@/lib/pickupSlots";
 import { db } from "@/lib/firebase";
 import { tr } from "@/lib/i18n";
+import { customOptionTexts } from "@/lib/bento";
 import type { Lock } from "@/types";
 
 /**
@@ -155,6 +156,7 @@ export default function VendorRedeemPage() {
             {s.sides && s.sides.length > 0 && <p className="text-sm">{s.sides.join("、")}</p>}
             {s.main_dish && <p className="text-sm">{tr("主菜：", "Main: ")}<strong>{s.main_dish}</strong></p>}
             {s.extra_side && <p className="text-sm">{s.extra_side.mode === "addon" ? tr(`加菜：${s.extra_side.dish}`, `Add-on: ${s.extra_side.dish}`) : s.extra_side.used ? tr(`備案已遞補：${s.extra_side.dish}`, `Backup used: ${s.extra_side.dish}`) : tr(`備案（未用到）：${s.extra_side.dish}`, `Backup (unused): ${s.extra_side.dish}`)}</p>}
+            {customOptionTexts(s.custom_options).map((text, k) => <p key={k} className="text-sm">{text}</p>)}
             {s.rice && s.rice !== "normal" && <p className="text-sm font-semibold">{s.rice === "add" ? tr("白飯一碗半", "1.5 bowls of rice") : tr("白飯半碗", "Half bowl of rice")}</p>}
             {s.note && <p className="text-sm text-amber-700">{tr("備註：", "Note: ")}{s.note}</p>}
             {s.kind === "lock" && (

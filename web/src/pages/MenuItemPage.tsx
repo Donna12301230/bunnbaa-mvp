@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, doc, getDocs, getDoc, query, where } from "firebase/firestore";
-import { AlertTriangle, ArrowLeft, Check, ChevronUp, Info, Minus, Plus, ShoppingCart, UtensilsCrossed } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronUp, Info, Minus, Plus, ShoppingCart, UtensilsCrossed } from "lucide-react";
 import { auth, db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
 import type { ExtraSideChoice, ExtraSideMode, MenuItem, RiceOption, SlotChoice, Vendor } from "@/types";
@@ -11,69 +11,52 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
-import { EmptyState } from "@/components/ds";
+import { EmptyState, Select } from "@/components/ds";
 import { Input } from "@/components/ui/input";
 import PriceDateStrip from "@/components/PriceDateStrip";
 import { tr, loc } from "@/lib/i18n";
 import { tagEn } from "@/types";
 import { cn } from "@/lib/utils";
 import { discountText } from "@/lib/pricing";
-import { RICE_OPTIONS, isBento, itemListPrice, itemMains, portionLabel, priceBreakdown, sideOptions } from "@/lib/bento";
+import { RICE_OPTIONS, customFields, isBento, itemListPrice, itemMains, portionLabel, priceBreakdown, priceDeltaText, sideOptions } from "@/lib/bento";
 import { usePlatformConfig } from "@/lib/platformConfig";
 import { useSideWishes } from "@/hooks/useSideWishes";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
 import { getPreferredPickup, mealPeriodLabel, mealPeriodOf, priceDays, slotLabel, vendorCutoffTime, weekdayOf } from "@/lib/pickupSlots";
 import { notifyCartAdded } from "@/components/CartPreview";
 
-/** 點圖片選菜的卡片（§4.2）：選取加框打勾、再點一次取消；不能點的灰色 */
-function DishCard({
-  name, image, selected, disabled, dimmed, badge, sub, onClick,
+/** 下拉式選單一列（§4.2）：左邊是目前選的那道菜的小圖，右邊是原生下拉（手機上是系統選單） */
+function DishSelectRow({
+  label, image, hint, children,
 }: {
-  name: string;
+  label: string;
   image?: string | null;
-  selected: boolean;
-  disabled?: boolean;
-  dimmed?: boolean;
-  badge?: string | null;
-  sub?: string | null;
-  onClick: () => void;
+  hint?: ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={selected}
-      className={cn(
-        "relative shrink-0 w-[132px] text-left rounded-2xl border-2 bg-card p-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        selected ? "border-primary shadow-[0_0_0_2px_var(--primary)]" : "border-border hover:border-ink",
-        disabled && "grayscale opacity-45 cursor-not-allowed hover:border-border",
-        dimmed && !selected && !disabled && "opacity-50"
-      )}
-    >
-      <span className="relative block aspect-square rounded-xl overflow-hidden bg-secondary">
-        {image ? (
-          <img src={image} alt="" loading="lazy" className="w-full h-full object-cover" />
-        ) : (
-          <span className="w-full h-full flex items-center justify-center">
-            <UtensilsCrossed className="w-7 h-7 text-secondary-foreground/50" strokeWidth={1.5} aria-hidden="true" />
-          </span>
-        )}
-        {selected && (
-          <span className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-            <Check className="w-4 h-4" aria-hidden="true" />
-          </span>
-        )}
-        {badge && <span className="absolute bottom-1.5 left-1.5 text-micro font-bold px-1.5 py-0.5 rounded bg-card/95 border border-ink">{badge}</span>}
-      </span>
-      <span className="block mt-1.5 px-0.5 text-sm font-semibold leading-tight line-clamp-2">{name}</span>
-      {sub && <span className="block px-0.5 text-micro text-muted-foreground leading-snug">{sub}</span>}
-    </button>
+    <div className="space-y-1">
+      <div className="flex items-center gap-3">
+        <span className="shrink-0 w-12 h-12 rounded-xl overflow-hidden border border-border bg-secondary flex items-center justify-center">
+          {image ? (
+            <img src={image} alt="" loading="lazy" className="w-full h-full object-cover" />
+          ) : (
+            <UtensilsCrossed className="w-5 h-5 text-secondary-foreground/50" strokeWidth={1.5} aria-hidden="true" />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-muted-foreground mb-0.5">{label}</p>
+          {children}
+        </div>
+      </div>
+      {hint && <div className="pl-[60px] text-xs">{hint}</div>}
+    </div>
   );
 }
 
-// 品項頁＝組便當（規格 §4.2）：價格日期列選取餐日（30 天內）、時段；點圖片選主菜、配菜（預設菜已選好、
-// 候選菜點選就是許願、再點取消＝少一道）、第四道（備案或加菜）、飯量三個按鈕；底部固定合計、可展開材料總和。
+// 品項頁＝組便當（規格 §4.2）：價格日期列選取餐日（30 天內）、時段；白飯、主菜、配菜都用下拉式選單
+// （配菜預設菜已選好、選候選菜就是許願、選「不要」＝少一道）、第四道（備案或加菜）；
+// 下方以「素材 + 素材 → 便當」列出材料總和；底部固定合計、可展開金額拆解。
 // 金額只是預覽，結帳時伺服器會重算。
 export default function MenuItemPage() {
   const { id } = useParams<{ id: string }>();
@@ -91,7 +74,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
   const [choices, setChoices] = useState<SlotChoice[]>([]);
   const [mainIndex, setMainIndex] = useState<number | null>(null);
   const [extra, setExtra] = useState<ExtraSideChoice | null>(null);
-  const [extraAsk, setExtraAsk] = useState<{ slot: number; candidate: number | null; name: string } | null>(null);
+  const [customPicks, setCustomPicks] = useState<number[]>([]);
   const [showMaterials, setShowMaterials] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -145,6 +128,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     if (item?.slots) setChoices(item.slots.map(() => "default"));
     setMainIndex((item?.mains || []).length > 0 ? 0 : null);
     setExtra(null);
+    setCustomPicks(customFields(item).map(() => 0));
   }, [item?.id]);
 
   // 瀏覽訊號（§10）：登入者看品項頁記一次，伺服器端同一天同品項只算一次
@@ -162,6 +146,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
   const { dayCount, weekCount } = useSideWishes(vendor?.id, date);
   const mains = useMemo(() => (item ? itemMains(item) : []), [item]);
   const options = useMemo(() => (item ? sideOptions(item) : []), [item]);
+  const custom = useMemo(() => customFields(item), [item]);
 
   if (isLoading) return <SkeletonBlocks height={256} />;
   if (!item) {
@@ -177,13 +162,15 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
 
   const bento = isBento(item) && item.item_type !== "single";
   const listPrice = itemListPrice(item, mainIndex);
-  const breakdown = date ? priceBreakdown(item, date, rice, choices, 0, { mainIndex, extra }) : null;
+  const breakdown = date ? priceBreakdown(item, date, rice, choices, 0, { mainIndex, extra, customPicks }) : null;
   const minQtyDefault = vendor?.candidate_min_qty || config?.candidateMinQty || 10;
   const maxSides = config?.maxSides ?? 4;
   const standardCount = item.slots?.length ?? 0;
   const removedCount = choices.filter((c) => c === "none").length;
   const selectedCount = standardCount - removedCount + (extra ? 1 : 0);
   const canAddFourth = bento && standardCount < maxSides && removedCount === 0;
+  const removePrice = Math.abs(config?.slotRemovePrice ?? 5);
+  const addonPrice = config?.addonSidePrice ?? 10;
   const problem = !date ? tr("請選擇取餐日", "Choose a pickup date") : servedProblem(date);
   const canAdd = !problem && !!window && windowSlots.some((s) => s.window === window && s.open);
   const typhoon = date && vendor?.typhoon_notice?.dates?.includes(date);
@@ -196,12 +183,9 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     return { cand, count, min, full };
   }
 
-  /** 點某一格的卡片：選這道；點已選的那道＝這格不要（少一道 −5） */
-  function pickSide(slotIdx: number, choice: "default" | number) {
-    setChoices((prev) => {
-      const next = prev.map((c, j) => (j === slotIdx ? (c === choice ? "none" : choice) : c));
-      return next;
-    });
+  /** 某一格的下拉選了什麼：預設菜、候選菜（許願）或 "none"（這格不要，少一道 −5） */
+  function pickSide(slotIdx: number, choice: SlotChoice) {
+    setChoices((prev) => item!.slots!.map((_, j) => (j === slotIdx ? choice : prev[j] ?? "default")));
     // 第四道跟這格新選的菜撞到，就把第四道拿掉
     if (extra && extra.slot === slotIdx && extra.candidate === (choice === "default" ? null : choice)) setExtra(null);
   }
@@ -215,30 +199,36 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
   );
   const extraOptions = options.filter((o) => !chosenNames.has(o.name));
 
-  function chooseExtra(mode: ExtraSideMode) {
-    if (!extraAsk) return;
-    setExtra({ slot: extraAsk.slot, candidate: extraAsk.candidate, mode });
-    setExtraAsk(null);
+  /** 第四道下拉的值："" 不加；"backup|slot|cand" 或 "addon|slot|cand"（cand 為 d＝預設菜） */
+  const extraValue = extra ? `${extra.mode}|${extra.slot}|${extra.candidate ?? "d"}` : "";
+  function pickExtra(value: string) {
+    if (!value) return setExtra(null);
+    const [mode, slot, cand] = value.split("|");
+    setExtra({ mode: mode as ExtraSideMode, slot: Number(slot), candidate: cand === "d" ? null : Number(cand) });
   }
 
   // 材料總和（§4.2）：這一份實際包含的每樣材料與份量；跟店家每日備料用同一份配方
   const riceText = RICE_OPTIONS.find((r) => r.value === rice);
-  const materials: string[] = [];
-  if (bento && item.rice_component_id && riceText) materials.push(tr(`白飯 ${riceText.label}`, `Rice: ${riceText.labelEn}`));
+  const materials: { label: string; image?: string | null }[] = [];
+  if (bento && item.rice_component_id && riceText) materials.push({ label: tr(`白飯 ${riceText.label}`, `Rice: ${riceText.labelEn}`) });
   const main = mainIndex != null ? mains[mainIndex] : mains[0];
-  if (main) materials.push(main.portion_text || main.name);
-  for (const f of item.fixed || []) materials.push(f.portion_text || f.name);
+  if (main) materials.push({ label: main.portion_text || main.name, image: main.image_url });
+  for (const f of item.fixed || []) materials.push({ label: f.portion_text || f.name });
   (item.slots || []).forEach((slot, i) => {
     const c = choices[i];
     if (c === "none" || c === undefined) return;
-    if (c === "default") materials.push(slot.default.portion_text || slot.default.name);
+    if (c === "default") materials.push({ label: slot.default.portion_text || slot.default.name, image: slot.default.image_url });
     else {
       const cand = slot.candidates[c as number];
-      materials.push(`${cand.portion_text || cand.name}${cand.portion_level < 1 ? tr("（半份）", " (half)") : ""}`);
+      materials.push({ label: `${cand.portion_text || cand.name}${cand.portion_level < 1 ? tr("（半份）", " (half)") : ""}`, image: cand.image_url });
     }
   });
   const extraOpt = extra ? options.find((o) => o.slot === extra.slot && o.candidate === extra.candidate) : null;
-  if (extra?.mode === "addon" && extraOpt) materials.push(tr(`＋${extraOpt.portion_text || extraOpt.name}`, `+${extraOpt.portion_text || extraOpt.name}`));
+  if (extra?.mode === "addon" && extraOpt) materials.push({ label: extraOpt.portion_text || extraOpt.name, image: extraOpt.image_url });
+  custom.forEach((f, i) => {
+    const o = f.options[customPicks[i] ?? 0];
+    if (o) materials.push({ label: `${f.label}：${o.name}` });
+  });
 
   // 加入購物車前先用對話框確認訂單內容（不直接加入）
   function openConfirm() {
@@ -260,6 +250,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
       menuItem: item!, vendorId: item!.vendor_id, pickupDate: date, pickupWindow: window,
       choices: bento ? choices : [], rice: bento && item!.rice_component_id ? rice : "normal",
       mainIndex: (item!.mains || []).length > 0 ? mainIndex ?? 0 : null, extraSide: bento ? extra : null,
+      customPicks: custom.map((_, i) => customPicks[i] ?? 0),
       quantity: qty, note: note.trim(), couponId: null,
     });
     setConfirmOpen(false);
@@ -356,133 +347,125 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
             )}
           </section>
 
-          {/* 白飯：三個按鈕 */}
-          {bento && item.rice_component_id && (
-            <section className="space-y-2">
-              <h2 className="font-heading text-xl font-semibold">{tr("白飯", "Rice")}</h2>
-              <div className="flex gap-2" role="radiogroup" aria-label={tr("飯量", "Rice amount")}>
-                {RICE_OPTIONS.map((opt) => {
-                  const price = opt.value === "add" ? config?.riceAddPrice ?? 10 : opt.value === "less" ? config?.riceLessPrice ?? -5 : 0;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={rice === opt.value}
-                      onClick={() => setRice(opt.value)}
-                      className={cn("flex-1 h-12 rounded-full border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", rice === opt.value ? "border-ink bg-ink text-[var(--text-on-inverse)]" : "border-border bg-card hover:border-ink")}
-                    >
-                      {tr(opt.label, opt.labelEn)}
-                      {price !== 0 && <span className={cn("text-xs ml-1", rice === opt.value ? "opacity-80" : "text-muted-foreground")}>{price > 0 ? `+${price}` : price}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* 主菜：圖片卡片，單選、必選，各自定價 */}
-          {bento && mains.length > 1 && (
-            <section className="space-y-2">
-              <h2 className="font-heading text-xl font-semibold">{tr("主菜", "Main")} <span className="text-sm font-normal text-muted-foreground">{tr("（必選一道）", "(pick one)")}</span></h2>
-              <div className="flex gap-3 overflow-x-auto pb-2 bb-thin-scroll">
-                {mains.map((m, i) => (
-                  <DishCard key={i} name={m.name} image={m.image_url} selected={(mainIndex ?? 0) === i} sub={`NT$ ${m.price}`} onClick={() => setMainIndex(i)} />
-                ))}
-              </div>
-            </section>
-          )}
-          {bento && mains.length === 1 && <p className="text-sm">{tr("主菜：", "Main: ")}<strong>{mains[0].name}</strong></p>}
-
-          {/* 配菜：每一格點圖片選，預設菜已選好；候選菜點了就是許願 */}
+          {/* 組便當：白飯、主菜、配菜都用下拉式選單 */}
           {bento && (
             <section className="space-y-4">
               <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                <h2 className="font-heading text-xl font-semibold">{tr("配菜", "Sides")}</h2>
-                <span className="text-xs text-muted-foreground">{tr(`已選 ${selectedCount}／最多 ${maxSides} 道・少一道 −${Math.abs(config?.slotRemovePrice ?? 5)}`, `${selectedCount} of up to ${maxSides} · −${Math.abs(config?.slotRemovePrice ?? 5)} per side removed`)}</span>
+                <h2 className="font-heading text-xl font-semibold">{tr("組便當", "Build your bento")}</h2>
+                <span className="text-xs text-muted-foreground">{tr(`配菜已選 ${selectedCount}／最多 ${maxSides} 道・少一道 −${removePrice}`, `${selectedCount} of up to ${maxSides} sides · −${removePrice} per side removed`)}</span>
               </div>
+
+              {item.rice_component_id && (
+                <DishSelectRow label={tr("白飯", "Rice")}>
+                  <Select aria-label={tr("飯量", "Rice amount")} value={rice} onChange={(e) => setRice(e.target.value as RiceOption)}>
+                    {RICE_OPTIONS.map((opt) => {
+                      const price = opt.value === "add" ? config?.riceAddPrice ?? 10 : opt.value === "less" ? config?.riceLessPrice ?? -5 : 0;
+                      return <option key={opt.value} value={opt.value}>{tr(opt.label, opt.labelEn)}{price !== 0 ? `（${price > 0 ? `+${price}` : price}）` : ""}</option>;
+                    })}
+                  </Select>
+                </DishSelectRow>
+              )}
+
+              {mains.length > 0 && (
+                <DishSelectRow label={tr("主菜", "Main")} image={main?.image_url}>
+                  <Select aria-label={tr("主菜", "Main")} value={String(mainIndex ?? 0)} disabled={mains.length === 1} onChange={(e) => setMainIndex(Number(e.target.value))}>
+                    {mains.map((m, i) => <option key={i} value={i}>{m.name}{mains.length > 1 ? `（NT$ ${m.price}）` : ""}</option>)}
+                  </Select>
+                </DishSelectRow>
+              )}
+
               {item.slots!.map((slot, i) => {
                 const choice = choices[i] ?? "default";
+                const picked = choice === "none" ? null : choice === "default" ? slot.default : slot.candidates[choice];
+                const wish = typeof choice === "number" ? candidateState(i, choice) : null;
                 return (
-                  <div key={i} className="space-y-1.5">
-                    <p className="text-xs font-semibold text-muted-foreground">
-                      {slot.category || tr(`配菜 ${i + 1}`, `Side ${i + 1}`)}
-                      {choice === "none" && <span className="ml-2 text-orange-700">{tr(`這道不要（−${Math.abs(config?.slotRemovePrice ?? 5)}）`, `Skipped (−${Math.abs(config?.slotRemovePrice ?? 5)})`)}</span>}
-                    </p>
-                    <div className="flex gap-3 overflow-x-auto pb-1 bb-thin-scroll">
-                      <DishCard
-                        name={slot.default.name}
-                        image={slot.default.image_url}
-                        selected={choice === "default"}
-                        badge={tr("預設", "Default")}
-                        dimmed={choice === "none"}
-                        onClick={() => pickSide(i, "default")}
-                      />
+                  <DishSelectRow
+                    key={i}
+                    label={`${tr(`配菜 ${i + 1}`, `Side ${i + 1}`)}${slot.category ? `・${slot.category}` : ""}`}
+                    image={picked?.image_url}
+                    hint={wish ? (
+                      <p className="text-orange-700">
+                        {tr(`許願中：截單時滿 ${wish.min} 人才成立；未成立${extra?.mode === "backup" ? "換成備案" : `換回「${slot.default.name}」`}，訂單照常成立。`,
+                          `Wish: needs ${wish.min} people by cutoff; otherwise ${extra?.mode === "backup" ? "your backup" : slot.default.name} is used.`)}
+                      </p>
+                    ) : choice === "none" ? <p className="text-orange-700">{tr(`這道不要（−${removePrice}）`, `Skipped (−${removePrice})`)}</p> : null}
+                  >
+                    <Select aria-label={tr(`配菜 ${i + 1}`, `Side ${i + 1}`)} value={String(choice)} onChange={(e) => pickSide(i, e.target.value === "default" || e.target.value === "none" ? e.target.value : Number(e.target.value))}>
+                      <option value="default">{slot.default.name}{tr("（預設）", " (default)")}</option>
                       {slot.candidates.map((_, ci) => {
-                        const s = candidateState(i, ci);
-                        if (s.cand.disabled) {
-                          return <DishCard key={ci} name={s.cand.name} image={s.cand.image_url} selected={false} disabled sub={tr("今日未供應", "Not served today")} onClick={() => {}} />;
-                        }
-                        return (
-                          <DishCard
-                            key={ci}
-                            name={s.cand.name}
-                            image={s.cand.image_url}
-                            selected={choice === ci}
-                            disabled={s.full && choice !== ci}
-                            dimmed={choice === "none"}
-                            badge={portionLabel(s.cand.portion_level)}
-                            sub={s.full ? tr("已滿，改點其他配菜", "Full — pick another") : tr(`${s.count}/${s.min} 人，滿 ${s.min} 人成立`, `${s.count}/${s.min} wishes, needs ${s.min}`)}
-                            onClick={() => pickSide(i, ci)}
-                          />
-                        );
+                        const st = candidateState(i, ci);
+                        const status = st.cand.disabled
+                          ? tr("今日未供應", "not served today")
+                          : st.full && choice !== ci
+                            ? tr("已滿", "full")
+                            : tr(`${portionLabel(st.cand.portion_level)}・${st.count}/${st.min} 人成立`, `${portionLabel(st.cand.portion_level)} · ${st.count}/${st.min} wishes`);
+                        return <option key={ci} value={ci} disabled={st.cand.disabled || (st.full && choice !== ci)}>{st.cand.name}（{status}）</option>;
                       })}
-                    </div>
-                    {typeof choice === "number" && (() => {
-                      const s = candidateState(i, choice);
-                      return (
-                        <p className="text-xs text-orange-700">
-                          {tr(`許願中：截單時滿 ${s.min} 人才成立；未成立${extra?.mode === "backup" ? "換成備案" : `換回「${slot.default.name}」`}，訂單照常成立。`,
-                            `Wish: needs ${s.min} people by cutoff; otherwise ${extra?.mode === "backup" ? "your backup" : slot.default.name} is used.`)}
-                        </p>
-                      );
-                    })()}
-                  </div>
+                      <option value="none">{tr(`不要這道（−${removePrice}）`, `None (−${removePrice})`)}</option>
+                    </Select>
+                  </DishSelectRow>
                 );
               })}
 
-              {/* 第四道：選滿標準數量後才能點，跳出小視窗選「備案」或「加菜 +10」 */}
+              {/* 第四道：選滿標準數量後才能選，「備案」不加價或「加菜 +10」 */}
               {standardCount < maxSides && (
-                <div className="space-y-1.5 rounded-2xl border border-dashed border-ink p-3">
-                  <p className="text-xs font-semibold">
-                    {tr(`第 ${standardCount + 1} 道（選填）：備案不加價，或加菜 +${config?.addonSidePrice ?? 10}`, `Side ${standardCount + 1} (optional): backup for free, or add-on +${config?.addonSidePrice ?? 10}`)}
-                  </p>
-                  {!canAddFourth ? (
-                    <p className="text-xs text-muted-foreground">{tr("先選滿前面每一格，才能加第四道。", "Fill every side above first to add a fourth.")}</p>
-                  ) : (
-                    <div className="flex gap-3 overflow-x-auto pb-1 bb-thin-scroll">
-                      {extraOptions.map((o) => {
-                        const isExtra = extra?.slot === o.slot && extra?.candidate === o.candidate;
-                        const st = o.candidate != null ? candidateState(o.slot, o.candidate) : null;
-                        return (
-                          <DishCard
-                            key={`${o.slot}-${o.candidate ?? "d"}`}
-                            name={o.name}
-                            image={o.image_url}
-                            selected={isExtra}
-                            disabled={!!st?.full && !isExtra}
-                            dimmed={!!extra && !isExtra}
-                            badge={isExtra ? (extra!.mode === "backup" ? tr("備案", "Backup") : tr("加菜 +10", "Add-on +10")) : o.portion_level < 1 ? portionLabel(o.portion_level) : null}
-                            sub={st ? tr(`${st.count}/${st.min} 人`, `${st.count}/${st.min}`) : null}
-                            onClick={() => (isExtra ? setExtra(null) : setExtraAsk({ slot: o.slot, candidate: o.candidate, name: o.name }))}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                <DishSelectRow
+                  label={tr(`配菜 ${standardCount + 1}（選填）`, `Side ${standardCount + 1} (optional)`)}
+                  image={extraOpt?.image_url}
+                  hint={<p className="text-muted-foreground">{!canAddFourth
+                    ? tr("先選滿前面每一格，才能加第四道。", "Fill every side above first to add a fourth.")
+                    : tr(`備案：平常不放進便當，前面任一道沒供應、已滿或許願未成立時自動遞補。加菜 +${addonPrice}：四道都放進便當。`, `Backup: fills in only if a side isn't served or a wish fails. Add-on +${addonPrice}: all four go in the box.`)}</p>}
+                >
+                  <Select aria-label={tr("第四道", "4th side")} value={canAddFourth ? extraValue : ""} disabled={!canAddFourth} onChange={(e) => pickExtra(e.target.value)}>
+                    <option value="">{tr("不加", "None")}</option>
+                    {(["backup", "addon"] as const).map((mode) => (
+                      <optgroup key={mode} label={mode === "backup" ? tr("備案（不加價）", "Backup (free)") : tr(`加菜 +${addonPrice}`, `Add-on +${addonPrice}`)}>
+                        {extraOptions.map((o) => {
+                          const st = o.candidate != null ? candidateState(o.slot, o.candidate) : null;
+                          const value = `${mode}|${o.slot}|${o.candidate ?? "d"}`;
+                          return (
+                            <option key={value} value={value} disabled={!!st?.full && value !== extraValue}>
+                              {o.name}{o.portion_level < 1 ? tr("（半份）", " (half)") : ""}{st ? tr(`・${st.count}/${st.min} 人`, ` · ${st.count}/${st.min}`) : ""}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                    ))}
+                  </Select>
+                </DishSelectRow>
               )}
-              <p className="text-xs text-muted-foreground flex gap-1"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />{tr("候選菜不加價，改以份量平衡成本（標示全份／半份）；已滿或今日未供應的灰色不能點。", "Candidates cost the same — portions balance the cost (full/half). Grey cards are full or not served today.")}</p>
+              {/* 店家自訂欄位（例：湯品、飲料、辣度），第一個選項是預設 */}
+              {custom.map((f, i) => (
+                <DishSelectRow key={`custom-${i}`} label={f.label}>
+                  <Select aria-label={f.label} value={String(customPicks[i] ?? 0)} onChange={(e) => setCustomPicks((prev) => custom.map((_, j) => (j === i ? Number(e.target.value) : prev[j] ?? 0)))}>
+                    {f.options.map((o, oi) => <option key={oi} value={oi}>{o.name}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</option>)}
+                  </Select>
+                </DishSelectRow>
+              ))}
+              <p className="text-xs text-muted-foreground flex gap-1"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />{tr("候選菜不加價，改以份量平衡成本（標示全份／半份）；已滿或今日未供應的選項不能選。", "Candidates cost the same — portions balance the cost (full/half). Full or unavailable options can't be picked.")}</p>
+            </section>
+          )}
+
+          {/* 材料總和（§4.2）：素材 + 素材 + … → 便當 */}
+          {materials.length > 0 && (
+            <section className="rounded-2xl border border-ink bg-accent p-4 space-y-3" aria-label={tr("材料總和", "What's in it")}>
+              <h2 className="font-heading text-lg font-semibold">{tr("材料總和", "What's in it")}</h2>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                {materials.map((m, i) => (
+                  <span key={i} className="contents">
+                    {i > 0 && <span className="font-semibold text-muted-foreground" aria-hidden="true">+</span>}
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-ink bg-card px-2.5 py-1.5">
+                      {m.image && <img src={m.image} alt="" className="w-6 h-6 rounded object-cover" />}
+                      {m.label}
+                    </span>
+                  </span>
+                ))}
+                <span className="font-semibold text-muted-foreground" aria-hidden="true">→</span>
+                <span className="inline-flex items-center rounded-lg border-2 border-ink bg-ink text-[var(--text-on-inverse)] px-2.5 py-1.5 font-semibold">
+                  {loc(item, "name")}{breakdown ? `・NT$ ${breakdown.total}` : ""}
+                </span>
+              </div>
+              {extra?.mode === "backup" && extraOpt && <p className="text-xs text-muted-foreground">{tr(`備案：${extraOpt.name}（前面許願沒成立才遞補）`, `Backup: ${extraOpt.name} (only if a wish fails)`)}</p>}
             </section>
           )}
 
@@ -495,9 +478,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
           <div className="sticky bottom-0 z-10 -mx-4 px-4 md:mx-0 md:px-0 pt-2 pb-4 bg-background/95 backdrop-blur-md border-t border-border space-y-2">
             {showMaterials && breakdown && (
               <div className="rounded-2xl border border-ink bg-accent p-4 text-sm space-y-2">
-                <p className="font-semibold">{tr("材料總和", "What's in it")}</p>
-                <p className="text-muted-foreground leading-relaxed">{materials.join(" · ")}</p>
-                {extra?.mode === "backup" && extraOpt && <p className="text-xs text-muted-foreground">{tr(`備案：${extraOpt.name}（前面許願沒成立才遞補）`, `Backup: ${extraOpt.name} (only if a wish fails)`)}</p>}
+                <p className="font-semibold">{tr("金額拆解", "Price breakdown")}</p>
                 <dl className="space-y-1 pt-2 border-t border-border">
                   <div className="flex justify-between"><dt className="text-muted-foreground">{tr("原價", "Price")}</dt><dd>NT${breakdown.listPrice}</dd></div>
                   {breakdown.earlyBird > 0 && <div className="flex justify-between text-green-700"><dt>{tr(`早鳥 ${discountText(breakdown.discountPercent)}`, `Early bird ${discountText(breakdown.discountPercent)}`)}</dt><dd>−NT${breakdown.earlyBird}</dd></div>}
@@ -519,7 +500,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                   <ChevronUp className={cn("w-4 h-4 transition-transform", !showMaterials && "rotate-180")} aria-hidden="true" />
                 </span>
                 <span className="block text-xs text-muted-foreground truncate">
-                  {breakdown?.discountPercent ? tr(`已含早鳥 ${discountText(breakdown.discountPercent)}・點開看材料`, `Incl. early bird ${discountText(breakdown.discountPercent)} · tap for details`) : tr("點開看材料", "Tap for details")}
+                  {breakdown?.discountPercent ? tr(`已含早鳥 ${discountText(breakdown.discountPercent)}・點開看明細`, `Incl. early bird ${discountText(breakdown.discountPercent)} · tap for details`) : tr("點開看金額明細", "Tap for details")}
                 </span>
               </button>
               <div className="flex items-center gap-2 shrink-0">
@@ -589,6 +570,9 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
             {bento && extra && (
               <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("第四道", "4th side")}</dt><dd className="text-right">{extra.mode === "backup" ? tr("備案", "Backup") : tr("加菜", "Add-on")}</dd></div>
             )}
+            {custom.map((f, i) => (
+              <div key={`custom-${i}`} className="flex justify-between gap-4"><dt className="text-muted-foreground">{f.label}</dt><dd className="text-right">{f.options[customPicks[i] ?? 0]?.name}</dd></div>
+            ))}
             <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("數量", "Qty")}</dt><dd className="text-right">{qty}</dd></div>
             {note.trim() && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("備註", "Note")}</dt><dd className="text-right">{note.trim()}</dd></div>}
           </dl>
@@ -603,24 +587,6 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!extraAsk} onOpenChange={(open) => !open && setExtraAsk(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{tr(`「${extraAsk?.name}」當第四道`, `${extraAsk?.name} as a 4th side`)}</DialogTitle>
-            <DialogDescription>{tr("選一種：", "Choose one:")}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <button type="button" onClick={() => chooseExtra("backup")} className="text-left rounded-2xl border border-ink p-4 hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <p className="font-semibold">{tr("備案（不加價）", "Backup (free)")}</p>
-              <p className="text-xs text-muted-foreground mt-1">{tr("平常不放進便當；前三道任一道沒供應、已滿或許願未成立時，自動遞補。", "Not in the box normally — it fills in automatically if any side isn't served, is full, or a wish doesn't happen.")}</p>
-            </button>
-            <button type="button" onClick={() => chooseExtra("addon")} className="text-left rounded-2xl border border-ink p-4 hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <p className="font-semibold">{tr(`加菜 +${config?.addonSidePrice ?? 10}`, `Add-on +${config?.addonSidePrice ?? 10}`)}</p>
-              <p className="text-xs text-muted-foreground mt-1">{tr("四道都放進便當。", "All four sides go in the box.")}</p>
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
