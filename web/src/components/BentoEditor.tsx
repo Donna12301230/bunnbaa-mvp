@@ -229,7 +229,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
         <RecipeCraft
           items={craftItems(needs, ingredientsById, stock)}
           target={{ name: itemName || tr("便當", "Bento"), sub: qty > 1 ? tr(`× ${qty} 份`, `× ${qty}`) : `NT$ ${finalPrice}` }}
-          haveNote={counted ? tr("本週盤點", "this week's count") : tr("理論庫存（本週未盤點）", "theoretical stock (not counted)")}
+          haveNote={counted ? tr("上週六盤點＋本週到貨−已用", "last count + deliveries − used") : tr("理論庫存（上週六未盤點）", "theoretical stock (not counted)")}
           compact
         />
         {unlinked.length > 0 && (

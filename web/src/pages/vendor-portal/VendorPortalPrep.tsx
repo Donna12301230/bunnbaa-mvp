@@ -240,7 +240,7 @@ export default function VendorPortalPrep() {
     return { portions, needs: rawNeeds(portions, compById, ingById) };
   }, [plan, catalog, menuItems, locks]);
   const planNeeds = useMemo(() => new Map(Object.entries(plan?.raw_needs ?? {})), [plan]);
-  const stockNote = counted ? tr("本週盤點＋到貨−已用", "count + deliveries − used") : tr("理論庫存（本週未盤點）", "theoretical stock (not counted)");
+  const stockNote = counted ? tr("上週六盤點＋本週到貨−已用", "last count + deliveries − used") : tr("理論庫存（上週六未盤點）", "theoretical stock (not counted)");
 
   function printWith(mode: "labels" | "picklist") {
     setPrintMode(mode);
