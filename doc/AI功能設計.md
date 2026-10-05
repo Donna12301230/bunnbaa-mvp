@@ -149,6 +149,6 @@ flowchart LR
 - **負責任 AI**：助理給的 id 會比對目錄，查無或下架的丟掉；卡片價格由伺服器依早鳥規則重算，結帳時再算一次。會員自己設定的過敏原在伺服器端先濾掉，不靠模型記得。拍照草稿的飲食標記、過敏原只保留固定選項，畫面提醒店主逐項確認
 - **限流**：助理每人每天 30 次（`users.assistant_usage`），單輪相同問題 10 分鐘內直接回快取（`assistant_cache`）。媒合通知每人每天最多 2 則，常用地點離店 10 公里以上不通知，同一筆取消後重新上架 12 小時內不重複通知
 - **媒合排序**：Firestore KNN 找同縣市的相似品項（cosine，768 維 `gemini-embedding-001`）→ 過去鎖定過這些品項的會員 → 依相似度、同店、取餐時段相近加權。排除轉讓者、曾經持有者、當天已訂這家店的人
-- **影響指標**：`resale_matches/{lockId}` 記下通知了誰；透過 `claimResoldLock` 接手時，若接手者是被通知的會員，會記 `claimed_by_match: true`，可算出「媒合救回的份數」。逾時免費領取走前端規則，不會記到
+- **影響指標**：`resale_matches/{lockId}` 記下通知了誰；付費接手（`confirmLinePayPayment` 確認）時，若接手者是被通知的會員，會記 `claimed_by_match: true`，可算出「媒合救回的份數」。逾時免費領取走前端規則，不會記到
 - **預測區間**：過去 60 天、每天至少 3 份的日子算取餐率；同星期幾的資料滿 4 天就只用同星期幾。8 天以上取 10%／90% 分位數，不到 8 天用平均 ± 1.28 標準差
 - **部署**：`firebase deploy --only firestore:indexes,firestore:rules,functions`（含 `menu_embeddings` 向量索引），再由管理員呼叫一次 `backfillMenuEmbeddings`，為既有品項補算向量

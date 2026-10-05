@@ -77,6 +77,12 @@ function expectCode(r, code, msg) {
   if (r.code !== code) throw new Error(`${msg || ""} expected ${code}, got ${r.code}: ${r.message}`);
   return r;
 }
+/** 轉讓市集付費接手（§4.1）：保留＋請款 → 確認付款。emulator 沒有 LINE Pay 金鑰，走假金流 */
+async function takeOver(user, lockId) {
+  const r = await user.call("createResaleLinePayReservation", { lock_id: lockId });
+  if (!r.ok) return r;
+  return user.call("confirmLinePayPayment", { order_id: r.data.order_id });
+}
 
 // ── 日期 ──
 const TODAY = taipeiToday();
@@ -398,7 +404,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     expectOk(await ANON.call("issuePickupQr", { lock_id: id, share_token: "tok-123" }));
     expectCode(await ANON.call("issuePickupQr", { lock_id: id, share_token: "wrong" }), "permission-denied");
     await ref.update({ status: "for_resale" });
-    expectOk(await B.call("claimResoldLock", { lock_id: id }));
+    expectOk(await takeOver(B, id));
     expectCode(await ANON.call("issuePickupQr", { lock_id: id, share_token: "tok-123" }), "permission-denied", "轉讓後");
   });
 
@@ -424,12 +430,16 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   });
 
   // ════ 3.8 轉讓市集 ════
-  await test("C-MKT-02/08", "B 接手：buyer=B、locked、payer 仍是 A、換新 share_token", async () => {
-    const { id, ref } = await lock(uids.A, { share_token: "old" });
+  await test("C-MKT-02/08", "B 付款接手：buyer=B、locked、付款人換成 B、付接手價、原付款人退款、換新 share_token", async () => {
+    const { id, ref } = await lock(uids.A, { share_token: "old", list_price: 100, early_bird_amount: 20, adjust_amount: 0, coupon_id: "c-old", coupon_discount: 30, locked_price: 50, paid_amount: 50, transaction_id: "fake-seller-tx" });
     await ref.update({ status: "for_resale" });
-    expectOk(await B.call("claimResoldLock", { lock_id: id }));
+    const r = expectOk(await takeOver(B, id));
+    eq(r.kind, "resale"); eq(r.lock_ids, [id]);
     const l = await get(`locks/${id}`);
-    eq(l.buyer_uid, uids.B); eq(l.status, "locked"); eq(l.payer_uid, uids.A);
+    eq(l.buyer_uid, uids.B); eq(l.status, "locked"); eq(l.payer_uid, uids.B);
+    eq([l.locked_price, l.paid_amount, l.coupon_id, l.coupon_discount], [80, 80, null, 0], "接手價＝早鳥價（折價券前）");
+    eq([l.transfer_refund.uid, l.transfer_refund.amount, l.transfer_refund.status], [uids.A, 50, "done"], "退回 A 實付的 50");
+    assert(!l.resale_hold && !l.resale_payment_pending, "保留與付款中標記應清掉");
     assert(l.share_token && l.share_token !== "old", "share_token 應更換");
     assert((l.transferred_from_uids || []).includes(uids.A), "transferred_from_uids 應含 A");
   });
@@ -437,14 +447,30 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   await test("C-MKT-03", "接手自己的被擋（failed-precondition）", async () => {
     const { id, ref } = await lock(uids.A);
     await ref.update({ status: "for_resale" });
-    expectCode(await A.call("claimResoldLock", { lock_id: id }), "failed-precondition");
+    expectCode(await A.call("createResaleLinePayReservation", { lock_id: id }), "failed-precondition");
   });
 
-  await test("C-MKT-04", "B、C 同時接手：只有一人成功", async () => {
+  await test("C-MKT-04", "B、C 同時按接手：只有一人能進付款（保留 15 分鐘），另一人被擋；確認後只有一人接手", async () => {
     const { id, ref } = await lock(uids.A);
     await ref.update({ status: "for_resale" });
-    const rs = await Promise.all([B.call("claimResoldLock", { lock_id: id }), C.call("claimResoldLock", { lock_id: id })]);
-    eq(rs.filter((r) => r.ok).length, 1, "成功人數");
+    const rs = await Promise.all([B, C].map((u) => u.call("createResaleLinePayReservation", { lock_id: id })));
+    eq(rs.filter((r) => r.ok).length, 1, "能進付款的人數");
+    const winner = rs[0].ok ? B : C;
+    const loser = rs[0].ok ? C : B;
+    assert(/有人正在付款接手/.test(rs.find((r) => !r.ok).message), "被擋的人要看到有人正在付款");
+    expectOk(await winner.call("confirmLinePayPayment", { order_id: rs.find((r) => r.ok).data.order_id }));
+    eq((await get(`locks/${id}`)).buyer_uid, winner === B ? uids.B : uids.C);
+    expectCode(await loser.call("createResaleLinePayReservation", { lock_id: id }), "failed-precondition", "已被接走");
+  });
+
+  await test("C-MKT-10", "付款中被別人免費領走（逾時）→ 確認時不扣款、意圖 gone", async () => {
+    const { id, ref } = await lock(uids.A);
+    await ref.update({ status: "for_resale" });
+    const r = expectOk(await B.call("createResaleLinePayReservation", { lock_id: id }));
+    await ref.update({ status: "locked", buyer_uid: uids.C, locked_price: 0, transferred_from_uids: [uids.A] }); // 模擬逾時被 C 免費領取
+    expectCode(await B.call("confirmLinePayPayment", { order_id: r.order_id }), "failed-precondition");
+    eq((await get(`payment_intents/${r.order_id}`)).status, "gone");
+    eq((await get(`locks/${id}`)).buyer_uid, uids.C, "還是 C 的");
   });
 
   // ════ 4.2 核對取餐 ════
@@ -478,16 +504,16 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     eq((await get(`userSpend/${V1}_${uids.E}`)).carry, 30);
   });
 
-  await test("C-MKT-08b", "B 接手後取餐：抽獎券發給付款人 A", async () => {
+  await test("C-MKT-08b", "B 付款接手後取餐：抽獎券發給真正付錢的 B", async () => {
     if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
     const { id, ref } = await lock(uids.A, { pickup_date: TODAY, locked_price: 100 });
     await ref.update({ status: "for_resale" });
-    expectOk(await B.call("claimResoldLock", { lock_id: id }));
+    expectOk(await takeOver(B, id));
     const { token } = expectOk(await B.call("issuePickupQr", { lock_id: id }));
     eq(expectOk(await V({ token })).status, "resold_and_fulfilled");
     await waitFor(async () => (await get(`locks/${id}`)).reward_counted);
     const t = await db.collection("rewardTickets").where("lock_id", "==", id).get();
-    assert(t.docs.every((d) => d.data().user_id === uids.A), "抽獎券應給 A");
+    assert(t.size > 0 && t.docs.every((d) => d.data().user_id === uids.B), "抽獎券應給 B");
   });
 
   await test("V-RDM-07", "兩台裝置同時核銷：只有一次成功", async () => {
@@ -519,7 +545,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     const { id, ref } = await lock(uids.A, { pickup_date: TODAY });
     const old = expectOk(await A.call("issuePickupQr", { lock_id: id })).token;
     await ref.update({ status: "for_resale" });
-    expectOk(await B.call("claimResoldLock", { lock_id: id }));
+    expectOk(await takeOver(B, id));
     expectCode(await V({ token: old }), "failed-precondition");
   });
 

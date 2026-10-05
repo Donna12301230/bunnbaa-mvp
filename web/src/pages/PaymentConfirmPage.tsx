@@ -24,6 +24,7 @@ export default function PaymentConfirmPage() {
   const [status, setStatus] = useState<"waiting-auth" | "confirming" | "done" | "error">("waiting-auth");
   const [locks, setLocks] = useState<Lock[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isResale, setIsResale] = useState(false); // 轉讓市集付費接手（同一個確認頁）
   // LINE Pay's ?transactionId=... append can end up glued onto this param
   const { orderId: rawOrderId } = useParams<{ orderId: string }>();
   const orderId = rawOrderId?.split(/[?&]/)[0];
@@ -44,7 +45,8 @@ export default function PaymentConfirmPage() {
       setStatus("confirming");
       try {
         const result = await httpsCallable(functions, "confirmLinePayPayment")({ order_id: orderId });
-        const { lock_ids: ids } = result.data as { lock_ids: string[] };
+        const { lock_ids: ids, kind } = result.data as { lock_ids: string[]; kind?: string };
+        setIsResale(kind === "resale");
         // 付款已成功，讀不到細節也不能讓頁面變成「付款確認失敗」
         const docs = await Promise.all(ids.map((id) => getDoc(doc(db, "locks", id)).catch(() => null)));
         setLocks(docs.filter((d) => d?.exists()).map((d) => ({ id: d!.id, ...d!.data() }) as Lock));
@@ -78,7 +80,7 @@ export default function PaymentConfirmPage() {
           <div className="bb-receipt space-y-6">
             <div className="text-center">
               <span className="bb-receipt__check" aria-hidden="true"><CheckCircle2 className="w-9 h-9" /></span>
-              <h1 className="font-heading font-semibold text-[clamp(36px,6vw,56px)] leading-tight mt-4">{tr("預購成功！", "You're all set!")}</h1>
+              <h1 className="font-heading font-semibold text-[clamp(36px,6vw,56px)] leading-tight mt-4">{isResale ? tr("接手成功！", "It's yours!") : tr("預購成功！", "You're all set!")}</h1>
               <p className="text-muted-foreground mt-1">{tr("越早訂，越開心。到時候見！", "Book early, eat happy — see you at pickup!")}</p>
             </div>
             <ul className="divide-y divide-dashed divide-border border-y border-dashed border-border">

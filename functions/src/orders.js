@@ -5,12 +5,15 @@
 //   menu_item_id, slots[{ category, default_dish, default_component_id, removed, wished,
 //     wished_component_id, candidate_index, resolved, portion_level }], rice: add|normal|less
 //   list_price（品項原價）, adjust_amount（加減）, early_bird_amount, coupon_discount,
-//   locked_price（實付）, coupon_id, payer_uid（付款人，轉讓後不變，抽獎券歸他）
+//   locked_price（實付）, coupon_id, payer_uid（付款人，抽獎券歸他；付費接手後換成接手者）
+//   paid_amount（payer 在 transaction_id 實付的金額，退款以它為準；免費領取把 locked_price 改 0 也不動它）
+//   resale_hold{ uid, intent_id, expires_at }（有人正在付款接手）, transfers[]（付費接手紀錄）
 //   payment_intent_id, transaction_id, pickup_code（4 碼）, phone_last3, qr_nonce, share_token
 //   cutoff_done（截單已判定）, charity_source: noshow|donated
 // 狀態：locked → for_resale / for_gift → fulfilled / resold_and_fulfilled / charity / cancelled
 const crypto = require("crypto");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { Timestamp } = require("firebase-admin/firestore");
 const {
   REGION, db, onCall, HttpsError, logger, FieldValue, t, isEmulator, assertSignedInUser, assertAdminOrVendorOwner,
   callerVendorId, notifyUser, notifyVendor, loadVendorCatalog, forEachVendor,
@@ -25,6 +28,7 @@ const {
 const { isBento, resolveChoices, resolveMain, resolveExtraSide, adjustAmount, RICE_OPTIONS } = require("./bento");
 const { ACTIVE_LOCK_STATUSES, componentPortions, rawNeeds, buildTimeline, buildLabels } = require("./prep");
 const { taipeiToday, taipeiTime, addDays, mondayOf, at, splitWindow } = require("./calendar");
+const { recordMatchedClaim } = require("./resaleMatch").helpers;
 const { billingStateOf } = require("./finance").helpers;
 
 const APP_BASE_URL = () => process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
@@ -456,7 +460,9 @@ exports.confirmLinePayPayment = onCall({}, async (request) => {
   const intent = intentSnap.data();
   if (intent.buyer_uid !== request.auth.uid) throw new HttpsError("permission-denied", "This payment doesn't belong to you");
   // Idempotent: the confirm redirect can legitimately fire twice.
-  if (intent.status === "confirmed") return { lock_ids: intent.lock_ids };
+  if (intent.status === "confirmed") return { lock_ids: intent.lock_ids, ...(intent.kind === "resale" ? { kind: "resale" } : {}) };
+  if (intent.status === "gone") throw new HttpsError("failed-precondition", intent.gone_reason || t("這份已經被接走了，這筆沒有扣款", "Someone else got it first. You weren't charged."));
+  if (intent.kind === "resale") return confirmResale(request, intentRef, intent);
   if (intent.status === "sold_out") throw new HttpsError("resource-exhausted", soldOutDuringPayment());
   if (intent.status === "coupon_gone") throw new HttpsError("failed-precondition", couponGoneDuringPayment());
   if (intent.status !== "pending") throw new HttpsError("failed-precondition", `This payment is ${intent.status}, not pending`);
@@ -543,6 +549,7 @@ exports.confirmLinePayPayment = onCall({}, async (request) => {
       status: "locked",
       buyer_uid: request.auth.uid,
       payer_uid: request.auth.uid,
+      paid_amount: draft.locked_price,
       payment_intent_id: orderId,
       transaction_id: intent.transaction_id,
       pickup_code: codes[i],
@@ -563,9 +570,15 @@ exports.confirmLinePayPayment = onCall({}, async (request) => {
  * 截單前取消／修改；取餐時段內捐為愛心餐
  * ------------------------------------------------------------------ */
 
+/** 付款人在這筆交易實付的金額；舊資料沒有 paid_amount 就用 locked_price */
+function paidAmountOf(lock) {
+  return Number.isFinite(lock.paid_amount) ? lock.paid_amount : lock.locked_price || 0;
+}
+
 async function refundLockMoney(lock) {
-  if (!(lock.locked_price > 0) || !lock.transaction_id) return;
-  await refundPayment({ transactionId: lock.transaction_id, refundAmount: lock.locked_price });
+  const amount = paidAmountOf(lock);
+  if (!(amount > 0) || !lock.transaction_id) return;
+  await refundPayment({ transactionId: lock.transaction_id, refundAmount: amount });
 }
 
 /**
@@ -586,7 +599,7 @@ async function cancelAndRefund(lockRef, reason) {
   }
   const batch = db().batch();
   batch.update(lockRef, {
-    status: "cancelled", cancel_reason: reason, refunded_amount: lock.locked_price || 0, cancelled_at: FieldValue.serverTimestamp(),
+    status: "cancelled", cancel_reason: reason, refunded_amount: paidAmountOf(lock), cancelled_at: FieldValue.serverTimestamp(),
   });
   if (lock.coupon_id) {
     const couponRef = db().collection("coupons").doc(lock.coupon_id);
@@ -632,6 +645,211 @@ exports.cancelLock = onCall({}, async (request) => {
   }
   return { ok: true };
 });
+
+/* ------------------------------------------------------------------ *
+ * 轉讓市集付費接手（規格 §4.1：接手者付款後成為新持有人）
+ * 接手者付「早鳥價（折價券前）」給 LINE Pay，成功後原付款人自動退回他實付的金額：
+ * 同一份餐店家還是收一次錢，只是付錢的人換了。原付款人用掉的折價券不退回。
+ * 抽獎券跟著真正付錢的人走：接手後 payer_uid 換成接手者。
+ * 逾時沒人接手仍照 firestore.rules 開放 $0 免費領取（原付款人不退款）。
+ * ------------------------------------------------------------------ */
+
+const RESALE_HOLD_MS = 15 * 60 * 1000;
+
+/** 接手價＝早鳥價＋加減（折價券前）；舊資料沒有拆欄位就用實付＋券折抵 */
+function resalePriceOf(lock) {
+  if (Number.isFinite(lock.list_price) && Number.isFinite(lock.early_bird_amount)) {
+    return Math.max(0, lock.list_price - lock.early_bird_amount + (lock.adjust_amount || 0));
+  }
+  return Math.max(0, (lock.locked_price || 0) + (lock.coupon_discount || 0));
+}
+
+const millisOf = (ts) => (ts && typeof ts.toMillis === "function" ? ts.toMillis() : 0);
+
+/** 這份還能不能由 uid 付款接手；回傳錯誤訊息或 null */
+function resaleProblem(lock, uid, now = Date.now()) {
+  if (!lock || lock.status !== "for_resale") return t("這份已經被接走或取消轉讓了", "This meal is no longer up for transfer");
+  if (lock.buyer_uid === uid) return t("不能接手自己轉讓的餐點", "You can't take over your own listing");
+  const deadline = millisOf(lock.resale_deadline);
+  if (deadline && deadline <= now) return t("轉讓已逾時，現在可以免費領取", "The listing has expired — it's free to claim now");
+  const hold = lock.resale_hold;
+  if (hold && hold.uid !== uid && millisOf(hold.expires_at) > now) {
+    return t("有人正在付款接手這份，請稍後再看看", "Someone is paying for this one right now. Check back shortly.");
+  }
+  return null;
+}
+
+/** 「我要接手」：先保留這份 15 分鐘，再向 LINE Pay 請款（0 元直接到確認頁） */
+exports.createResaleLinePayReservation = onCall({}, async (request) => {
+  assertSignedInUser(request, "接手轉讓");
+  await assertNotBanned(request.auth.uid);
+  const lockId = request.data?.lock_id;
+  if (typeof lockId !== "string" || !lockId) throw new HttpsError("invalid-argument", "lock_id is required");
+  const lockRef = db().collection("locks").doc(lockId);
+  const intentRef = db().collection("payment_intents").doc();
+  const orderId = intentRef.id;
+
+  const lock = await db().runTransaction(async (tx) => {
+    const snap = await tx.get(lockRef);
+    const data = snap.exists ? snap.data() : null;
+    const problem = resaleProblem(data, request.auth.uid);
+    if (problem) throw new HttpsError("failed-precondition", problem);
+    tx.update(lockRef, {
+      resale_hold: { uid: request.auth.uid, intent_id: orderId, expires_at: Timestamp.fromMillis(Date.now() + RESALE_HOLD_MS) },
+    });
+    return data;
+  });
+
+  const amount = resalePriceOf(lock);
+  let transactionId = null;
+  let paymentUrl = `${APP_BASE_URL()}/#/payment/confirm/${orderId}`;
+  if (amount > 0) {
+    try {
+      const info = await requestPayment({
+        orderId, amount,
+        products: [{ name: t(`接手：${lock.item_name}`, `Take over: ${lock.item_name_en || lock.item_name}`), quantity: 1, price: amount }],
+        confirmUrl: `${APP_BASE_URL()}/#/payment/confirm/${orderId}`,
+        cancelUrl: `${APP_BASE_URL()}/#/payment/cancel/${orderId}`,
+      });
+      transactionId = String(info.transactionId);
+      paymentUrl = info.paymentUrl.web;
+    } catch (err) {
+      logger.error("LINE Pay request failed (resale)", err);
+      await lockRef.update({ resale_hold: FieldValue.delete() }).catch(() => {});
+      throw new HttpsError("internal", t("LINE Pay 付款請求失敗，請稍後再試", "The LINE Pay request failed. Please try again later."));
+    }
+  }
+  await intentRef.set({
+    kind: "resale",
+    status: "pending",
+    buyer_uid: request.auth.uid,
+    lock_id: lockId,
+    seller_uid: lock.buyer_uid,
+    transaction_id: transactionId,
+    amount,
+    created_at: FieldValue.serverTimestamp(),
+  });
+  return { order_id: orderId, payment_url: paymentUrl, free: amount === 0, amount };
+});
+
+/** confirmLinePayPayment 的接手分支：先換人（賣家就不能再取消轉讓）→ 扣款 → 退款給原付款人 */
+async function confirmResale(request, intentRef, intent) {
+  const orderId = intentRef.id;
+  const lockRef = db().collection("locks").doc(intent.lock_id);
+  const uid = request.auth.uid;
+
+  // 1) 交易內檢查還能接手，先把持有人換成接手者並標記「付款中」；還沒扣款
+  const prev = await db().runTransaction(async (tx) => {
+    const fresh = (await tx.get(intentRef)).data();
+    if (fresh.status !== "pending") {
+      throw new HttpsError("failed-precondition", t("這筆付款正在處理中，請稍候重新整理", "This payment is still being processed."));
+    }
+    const lock = (await tx.get(lockRef)).data();
+    // 自己的保留過期了但沒人搶，照樣可以接手；別人正在付款（保留未過期）就不行
+    const problem = resaleProblem(lock, uid);
+    if (problem) {
+      tx.update(intentRef, { status: "gone", gone_reason: problem });
+      return { gone: problem };
+    }
+    const snapshot = {
+      buyer_uid: lock.buyer_uid,
+      payer_uid: lock.payer_uid || lock.buyer_uid,
+      transaction_id: lock.transaction_id || null,
+      paid_amount: paidAmountOf(lock),
+      resale_deadline: lock.resale_deadline || null,
+      transferred_from_uids: lock.transferred_from_uids || [],
+    };
+    tx.update(lockRef, {
+      status: "locked",
+      buyer_uid: uid,
+      transferred_from_uids: FieldValue.arrayUnion(lock.buyer_uid),
+      resale_deadline: FieldValue.delete(),
+      resale_hold: FieldValue.delete(),
+      resale_payment_pending: orderId,
+    });
+    tx.update(intentRef, { status: "confirming", prev: snapshot });
+    return snapshot;
+  });
+  if (prev.gone) throw new HttpsError("failed-precondition", prev.gone);
+
+  // 2) 扣款；失敗就把餐點還給賣家、意圖回 pending，接手者可以重試
+  if (intent.amount > 0) {
+    try {
+      await confirmPayment({ transactionId: intent.transaction_id, amount: intent.amount });
+    } catch (err) {
+      logger.error("LINE Pay confirm failed (resale)", err);
+      const rollback = db().batch();
+      rollback.update(lockRef, {
+        status: "for_resale",
+        buyer_uid: prev.buyer_uid,
+        transferred_from_uids: prev.transferred_from_uids,
+        ...(prev.resale_deadline ? { resale_deadline: prev.resale_deadline } : {}),
+        resale_payment_pending: FieldValue.delete(),
+      });
+      rollback.update(intentRef, { status: "pending" });
+      await rollback.commit().catch((e) => logger.error("Resale rollback failed", e));
+      throw new HttpsError("internal", t("LINE Pay 付款確認失敗，請稍後再試或聯絡客服", "LINE Pay couldn't confirm the payment. Please try again later."));
+    }
+  }
+
+  // 3) 接手者成為付款人；換掉代領連結與 QR，原持有人手上的截圖立即失效
+  const lock = (await lockRef.get()).data();
+  const batch = db().batch();
+  batch.update(lockRef, {
+    payer_uid: uid,
+    transaction_id: intent.transaction_id,
+    payment_intent_id: orderId,
+    paid_amount: intent.amount,
+    locked_price: intent.amount,
+    coupon_id: null,
+    coupon_discount: 0,
+    share_token: crypto.randomBytes(12).toString("hex"),
+    qr_nonce: FieldValue.delete(),
+    resale_payment_pending: FieldValue.delete(),
+    transfers: FieldValue.arrayUnion({
+      intent_id: orderId, from_uid: prev.buyer_uid, to_uid: uid, price: intent.amount,
+      refund_uid: prev.payer_uid, refund_amount: prev.transaction_id ? prev.paid_amount : 0, at: Timestamp.now(),
+    }),
+  });
+  batch.delete(db().collection("lock_tokens").doc(intent.lock_id)); // 原持有人的取餐提醒
+  batch.update(intentRef, { status: "confirmed", lock_ids: [intent.lock_id] });
+  await batch.commit();
+
+  // 4) 退款給原付款人（他實付的金額）。扣款已成功、餐點已換人，退款失敗不回滾，記下來讓管理員補退
+  let refundStatus = "none";
+  if (prev.transaction_id && prev.paid_amount > 0) {
+    try {
+      await refundPayment({ transactionId: prev.transaction_id, refundAmount: prev.paid_amount });
+      refundStatus = "done";
+    } catch (err) {
+      logger.error(`resale refund failed for lock ${intent.lock_id}`, err);
+      refundStatus = "failed";
+    }
+  }
+  await lockRef.update({
+    transfer_refund: { intent_id: orderId, uid: prev.payer_uid, amount: prev.paid_amount, transaction_id: prev.transaction_id, status: refundStatus, at: Timestamp.now() },
+  });
+  await notifyUser(prev.buyer_uid, {
+    kind: "transfer",
+    title: t("你轉讓的餐點已被接手", "Your listed meal was taken over"),
+    body: refundStatus === "done" && prev.payer_uid === prev.buyer_uid
+      ? t(`「${lock.item_name}」已由別人付款接手，NT$ ${prev.paid_amount} 已退回原付款方式。`, `${lock.item_name} was taken over; NT$ ${prev.paid_amount} is on its way back to you.`)
+      : t(`「${lock.item_name}」已由別人付款接手。`, `${lock.item_name} was taken over.`),
+    link: "/my-bookings",
+  }).catch((err) => logger.warn("notify seller failed", err));
+  // 贈送或免費領取來的餐點再轉讓：錢退給當初真正付款的人
+  if (refundStatus === "done" && prev.payer_uid !== prev.buyer_uid) {
+    await notifyUser(prev.payer_uid, {
+      kind: "transfer",
+      title: t("餐點款項已退回", "Your payment was refunded"),
+      body: t(`你付款的「${lock.item_name}」已由別人付款接手，NT$ ${prev.paid_amount} 已退回原付款方式。`, `Someone paid for ${lock.item_name}; NT$ ${prev.paid_amount} is on its way back to you.`),
+      link: "/my-bookings",
+    }).catch((err) => logger.warn("notify payer failed", err));
+  }
+  // AI 轉讓媒合的影響指標：接手的人是不是被通知的會員（失敗不影響接手）
+  await recordMatchedClaim(intent.lock_id, uid).catch((err) => logger.warn(`recordMatchedClaim ${intent.lock_id}`, err));
+  return { lock_ids: [intent.lock_id], kind: "resale", refund_status: refundStatus };
+}
 
 /** 鎖定目前的選擇 → resolveOrderChoices 吃的格式（沒送的欄位沿用原本的） */
 function currentChoices(lock) {
@@ -717,6 +935,7 @@ exports.updateLockChoices = onCall({}, async (request) => {
       throw new HttpsError("internal", t("退差額失敗，請稍後再試", "Refunding the difference failed. Please try again later."));
     }
     patch.refunded_amount = (lock.refunded_amount || 0) + refund;
+    patch.paid_amount = paidAmountOf(lock) - refund;
   }
 
   // 換時段要搬份數（有上限的店家先檢查新時段還有沒有位子）
@@ -885,7 +1104,8 @@ async function completeLock(ref, vendorId, today, preview, nonce) {
     }
     const summary = lockSummary(ref.id, lock);
     if (preview) return summary;
-    const transferred = (lock.payer_uid || lock.buyer_uid) !== lock.buyer_uid;
+    // 轉讓過的餐點：免費領取／贈送（付款人還是原訂購人）或付費接手（transfers 有紀錄、付款人已換成接手者）
+    const transferred = (lock.payer_uid || lock.buyer_uid) !== lock.buyer_uid || (lock.transfers || []).length > 0;
     const status = transferred ? "resold_and_fulfilled" : "fulfilled";
     tx.update(ref, { status, qr_nonce: FieldValue.delete(), fulfilled_at: FieldValue.serverTimestamp() });
     return { ...summary, status, completed: true };

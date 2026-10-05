@@ -149,7 +149,13 @@ Oct 1, 2026 · @Tom
 - 截單前可自由修改（主菜、配菜、飯量、取餐時段）或取消，LINE Pay 全額退款、折價券退回。
 - 截單後不可退款；天災例外見第 11 節。
 
-**轉讓與贈送**：截單前後都可在「轉讓市集」上架轉售，或以連結贈送；接手者付款後成為新持有人。抽獎券仍歸原付款人。取餐時段內可主動「捐為愛心餐」。
+**轉讓與贈送**：截單前後都可在「轉讓市集」上架轉售，或以連結贈送。取餐時段內可主動「捐為愛心餐」。
+
+- **付費接手**：接手價＝早鳥價＋加減（折價券前），不能自訂。接手者以 LINE Pay 付款後成為新持有人，原付款人自動退回他實付的金額（部分退款）；原付款人用掉的折價券不退回。店家同一份餐只收一次錢。
+- **搶單**：按「付款接手」時保留這份 15 分鐘，其他人暫時不能接手；付款失敗則退回賣家。
+- **抽獎券**：歸實際付款的人，付費接手後改歸接手者。
+- **逾時**：取餐時段結束仍沒人接手，開放 $0 免費領取，原付款人不退款。
+- **贈送**：不經付款，抽獎券仍歸原付款人。
 
 ### 4.2 自組便當（點圖片選菜）
 
@@ -311,7 +317,7 @@ Oct 1, 2026 · @Tom
 ### 8.2 抽獎券發放
 
 - 以「使用者 × 店家 × 結算期」累計實付金額，每 100 元一張，餘額結轉下一期。
-- 發放時機：掃碼完成取餐，或轉為愛心餐時；歸原付款人（`payer_uid`）。
+- 發放時機：掃碼完成取餐，或轉為愛心餐時；歸付款人（`payer_uid`，付費接手後為接手者）。
 - 只能抽該店家的回饋池；開池前不過期。
 
 ### 8.3 券種
@@ -449,6 +455,7 @@ locks/{lockId}           // 一筆＝一份餐點
   main_dish_id, slots[...], extra_side{dishId, mode: backup|addon}, rice: add|normal|less
   plan_id, plan_day
   list_price, early_bird_amount, adjust_amount, coupon_discount, locked_price, coupon_id
+  paid_amount（付款人實付，退款依據）, resale_hold{uid, intent_id, expires_at}, transfers[], transfer_refund
   status: locked|for_resale|for_gift|fulfilled|resold_and_fulfilled|charity|cancelled
 
 sideWishes/{vendorId}_{date}_{slot}_{dishId}   // 候選菜許願計數
@@ -468,7 +475,7 @@ charityMeals/{id}  charityReservations/{id}  disasterEvents/{id}  payment_intent
 | Function | 觸發 | 功能 |
 | --- | --- | --- |
 | `createCartLinePayReservation`／`confirmLinePayPayment` | Callable | 付款、建立 `locks`（伺服器重算早鳥與加減） |
-| `claimResoldLock` | Callable | 接手轉讓／領取贈送 |
+| `createResaleLinePayReservation` | Callable | 付費接手：保留 15 分鐘並向 LINE Pay 請款；`confirmLinePayPayment` 確認後換人並退款給原付款人 |
 | `cancelLock`／`updateLockChoices` | Callable | 截單前取消、修改主菜、配菜、飯量與取餐時段 |
 | `donateLock` | Callable | 捐為愛心餐 |
 | `lockOrders` | 每 10 分 | 截單、判定許願與備案遞補、產生每日備料與標籤 |
@@ -524,6 +531,7 @@ charityMeals/{id}  charityReservations/{id}  disasterEvents/{id}  payment_intent
 - [x] **第一階段簡化**：券種 3 種；愛心餐不停權；份量全份／半份；導覽列 4 個。
 - [x] **平台收費**：不抽成，每月 NT$ 1,999 含稅，首月免費。
 - [x] **基本工資**：自動更新，店家不得低於基本工資。
+- [x] **轉讓付款**：接手者付早鳥價（折價券前），原付款人退回實付、券不退；抽獎券歸接手者（2026-10-05）。
 - [ ] **主菜價差與早鳥**：暫定只打在主菜價格上。
 - [ ] **毛利警示門檻**：暫定 8 折後毛利低於材料成本 30%。
 - [ ] **繳費與逾期**：暫定信用卡或轉帳；寬限 7 天後暫停接單。

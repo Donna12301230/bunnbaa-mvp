@@ -7,11 +7,10 @@ const { FieldValue } = require("firebase-admin/firestore");
 admin.initializeApp();
 const db = admin.firestore();
 
-const { onCall, HttpsError, assertAdminOrEmulator, assertSignedInUser, assertAdminOrVendorOwner } = require("./common");
+const { onCall, HttpsError, assertAdminOrEmulator, assertAdminOrVendorOwner } = require("./common");
 const { generateVendorCalibrationReport } = require("./vendorCalibration");
 const { generateDiscountExplanation } = require("./consumerExplanation");
 const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./translate");
-const { recordMatchedClaim } = require("./resaleMatch").helpers;
 
 // 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格.md）的功能拆在各模組：
 //   orders.js     下單計價、LINE Pay、截單判定許願、每日備料、QR 取餐、取消退款
@@ -149,55 +148,7 @@ exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request)
   return { report_id: reportId };
 });
 
-/**
- * A second buyer takes over a resold lock. Spec ref: 改造指南 §5.3 — resale
- * money never flows through the platform (B pays A directly, off-platform);
- * the platform's only job is reassigning `buyer_uid` in Firestore. Needs
- * admin rights because the existing rule only lets a lock's *current*
- * buyer transition their own lock to `for_resale`, not have a stranger
- * take it over.
- */
-exports.claimResoldLock = onCall({ region: "asia-east1" }, async (request) => {
-  assertSignedInUser(request, "claim a lock");
-  const { lock_id: lockId } = request.data || {};
-  if (!lockId) throw new HttpsError("invalid-argument", "lock_id is required");
-
-  const lockRef = db.collection("locks").doc(lockId);
-  // Transaction so two buyers racing for the same listing can't both win —
-  // the loser re-reads a "locked" doc and gets failed-precondition.
-  await db.runTransaction(async (tx) => {
-    const lockSnap = await tx.get(lockRef);
-    if (!lockSnap.exists) {
-      throw new HttpsError("not-found", `No lock found with id ${lockId}`);
-    }
-    const lock = lockSnap.data();
-    if (lock.status !== "for_resale") {
-      throw new HttpsError("failed-precondition", "This lock isn't currently up for resale");
-    }
-    if (lock.buyer_uid === request.auth.uid) {
-      throw new HttpsError("failed-precondition", "You can't claim your own resale listing");
-    }
-
-    // Back to "locked" so the lock leaves the marketplace instead of showing up
-    // as the new owner's own listing; transferred_from_uids keeps it visible
-    // under the seller's 「我的轉讓」 (same field the client-side claim rules
-    // require in firestore.rules).
-    tx.update(lockRef, {
-      status: "locked",
-      buyer_uid: request.auth.uid,
-      resale_deadline: FieldValue.delete(),
-      transferred_from_uids: FieldValue.arrayUnion(lock.buyer_uid),
-      // 換掉代領連結與 QR nonce，原持有人手上的連結／截圖立即失效
-      share_token: require("crypto").randomBytes(12).toString("hex"),
-      qr_nonce: FieldValue.delete(),
-    });
-    // 原持有人的取餐提醒推播 token，接手後就不該再提醒他
-    tx.delete(db.collection("lock_tokens").doc(lockId));
-  });
-  // AI 轉讓媒合的影響指標：接手的人是不是被通知的會員（失敗不影響接手）
-  await recordMatchedClaim(lockId, request.auth.uid).catch((err) => logger.warn(`recordMatchedClaim ${lockId}`, err));
-  return { lock_id: lockId };
-});
+// 轉讓市集接手改成付費接手（規格 §4.1）：createResaleLinePayReservation＋confirmLinePayPayment（orders.js）
 
 /* ------------------------------------------------------------------ *
  * 1b. Vendor payouts — platform collects, forwards in full, on a

@@ -61,12 +61,28 @@ async function callLinePay(method, uri, body) {
   return json.info;
 }
 
+// 本機 emulator 沒設 LINE Pay 金鑰時改用假金流，才能在本機點完付款、轉讓接手、退款。
+// 只在 emulator、只認自己發出的 fake- 交易編號；測試故意塞的 tx-fake 之類照樣失敗。
+// 正式站（不是 emulator）或有金鑰時一律走真的 LINE Pay。
+const FAKE_PREFIX = "fake-";
+function fakeMode() {
+  return process.env.FUNCTIONS_EMULATOR === "true"
+    && !(process.env.LINE_PAY_CHANNEL_ID && process.env.LINE_PAY_CHANNEL_SECRET);
+}
+const isFakeTransaction = (transactionId) => fakeMode() && String(transactionId).startsWith(FAKE_PREFIX);
+
 /**
  * Reserves a payment; returns { transactionId, paymentUrl, paymentAccessToken }.
  * `products` is LINE Pay's own shape: [{ name, quantity, price }, ...] — one
  * entry per cart line (a single-item checkout just passes a 1-element array).
  */
 function requestPayment({ orderId, amount, products, confirmUrl, cancelUrl }) {
+  if (fakeMode()) {
+    const transactionId = `${FAKE_PREFIX}${Date.now()}${randomUUID().slice(0, 8)}`;
+    // 跟真的 LINE Pay 一樣導回 confirmUrl 並接上 ?transactionId=；只留 #/ 之後，本機才不會跳去 APP_BASE_URL（正式站）
+    const hashPath = confirmUrl.includes("#") ? confirmUrl.slice(confirmUrl.indexOf("#")) : confirmUrl;
+    return Promise.resolve({ transactionId, paymentUrl: { web: `${hashPath}?transactionId=${transactionId}` } });
+  }
   const uri = "/v3/payments/request";
   return callLinePay("POST", uri, {
     amount,
@@ -79,6 +95,7 @@ function requestPayment({ orderId, amount, products, confirmUrl, cancelUrl }) {
 
 /** Confirms a reserved payment after the buyer approves it in LINE Pay. */
 function confirmPayment({ transactionId, amount }) {
+  if (isFakeTransaction(transactionId)) return Promise.resolve({ transactionId, fake: true, amount });
   const uri = `/v3/payments/${transactionId}/confirm`;
   return callLinePay("POST", uri, { amount, currency: "TWD" });
 }
@@ -90,6 +107,7 @@ function confirmPayment({ transactionId, amount }) {
  * locked_price. 停班停課自動退款（§11）也走這裡。
  */
 function refundPayment({ transactionId, refundAmount }) {
+  if (isFakeTransaction(transactionId)) return Promise.resolve({ refundTransactionId: `${transactionId}-refund`, fake: true, refundAmount });
   const uri = `/v3/payments/${transactionId}/refund`;
   return callLinePay("POST", uri, refundAmount === undefined ? {} : { refundAmount });
 }

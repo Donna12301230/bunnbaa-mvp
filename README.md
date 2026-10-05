@@ -84,7 +84,7 @@ Functions 依功能拆檔（`functions/src/`）：`orders.js`（下單、LINE Pa
 | | `onLockCreated` | Firestore trigger（產生消費者折扣說明） |
 | 金流 | `createLinePayReservation`、`createCartLinePayReservation` | callable（單品／購物車發起付款） |
 | | `confirmLinePayPayment` | callable（付款確認後建立 `locks`） |
-| 交易 | `claimResoldLock` | callable（接手轉讓） |
+| 交易 | `createResaleLinePayReservation` | callable（付費接手轉讓，確認走 `confirmLinePayPayment`） |
 | | `markLockOutcome` | callable（商家 QR 核銷／標記 no-show） |
 | 結算 | `settleVendorPayouts` | 排程（每日 20:00） |
 | | `triggerSettlementNow` | callable |

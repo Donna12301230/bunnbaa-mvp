@@ -93,6 +93,12 @@ function expectCode(r, code, msg) {
   if (r.code !== code) throw new Error(`${msg || ""} expected ${code}, got ${r.code}: ${r.message}`);
   return r;
 }
+/** 轉讓市集付費接手（§4.1）：保留＋請款 → 確認付款。emulator 沒有 LINE Pay 金鑰，走假金流 */
+async function takeOver(user, lockId) {
+  const r = await user.call("createResaleLinePayReservation", { lock_id: lockId });
+  if (!r.ok) return r;
+  return user.call("confirmLinePayPayment", { order_id: r.data.order_id });
+}
 
 // ── 日期 ──
 const TODAY = taipeiToday();
@@ -594,9 +600,9 @@ function geohash(lat, lng, precision = 7) {
     });
 
     await test("C-MTC-10", "被通知的人接手 → claimed_by_match=true；沒被通知的人接手維持 false", async () => {
-      expectOk(await B1.call("claimResoldLock", { lock_id: L1.id }));
+      expectOk(await takeOver(B1, L1.id));
       eq((await get(`resale_matches/${L1.id}`)).claimed_by_match, true);
-      expectOk(await N.call("claimResoldLock", { lock_id: L3.id }));
+      expectOk(await takeOver(N, L3.id));
       eq((await get(`resale_matches/${L3.id}`)).claimed_by_match, false);
     });
 
@@ -625,7 +631,7 @@ function geohash(lat, lng, precision = 7) {
     const l = await lock(A.uid, VK);
     await db.doc(`lock_tokens/${l.id}`).set({ fcm_token: "fake-token", buyer_uid: A.uid });
     await l.ref.update({ status: "for_resale" });
-    expectOk(await B.call("claimResoldLock", { lock_id: l.id }));
+    expectOk(await takeOver(B, l.id));
     assert(!(await get(`lock_tokens/${l.id}`)), "lock_tokens 仍在（A 會繼續收到這筆的提醒）");
   });
 

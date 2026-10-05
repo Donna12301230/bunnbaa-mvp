@@ -214,6 +214,9 @@ export interface Lock {
   coupon_id?: string | null;
   coupon_discount?: number;
   payer_uid?: string;
+  paid_amount?: number; // payer 在 transaction_id 實付的金額（退款依據）
+  resale_hold?: { uid: string; intent_id: string; expires_at: unknown } | null; // 有人正在付款接手
+  transfer_refund?: { uid: string; amount: number; status: "done" | "failed" | "none" } | null;
   pickup_code?: string; // 4 碼取餐號
   share_token?: string; // 代領連結
   cutoff_at?: unknown; // Firestore Timestamp

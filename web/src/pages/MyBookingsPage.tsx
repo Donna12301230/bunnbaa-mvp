@@ -22,6 +22,7 @@ import EditWishesDialog from "@/components/EditWishesDialog";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { extraSideText, riceLabel, slotText } from "@/lib/bento";
 import { isPastCutoff, todayStr } from "@/lib/pickupSlots";
+import { refundOnTakeover, resalePrice } from "@/lib/transfers";
 import type { Lock } from "@/types";
 import { EmptyState, Tag } from "@/components/ds";
 import TransferMarketPage from "@/pages/TransferMarketPage";
@@ -489,6 +490,12 @@ export default function MyBookingsPage() {
                         <div className="flex flex-col gap-1.5 pt-1">
                           <p className="text-caption text-muted-foreground">
                             {deadline ? formatCountdown(deadline, now) : tr("等待有人接手", "Waiting for someone to take it")}{tr("・已上架到轉讓市集", " · listed on the transfer market")}
+                          </p>
+                          <p className="text-caption text-muted-foreground">
+                            {(lock.payer_uid ?? lock.buyer_uid) === lock.buyer_uid && refundOnTakeover(lock) > 0
+                              ? tr(`接手價 NT$${resalePrice(lock)}；有人付款接手後，你付的 NT$${refundOnTakeover(lock)} 會退回原付款方式。逾時沒人接手會開放免費領取、不退款。`,
+                                `Listed at NT$${resalePrice(lock)}. Once someone pays, your NT$${refundOnTakeover(lock)} goes back to you. If nobody takes it in time it becomes free to claim, with no refund.`)
+                              : tr(`接手價 NT$${resalePrice(lock)}。`, `Listed at NT$${resalePrice(lock)}.`)}
                           </p>
                           <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-600" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
                             {tr("取消轉讓", "Cancel transfer")}

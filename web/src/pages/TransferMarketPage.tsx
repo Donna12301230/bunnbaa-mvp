@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db, functions } from "@/lib/firebase";
 import { isClean } from "@/lib/searchFilter";
-import { takeOverLock } from "@/lib/transfers";
+import { refundOnTakeover, resalePrice, takeOverLock } from "@/lib/transfers";
 import type { Lock } from "@/types";
 import { useVendors } from "@/hooks/useVendors";
 import { useItemImages } from "@/hooks/useItemImages";
@@ -19,21 +19,21 @@ import { tr, loc } from "@/lib/i18n";
 import { EmptyState, Tag } from "@/components/ds";
 import CharityMealsSection from "@/components/CharityMealsSection";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 // 對應 UI草圖 Marketplace.dc.html「轉讓市集」。接上真實 Firestore,沿用
 // ConsumerLockPage.tsx 已驗證過的模式:
-//   - 「我要接手」呼叫 claimResoldLock（functions/src/index.js，正式站要等 Blaze）
+//   - 「我要接手」＝付費接手（規格 §4.1）：createResaleLinePayReservation 保留 15 分鐘並導去
+//     LINE Pay，付款確認（confirmLinePayPayment）後換人，原付款人自動退款（functions/src/orders.js）
 //   - 「免費領取」是純 client-side 規則（firestore.rules：for_resale 且
 //     resale_deadline 已過，任何登入用戶可直接 updateDoc），不用排程
 //   - 列出所有商家的轉讓，只用 status 單一等值查詢（自動索引），排序交給前端，
 //     避免另外要求新的複合索引
 // 「取消轉讓」2026-09-22 補上 firestore.rules 規則（owner 可以把還沒被接手的
 // for_resale 改回 locked），「我的轉讓」現在是真的可以取消。已被接手的項目靠
-// locks.transferred_from_uids（接手時由 claimResoldLock／firestore.rules 強制寫入
+// locks.transferred_from_uids（接手時由 confirmLinePayPayment／firestore.rules 強制寫入
 // 原持有人）查回來，原持有人也保有讀取權限。
-// 轉賣價格由買家雙方私下議定、平台不經手，所以這裡不顯示「轉讓價」，只顯示
-// 原鎖定價（locked_price）。
+// 卡片顯示接手價（早鳥價、折價券前，lib/transfers.ts resalePrice），接手者實際付這個金額。
 
 function millisOf(ts: unknown): number {
   return (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
@@ -50,6 +50,7 @@ function formatCountdown(deadline: Date, now: number): string {
 // embedded＝放在我的餐點頁裡（不畫頁首、不含愛心餐分頁，愛心餐由我的餐點自己的分頁顯示）。
 export default function TransferMarketPage({ embedded = false }: { embedded?: boolean }) {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [browseTab, setBrowseTab] = useState<"browse" | "charity" | "mine">(() => {
     if (embedded || !`${window.location.search}${window.location.hash}`.includes("tab=charity")) return "browse";
     // 用過就清掉 ?tab=charity，免得之後再進轉讓市集還停在愛心餐分頁
@@ -159,12 +160,14 @@ export default function TransferMarketPage({ embedded = false }: { embedded?: bo
     if (!requireLogin()) return;
     setClaimingId(lockId);
     try {
-      const fn = httpsCallable(functions, "claimResoldLock");
-      await fn({ lock_id: lockId });
-      toast({ title: tr("已接手", "It's yours"), description: tr("取餐編號可在「我的餐點」查看。", "Find the pickup code under My meals.") });
+      const fn = httpsCallable(functions, "createResaleLinePayReservation");
+      const result = await fn({ lock_id: lockId });
+      const { order_id: orderId, payment_url: paymentUrl, free } = result.data as { order_id: string; payment_url: string; free?: boolean };
+      // 付款完成後由確認頁（/payment/confirm）換人、退款給原付款人
+      if (free) navigate(`/payment/confirm/${orderId}`);
+      else window.location.href = paymentUrl;
     } catch (err) {
       toast({ title: tr("接手失敗", "Couldn't take it over"), description: (err as Error).message, variant: "destructive" });
-    } finally {
       setClaimingId(null);
     }
   }
@@ -258,13 +261,16 @@ export default function TransferMarketPage({ embedded = false }: { embedded?: bo
                           <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                         </div>
                         <div className="flex items-center justify-between mt-auto pt-1.5">
-                          <span className="font-heading text-2xl font-semibold">${item.locked_price}</span>
+                          <span className="flex flex-col leading-tight">
+                            <span className="text-micro text-muted-foreground">{tr("接手價", "Price")}</span>
+                            <span className="font-heading text-2xl font-semibold">${resalePrice(item)}</span>
+                          </span>
                           <Button
                             size="sm"
                             disabled={claimingId === item.id}
                             onClick={() => handleClaim(item.id)}
                           >
-                            {claimingId === item.id ? tr("處理中…", "Working…") : tr("我要接手", "Take it")}
+                            {claimingId === item.id ? tr("處理中…", "Working…") : tr("付款接手", "Pay & take it")}
                           </Button>
                         </div>
                       </div>
@@ -304,7 +310,7 @@ export default function TransferMarketPage({ embedded = false }: { embedded?: bo
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-1.5">
                         <div>
-                          <span className="text-xs text-muted-foreground line-through mr-1.5">${item.locked_price}</span>
+                          <span className="text-xs text-muted-foreground line-through mr-1.5">${resalePrice(item)}</span>
                           <span className="font-heading text-2xl font-semibold">$0</span>
                         </div>
                         <Button
@@ -356,7 +362,10 @@ export default function TransferMarketPage({ embedded = false }: { embedded?: bo
                         <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-1.5">
-                        <span className="font-heading text-2xl font-semibold">${item.locked_price}</span>
+                        <span className="flex flex-col leading-tight">
+                          <span className="font-heading text-2xl font-semibold">${resalePrice(item)}</span>
+                          <span className="text-micro text-muted-foreground">{tr(`有人接手後退你 NT$${refundOnTakeover(item)}`, `NT$${refundOnTakeover(item)} back to you once taken`)}</span>
+                        </span>
                         <Button
                           size="sm"
                           variant="outline"
