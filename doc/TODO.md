@@ -4,7 +4,7 @@
 
 對應文件：`BunnBaa_0到1架構文件.docx`（唯一權威文件）、`BunnBaa_技術規格文件_v6_消費者端補強版.docx`（都在 repo 根目錄）。舊雛型：`../BunnBaa Parse_Ref/`。架構與開發設定見 [README.md](README.md)。舊版詳細紀錄（每項的來龍去脈、測試過程）請看 git 歷史 `26469e2` 以前的 TODO.md。
 
-正式站：https://bunnbaa-mvp-5474.web.app ｜ 目前正式站版本：`Donna` 分支 `e50e527`（2026-09-29 部署 `markLockOutcome`＋hosting；rules 與其他 Functions 仍是 09-28 的 `2e1a59b`）
+正式站：https://bunnbaa-mvp-5474.web.app ｜ 目前正式站版本：master `abdb4c4`（2026-10-05 21:28 hosting 由 GitHub Actions 部署、Functions 由本機 `firebase deploy --only functions` 手動部署；rules／indexes 仍是 09-30 部署的版本）
 
 ---
 
@@ -18,14 +18,16 @@ emulator 端對端測試已跑過：截單判定許願、備料清單／時間�
 部署前要做：
 - [x] `functions/.env` 加 `PICKUP_QR_SECRET`：2026-09-30 SU 已產生一組隨機字串（64 碼 hex），**還沒真的寫進正式站的 `functions/.env`**——本機沒有 `GEMINI_API_KEY`／`LINE_PAY_*` 這幾把既有金鑰，等雅婷把完整 `.env` 補齊再一起部署 Functions，避免用不完整的 `.env` 部署把現有能動的翻譯／LINE Pay 洗掉
 - [x] 部署 `firestore:rules,firestore:indexes`：2026-09-30 SU 已部署完成（先審查過規則，沒發現安全漏洞，只有 `charityBans` 沒開放管理員讀取，但目前沒有前端頁面用到，不影響）；索引在背景建立，可能還要幾分鐘才會顯示為 Enabled
-- [ ] 部署 `functions,hosting`（hosting 其實已經在 master push 時自動上了；functions 卡在上面的金鑰，等雅婷）
+- [x] 部署 `functions,hosting`：2026-10-05 完成（`.env` 金鑰已補齊，從本機手動部署 Functions）
+- [ ] **GitHub Actions 自動部署 Functions 會失敗**：repo 沒設 `FUNCTIONS_ENV` secret，workflow 會在部署前停下（保護金鑰，不會動到正式站）。設好之前 master 動到 `functions/` 都要手動 `firebase deploy --only functions`；設定方式：`gh secret set FUNCTIONS_ENV < functions/.env`
 - [ ] 正式站灌 `node scripts/seed-phase1.js`（或 `--catalog-only` 只灌模板與配方）——需要服務帳號金鑰
-- [ ] Firebase Console 確認新排程都有啟用：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`（每 5–10 分）、`closeRewardPeriod`（週一 00:10）、`buildWeeklyPurchase`（週六 12:00）、`buildMonthlyPurchase`（25 日）、`pollDisasterFeeds`（每 15 分）
-- [ ] 舊的 `drawGrowthReward`、`markLockOutcome`、`createLinePayReservation`、`pickupReminders`、`triggerPickupRemindersNow` 已移除，部署時 CLI 會問要不要刪除雲端上的舊函式 → 選是
+- [ ] Firebase Console 確認新排程都有啟用：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`（每 5–10 分）、`closeRewardPeriod`（週一 00:10）、`buildWeeklyPurchase`（週六 12:00）、`pollDisasterFeeds`（每 15 分）（`buildMonthlyPurchase` 已依 1002 規格移除，久放品項併入週叫貨單）
+- [x] 舊的 `drawGrowthReward`、`markLockOutcome`、`createLinePayReservation`、`pickupReminders`、`triggerPickupRemindersNow` 已移除；2026-10-05 再刪掉雲端上的 `buildMonthlyPurchase`（月叫貨單已取消）、`claimResoldLock`（舊的免費接手，已改付費接手）
 
 正式站要點過一次的流程：
 - [ ] 消費者：品項頁組便當（選日期、許願候選菜、不要、加減飯）→ 購物車套折價券 → LINE Pay → 我的餐點（QR、修改許願、截單前取消退款、代領連結、捐為愛心餐）
-- [ ] 店家：配方與原物料（Gemini 草稿、套用模板）→ 菜單便當設定 → 每日備料（產生、勾選、列印標籤、等值替換）→ 採購叫貨（盤點、LINE 傳送）→ 取餐掃碼 → 愛心餐 → 券負債看板 → 區域洞察
+- [ ] 店家：配方與原物料（Gemini 草稿、套用模板）→ 菜單便當設定 → 今日備料（產生、勾選、列印標籤、等值替換）→ 採購叫貨（盤點、LINE 傳送）
+- [ ] 店家「菜單與備料」四頁改版（設計見 [菜單與備料重新設計.md](菜單與備料重新設計.md)；emulator 已點過，截單與叫貨的 callable 因 emulator Functions 無回應沒測到）：叫貨單按「重新產生」後展開看需求來源、今日備料「LINE 叫貨」與「列印領料單」、原物料改單價的漲價影響→ 取餐掃碼 → 愛心餐 → 券負債看板 → 區域洞察
 - [ ] 管理員：平台參數、菜色庫與模板、天災事件（手動建立停班事件會真的退款，先用測試訂單）、異常審核
 - [ ] 手機：相機掃碼、定位（`firebase.json` 已改成 `geolocation=(self)`）
 
@@ -53,9 +55,9 @@ emulator 端對端測試已跑過：截單判定許願、備料清單／時間�
   - [ ] **部署 `firestore.rules` 到正式站**（BUG-9 修正在規則裡，沒部署前正式站上架 24 小時以後的餐點仍會 PERMISSION_DENIED）
   - [ ] 前景分頁複測畫面：C-MY-03 上架 3 天後的餐點、V-RPT-01 圖表總額＝卡片、V-PRP-01 另一視窗下單後份數自動 +1
 - [x] **已修但結果欄還是 FAIL**（2026-10-05 改 PASS；test:functions 59/59、test:functions:more 68/69（F-19 要 20:00 後））：C-NAV-01、C-MY-10、C-MKT-07、C-CHR-13、V-PUR-01、F-02、F-10
-  - [ ] C-ORD-02 付款成功頁（LINE Pay Sandbox）待測
+  - [x] C-ORD-02：2026-10-05 emulator 假金流 PASS（4 筆 locks、vendor_id 正確）；LINE Pay Sandbox 版成功頁留到正式站流程一起看
 - [ ] **完全沒測的 P0**（2026-10-05 畫面測完 11 筆 PASS：C-AUTH-01、C-BAN-07、V-MNU-01、V-SET-01／04／05、V-RCP-01／02、A-VND-01、A-APL-01、N-RWD-01（BUG-14 商家後台 4 頁手機橫向捲動，已修））；剩下：
-  - [ ] C-ORD-01：BLOCKED，Functions emulator 載入逾時（每個 callable 都 `Failed to load function`），重開 emulator 再測
+  - [x] C-ORD-01：2026-10-05 重開 emulator 後 PASS（假金流）；順帶修 BUG-15（品項頁換品項時數量沒重設）
   - [ ] C-AST-01／02、V-MNU-08／09：BLOCKED，`functions/.env.local` 在 emulator 把 `GEMINI_API_KEY` 清空，要暫時填 key 或到正式站測
   - [ ] V-RDM-10（正式站）
 - [ ] **整區沒測**：3.11 預購助理（C-AST-01～13、16、17）、4.4 菜單管理（V-MNU-01～05、07～15、17）、4.5 店家設定（V-SET-01、04～08、11、12）、4.7 配方（V-RCP-01～08）、4.3 時段與訂單（V-SES-01／02、V-ORD-01～03、V-PRP-04／06／07／08／10／12／16）、5 管理後台（A-VND、A-SET、A-AUD、A-DSH）、第四道備案遞補（C-BNT-20～23）
