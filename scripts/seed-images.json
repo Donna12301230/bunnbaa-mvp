@@ -2473,5 +2473,59 @@
     "src_large": "https://images.pexels.com/photos/1437268/pexels-photo-1437268.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
     "storage_path": "vendors/zaoan-sandwich/pexels-1437268.jpg",
     "url": "https://storage.googleapis.com/bunnbaa-mvp/vendors/zaoan-sandwich/pexels-1437268.jpg"
+  },
+  "item:cafe-renheya-demo-classic": {
+    "query": "chicken drumstick rice",
+    "pexels_id": 5266092,
+    "pexels_url": "https://www.pexels.com/photo/close-up-shot-of-a-delicious-chicken-5266092/",
+    "photographer": "Kai-Chieh Chan",
+    "src_large": "https://images.pexels.com/photos/5266092/pexels-photo-5266092.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+    "storage_path": "vendors/cafe-renheya-demo/pexels-5266092.jpg",
+    "url": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-5266092.jpg"
+  },
+  "item:cafe-renheya-demo-healthy": {
+    "query": "grilled chicken breast meal prep",
+    "pexels_id": 32287751,
+    "pexels_url": "https://www.pexels.com/photo/healthy-lunch-box-with-rice-and-vegetables-32287751/",
+    "photographer": "David Balbino",
+    "src_large": "https://images.pexels.com/photos/32287751/pexels-photo-32287751.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+    "storage_path": "vendors/cafe-renheya-demo/pexels-32287751.jpg",
+    "url": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-32287751.jpg"
+  },
+  "item:cafe-renheya-demo-veggie": {
+    "query": "mapo tofu",
+    "pexels_id": 20943933,
+    "pexels_url": "https://www.pexels.com/photo/close-up-of-a-person-eating-a-meal-20943933/",
+    "photographer": "Change C.C",
+    "src_large": "https://images.pexels.com/photos/20943933/pexels-photo-20943933.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+    "storage_path": "vendors/cafe-renheya-demo/pexels-20943933.jpg",
+    "url": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-20943933.jpg"
+  },
+  "item:wang-mama-biandang-don": {
+    "query": "sukiyaki beef bowl",
+    "pexels_id": 13065203,
+    "pexels_url": "https://www.pexels.com/photo/close-up-shot-of-a-dish-in-a-bowl-13065203/",
+    "photographer": "Marvin  Sacdalan",
+    "src_large": "https://images.pexels.com/photos/13065203/pexels-photo-13065203.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+    "storage_path": "vendors/wang-mama-biandang/pexels-13065203.jpg",
+    "url": "https://storage.googleapis.com/bunnbaa-mvp/vendors/wang-mama-biandang/pexels-13065203.jpg"
+  },
+  "item:wang-mama-biandang-rot_mon": {
+    "query": "braised chicken leg rice",
+    "pexels_id": 5305441,
+    "pexels_url": "https://www.pexels.com/photo/chicken-with-sesame-seeds-on-rice-5305441/",
+    "photographer": "Kai-Chieh Chan",
+    "src_large": "https://images.pexels.com/photos/5305441/pexels-photo-5305441.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+    "storage_path": "vendors/wang-mama-biandang/pexels-5305441.jpg",
+    "url": "https://storage.googleapis.com/bunnbaa-mvp/vendors/wang-mama-biandang/pexels-5305441.jpg"
+  },
+  "item:wang-mama-biandang-rot_tue": {
+    "query": "fried pork chop rice",
+    "pexels_id": 35215470,
+    "pexels_url": "https://www.pexels.com/photo/authentic-thai-stir-fried-pork-dish-with-egg-35215470/",
+    "photographer": "UNDO KIM",
+    "src_large": "https://images.pexels.com/photos/35215470/pexels-photo-35215470.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+    "storage_path": "vendors/wang-mama-biandang/pexels-35215470.jpg",
+    "url": "https://storage.googleapis.com/bunnbaa-mvp/vendors/wang-mama-biandang/pexels-35215470.jpg"
   }
 }
