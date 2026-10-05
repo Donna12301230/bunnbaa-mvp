@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { addDoc, collection, doc, setDoc } from "firebase/firestore";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useVendorCatalog } from "@/hooks/useVendorCatalog";
+import { useVendorMenu } from "@/hooks/useVendorMenu";
+import { componentPortionsForLock, portionsCost } from "@/lib/prep";
 import { queryClient } from "@/lib/queryClient";
 import { db } from "@/lib/firebase";
 import { componentCost, rawAmount } from "@/lib/bento";
@@ -48,6 +50,44 @@ export async function saveCatalogDoc(vendorId: string, kind: "ingredients" | "co
 }
 
 const SELECT = "w-full h-10 rounded-md border border-input bg-background px-2 text-sm";
+
+/**
+ * 漲價影響（3.3(c)）：改單價時，列出用到這個原物料的品項，預設組合（一碗飯、第一道主菜、預設配菜）的成本與毛利前後變化。
+ */
+function PriceImpact({ vendorId, draft }: { vendorId: string | undefined; draft: IngredientDraft }) {
+  const { data: catalog } = useVendorCatalog(vendorId);
+  const { data: items = [] } = useVendorMenu(vendorId);
+  const rows = useMemo(() => {
+    if (!catalog || !draft.id) return [];
+    const before = catalog.ingredientsById;
+    const after = { ...before, [draft.id]: { ...before[draft.id], ...draft, id: draft.id } };
+    const uses = new Set(catalog.components.filter((c) => c.ingredients.some((l) => l.ingredient_id === draft.id)).map((c) => c.id));
+    return items.flatMap((item) => {
+      const portions = componentPortionsForLock({ rice: "normal", slots: [], extra_side: null }, item, catalog.componentsById);
+      if (![...portions.keys()].some((id) => uses.has(id))) return [];
+      const price = item.mains?.[0]?.price || item.price || 0;
+      const c0 = portionsCost(portions, catalog.componentsById, before);
+      const c1 = portionsCost(portions, catalog.componentsById, after);
+      return [{ id: item.id, name: item.name, price, c0, c1 }];
+    });
+  }, [catalog, items, draft]);
+  const original = draft.id ? catalog?.ingredientsById[draft.id] : undefined;
+  if (!original || original.unit_price === draft.unit_price || rows.length === 0) return null;
+  const margin = (price: number, cost: number) => (price > 0 ? `${Math.round(((price - cost) / price) * 100)}%` : "—");
+  return (
+    <div className="col-span-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs space-y-1">
+      <p className="font-semibold">{tr(`單價 ${original.unit_price} → ${draft.unit_price}，影響 ${rows.length} 道菜（預設組合）：`, `Price ${original.unit_price} → ${draft.unit_price} affects ${rows.length} item(s):`)}</p>
+      {rows.map((r) => (
+        <p key={r.id} className="flex flex-wrap gap-x-2">
+          <span className="font-medium">{r.name}</span>
+          <span>{tr("成本", "cost")} {r.c0.toFixed(1)} → <b>{r.c1.toFixed(1)}</b></span>
+          <span className={r.price > 0 && (r.price - r.c1) / r.price < 0.4 ? "text-orange-700 font-semibold" : ""}>{tr("毛利", "margin")} {margin(r.price, r.c0)} → {margin(r.price, r.c1)}</span>
+        </p>
+      ))}
+      <p className="text-muted-foreground">{tr("存檔後，未截單日期的候選菜份量級距會自動重算。", "After saving, portion levels for open dates are recalculated.")}</p>
+    </div>
+  );
+}
 
 export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
   vendorId: string | undefined;
@@ -106,6 +146,7 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
                 <option value="">—</option>
                 {catalog?.suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select></div>
+            <PriceImpact vendorId={vendorId} draft={ing} />
             <p className="col-span-2 text-xs text-muted-foreground">{tr("生料用量 = 熟重 × 份數 ÷（熟成率 ×（1 − 損耗率））。例：100 g 熟重、熟成率 0.8、損耗 10% → 生料 139 g。", "Raw = cooked × portions ÷ (yield × (1 − loss)).")}{" "}{ing.name && `${tr("試算", "e.g.")} 100${ing.unit} → ${rawAmount(100, ing).toFixed(0)}${ing.unit}`}</p>
           </div>
         )}

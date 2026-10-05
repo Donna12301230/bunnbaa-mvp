@@ -1145,19 +1145,26 @@ async function completeCharityReservation(parsed, vendorId, preview) {
  * 截單（§4.3、§5.4）：判定候選菜許願、產生每日備料與出餐標籤、缺料警示
  * ------------------------------------------------------------------ */
 
-/** 截單後的當日需求 vs 本週理論庫存 → 缺料清單 */
+/**
+ * 截單後的當日需求 vs 本週理論庫存 → 缺料清單。
+ * 期初庫存＝上週六的盤點（記在 inventory/{上週一}，跟 purchasing.js currentStock 同一個語意）；
+ * 沒盤點就用本週叫貨單產生時採用的庫存（lines[].stock）。再加本週到貨、扣掉這天之前的備料用量。
+ * web/src/hooks/useStockOnHand.ts 用同一套算法，要一起改。
+ */
 async function shortageFor(vendorId, date, needs, ingredientsById) {
   const week = mondayOf(date);
   const vendorRef = db().collection("vendors").doc(vendorId);
   const [invSnap, weeklySnap, plansSnap] = await Promise.all([
-    vendorRef.collection("inventory").doc(week).get(),
+    vendorRef.collection("inventory").doc(addDays(week, -7)).get(),
     vendorRef.collection("purchaseLists").doc(`weekly_${week}`).get(),
     vendorRef.collection("prepPlans").where("week", "==", week).get(),
   ]);
-  const stock = new Map(Object.entries(invSnap.exists ? invSnap.data().counts || {} : {}));
-  if (weeklySnap.exists) {
-    for (const line of weeklySnap.data().lines || []) stock.set(line.ingredient_id, (stock.get(line.ingredient_id) || 0) + (line.order_amount || 0));
-  }
+  const lines = weeklySnap.exists ? weeklySnap.data().lines || [] : [];
+  const counted = invSnap.exists && invSnap.data().counted;
+  const stock = counted
+    ? new Map(Object.entries(invSnap.data().counts || {}))
+    : new Map(lines.map((line) => [line.ingredient_id, Number(line.stock) || 0]));
+  for (const line of lines) stock.set(line.ingredient_id, (stock.get(line.ingredient_id) || 0) + (line.order_amount || 0));
   for (const plan of plansSnap.docs) {
     if (plan.id >= date) continue;
     for (const [id, amount] of Object.entries(plan.data().raw_needs || {})) stock.set(id, (stock.get(id) || 0) - amount);
