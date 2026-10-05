@@ -8,10 +8,13 @@ import type { Vendor, MenuItem } from "@/types";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { MenuItemOrder } from "@/pages/MenuItemPage";
 import { cn } from "@/lib/utils";
 import { tr, loc } from "@/lib/i18n";
 import { tagEn } from "@/types";
 import { useCart } from "@/hooks/useCart";
+import { notifyCartAdded } from "@/components/CartPreview";
 import { useToast } from "@/hooks/use-toast";
 import { useReviews, summarizeRatings } from "@/hooks/useReviews";
 import { isBento } from "@/lib/bento";
@@ -34,6 +37,7 @@ function scrollToCategory(category: string) {
 export default function VendorPage() {
   const { id } = useParams<{ id: string }>();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [openItemId, setOpenItemId] = useState<string | null>(null);
   const { add, vendorId: cartVendorId } = useCart();
   const [, navigate] = useLocation();
   const [wishOpen, setWishOpen] = useState(false);
@@ -97,7 +101,7 @@ export default function VendorPage() {
       return;
     }
     add({ menuItem: item, vendorId: item.vendor_id, pickupDate: next.date, pickupWindow: next.window, choices: [], rice: "normal", quantity: 1, note: "", couponId: null });
-    toast({ title: tr("已加入購物車", "Added to cart"), description: `${loc(item, "name")}・${next.date} ${next.window}` });
+    notifyCartAdded();
   }
 
   if (vendorLoading) {
@@ -229,7 +233,7 @@ export default function VendorPage() {
                     {categoryItems.map((item) => (
                       /* 整列是連結，「加入購物車」是旁邊的獨立按鈕（原本 button 包在 a 裡，互動元素不能巢狀） */
                       <li key={item.id} className="flex items-center gap-4 py-5 border-b border-border">
-                        <Link href={`/item/${item.id}`} className="group flex items-center gap-4 min-w-0 flex-1 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                        <button type="button" onClick={() => setOpenItemId(item.id)} className="group text-left flex items-center gap-4 min-w-0 flex-1 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                           <span className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border border-ink bg-secondary shrink-0 flex items-center justify-center">
                             {item.image
                               ? <img src={item.image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.08]" />
@@ -254,7 +258,7 @@ export default function VendorPage() {
                               {isBento(item) && <span className="text-xs text-muted-foreground">{tr("點圖選主菜、配菜、飯量", "Pick main, sides & rice")}</span>}
                             </span>
                           </span>
-                        </Link>
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => quickAdd(e, item)}
@@ -272,6 +276,14 @@ export default function VendorPage() {
           </>
         )}
       </div>
+
+      {/* 點品項跳出點餐視窗（同品項頁的內容），加入購物車後自動關閉 */}
+      <Dialog open={!!openItemId} onOpenChange={(open) => !open && setOpenItemId(null)}>
+        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
+          <DialogTitle className="sr-only">{tr("點餐", "Order")}</DialogTitle>
+          {openItemId && <MenuItemOrder id={openItemId} dialog onAdded={() => setOpenItemId(null)} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

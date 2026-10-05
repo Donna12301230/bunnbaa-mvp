@@ -208,7 +208,7 @@ export default function VendorPortalRecipes() {
 
       {isLoading ? <SkeletonBlocks count={3} height={64} className="space-y-2" /> : (
         <Tabs defaultValue="components">
-          <TabsList>
+          <TabsList className="max-w-full justify-start overflow-x-auto">
             <TabsTrigger value="components">{tr("半成品", "Components")}（{catalog?.components.length ?? 0}）</TabsTrigger>
             <TabsTrigger value="ingredients">{tr("原物料", "Ingredients")}（{catalog?.ingredients.length ?? 0}）</TabsTrigger>
             <TabsTrigger value="suppliers">{tr("小盤商", "Suppliers")}（{catalog?.suppliers.length ?? 0}）</TabsTrigger>
