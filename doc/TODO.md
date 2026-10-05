@@ -55,9 +55,9 @@ emulator 端對端測試已跑過：截單判定許願、備料清單／時間�
   - [ ] **部署 `firestore.rules` 到正式站**（BUG-9 修正在規則裡，沒部署前正式站上架 24 小時以後的餐點仍會 PERMISSION_DENIED）
   - [ ] 前景分頁複測畫面：C-MY-03 上架 3 天後的餐點、V-RPT-01 圖表總額＝卡片、V-PRP-01 另一視窗下單後份數自動 +1
 - [x] **已修但結果欄還是 FAIL**（2026-10-05 改 PASS；test:functions 59/59、test:functions:more 68/69（F-19 要 20:00 後））：C-NAV-01、C-MY-10、C-MKT-07、C-CHR-13、V-PUR-01、F-02、F-10
-  - [ ] C-ORD-02 付款成功頁（LINE Pay Sandbox）待測
+  - [x] C-ORD-02：2026-10-05 emulator 假金流 PASS（4 筆 locks、vendor_id 正確）；LINE Pay Sandbox 版成功頁留到正式站流程一起看
 - [ ] **完全沒測的 P0**（2026-10-05 畫面測完 11 筆 PASS：C-AUTH-01、C-BAN-07、V-MNU-01、V-SET-01／04／05、V-RCP-01／02、A-VND-01、A-APL-01、N-RWD-01（BUG-14 商家後台 4 頁手機橫向捲動，已修））；剩下：
-  - [ ] C-ORD-01：BLOCKED，Functions emulator 載入逾時（每個 callable 都 `Failed to load function`），重開 emulator 再測
+  - [x] C-ORD-01：2026-10-05 重開 emulator 後 PASS（假金流）；順帶修 BUG-15（品項頁換品項時數量沒重設）
   - [ ] C-AST-01／02、V-MNU-08／09：BLOCKED，`functions/.env.local` 在 emulator 把 `GEMINI_API_KEY` 清空，要暫時填 key 或到正式站測
   - [ ] V-RDM-10（正式站）
 - [ ] **整區沒測**：3.11 預購助理（C-AST-01～13、16、17）、4.4 菜單管理（V-MNU-01～05、07～15、17）、4.5 店家設定（V-SET-01、04～08、11、12）、4.7 配方（V-RCP-01～08）、4.3 時段與訂單（V-SES-01／02、V-ORD-01～03、V-PRP-04／06／07／08／10／12／16）、5 管理後台（A-VND、A-SET、A-AUD、A-DSH）、第四道備案遞補（C-BNT-20～23）

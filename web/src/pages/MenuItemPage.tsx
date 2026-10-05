@@ -124,7 +124,11 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     if (pref?.window) setWindow(pref.window);
   }, [vendor]);
 
+  // 換品項（點「同一家店的其他品項」）元件不會重掛，數量、備註、飯量要重設；日期與時段沿用
   useEffect(() => {
+    setQty(1);
+    setNote("");
+    setRice("normal");
     if (item?.slots) setChoices(item.slots.map(() => "default"));
     setMainIndex((item?.mains || []).length > 0 ? 0 : null);
     setExtra(null);
