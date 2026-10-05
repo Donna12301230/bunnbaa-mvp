@@ -112,6 +112,9 @@ const QUERY = {
   叉燒飯: "char siu", 燒鴨飯: "roast duck rice", 油雞飯: "soy sauce chicken", 雙拼飯: "roast meat rice", 三寶飯: "cantonese roast meat",
   鮮蝦雲吞麵: "wonton noodles", 叉燒撈麵: "char siu noodles", 例湯: "chinese soup", 鮮蝦雲吞湯: "wonton soup", 蠔油芥蘭: "chinese broccoli",
   港式凍檸茶: "iced lemon tea", 鴛鴦奶茶: "hong kong milk tea",
+  // seed-phase1.js 的定式便當（id `${vendorId}-${templateKey}`，沒有 name_en）
+  滷雞腿便當: "chicken drumstick rice", "週一 滷雞腿便當": "braised chicken leg rice", "週二 炸排骨便當": "fried pork chop rice",
+  烤雞胸健康餐盒: "grilled chicken breast meal prep", 麻婆豆腐素食便當: "mapo tofu", 壽喜燒牛丼: "sukiyaki beef bowl", 古早味乾拌麵: "dry noodles",
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

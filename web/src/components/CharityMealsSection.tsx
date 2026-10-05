@@ -19,9 +19,9 @@ const RANGES = [500, 1000, 2000, 3000];
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 
 /**
- * 轉讓市集裡的「愛心餐」分頁（規格 §7，使用者 2026-09-30 決定放在轉讓市集）。
+ * 「我的餐點」頁上方的「附近愛心餐」分頁（規格 1002 §4.5、§7；原本放在轉讓市集頁，1002 規格移到我的餐點）。
  * 未取餐或主動捐出的便當，當天現場領取：線上預約（手機驗證、每人每天 1 份、10 分鐘內到場；逾時釋出給下一位、不停權）
- * 或現場先到先領。依距離排序、顯示剩餘份數、截止時間、步行時間，走不到的標「來不了」。
+ * 或現場先到先領。依距離排序、顯示剩餘份數、截止時間、步行時間，走不到的標「來不及」。
  * 愛心餐的預約、領取、瀏覽紀錄一律不進入統計與推薦（§10.3）。
  */
 export default function CharityMealsSection() {
@@ -159,7 +159,7 @@ export default function CharityMealsSection() {
                   {walk !== null && <span className="flex items-center gap-1"><Footprints className="w-3.5 h-3.5" /> {formatDistance(g.distance)}・{tr(`步行 ${walk} 分`, `${walk} min walk`)}</span>}
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2">{g.available.slice(0, 3).map((m) => m.item_name).join("、")}</p>
-                {tooFar && <span className="text-xs font-semibold text-red-700">{tr("來不了（步行時間超過剩餘時間）", "Too far to make it in time")}</span>}
+                {tooFar && <span className="text-xs font-semibold text-red-700">{tr("來不及（步行時間超過剩餘時間）", "Too far to make it in time")}</span>}
                 <Button size="sm" className="mt-auto" disabled={!!activeReservation || busy === g.vendor_id || tooFar} onClick={() => reserve(g.vendor_id)}>
                   {busy === g.vendor_id ? tr("預約中…", "Reserving…") : tr("預約一份", "Reserve one")}
                 </Button>

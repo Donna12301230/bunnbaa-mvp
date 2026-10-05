@@ -67,12 +67,18 @@ export async function undoCancelSubscription(vendor: Vendor) {
   });
 }
 
-/** 新核准的商家：首月免費試用 */
-export function initialTrialFields(now = new Date()) {
-  return {
-    subscription_status: "trial" as const,
-    subscription_end_date: Timestamp.fromDate(new Date(now.getTime() + SUBSCRIPTION_PERIOD_DAYS * 86400000)),
-  };
+/**
+ * 新核准的商家：標成首月免費試用，但還不給到期日——規格 §1「自店家第一次上架當天起算 30 天」，
+ * 到期日由後端 onMenuItemListed（functions/src/finance.js）在第一個品項上架時寫入。
+ * 沒有到期日的 trial 不擋後台、也不會進寬限／暫停。
+ */
+export function initialTrialFields() {
+  return { subscription_status: "trial" as const };
+}
+
+/** 試用中、但還沒上架過任何品項（首月還沒開始算） */
+export function trialNotStarted(vendor: Vendor): boolean {
+  return vendor.subscription_status === "trial" && !vendor.subscription_end_date;
 }
 
 /** 管理員確認收到月費後延長 30 天（從目前到期日或今天，取較晚者起算），寫稽核紀錄 */

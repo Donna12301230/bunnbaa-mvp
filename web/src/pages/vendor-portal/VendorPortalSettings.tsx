@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useMyVendor, myVendorDocKey } from "@/hooks/useMyVendor";
-import { getSubscriptionState, requestCancelSubscription, undoCancelSubscription, PLATFORM_CONTACT_EMAIL } from "@/lib/subscription";
+import { getSubscriptionState, requestCancelSubscription, trialNotStarted, undoCancelSubscription, PLATFORM_CONTACT_EMAIL } from "@/lib/subscription";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -588,7 +588,9 @@ export default function VendorPortalSettings() {
                 )}
                 {!sub.unset && (sub.status === "trial" || sub.status === "active") && (
                   <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-100 rounded p-2">
-                    {sub.status === "trial"
+                    {sub.status === "trial" && trialNotStarted(realVendor)
+                      ? tr("首月免費從第一次上架品項那天起算 30 天，目前還沒開始計算。", "Your free month starts the day you first list an item (30 days); it hasn't started yet.")
+                      : sub.status === "trial"
                       ? tr("試用期結束後進入每月 NT$1,999 的訂閱方案，平台會在到期前聯絡您付款。", "After the trial, the plan is NT$1,999 / month. We'll contact you about payment before it ends.")
                       : tr("每月 NT$1,999，平台確認收款後延長到下一期。", "NT$1,999 / month; extended to the next period once payment is confirmed.")}
                   </p>

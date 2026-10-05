@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle, XCircle, Store, Link2Off, CalendarPlus } from "lucide-react";
-import { adminRenewSubscription, getSubscriptionState, initialTrialFields } from "@/lib/subscription";
+import { adminRenewSubscription, getSubscriptionState, initialTrialFields, trialNotStarted } from "@/lib/subscription";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
@@ -299,6 +299,7 @@ function SubscriptionLine({ vendor }: { vendor: Vendor }) {
     <div className={`text-xs ${sub.blocked ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
       {tr("訂閱：", "Subscription: ")}{subLabel(sub.status)}
       {sub.endDate ? tr(`，到期 ${sub.endDate.toLocaleDateString("zh-TW")}`, `, ends ${sub.endDate.toLocaleDateString("en-US")}`) : ""}
+      {trialNotStarted(vendor) ? tr("（尚未上架，首月未開始）", " (no item listed yet; free month not started)") : ""}
     </div>
   );
 }

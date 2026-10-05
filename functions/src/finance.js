@@ -4,10 +4,12 @@
 // vendors/{id} 相關欄位：
 //   subscription_status / subscription_end_date   既有月費訂閱（web/src/lib/subscription.ts）：首月免費 30 天、之後每 30 天一期
 //   billing { status: active|grace|suspended, due_at, grace_until, reminded_on }   billingCycle 每天寫
+//   billing { first_listed_at, free_until }   onMenuItemListed 在第一個品項上架時寫（首月從這天起算）
 //   hourly_wage（備料人工時薪，只能調高）、staff_salaries[]（正職月薪）、fixed_costs（其他固定成本／月）
 //   owner_hours_per_day（老闆每天工時，算老闆實際時薪）、linepay_fee_rate（LINE Pay 合約費率）
 // vendors/{id}/revenueForecast/{YYYY-MM}：buildRevenueForecast 每天 21:00 寫
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { Timestamp } = require("firebase-admin/firestore");
 const {
   REGION, db, onCall, HttpsError, FieldValue, t, logger, callerVendorId, notifyVendor, loadVendorCatalog, forEachVendor,
@@ -91,6 +93,31 @@ exports.billingCycle = onSchedule({ schedule: "0 9 * * *", timeZone: "Asia/Taipe
       logger.error(`billingCycle failed for ${vendor.id}`, err);
     }
   }
+});
+
+/**
+ * 首月免費從第一次上架起算（§1）：核准時只標 subscription_status = trial、不給到期日；
+ * 第一個品項上架（is_available 變成 true）時寫 billing.first_listed_at、billing.free_until，
+ * 並把 subscription_end_date 設成上架日 + 30 天。只處理「trial 且沒有到期日」的店家，
+ * 已在計費中或沒有訂閱欄位的舊資料不動。
+ */
+exports.onMenuItemListed = onDocumentWritten({ document: "menu_items/{itemId}", region: REGION }, async (event) => {
+  const before = event.data?.before?.data();
+  const after = event.data?.after?.data();
+  if (!after?.is_available || before?.is_available || !after.vendor_id) return;
+  const config = await loadPlatformConfig(db());
+  const vendorRef = db().collection("vendors").doc(after.vendor_id);
+  await db().runTransaction(async (tx) => {
+    const vendor = (await tx.get(vendorRef)).data();
+    if (!vendor || vendor.subscription_status !== "trial" || vendor.subscription_end_date || vendor.billing?.first_listed_at) return;
+    const now = Date.now();
+    const freeUntil = Timestamp.fromMillis(now + (config.billingCycleDays ?? 30) * DAY_MS);
+    tx.update(vendorRef, {
+      subscription_end_date: freeUntil,
+      "billing.first_listed_at": Timestamp.fromMillis(now),
+      "billing.free_until": freeUntil,
+    });
+  });
 });
 
 /* ------------------------------------------------------------------ *

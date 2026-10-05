@@ -1270,6 +1270,26 @@ function geohash(lat, lng, precision = 7) {
     expectOk(await U.call("createCartLinePayReservation", { lines: [{ menu_item_id: `${VN}-bento`, pickup_date: OPEN_DAY, pickup_window: WINDOW, quantity: 1, slots: [{ choice: "default" }, { choice: "default" }], coupon_id: await coupon(U.uid, VN, 1000) }] }));
   });
 
+  await test("V-BIL-04", "首月免費從第一次上架起算：trial 沒到期日的店上架品項 → 到期日＝上架日＋30 天；已有到期日的不動", async () => {
+    const VT = await mkVendor(vid("firstlist"), { subscription_status: "trial", subscription_end_date: null });
+    const fixedEnd = future();
+    const VK = await mkVendor(vid("haveend"), { subscription_status: "trial", subscription_end_date: fixedEnd });
+    const before = Date.now();
+    await mkBento(VT, { is_available: true });
+    await mkBento(VK, { is_available: true });
+    const v = await waitFor(async () => { const x = await get(`vendors/${VT}`); return x.subscription_end_date ? x : null; });
+    const days = (v.subscription_end_date.toMillis() - before) / 86400000;
+    eq(days > 29.9 && days < 30.1, true, `到期日約 30 天後（實際 ${days.toFixed(2)} 天）`);
+    eq(v.billing.free_until.toMillis(), v.subscription_end_date.toMillis());
+    eq(!!v.billing.first_listed_at, true);
+    // 下架再上架不會重算
+    await db.doc(`menu_items/${VT}-bento`).update({ is_available: false });
+    await db.doc(`menu_items/${VT}-bento`).update({ is_available: true });
+    await new Promise((r) => setTimeout(r, 5000));
+    eq((await get(`vendors/${VT}`)).subscription_end_date.toMillis(), v.subscription_end_date.toMillis(), "重新上架不重算");
+    eq((await get(`vendors/${VK}`)).subscription_end_date.toMillis(), fixedEnd.toMillis(), "已有到期日的不動");
+  });
+
   await test("V-WAGE-03", "基本工資今天調漲 → syncMinimumWage 更新標準、低於的店家拉到新標準並通知、較高的不動", async () => {
     const ref = db.doc("platformConfig/minimumWage");
     const original = (await ref.get()).data() || null;
