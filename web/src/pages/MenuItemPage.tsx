@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, query, where } from "firebase/firestore";
 import { AlertTriangle, ArrowLeft, Check, ChevronUp, Info, Minus, Plus, ShoppingCart, UtensilsCrossed } from "lucide-react";
 import { auth, db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
@@ -23,6 +23,7 @@ import { usePlatformConfig } from "@/lib/platformConfig";
 import { useSideWishes } from "@/hooks/useSideWishes";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
 import { getPreferredPickup, mealPeriodLabel, mealPeriodOf, priceDays, slotLabel, vendorCutoffTime, weekdayOf } from "@/lib/pickupSlots";
+import { notifyCartAdded } from "@/components/CartPreview";
 
 /** 點圖片選菜的卡片（§4.2）：選取加框打勾、再點一次取消；不能點的灰色 */
 function DishCard({
@@ -76,6 +77,11 @@ function DishCard({
 // 金額只是預覽，結帳時伺服器會重算。
 export default function MenuItemPage() {
   const { id } = useParams<{ id: string }>();
+  return <MenuItemOrder id={id} />;
+}
+
+// 品項點餐內容：路由頁與商家頁的彈窗共用。dialog 模式不顯示回上一頁連結，加入後呼叫 onAdded。
+export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dialog?: boolean; onAdded?: () => void }) {
   const { toast } = useToast();
   const { add, vendorId: cartVendorId } = useCart();
   const { data: config } = usePlatformConfig();
@@ -87,6 +93,8 @@ export default function MenuItemPage() {
   const [extra, setExtra] = useState<ExtraSideChoice | null>(null);
   const [extraAsk, setExtraAsk] = useState<{ slot: number; candidate: number | null; name: string } | null>(null);
   const [showMaterials, setShowMaterials] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [date, setDate] = useState<string>("");
   const [window, setWindow] = useState<string>("");
 
@@ -105,6 +113,15 @@ export default function MenuItemPage() {
     queryFn: async () => {
       const snap = await getDoc(doc(db, "vendors", item!.vendor_id));
       return snap.exists() ? ({ id: snap.id, ...snap.data() } as Vendor) : null;
+    },
+    enabled: !!item,
+  });
+
+  const { data: relatedItems = [] } = useQuery({
+    queryKey: ["vendorItemsRelated", item?.vendor_id],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "menu_items"), where("vendor_id", "==", item!.vendor_id), where("is_available", "==", true)));
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as MenuItem).filter((x) => x.id !== item!.id);
     },
     enabled: !!item,
   });
@@ -223,7 +240,8 @@ export default function MenuItemPage() {
   const extraOpt = extra ? options.find((o) => o.slot === extra.slot && o.candidate === extra.candidate) : null;
   if (extra?.mode === "addon" && extraOpt) materials.push(tr(`＋${extraOpt.portion_text || extraOpt.name}`, `+${extraOpt.portion_text || extraOpt.name}`));
 
-  function handleAdd() {
+  // 加入購物車前先用對話框確認訂單內容（不直接加入）
+  function openConfirm() {
     if (!canAdd || !vendor) return;
     if (cartVendorId && cartVendorId !== item!.vendor_id) {
       toast({
@@ -233,25 +251,49 @@ export default function MenuItemPage() {
       });
       return;
     }
+    setConfirmOpen(true);
+  }
+
+  function confirmAdd() {
+    if (!canAdd || !vendor) return;
     add({
       menuItem: item!, vendorId: item!.vendor_id, pickupDate: date, pickupWindow: window,
       choices: bento ? choices : [], rice: bento && item!.rice_component_id ? rice : "normal",
       mainIndex: (item!.mains || []).length > 0 ? mainIndex ?? 0 : null, extraSide: bento ? extra : null,
       quantity: qty, note: note.trim(), couponId: null,
     });
-    toast({ title: tr("已加入購物車", "Added to cart"), description: `${loc(item, "name")} ${date} x${qty}` });
+    setConfirmOpen(false);
+    notifyCartAdded();
+    onAdded?.();
+  }
+
+  function choiceName(i: number): string {
+    const slot = item!.slots![i];
+    const c = choices[i];
+    if (c === "none") return tr("不要", "None");
+    if (c === undefined || c === "default") return slot.default.name;
+    return slot.candidates[c]?.name ?? slot.default.name;
   }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-4">
-      <Link href="/home" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("回預購餐點", "Back to pre-order")}
-      </Link>
+      {!dialog && (
+        <Link href="/home" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("回預購餐點", "Back to pre-order")}
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 gap-8 lg:gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start">
         <div className="min-w-0 lg:sticky lg:top-24 space-y-4">
           {item.image ? (
-            <img src={item.image} alt={loc(item, "name")} className="w-full aspect-[4/3] rounded-[2rem] border border-ink object-cover" />
+            <button
+              type="button"
+              onClick={() => setImageOpen(true)}
+              aria-label={tr("放大圖片", "Enlarge photo")}
+              className="block w-full rounded-[2rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-zoom-in"
+            >
+              <img src={item.image} alt={loc(item, "name")} className="w-full aspect-[4/3] rounded-[2rem] border border-ink object-cover" />
+            </button>
           ) : (
             <div className="w-full aspect-[4/3] rounded-[2rem] border border-ink bg-secondary flex items-center justify-center">
               <UtensilsCrossed className="h-14 w-14 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
@@ -484,7 +526,7 @@ export default function MenuItemPage() {
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" aria-label={tr("減少數量", "Decrease quantity")} onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus /></Button>
                 <span className="w-5 text-center font-medium bb-num" aria-live="polite">{qty}</span>
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" aria-label={tr("增加數量", "Increase quantity")} onClick={() => setQty((q) => Math.min(20, q + 1))}><Plus /></Button>
-                <Button onClick={handleAdd} disabled={!canAdd} className="h-12 px-5 rounded-full text-base">
+                <Button onClick={openConfirm} disabled={!canAdd} className="h-12 px-5 rounded-full text-base">
                   <ShoppingCart /> {tr("加入購物車", "Add to cart")}
                 </Button>
               </div>
@@ -493,6 +535,73 @@ export default function MenuItemPage() {
           </div>
         </div>
       </div>
+
+      {/* 同一商店的其他品項（頁面模式才顯示；彈窗模式不另外跳頁） */}
+      {!dialog && relatedItems.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-heading text-xl font-semibold">{tr("同一家店的其他品項", "More from this vendor")}</h2>
+          <ul className="flex gap-4 overflow-x-auto pb-2">
+            {relatedItems.map((r) => (
+              <li key={r.id} className="shrink-0 w-40">
+                <Link href={`/item/${r.id}`} className="block group">
+                  <span className="block aspect-[4/3] rounded-2xl overflow-hidden border border-ink bg-secondary">
+                    {r.image && <img src={r.image} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" />}
+                  </span>
+                  <span className="block mt-2 text-sm font-semibold truncate">{loc(r, "name")}</span>
+                  <span className="block text-sm text-muted-foreground">NT${r.price}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* 點商品圖片放大 */}
+      <Dialog open={imageOpen} onOpenChange={setImageOpen}>
+        <DialogContent className="max-w-3xl p-3 md:p-4 bg-transparent border-0 shadow-none">
+          <DialogTitle className="sr-only">{loc(item, "name")}</DialogTitle>
+          {item.image && <img src={item.image} alt={loc(item, "name")} className="w-full max-h-[80vh] object-contain rounded-2xl bg-card" />}
+        </DialogContent>
+      </Dialog>
+
+      {/* 下訂前確認：把要下的訂單完整列出來，確認後才真正加入購物車 */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{tr("確認訂單內容", "Confirm your order")}</DialogTitle>
+            <DialogDescription>{tr("確認無誤後加入購物車，結帳時才會付款。", "Add to cart now; you only pay at checkout.")}</DialogDescription>
+          </DialogHeader>
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("品項", "Item")}</dt><dd className="text-right font-medium">{loc(item, "name")}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("取餐", "Pickup")}</dt><dd className="text-right">{date}・{slotLabel(window)}</dd></div>
+            {bento && item.mains && item.mains.length > 0 && mainIndex !== null && (
+              <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("主菜", "Main")}</dt><dd className="text-right">{item.mains[mainIndex]?.name}</dd></div>
+            )}
+            {bento && (item.slots || []).map((slot, i) => (
+              <div key={i} className="flex justify-between gap-4"><dt className="text-muted-foreground">{slot.category}</dt><dd className="text-right">{choiceName(i)}</dd></div>
+            ))}
+            {bento && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">{tr("飯量", "Rice")}</dt>
+                <dd className="text-right">{rice === "add" ? tr("加飯", "More rice") : rice === "less" ? tr("減飯", "Less rice") : tr("正常", "Normal")}</dd>
+              </div>
+            )}
+            {bento && extra && (
+              <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("第四道", "4th side")}</dt><dd className="text-right">{extra.mode === "backup" ? tr("備案", "Backup") : tr("加菜", "Add-on")}</dd></div>
+            )}
+            <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("數量", "Qty")}</dt><dd className="text-right">{qty}</dd></div>
+            {note.trim() && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("備註", "Note")}</dt><dd className="text-right">{note.trim()}</dd></div>}
+          </dl>
+          <div className="flex items-center justify-between border-t border-border pt-3">
+            <span className="text-sm text-muted-foreground">{tr("合計", "Total")}</span>
+            <span className="font-heading text-2xl font-semibold">NT${breakdown ? breakdown.total * qty : "—"}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} className="h-11 rounded-full">{tr("再改改", "Edit")}</Button>
+            <Button onClick={confirmAdd} disabled={!canAdd} className="h-11 rounded-full"><ShoppingCart /> {tr("確認加入", "Confirm")}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!extraAsk} onOpenChange={(open) => !open && setExtraAsk(null)}>
         <DialogContent className="max-w-sm">

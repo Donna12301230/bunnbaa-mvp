@@ -35,6 +35,7 @@ import { avatarUrl } from "@/lib/avatar";
 import { matchesQuery, setSearchQuery, useSearchQuery } from "@/lib/searchQuery";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/hooks/useCart";
+import { notifyCartAdded } from "@/components/CartPreview";
 
 const bannedHint = () =>
   tr("您的帳號已被限制下單，請至會員中心提交解封申訴", "Your account can't place orders. Please submit an appeal from My account.");
@@ -255,7 +256,7 @@ export default function HomePage() {
       return;
     }
     addToCart({ menuItem: item, vendorId: item.vendor_id, pickupDate: date, pickupWindow: window, choices: [], rice: "normal", quantity: 1, note: "", couponId: null });
-    toast({ title: t("已加入購物車", "Added to cart"), description: `${loc(item, "name")}・${date} ${window}` });
+    notifyCartAdded();
   }
 
   // 計畫（§4.4）：下單時選第一天＋一個時段套用每一天，每天各自算早鳥、遇公休順延；之後到「我的餐點」個別改時段
