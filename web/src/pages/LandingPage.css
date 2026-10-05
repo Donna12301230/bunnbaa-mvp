@@ -775,7 +775,7 @@
 
 .lp-sim__days {
   display: grid;
-  grid-template-columns: repeat(11, 1fr);
+  grid-template-columns: repeat(10, 1fr); /* 30 天排成三排 */
   gap: 4px;
   margin: 16px 0 0;
   padding: 0;

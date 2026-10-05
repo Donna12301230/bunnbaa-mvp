@@ -14,6 +14,7 @@ import type { MenuItem } from "@/types";
 import { EARLY_BIRD_TIERS, VISIBLE_EARLY_BIRD_TIERS, discountText } from "@/lib/pricing";
 import { useReviews } from "@/hooks/useReviews";
 import { slotLabel, vendorWindows } from "@/lib/pickupSlots";
+import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
 import "./LandingPage.css";
 import { dateLocale, useI18n, type Lang, loc } from "@/lib/i18n";
 import { useVendors } from "@/hooks/useVendors";
@@ -47,8 +48,8 @@ const discountFor = (days: number) => EARLY_BIRD_TIERS.find((t) => days >= t.min
 const MENU_TAB_LIMIT = 5;
 const MENU_ITEMS_PER_TAB = 4;
 
-// 預訂開放到下週五：最多提前 11 天（週一訂下週五）
-const MAX_ADVANCE_DAYS = 11;
+// 預訂開放範圍：最遠提前 30 天（規格 §2，跟 lib/pickupSlots 同一個參數）
+const MAX_ADVANCE_DAYS = DEFAULT_PLATFORM_CONFIG.bookingRangeDays;
 
 // 近期活動讀 landing_events（管理員在 Firestore 維護），icon 存成字串 key
 const EVENT_ICONS: Record<string, ReactNode> = {

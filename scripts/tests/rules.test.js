@@ -229,6 +229,20 @@ const results = [];
     await assertSucceeds(updateDoc(doc(OWNER, "vendors/vSub"), { subscription_status: "active", cancelled_from: deleteField(), cancel_requested_at: deleteField() }));
   });
 
+  await t("R-30", "我的最愛：只有本人能建立（vendor_id＋created_at）、讀、刪；不能更新、不能多帶欄位、別人讀寫被拒", async () => {
+    const fav = (db, uid, vid) => doc(db, `users/${uid}/favorites/${vid}`);
+    await assertSucceeds(setDoc(fav(A, "userA", "v1"), { vendor_id: "v1", created_at: serverTimestamp() }));
+    await assertSucceeds(getDoc(fav(A, "userA", "v1")));
+    await assertFails(updateDoc(fav(A, "userA", "v1"), { created_at: serverTimestamp() }));
+    await assertFails(setDoc(fav(A, "userA", "v2"), { vendor_id: "v2", created_at: serverTimestamp(), note: "x" }));
+    await assertFails(setDoc(fav(A, "userA", "v2"), { vendor_id: "v1", created_at: serverTimestamp() }));
+    await assertFails(setDoc(fav(A, "userA", "v2"), { vendor_id: "v2", created_at: Timestamp.fromMillis(Date.now() - 86400000) }));
+    await assertFails(getDoc(fav(B, "userA", "v1")));
+    await assertFails(setDoc(fav(B, "userA", "v2"), { vendor_id: "v2", created_at: serverTimestamp() }));
+    await assertFails(deleteDoc(fav(B, "userA", "v1")));
+    await assertSucceeds(deleteDoc(fav(A, "userA", "v1")));
+  });
+
   await t("N-SEC-04", "draws/reviews 公開內容無完整 uid", async () => {
     const d = (await getDoc(doc(ANON, "draws/d1"))).data();
     if (d.buyer_uid) throw new Error("draws 有 buyer_uid");
