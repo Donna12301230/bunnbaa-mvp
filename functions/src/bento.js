@@ -7,7 +7,7 @@
 //   mains: [{ name, component_id, price, image_url }] 可選主菜，各自定價（便當價以所選主菜為準）
 //   main: { name, component_id }                 舊版單一主菜（沒有 mains 時用）
 //   rice_component_id                            主食半成品（白飯等），加飯／減飯作用在它
-//   fixed: [{ name, component_id }]              固定附餐，不能換也不能減（例：經典便當的滷蛋）
+//   fixed: [{ name, component_id, portions }]    備料組成／固定附餐，不能換也不能減（例：滷蛋；單品的全部組成）
 //   slots: [{ category, default: { name, component_id },
 //             candidates: [{ name, component_id, portion_level, weekly_cap, min_qty }] }]
 //   weekdays: [1..5]                             週菜單輪替：只在這幾天供應（沒設＝每天）
