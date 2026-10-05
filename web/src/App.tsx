@@ -34,6 +34,7 @@ const JoinUsPage = lazy(() => import("./pages/JoinUsPage"));
 import CustomerLayout from "./components/CustomerLayout";
 import MarketplaceHeader from "./components/MarketplaceHeader";
 import SiteFooter from "./components/SiteFooter";
+import CartPreview from "./components/CartPreview";
 import { RequireVendorSignIn } from "./components/RequireRealAdmin";
 const AdminVendorsPage = lazy(() => import("./pages/admin/AdminVendorsPage"));
 const AdminAppealsPage = lazy(() => import("./pages/admin/AdminAppealsPage"));
@@ -107,6 +108,7 @@ function MarketplacePage({ children }: { children: React.ReactNode }) {
       {/* bb-page-enter：每次換頁內容淡入上移（global.css，尊重 reduced-motion） */}
       <div className="bb-page-enter">{children}</div>
       <SiteFooter />
+      <CartPreview />
     </div>
   );
 }

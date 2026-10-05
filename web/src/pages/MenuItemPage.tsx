@@ -23,6 +23,7 @@ import { usePlatformConfig } from "@/lib/platformConfig";
 import { useSideWishes } from "@/hooks/useSideWishes";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
 import { getPreferredPickup, mealPeriodLabel, mealPeriodOf, priceDays, slotLabel, vendorCutoffTime, weekdayOf } from "@/lib/pickupSlots";
+import { BB_CART_ADDED_EVENT } from "@/components/CartPreview";
 
 /** 點圖片選菜的卡片（§4.2）：選取加框打勾、再點一次取消；不能點的灰色 */
 function DishCard({
@@ -87,6 +88,8 @@ export default function MenuItemPage() {
   const [extra, setExtra] = useState<ExtraSideChoice | null>(null);
   const [extraAsk, setExtraAsk] = useState<{ slot: number; candidate: number | null; name: string } | null>(null);
   const [showMaterials, setShowMaterials] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [date, setDate] = useState<string>("");
   const [window, setWindow] = useState<string>("");
 
@@ -223,7 +226,8 @@ export default function MenuItemPage() {
   const extraOpt = extra ? options.find((o) => o.slot === extra.slot && o.candidate === extra.candidate) : null;
   if (extra?.mode === "addon" && extraOpt) materials.push(tr(`＋${extraOpt.portion_text || extraOpt.name}`, `+${extraOpt.portion_text || extraOpt.name}`));
 
-  function handleAdd() {
+  // 加入購物車前先用對話框確認訂單內容（不直接加入）
+  function openConfirm() {
     if (!canAdd || !vendor) return;
     if (cartVendorId && cartVendorId !== item!.vendor_id) {
       toast({
@@ -233,13 +237,28 @@ export default function MenuItemPage() {
       });
       return;
     }
+    setConfirmOpen(true);
+  }
+
+  function confirmAdd() {
+    if (!canAdd || !vendor) return;
     add({
       menuItem: item!, vendorId: item!.vendor_id, pickupDate: date, pickupWindow: window,
       choices: bento ? choices : [], rice: bento && item!.rice_component_id ? rice : "normal",
       mainIndex: (item!.mains || []).length > 0 ? mainIndex ?? 0 : null, extraSide: bento ? extra : null,
       quantity: qty, note: note.trim(), couponId: null,
     });
+    setConfirmOpen(false);
+    globalThis.dispatchEvent(new Event(BB_CART_ADDED_EVENT));
     toast({ title: tr("已加入購物車", "Added to cart"), description: `${loc(item, "name")} ${date} x${qty}` });
+  }
+
+  function choiceName(i: number): string {
+    const slot = item!.slots![i];
+    const c = choices[i];
+    if (c === "none") return tr("不要", "None");
+    if (c === undefined || c === "default") return slot.default.name;
+    return slot.candidates[c]?.name ?? slot.default.name;
   }
 
   return (
@@ -251,7 +270,14 @@ export default function MenuItemPage() {
       <div className="grid grid-cols-1 gap-8 lg:gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start">
         <div className="min-w-0 lg:sticky lg:top-24 space-y-4">
           {item.image ? (
-            <img src={item.image} alt={loc(item, "name")} className="w-full aspect-[4/3] rounded-[2rem] border border-ink object-cover" />
+            <button
+              type="button"
+              onClick={() => setImageOpen(true)}
+              aria-label={tr("放大圖片", "Enlarge photo")}
+              className="block w-full rounded-[2rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-zoom-in"
+            >
+              <img src={item.image} alt={loc(item, "name")} className="w-full aspect-[4/3] rounded-[2rem] border border-ink object-cover" />
+            </button>
           ) : (
             <div className="w-full aspect-[4/3] rounded-[2rem] border border-ink bg-secondary flex items-center justify-center">
               <UtensilsCrossed className="h-14 w-14 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
@@ -484,7 +510,7 @@ export default function MenuItemPage() {
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" aria-label={tr("減少數量", "Decrease quantity")} onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus /></Button>
                 <span className="w-5 text-center font-medium bb-num" aria-live="polite">{qty}</span>
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" aria-label={tr("增加數量", "Increase quantity")} onClick={() => setQty((q) => Math.min(20, q + 1))}><Plus /></Button>
-                <Button onClick={handleAdd} disabled={!canAdd} className="h-12 px-5 rounded-full text-base">
+                <Button onClick={openConfirm} disabled={!canAdd} className="h-12 px-5 rounded-full text-base">
                   <ShoppingCart /> {tr("加入購物車", "Add to cart")}
                 </Button>
               </div>
@@ -493,6 +519,53 @@ export default function MenuItemPage() {
           </div>
         </div>
       </div>
+
+      {/* 點商品圖片放大 */}
+      <Dialog open={imageOpen} onOpenChange={setImageOpen}>
+        <DialogContent className="max-w-3xl p-3 md:p-4 bg-transparent border-0 shadow-none">
+          <DialogTitle className="sr-only">{loc(item, "name")}</DialogTitle>
+          {item.image && <img src={item.image} alt={loc(item, "name")} className="w-full max-h-[80vh] object-contain rounded-2xl bg-card" />}
+        </DialogContent>
+      </Dialog>
+
+      {/* 下訂前確認：把要下的訂單完整列出來，確認後才真正加入購物車 */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{tr("確認訂單內容", "Confirm your order")}</DialogTitle>
+            <DialogDescription>{tr("確認無誤後加入購物車，結帳時才會付款。", "Add to cart now; you only pay at checkout.")}</DialogDescription>
+          </DialogHeader>
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("品項", "Item")}</dt><dd className="text-right font-medium">{loc(item, "name")}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("取餐", "Pickup")}</dt><dd className="text-right">{date}・{slotLabel(window)}</dd></div>
+            {bento && item.mains && item.mains.length > 0 && mainIndex !== null && (
+              <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("主菜", "Main")}</dt><dd className="text-right">{item.mains[mainIndex]?.name}</dd></div>
+            )}
+            {bento && (item.slots || []).map((slot, i) => (
+              <div key={i} className="flex justify-between gap-4"><dt className="text-muted-foreground">{slot.category}</dt><dd className="text-right">{choiceName(i)}</dd></div>
+            ))}
+            {bento && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">{tr("飯量", "Rice")}</dt>
+                <dd className="text-right">{rice === "add" ? tr("加飯", "More rice") : rice === "less" ? tr("減飯", "Less rice") : tr("正常", "Normal")}</dd>
+              </div>
+            )}
+            {bento && extra && (
+              <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("第四道", "4th side")}</dt><dd className="text-right">{extra.mode === "backup" ? tr("備案", "Backup") : tr("加菜", "Add-on")}</dd></div>
+            )}
+            <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("數量", "Qty")}</dt><dd className="text-right">{qty}</dd></div>
+            {note.trim() && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("備註", "Note")}</dt><dd className="text-right">{note.trim()}</dd></div>}
+          </dl>
+          <div className="flex items-center justify-between border-t border-border pt-3">
+            <span className="text-sm text-muted-foreground">{tr("合計", "Total")}</span>
+            <span className="font-heading text-2xl font-semibold">NT${breakdown ? breakdown.total * qty : "—"}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} className="h-11 rounded-full">{tr("再改改", "Edit")}</Button>
+            <Button onClick={confirmAdd} disabled={!canAdd} className="h-11 rounded-full"><ShoppingCart /> {tr("確認加入", "Confirm")}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!extraAsk} onOpenChange={(open) => !open && setExtraAsk(null)}>
         <DialogContent className="max-w-sm">
