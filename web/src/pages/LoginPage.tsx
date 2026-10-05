@@ -73,7 +73,7 @@ export default function LoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: () => login(username, password),
-    onSuccess: () => navigate("/"),
+    onSuccess: () => navigate("/home"),
     onError: (err: Error) => toast({ variant: "destructive", title: tr("登入失敗", "Sign-in failed"), description: err.message }),
   });
 
@@ -93,7 +93,7 @@ export default function LoginPage() {
       if (!otpConfirmation) throw new Error(tr("請先取得驗證碼", "Request a verification code first"));
       return confirmOtp(otpConfirmation, otpCode);
     },
-    onSuccess: () => navigate("/"),
+    onSuccess: () => navigate("/home"),
     onError: (err: Error) => toast({ variant: "destructive", title: tr("驗證失敗", "Verification failed"), description: err.message }),
   });
 
@@ -111,7 +111,7 @@ export default function LoginPage() {
     },
     onSuccess: () => {
       toast({ title: tr("註冊成功", "You're signed up"), description: tr("歡迎加入 飯飽BunnBaa！", "Welcome to BunnBaa!") });
-      navigate("/");
+      navigate("/home");
     },
     onError: (err: Error) => toast({ variant: "destructive", title: tr("註冊失敗", "Sign-up failed"), description: err.message }),
   });
@@ -126,7 +126,7 @@ export default function LoginPage() {
     },
     onSuccess: () => {
       toast({ title: tr("廠商申請已送出", "Application submitted"), description: tr("管理員審核通過後即可使用廠商後台。", "You can use the vendor portal once an admin approves it.") });
-      navigate("/");
+      navigate("/home");
     },
     onError: (err: Error) => toast({ variant: "destructive", title: tr("申請失敗", "Application failed"), description: err.message }),
   });

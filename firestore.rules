@@ -158,7 +158,8 @@ service cloud.firestore {
       allow update: if isAdmin()
                     // Buyer flips their own still-"locked" lock to "for_resale",
                     // optionally attaching a resale_deadline (pickup-window-based,
-                    // bounded so it can't be back-dated or set absurdly far out —
+                    // bounded so it can't be back-dated or set absurdly far out — 31 days
+                    // covers the farthest bookable pickup window (bookingRangeDays=30);
                     // once it's past, anyone may free-claim, see below).
                     || (isSignedInUser() && resource.data.buyer_uid == request.auth.uid
                         && resource.data.status == 'locked'
@@ -167,7 +168,7 @@ service cloud.firestore {
                         && (!request.resource.data.keys().hasAny(['resale_deadline'])
                             || (request.resource.data.resale_deadline is timestamp
                                 && request.resource.data.resale_deadline > request.time
-                                && request.resource.data.resale_deadline <= request.time + duration.value(24, 'h'))))
+                                && request.resource.data.resale_deadline <= request.time + duration.value(31, 'd'))))
                     // Buyer privately gifts their own still-"locked" lock — not
                     // publicly listed anywhere, the recipient needs the lock_id/link
                     // itself (same trust model as handing someone the pickup QR code).

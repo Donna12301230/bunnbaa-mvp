@@ -27,6 +27,8 @@ export const LOCK_STATUS_STYLE: Record<string, { label: string; className: strin
 export const REDEEMABLE_STATUSES = new Set(["locked", "for_resale", "for_gift"]);
 export const PENDING_STATUSES = new Set(["locked", "for_resale", "for_gift"]);
 export const DONE_STATUSES = new Set(["fulfilled", "resold_and_fulfilled"]);
+// 算營收的狀態：全額預付且沒退款（未取餐、轉愛心餐也不退）。跟 functions/src/finance.js 的 PAID_STATUSES 一致
+export const REVENUE_STATUSES = new Set(["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "charity", "no_show"]);
 
 /** 取餐號：4 碼（第一階段規格）；舊資料沒有就用 lock id 末 8 碼 */
 export function pickupCode(lock: Pick<Lock, "id" | "pickup_code">): string {

@@ -158,7 +158,7 @@ export default function VendorPortalPrep() {
     const unsubPlan = onSnapshot(doc(db, "vendors", vendorId, "prepPlans", date), (snap) => setPlan(snap.exists() && snap.data().locked_at ? (snap.data() as PrepPlan) : null), () => setPlan(null));
     const unsubLocks = onSnapshot(query(collection(db, "locks"), where("vendor_id", "==", vendorId), where("pickup_date", "==", date)), (snap) => {
       setLocks(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Lock).filter((l) => PENDING_STATUSES.has(l.status) || l.status === "fulfilled" || l.status === "resold_and_fulfilled" || l.status === "charity"));
-    });
+    }, (err) => toast({ variant: "destructive", title: tr("訂單讀取失敗", "Couldn't load orders"), description: err.message }));
     return () => {
       unsubPlan();
       unsubLocks();

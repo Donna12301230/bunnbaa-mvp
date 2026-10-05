@@ -3,9 +3,8 @@ import { collection, limit, onSnapshot, query, where } from "firebase/firestore"
 import { httpsCallable } from "@/lib/callable";
 import { db, functions } from "@/lib/firebase";
 import type { AccuracyReport } from "@/types";
-import { useVendorLocks } from "@/hooks/useVendorLocks";
 import { addDaysStr, todayStr } from "@/lib/pickupSlots";
-import { DONE_STATUSES } from "@/lib/lockOutcome";
+import { DONE_STATUSES, REVENUE_STATUSES } from "@/lib/lockOutcome";
 import { tr, loc, planBaseName } from "@/lib/i18n";
 import type { Lock } from "@/types";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
@@ -69,11 +68,16 @@ interface ReportStats {
 
 const REPORT_DAYS = 15;
 
-// 以取餐日落在最近 REPORT_DAYS 天（含今天）的鎖定計算；鎖定是全額預付，未取餐也算收入。
-function computeStats(locks: Lock[]): ReportStats | null {
+function reportRange() {
   const end = todayStr();
-  const start = addDaysStr(end, -(REPORT_DAYS - 1));
-  const rows = locks.filter((l) => l.pickup_date >= start && l.pickup_date <= end);
+  return { start: addDaysStr(end, -(REPORT_DAYS - 1)), end };
+}
+
+// 以取餐日落在最近 REPORT_DAYS 天（含今天）的鎖定計算；鎖定是全額預付，未取餐也算收入，
+// 取消退款的不算（狀態口徑跟每日收入圖 getDailyRevenueSeries 相同）。
+function computeStats(locks: Lock[]): ReportStats | null {
+  const { start, end } = reportRange();
+  const rows = locks.filter((l) => l.pickup_date >= start && l.pickup_date <= end && REVENUE_STATUSES.has(l.status));
   if (rows.length === 0) return null;
   const totalRevenue = rows.reduce((sum, l) => sum + (l.locked_price || 0), 0);
   const byDate = new Map<string, number>();
@@ -139,7 +143,23 @@ export default function VendorPortalReports() {
     }
   }
 
-  const { locks, loading: loadingStats } = useVendorLocks(500);
+  // 直接查取餐日區間（vendor_id + pickup_date 索引），不用 useVendorLocks 的「最近 500 筆」——
+  // 訂單一多，15 天內較早建立的單會被截掉，累計收入就比每日收入圖少（BUG-13）
+  const [locks, setLocks] = useState<Lock[]>([]);
+  const [loadingStats, setLoadingStats] = useState(true);
+  useEffect(() => {
+    if (!VENDOR_ID) return;
+    const { start, end } = reportRange();
+    const q = query(collection(db, "locks"), where("vendor_id", "==", VENDOR_ID), where("pickup_date", ">=", start), where("pickup_date", "<=", end));
+    return onSnapshot(
+      q,
+      (snap) => {
+        setLocks(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock));
+        setLoadingStats(false);
+      },
+      () => setLoadingStats(false)
+    );
+  }, [VENDOR_ID]);
   const stats = computeStats(locks);
 
   function StatCards({ stats, colorClass = "text-orange-600" }: {
@@ -152,7 +172,7 @@ export default function VendorPortalReports() {
           <CardContent className="pt-4 pb-3 text-center">
             <Banknote className="w-4 h-4 mx-auto mb-1 text-orange-500" />
             <div className={`text-2xl font-bold ${colorClass}`}>{stats.totalRevenue.toLocaleString()}</div>
-            <div className="text-xs text-muted-foreground">{tr("累計收入 (NT$)", "Revenue (NT$)")}</div>
+            <div className="text-xs text-muted-foreground">{tr(`${REPORT_DAYS} 天收入 (NT$)`, `${REPORT_DAYS}-day revenue (NT$)`)}</div>
           </CardContent>
         </Card>
         <Card>

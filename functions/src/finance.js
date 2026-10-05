@@ -22,7 +22,8 @@ const { helpers: purchasing } = require("./purchasing");
 
 const DAY_MS = 86400000;
 const DEFAULT_LINEPAY_FEE_RATE = 0.0275;
-const PAID_STATUSES = ["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "charity"];
+// 全額預付且沒退款（未取餐、轉愛心餐也不退）。跟 web/src/lib/lockOutcome.ts 的 REVENUE_STATUSES 一致
+const PAID_STATUSES = ["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "charity", "no_show"];
 
 /* ------------------------------------------------------------------ *
  * 平台維護費（§1）：首月免費；逾期寬限 7 天並每天提醒；仍未繳暫停接新訂單（已成立訂單照常出餐）

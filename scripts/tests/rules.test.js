@@ -78,7 +78,7 @@ const results = [];
     await env.withSecurityRulesDisabled((c) => updateDoc(doc(c.firestore(), "locks/lA"), { status: "locked", resale_deadline: null }));
   });
   await t("R-05a", "resale_deadline 設過去被拒", () => assertFails(updateDoc(doc(A, "locks/lA"), { status: "for_resale", resale_deadline: Timestamp.fromMillis(Date.now() - 60000) })));
-  await t("R-05b", "resale_deadline 設 25 小時後被拒", () => assertFails(updateDoc(doc(A, "locks/lA"), { status: "for_resale", resale_deadline: Timestamp.fromMillis(Date.now() + 25 * 3600000) })));
+  await t("R-05b", "resale_deadline 設 32 天後被拒", () => assertFails(updateDoc(doc(A, "locks/lA"), { status: "for_resale", resale_deadline: Timestamp.fromMillis(Date.now() + 32 * 86400000) })));
   await t("R-06", "自己改 orderBanned=false 被拒", () => assertFails(updateDoc(doc(A, "users/userA"), { orderBanned: false })));
   await t("R-07", "lang 改成 jp 被拒", () => assertFails(updateDoc(doc(A, "users/userA"), { lang: "jp" })));
   await t("R-08a", "讀寫 payment_intents 被拒", async () => { await assertFails(getDoc(doc(A, "payment_intents/o1"))); await assertFails(setDoc(doc(A, "payment_intents/o1"), { a: 1 })); });
@@ -180,6 +180,10 @@ const results = [];
   await t("C-MY-03b", "上架轉讓：取餐日是明天（期限在 24 小時內）", async () => {
     await seed("locks/lList1d", { buyer_uid: "userA", vendor_id: "v1", status: "locked", locked_price: 80 });
     await assertSucceeds(updateDoc(doc(A, "locks/lList1d"), { status: "for_resale", resale_deadline: Timestamp.fromMillis(Date.now() + 20 * 3600000) }));
+  });
+  await t("C-MY-03c", "上架轉讓：取餐日在 30 天後（最遠可預訂的一天）", async () => {
+    await seed("locks/lList30d", { buyer_uid: "userA", vendor_id: "v1", status: "locked", locked_price: 80 });
+    await assertSucceeds(updateDoc(doc(A, "locks/lList30d"), { status: "for_resale", resale_deadline: windowEnd(30) }));
   });
   await t("C-MY-05", "贈送：只能改 status=for_gift", async () => {
     await seed("locks/lGive", { buyer_uid: "userA", vendor_id: "v1", status: "locked", locked_price: 80 });
