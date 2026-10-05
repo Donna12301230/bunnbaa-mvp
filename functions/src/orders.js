@@ -110,8 +110,9 @@ async function loadUsableCoupon(couponId, uid, vendorId) {
 /**
  * 驗證並展開一份便當的選擇（主菜、飯量、配菜、第四道、店家自訂欄位），下單與截單前修改共用。
  * 回傳 { rice, resolved, extra, custom, main, listPrice, adjust }；不合法丟 HttpsError。
+ * keptCustom：截單前修改沒動自訂欄位時，直接沿用訂單上記錄的選擇與金額（店家之後刪改選項也不影響舊訂單）。
  */
-function resolveOrderChoices(item, line, config) {
+function resolveOrderChoices(item, line, config, keptCustom = null) {
   const bento = isBento(item);
   const rice = bento && item.rice_component_id && RICE_OPTIONS.includes(line.rice) ? line.rice : "normal";
   const mainPick = resolveMain(item, line.main_index);
@@ -121,7 +122,9 @@ function resolveOrderChoices(item, line, config) {
   const extraPick = resolveExtraSide(item, line.extra_side, resolved.slots, config);
   if (extraPick.problem) throw new HttpsError("invalid-argument", extraPick.problem);
   const extra = extraPick.extra;
-  const customPick = resolveCustomPicks(item, line.custom_picks);
+  const customPick = keptCustom
+    ? { custom: keptCustom, amount: keptCustom.reduce((sum, c) => sum + (Number(c.price) || 0), 0) }
+    : resolveCustomPicks(item, line.custom_picks);
   if (customPick.problem) throw new HttpsError("invalid-argument", customPick.problem);
   const adjust = adjustAmount({ rice, removedCount: resolved.removedCount, extraMode: extra?.mode }, config) + customPick.amount;
   return { rice, resolved, extra, custom: customPick.custom, main: mainPick.main, listPrice: mainPick.price, adjust };
@@ -861,7 +864,6 @@ function currentChoices(lock) {
     main_index: lock.main_index ?? null,
     slots: (lock.slots || []).map((s) => ({ choice: s.removed ? "none" : s.wished != null ? s.candidate_index : "default" })),
     extra_side: lock.extra_side ? { slot: lock.extra_side.slot, candidate: lock.extra_side.candidate_index, mode: lock.extra_side.mode } : null,
-    custom_picks: (lock.custom_options || []).map((c) => c.index),
   };
 }
 
@@ -899,7 +901,7 @@ exports.updateLockChoices = onCall({}, async (request) => {
   if (changesChoices) {
     if (!item || lock.plan_id) throw new HttpsError("failed-precondition", t("這筆餐點沒有可修改的選項，只能改取餐時段", "Only the pickup time can be changed for this meal"));
     const merged = { ...currentChoices(lock), ...Object.fromEntries(["slots", "rice", "main_index", "extra_side", "custom_picks"].filter((k) => k in data).map((k) => [k, data[k]])) };
-    const choice = resolveOrderChoices(item, merged, config);
+    const choice = resolveOrderChoices(item, merged, config, "custom_picks" in data ? null : lock.custom_options || []);
     const early = Math.round(choice.listPrice * (1 - (lock.discount_percent || 0) / 100));
     const subtotal = Math.max(0, early + choice.adjust);
     let couponDiscount = 0;
