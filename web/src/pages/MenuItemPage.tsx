@@ -18,7 +18,7 @@ import { tr, loc } from "@/lib/i18n";
 import { tagEn } from "@/types";
 import { cn } from "@/lib/utils";
 import { discountText } from "@/lib/pricing";
-import { RICE_OPTIONS, isBento, itemListPrice, itemMains, portionLabel, priceBreakdown, sideOptions } from "@/lib/bento";
+import { RICE_OPTIONS, customFields, isBento, itemListPrice, itemMains, portionLabel, priceBreakdown, priceDeltaText, sideOptions } from "@/lib/bento";
 import { usePlatformConfig } from "@/lib/platformConfig";
 import { useSideWishes } from "@/hooks/useSideWishes";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
@@ -69,6 +69,7 @@ export default function MenuItemPage() {
   const [choices, setChoices] = useState<SlotChoice[]>([]);
   const [mainIndex, setMainIndex] = useState<number | null>(null);
   const [extra, setExtra] = useState<ExtraSideChoice | null>(null);
+  const [customPicks, setCustomPicks] = useState<number[]>([]);
   const [showMaterials, setShowMaterials] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -113,6 +114,7 @@ export default function MenuItemPage() {
     if (item?.slots) setChoices(item.slots.map(() => "default"));
     setMainIndex((item?.mains || []).length > 0 ? 0 : null);
     setExtra(null);
+    setCustomPicks(customFields(item).map(() => 0));
   }, [item?.id]);
 
   // 瀏覽訊號（§10）：登入者看品項頁記一次，伺服器端同一天同品項只算一次
@@ -130,6 +132,7 @@ export default function MenuItemPage() {
   const { dayCount, weekCount } = useSideWishes(vendor?.id, date);
   const mains = useMemo(() => (item ? itemMains(item) : []), [item]);
   const options = useMemo(() => (item ? sideOptions(item) : []), [item]);
+  const custom = useMemo(() => customFields(item), [item]);
 
   if (isLoading) return <SkeletonBlocks height={256} />;
   if (!item) {
@@ -145,7 +148,7 @@ export default function MenuItemPage() {
 
   const bento = isBento(item) && item.item_type !== "single";
   const listPrice = itemListPrice(item, mainIndex);
-  const breakdown = date ? priceBreakdown(item, date, rice, choices, 0, { mainIndex, extra }) : null;
+  const breakdown = date ? priceBreakdown(item, date, rice, choices, 0, { mainIndex, extra, customPicks }) : null;
   const minQtyDefault = vendor?.candidate_min_qty || config?.candidateMinQty || 10;
   const maxSides = config?.maxSides ?? 4;
   const standardCount = item.slots?.length ?? 0;
@@ -208,6 +211,10 @@ export default function MenuItemPage() {
   });
   const extraOpt = extra ? options.find((o) => o.slot === extra.slot && o.candidate === extra.candidate) : null;
   if (extra?.mode === "addon" && extraOpt) materials.push({ label: extraOpt.portion_text || extraOpt.name, image: extraOpt.image_url });
+  custom.forEach((f, i) => {
+    const o = f.options[customPicks[i] ?? 0];
+    if (o) materials.push({ label: `${f.label}：${o.name}` });
+  });
 
   // 加入購物車前先用對話框確認訂單內容（不直接加入）
   function openConfirm() {
@@ -229,6 +236,7 @@ export default function MenuItemPage() {
       menuItem: item!, vendorId: item!.vendor_id, pickupDate: date, pickupWindow: window,
       choices: bento ? choices : [], rice: bento && item!.rice_component_id ? rice : "normal",
       mainIndex: (item!.mains || []).length > 0 ? mainIndex ?? 0 : null, extraSide: bento ? extra : null,
+      customPicks: custom.map((_, i) => customPicks[i] ?? 0),
       quantity: qty, note: note.trim(), couponId: null,
     });
     setConfirmOpen(false);
@@ -410,6 +418,14 @@ export default function MenuItemPage() {
                   </Select>
                 </DishSelectRow>
               )}
+              {/* 店家自訂欄位（例：湯品、飲料、辣度），第一個選項是預設 */}
+              {custom.map((f, i) => (
+                <DishSelectRow key={`custom-${i}`} label={f.label}>
+                  <Select aria-label={f.label} value={String(customPicks[i] ?? 0)} onChange={(e) => setCustomPicks((prev) => custom.map((_, j) => (j === i ? Number(e.target.value) : prev[j] ?? 0)))}>
+                    {f.options.map((o, oi) => <option key={oi} value={oi}>{o.name}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</option>)}
+                  </Select>
+                </DishSelectRow>
+              ))}
               <p className="text-xs text-muted-foreground flex gap-1"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />{tr("候選菜不加價，改以份量平衡成本（標示全份／半份）；已滿或今日未供應的選項不能選。", "Candidates cost the same — portions balance the cost (full/half). Full or unavailable options can't be picked.")}</p>
             </section>
           )}
@@ -518,6 +534,9 @@ export default function MenuItemPage() {
             {bento && extra && (
               <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("第四道", "4th side")}</dt><dd className="text-right">{extra.mode === "backup" ? tr("備案", "Backup") : tr("加菜", "Add-on")}</dd></div>
             )}
+            {custom.map((f, i) => (
+              <div key={`custom-${i}`} className="flex justify-between gap-4"><dt className="text-muted-foreground">{f.label}</dt><dd className="text-right">{f.options[customPicks[i] ?? 0]?.name}</dd></div>
+            ))}
             <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("數量", "Qty")}</dt><dd className="text-right">{qty}</dd></div>
             {note.trim() && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("備註", "Note")}</dt><dd className="text-right">{note.trim()}</dd></div>}
           </dl>

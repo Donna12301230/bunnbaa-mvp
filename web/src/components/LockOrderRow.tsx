@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { completePickup, LOCK_STATUS_STYLE, pickupCode, REDEEMABLE_STATUSES } from "@/lib/lockOutcome";
-import { riceLabel, slotText } from "@/lib/bento";
+import { customOptionTexts, riceLabel, slotText } from "@/lib/bento";
 import { todayStr } from "@/lib/pickupSlots";
 import type { Lock } from "@/types";
 
@@ -41,7 +41,7 @@ export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; sh
             {showDate && <> · {lock.pickup_date}</>} · {lock.pickup_window} · NT${lock.locked_price}
           </p>
           {(lock.slots?.length ?? 0) > 0 && (
-            <p className="text-xs text-muted-foreground">{lock.slots!.map(slotText).join("／")}{riceLabel(lock.rice) ? `／${riceLabel(lock.rice)}` : ""}</p>
+            <p className="text-xs text-muted-foreground">{[...lock.slots!.map(slotText), ...customOptionTexts(lock.custom_options)].join("／")}{riceLabel(lock.rice) ? `／${riceLabel(lock.rice)}` : ""}</p>
           )}
           {lock.note && <p className="text-xs text-amber-700 mt-0.5">{tr("備註：", "Note: ")}{lock.note}</p>}
         </div>

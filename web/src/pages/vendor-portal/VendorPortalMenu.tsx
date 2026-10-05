@@ -134,6 +134,12 @@ export default function VendorPortalMenu() {
             candidates: sl.candidates.filter((c) => c.name).map((c) => ({ ...c, image_url: c.image_url || null, portion_text: withPortion(c.component_id, c.name) })),
           }))
           : [],
+        // 配菜下方的自訂下拉欄位：沒填名稱的欄位、沒填名稱的選項都不存
+        custom_fields: bento.itemType === "bento"
+          ? bento.customFields
+            .map((f) => ({ label: f.label.trim(), options: f.options.filter((o) => o.name.trim()).map((o) => ({ name: o.name.trim(), price: Math.round(Number(o.price) || 0) })) }))
+            .filter((f) => f.label && f.options.length > 0)
+          : [],
         weekdays: bento.weekdays,
         component_id: bento.itemType === "single" ? bento.componentId || null : null,
       };
@@ -247,6 +253,7 @@ export default function VendorPortalMenu() {
       componentId: item.component_id ?? "",
       weekdays: item.weekdays ?? [],
       slots: item.slots ?? [],
+      customFields: item.custom_fields ?? [],
     });
     setDialogOpen(true);
   }

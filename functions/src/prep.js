@@ -142,6 +142,7 @@ function buildLabels(locks, itemsById) {
       const sides = (lock.slots || []).map((s) => (s.removed ? `${s.category || "配菜"}：不要` : s.resolved || s.default_dish)).filter(Boolean);
       const extra = lock.extra_side;
       if (extra?.mode === "addon" && (extra.resolved || extra.dish)) sides.push(`＋${extra.resolved || extra.dish}`);
+      for (const c of lock.custom_options || []) sides.push(`${c.label}：${c.choice}`);
       const rice = lock.rice === "add" ? "白飯一碗半" : lock.rice === "less" ? "白飯半碗" : null;
       return {
         lock_id: lock.id,

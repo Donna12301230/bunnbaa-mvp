@@ -73,6 +73,7 @@ export interface MenuItem {
   rice_component_id?: string | null;
   fixed?: { name: string; component_id?: string | null; portion_text?: string | null }[]; // 固定附餐（例：滷蛋），不能換也不能減
   slots?: BentoSlot[];
+  custom_fields?: BentoCustomField[]; // 配菜下方店家自訂的下拉欄位（例：湯品、飲料、辣度）
   weekdays?: number[]; // 週菜單輪替：只在這幾天供應（沒設＝每天）
   component_id?: string | null; // 單品對應的半成品（備料用）
 }
@@ -100,6 +101,23 @@ export interface BentoSlot {
   category: string; // 青菜類、肉類配菜、蛋豆類…候選菜只能同類別
   default: { name: string; component_id?: string | null; image_url?: string | null; portion_text?: string | null };
   candidates: BentoCandidate[];
+}
+
+/** 店家自訂欄位（便當配菜下方的下拉選單）：消費者從選項選一個，第一個是預設；選項可加減價 */
+export interface BentoCustomOption {
+  name: string;
+  price: number; // 加減價（0＝不加價）
+}
+export interface BentoCustomField {
+  label: string;
+  options: BentoCustomOption[];
+}
+/** 訂單上記錄的自訂欄位選擇 */
+export interface LockCustomOption {
+  label: string;
+  index: number;
+  choice: string;
+  price: number;
 }
 
 /** 第四道配菜：備案（不加價，前三道沒成立時遞補）或加菜（+10） */
@@ -206,6 +224,7 @@ export interface Lock {
   main_index?: number | null;
   slots?: LockSlot[];
   extra_side?: LockExtraSide | null;
+  custom_options?: LockCustomOption[];
   plan_day?: number;
   rice?: RiceOption;
   list_price?: number;
