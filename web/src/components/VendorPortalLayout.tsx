@@ -9,23 +9,50 @@ import { getSubscriptionState, PLATFORM_CONTACT_EMAIL } from "@/lib/subscription
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
-// 用函式包起來，每次 render 依目前語言組標籤
-const navItems = () => [
-  { href: "/vendor-portal/dashboard", label: tr("總覽", "Overview"), icon: LayoutDashboard },
-  // 取餐掃碼指向 /lock/vendor/redeem（舊路徑，跟 MarketplaceHeader 同一個入口）
-  { href: "/lock/vendor/redeem", label: tr("取餐掃碼", "Pickup scan"), icon: ScanLine },
-  { href: "/vendor-portal/prep", label: tr("每日備料", "Daily prep"), icon: ChefHat },
-  { href: "/vendor-portal/purchasing", label: tr("採購叫貨", "Purchasing"), icon: ShoppingBasket },
-  { href: "/vendor-portal/menu", label: tr("菜單管理", "Menu"), icon: UtensilsCrossed },
-  { href: "/vendor-portal/recipes", label: tr("配方原物料", "Recipes"), icon: BookOpen },
-  { href: "/vendor-portal/orders", label: tr("訂單管理", "Orders"), icon: ClipboardList },
-  { href: "/vendor-portal/sessions", label: tr("訂餐時段", "Pickup slots"), icon: CalendarDays },
-  { href: "/vendor-portal/charity", label: tr("愛心餐", "Charity"), icon: HeartHandshake },
-  { href: "/vendor-portal/growth", label: tr("券負債看板", "Rewards"), icon: Trophy },
-  { href: "/vendor-portal/insights", label: tr("區域洞察", "Insights"), icon: MapPinned },
-  { href: "/vendor-portal/reports", label: tr("統計報表", "Reports"), icon: TrendingUp },
-  { href: "/vendor-portal/settings", label: tr("店家設定", "Store settings"), icon: Settings },
+// 用函式包起來，每次 render 依目前語言組標籤；依功能分組，側欄顯示組標題
+const navGroups = () => [
+  {
+    title: null,
+    items: [
+      { href: "/vendor-portal/dashboard", label: tr("總覽", "Overview"), icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: tr("訂單出餐", "Orders & pickup"),
+    items: [
+      { href: "/vendor-portal/orders", label: tr("訂單管理", "Orders"), icon: ClipboardList },
+      // 取餐掃碼指向 /lock/vendor/redeem（舊路徑，跟 MarketplaceHeader 同一個入口）
+      { href: "/lock/vendor/redeem", label: tr("取餐掃碼", "Pickup scan"), icon: ScanLine },
+      { href: "/vendor-portal/sessions", label: tr("訂餐時段", "Pickup slots"), icon: CalendarDays },
+    ],
+  },
+  {
+    title: tr("菜單與備料", "Menu & prep"),
+    items: [
+      { href: "/vendor-portal/menu", label: tr("菜單管理", "Menu"), icon: UtensilsCrossed },
+      { href: "/vendor-portal/recipes", label: tr("配方原物料", "Recipes"), icon: BookOpen },
+      { href: "/vendor-portal/purchasing", label: tr("採購叫貨", "Purchasing"), icon: ShoppingBasket },
+      { href: "/vendor-portal/prep", label: tr("每日備料", "Daily prep"), icon: ChefHat },
+    ],
+  },
+  {
+    title: tr("營運統計", "Analytics"),
+    items: [
+      { href: "/vendor-portal/reports", label: tr("統計報表", "Reports"), icon: TrendingUp },
+      { href: "/vendor-portal/insights", label: tr("區域洞察", "Insights"), icon: MapPinned },
+      { href: "/vendor-portal/growth", label: tr("券負債看板", "Rewards"), icon: Trophy },
+    ],
+  },
+  {
+    title: tr("店家", "Store"),
+    items: [
+      { href: "/vendor-portal/charity", label: tr("愛心餐", "Charity"), icon: HeartHandshake },
+      { href: "/vendor-portal/settings", label: tr("店家設定", "Store settings"), icon: Settings },
+    ],
+  },
 ];
+
+const navItems = () => navGroups().flatMap((g) => g.items);
 
 // Ported from BunnBaa Parse_Ref's client/src/components/VendorLayout.tsx.
 // 訂閱狀態讀真實 vendors/{id}（lib/subscription.ts）：到期後整個廠商後台擋住，
@@ -103,19 +130,26 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
       <div className="flex">
         {/* Sidebar */}
         <aside className="w-60 shrink-0 min-h-[calc(100vh-4rem)] border-r border-border p-4 hidden md:flex flex-col">
-          <nav className="space-y-1 flex-1 sticky top-20" aria-label={tr("商家後台", "Vendor portal")}>
-            {navItems().map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} aria-current={location === href || location.startsWith(href) ? "page" : undefined} className="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <div className={cn(
-                  "flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm cursor-pointer transition-colors",
-                  location === href || location.startsWith(href)
-                    ? "bg-secondary text-secondary-foreground font-semibold shadow-[inset_0_0_0_1px_var(--border-ink)]"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                )}>
-                  <Icon className="w-4 h-4" />
-                  <span>{label}</span>
-                </div>
-              </Link>
+          <nav className="flex-1 sticky top-20 space-y-4" aria-label={tr("商家後台", "Vendor portal")}>
+            {navGroups().map((group, i) => (
+              <div key={group.title ?? i} className="space-y-1">
+                {group.title && (
+                  <div className="px-4 pb-1 text-xs font-semibold tracking-wide text-muted-foreground/80">{group.title}</div>
+                )}
+                {group.items.map(({ href, label, icon: Icon }) => (
+                  <Link key={href} href={href} aria-current={location === href || location.startsWith(href) ? "page" : undefined} className="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <div className={cn(
+                      "flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm cursor-pointer transition-colors",
+                      location === href || location.startsWith(href)
+                        ? "bg-secondary text-secondary-foreground font-semibold shadow-[inset_0_0_0_1px_var(--border-ink)]"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    )}>
+                      <Icon className="w-4 h-4" />
+                      <span>{label}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             ))}
           </nav>
           <div className="text-xs text-muted-foreground pt-3 border-t space-y-1">
