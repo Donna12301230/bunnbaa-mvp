@@ -53,6 +53,28 @@ function portionLevelFor(defaultCost, candidateCost) {
   return null;
 }
 
+// 材料總和（§4.2）不列的原物料類別：調味料、包材不是「這份裡的菜」
+const PORTION_SKIP_CATEGORIES = ["調味", "包材"];
+const UNIT_TEXT = { g: "克", ml: "毫升" };
+
+/**
+ * 材料總和顯示用的份量文字（§4.2），由配方帶出：例「滷雞腿 1 個」「炒高麗菜 80 克」。
+ * 取這道菜的主要原物料（排除調味料、包材；同單位時取用量最多的，以個計的優先於克，
+ * 因為「1 個雞腿」比「10 毫升醬油」更代表這道菜）。沒有配方就只回菜名。
+ * 前端 web/src/components/BentoEditor.tsx 的 portionTextFor 是同一套規則，要一起改。
+ */
+function portionText(component, ingredientsById, dishName) {
+  const lines = (component?.ingredients || [])
+    .map((line) => ({ line, ing: ingredientsById[line.ingredient_id] }))
+    .filter(({ ing }) => ing && !PORTION_SKIP_CATEGORIES.includes(ing.category));
+  if (lines.length === 0) return dishName;
+  const countable = lines.filter(({ ing }) => !UNIT_TEXT[ing.unit]);
+  const pool = countable.length > 0 ? countable : lines;
+  const { line, ing } = pool.reduce((a, b) => ((Number(b.line.grams) || 0) > (Number(a.line.grams) || 0) ? b : a));
+  const amount = Math.round((Number(line.grams) || 0) * 10) / 10;
+  return `${dishName} ${amount} ${UNIT_TEXT[ing.unit] || ing.unit}`;
+}
+
 function portionLabel(level) {
   if (level != null && level < 1) return "半份";
   return "全份";
@@ -196,6 +218,6 @@ function dishTags(component, ingredientsById) {
 }
 
 module.exports = {
-  RICE_OPTIONS, rawAmount, componentCost, portionLevelFor, portionLabel, isBento, resolveChoices, resolveMain, sideOptions,
+  RICE_OPTIONS, rawAmount, componentCost, portionLevelFor, portionText, portionLabel, isBento, resolveChoices, resolveMain, sideOptions,
   resolveExtraSide, adjustAmount, dishTags,
 };

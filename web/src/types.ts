@@ -69,9 +69,9 @@ export interface MenuItem {
   template?: string | null;
   // 可選主菜，各自定價（便當價以所選主菜為準）；沒有 mains 時用 main＋price
   mains?: BentoMain[];
-  main?: { name: string; component_id?: string | null } | null;
+  main?: { name: string; component_id?: string | null; portion_text?: string | null } | null;
   rice_component_id?: string | null;
-  fixed?: { name: string; component_id?: string | null }[]; // 固定附餐（例：滷蛋），不能換也不能減
+  fixed?: { name: string; component_id?: string | null; portion_text?: string | null }[]; // 固定附餐（例：滷蛋），不能換也不能減
   slots?: BentoSlot[];
   weekdays?: number[]; // 週菜單輪替：只在這幾天供應（沒設＝每天）
   component_id?: string | null; // 單品對應的半成品（備料用）

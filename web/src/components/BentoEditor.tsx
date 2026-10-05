@@ -25,14 +25,24 @@ const CATEGORIES = ["青菜類", "肉類配菜", "蛋豆類", "根莖類", "其�
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WD = ["日", "一", "二", "三", "四", "五", "六"];
 
-/** 材料總和顯示用的份量文字（§4.2），由配方帶出：例「茄子 80 克」「豬肉 2 片」 */
+const PORTION_SKIP_CATEGORIES = ["調味", "包材"];
+const UNIT_TEXT: Record<string, string> = { g: "克", ml: "毫升" };
+
+/**
+ * 材料總和顯示用的份量文字（§4.2），由配方帶出：例「滷雞腿 1 個」「炒高麗菜 80 克」。
+ * 取主要原物料：排除調味料、包材；以個／片計的優先於克（「1 個雞腿」比「10 毫升醬油」更代表這道菜），
+ * 同一種單位取用量最多的。跟 functions/src/bento.js 的 portionText 同一套規則，要一起改。
+ */
 export function portionTextFor(component: Component | undefined, ingredientsById: Record<string, Ingredient>, fallback: string): string {
-  if (!component?.ingredients?.length) return fallback;
-  const main = [...component.ingredients].sort((a, b) => (b.grams || 0) - (a.grams || 0))[0];
-  const ing = ingredientsById[main.ingredient_id];
-  if (!ing) return fallback;
-  const unit = ing.unit === "g" ? "克" : ing.unit === "ml" ? "毫升" : ing.unit;
-  return `${fallback} ${Math.round((main.grams || 0) * 10) / 10} ${unit}`;
+  const lines = (component?.ingredients ?? []).flatMap((line) => {
+    const ing = ingredientsById[line.ingredient_id];
+    return ing && !PORTION_SKIP_CATEGORIES.includes(ing.category) ? [{ line, ing }] : [];
+  });
+  if (lines.length === 0) return fallback;
+  const countable = lines.filter(({ ing }) => !UNIT_TEXT[ing.unit]);
+  const pool = countable.length > 0 ? countable : lines;
+  const { line, ing } = pool.reduce((a, b) => ((b.line.grams || 0) > (a.line.grams || 0) ? b : a));
+  return `${fallback} ${Math.round((line.grams || 0) * 10) / 10} ${UNIT_TEXT[ing.unit] ?? ing.unit}`;
 }
 
 /**

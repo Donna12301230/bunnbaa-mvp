@@ -125,7 +125,7 @@ export default function VendorPortalMenu() {
         item_type: bento.itemType,
         meal_periods: bento.mealPeriods,
         mains: bento.itemType === "bento" ? mains : [],
-        main: bento.itemType === "bento" && mains[0] ? { name: mains[0].name, component_id: mains[0].component_id || null } : null,
+        main: bento.itemType === "bento" && mains[0] ? { name: mains[0].name, component_id: mains[0].component_id || null, portion_text: mains[0].portion_text } : null,
         rice_component_id: bento.itemType === "bento" ? bento.riceComponentId || null : null,
         slots: bento.itemType === "bento"
           ? bento.slots.filter((sl) => sl.default.name).map((sl) => ({

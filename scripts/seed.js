@@ -340,6 +340,7 @@ async function seedVendorHistory(v, writer) {
 
   for (let day = v.historyDays; day >= 1; day--) {
     const date = daysAgo(day);
+    if (date.getDay() === 0 || date.getDay() === 6) continue; // 第一階段週一至週五營業（規格 §2）
     const dateStr = isoDate(date);
     const progress = v.historyDays === 1 ? 1 : (v.historyDays - day) / (v.historyDays - 1);
     let dayAccuracy = v.accuracyStart + progress * (v.accuracyEnd - v.accuracyStart);
@@ -358,6 +359,7 @@ async function seedVendorHistory(v, writer) {
       const ref = db.collection("locks").doc();
       await writer.set(ref, {
         vendor_id: v.id,
+        menu_item_id: `${v.id}-item-1`, // 材料成本、備料都靠它對到配方
         item_name: v.itemName,
         pickup_window: v.pickupWindow,
         pickup_date: dateStr,
@@ -404,13 +406,16 @@ async function topUpRevenue(v, currentRevenue, lockedPrice, writer) {
   if (!v.targetMinRevenue || currentRevenue >= v.targetMinRevenue) return { added: 0, lockCount: 0 };
 
   const needed = Math.ceil((v.targetMinRevenue - currentRevenue) / lockedPrice);
-  const date = daysAgo(v.historyDays); // same day as the oldest history bucket
+  // oldest history bucket; weekends have no history (Mon–Fri only), so step back to Friday
+  const oldest = daysAgo(v.historyDays).getDay();
+  const date = daysAgo(v.historyDays + (oldest === 6 ? 1 : oldest === 0 ? 2 : 0));
   const dateStr = isoDate(date);
   const refs = [];
   for (let i = 0; i < needed; i++) {
     const ref = db.collection("locks").doc();
     await writer.set(ref, {
       vendor_id: v.id,
+      menu_item_id: `${v.id}-item-1`, // 材料成本、備料都靠它對到配方
       item_name: v.itemName,
       pickup_window: v.pickupWindow,
       pickup_date: dateStr,
@@ -504,11 +509,15 @@ async function seedCurrentLocks(writer) {
   const ajia = VENDORS[2];
   const zaoan = VENDORS[3];
 
-  async function addLock(v, { daysAhead, window, status, resaleDeadlineHoursFromNow, buyerSuffix }) {
+  async function addLock(v, { daysAhead: requested, window, status, resaleDeadlineHoursFromNow, buyerSuffix }) {
+    // 週一至週五營業（規格 §2）：落在週六、週日的往後挪到週一（今天本身是週末就照舊，demo 才有今天的單）
+    const day = daysFromNow(requested).getDay();
+    const daysAhead = requested === 0 ? 0 : day === 6 ? requested + 2 : day === 0 ? requested + 1 : requested;
     const pickupDate = isoDate(daysFromNow(daysAhead));
     const { discountPercent, lockedPrice } = priceForDaysAhead(v.originalPrice, daysAhead);
     const data = {
       vendor_id: v.id,
+      menu_item_id: `${v.id}-item-1`, // 材料成本、備料都靠它對到配方
       item_name: v.itemName,
       pickup_window: window,
       pickup_date: pickupDate,

@@ -965,6 +965,11 @@ const REVIEW_COMMENTS = {
 function pickupDateFor(offsetDays) {
   return isoDate(daysAgo(offsetDays));
 }
+// 第一階段只在週一至週五營業（規格 §2）：落在週六、週日的取餐日往前挪到週五
+function weekdayOffset(offsetDays) {
+  const day = daysAgo(offsetDays).getDay();
+  return day === 6 ? offsetDays + 1 : day === 0 ? offsetDays + 2 : offsetDays;
+}
 function windowStart(window) {
   const [h, m] = window.split("-")[0].split(":").map(Number);
   return { h, m };
@@ -988,11 +993,11 @@ function buildOrders(users, catalog) {
       // lead: days between ordering and pickup, drives the early-bird tier.
       let pickupOffset, lead;
       if (rand() < 0.85) {
-        pickupOffset = randInt(1, 60);
+        pickupOffset = weekdayOffset(randInt(1, 60));
         lead = weighted([[0, 55], [1, 15], [randInt(2, 13), 25], [randInt(14, 30), 5]]);
         lead = Math.min(lead, user.createdDaysAgo - pickupOffset - 1); // not before sign-up
       } else {
-        pickupOffset = -randInt(0, 14);
+        pickupOffset = weekdayOffset(-randInt(0, 14));
         lead = Math.min(-pickupOffset + weighted([[0, 50], [1, 25], [randInt(2, 5), 25]]), 30); // placed today or a few days ago
       }
       const createdOffset = pickupOffset + lead;
@@ -1076,6 +1081,7 @@ function resolveOrders(orders, users) {
         const lock = {
           id: autoId(),
           vendor_id: o.vendorId,
+          menu_item_id: item.id, // 材料成本、備料都靠它對到配方
           item_name: item.name,
           item_name_en: item.name_en ?? null,
           pickup_window: o.window,

@@ -36,8 +36,8 @@ const FAQS = [
   {
     q: tr("店家沒有出餐怎麼辦？", "What if the vendor doesn't serve my order?"),
     a: tr(
-      "店家若未如期出餐，訂單會全額退款，並額外加贈 20 點回饋金。",
-      "If a vendor fails to serve your order on time, you'll receive a full refund plus 20 bonus reward points."
+      "請到「聯絡客服」回報，平台會跟店家確認並協助處理。颱風、停班停課時，當天的訂單會自動取消並全額退款。",
+      "Let us know via Contact us — we'll check with the vendor and help sort it out. On typhoon or work-suspension days, that day's orders are cancelled and fully refunded automatically."
     ),
   },
   {

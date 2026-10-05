@@ -35,8 +35,8 @@ const pick = (text: Bi, lang: Lang) => text[lang];
 
 const TICKER: Bi[] = [
   { zh: "訂明天 95 折，提前 2 天以上 8 折", en: "5% off for tomorrow, 20% off 2+ days ahead" },
-  { zh: "臨時去不了？轉讓給同學", en: "Can't make it? Transfer your meal to a classmate" },
-  { zh: "店家未出餐，全額退款再送 20 點", en: "Vendor didn't serve? Full refund plus 20 points" },
+  { zh: "臨時去不了？轉讓或捐為愛心餐", en: "Can't make it? Transfer it or donate it as a charity meal" },
+  { zh: "截單前免費取消，全額退款", en: "Free cancellation before cutoff — full refund" },
   { zh: "取餐前推播提醒，不怕忘記", en: "Push reminders before pickup" },
   { zh: "每 100 元一張抽獎券，人人有獎", en: "A reward ticket every NT$100 — everyone wins" },
 ];
@@ -427,7 +427,7 @@ function LandingContent() {
     { icon: <CalendarCheck />, title: t("提前預約", "Book ahead"), body: t(`挑好明天起 30 天內的早、中、晚餐，越早訂越便宜，最高 ${discountText(BEST_EARLY_BIRD)}。`, `Pick breakfast, lunch or dinner up to 30 days ahead — the earlier, the cheaper, up to ${BEST_EARLY_BIRD}% off.`) },
     { icon: <Wallet />, title: t("鎖定付款", "Lock it in"), body: t("LINE Pay 預付鎖定，店家照單備餐，不怕賣完。", "Prepay with LINE Pay. The vendor preps to order, so it never sells out on you.") },
     { icon: <QrCode />, title: t("準時取餐", "Grab & go"), body: t("取餐前推播提醒，出示 QR code，免排隊。", "Get a reminder before pickup, show your QR code, skip the queue.") },
-    { icon: <HeartHandshake />, title: t("去不了也不浪費", "Never wasted"), body: t("臨時有事就轉讓給同學、送給朋友，或捐成愛心餐。", "Plans changed? Transfer it, gift it, or donate it as a charity meal.") },
+    { icon: <HeartHandshake />, title: t("去不了也不浪費", "Never wasted"), body: t("臨時有事就轉讓、送給朋友，或捐成愛心餐。", "Plans changed? Transfer it, gift it, or donate it as a charity meal.") },
   ];
 
   const statementParts = isEn
@@ -450,7 +450,7 @@ function LandingContent() {
             <div className="lp-hero__copy">
               <p className="lp-hero__kicker" data-reveal>
                 <span className="lp-live" aria-hidden="true" />
-                {t("校園午餐預約平台・嘉義", "Campus lunch, booked ahead · Chiayi")}
+                {t("早餐・午餐・晚餐預約平台・嘉義", "Breakfast, lunch & dinner, booked ahead · Chiayi")}
               </p>
               <MaskLines
                 as="h1"
@@ -462,8 +462,8 @@ function LandingContent() {
               />
               <p className="lp-lead" data-reveal style={{ "--d": "240ms" } as CSSProperties}>
                 {isEn
-                  ? <>Students book ahead, vendors prep ahead. Lock in lunch from great spots near campus for <span className="lp-nowrap">up to {BEST_EARLY_BIRD}% off</span>, then just pick it up — no queues, no waste, your lunch break back.</>
-                  : <>學生提前預約、店家提前備餐。鎖定學校附近的好店午餐，<span className="lp-nowrap">最高 {discountText(BEST_EARLY_BIRD)}</span>，時間到直接取餐——不排隊、不浪費，把午休還給自己。</>}
+                  ? <>You book ahead, vendors prep ahead. Lock in breakfast, lunch or dinner from great spots near school or work for <span className="lp-nowrap">up to {BEST_EARLY_BIRD}% off</span>, then just pick it up — no queues, no waste.</>
+                  : <>學生、上班族提前預約，店家提前備餐。鎖定學校、公司附近好店的早餐、午餐、晚餐，<span className="lp-nowrap">最高 {discountText(BEST_EARLY_BIRD)}</span>，時間到直接取餐——不排隊、不浪費。</>}
               </p>
               <div className="lp-hero__cta" data-reveal style={{ "--d": "360ms" } as CSSProperties}>
                 <LinkButton href="/home" variant="primary" size="lg" rightIcon={<ArrowRight />} className="lp-magnet">{t("探索今日菜單", "Explore today's menu")}</LinkButton>
@@ -510,9 +510,9 @@ function LandingContent() {
                   <span className="lp-ticket__stamp">{isEn ? `−${BEST_EARLY_BIRD}%` : discountText(BEST_EARLY_BIRD)}</span>
                 </div>
               )}
-              <div className="lp-float lp-float--a"><Ticket /> {t("可轉讓給同學", "Transferable")}</div>
+              <div className="lp-float lp-float--a"><Ticket /> {t("可轉讓・贈送", "Transfer or gift")}</div>
               <div className="lp-float lp-float--b"><BellRing /> {t("取餐前提醒", "Pickup reminder")}</div>
-              <div className="lp-float lp-float--c"><ShieldCheck /> {t("未出餐全額退", "Full refund if not served")}</div>
+              <div className="lp-float lp-float--c"><ShieldCheck /> {t("截單前免費取消", "Free cancellation before cutoff")}</div>
             </div>
           </div>
         </section>
@@ -669,7 +669,7 @@ function LandingContent() {
           <dl className="lp-stats">
             <div className="lp-stat" data-reveal><dd>{isEn ? <StatNumber value={BEST_EARLY_BIRD} suffix="%" /> : <StatNumber value={(100 - BEST_EARLY_BIRD) / 10} suffix="折" />}</dd><dt>{t("早鳥折扣最高", "Max early-bird discount")}</dt></div>
             <div className="lp-stat" data-reveal style={{ "--d": "120ms" } as CSSProperties}><dd><StatNumber value={MAX_ADVANCE_DAYS} suffix={t("天", "d")} /></dd><dt>{t("最早可提前預約", "Book up to days ahead")}</dt></div>
-            <div className="lp-stat" data-reveal style={{ "--d": "240ms" } as CSSProperties}><dd><StatNumber value={20} suffix={t("點", "pts")} /></dd><dt>{t("未出餐全額退，再加贈", "Bonus on top of a full refund if not served")}</dt></div>
+            <div className="lp-stat" data-reveal style={{ "--d": "240ms" } as CSSProperties}><dd><StatNumber value={100} suffix={t("元", "NT$")} /></dd><dt>{t("每累計實付，換一張抽獎券", "Paid per reward ticket")}</dt></div>
           </dl>
         </section>
 
@@ -690,7 +690,7 @@ function LandingContent() {
         {/* ── 評價（沒有公開評價時整段不顯示） ── */}
         {r && (
           <section className="lp-section lp-container lp-reviews" aria-labelledby="lp-reviews-title" aria-roledescription={t("輪播", "carousel")}>
-            <Eyebrow index={nextIndex()}>{t("同學怎麼說", "Word on campus")}</Eyebrow>
+            <Eyebrow index={nextIndex()}>{t("吃過的人怎麼說", "What eaters say")}</Eyebrow>
             <h2 id="lp-reviews-title" className="sr-only">{t("使用者評價", "Reviews")}</h2>
             <div className={`lp-reviews__row${reviewPhoto ? " has-photo" : ""}`}>
               {reviewPhoto && (

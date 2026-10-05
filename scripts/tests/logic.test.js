@@ -129,6 +129,17 @@ test("C-BNT-09", "份量級距只分全份／半份：比例 ≥0.75 全份、0.
   assert.equal(bento.portionLevelFor(10, 25), null);
   assert.equal(bento.portionLabel(0.75), "半份");
 });
+test("C-BNT-26", "材料總和份量文字：排除調味料與包材、以個計優先、g→克；沒配方只回菜名", () => {
+  const ING = {
+    leg: { unit: "個", category: "雞" }, soy: { unit: "ml", category: "調味" }, cabbage: { unit: "g", category: "葉菜" },
+    oil: { unit: "ml", category: "調味" }, rice: { unit: "g", category: "米" }, box: { unit: "個", category: "包材" },
+  };
+  const comp = (lines) => ({ ingredients: lines.map(([ingredient_id, grams]) => ({ ingredient_id, grams })) });
+  assert.equal(bento.portionText(comp([["leg", 1], ["soy", 10]]), ING, "滷雞腿"), "滷雞腿 1 個");
+  assert.equal(bento.portionText(comp([["cabbage", 80], ["oil", 5]]), ING, "炒高麗菜"), "炒高麗菜 80 克");
+  assert.equal(bento.portionText(comp([["rice", 200], ["box", 1]]), ING, "白飯"), "白飯 200 克");
+  assert.equal(bento.portionText(undefined, ING, "滷蛋"), "滷蛋");
+});
 test("C-BNT-11", "沒有 slots 的舊品項不能加減", () => {
   assert.equal(bento.isBento({}), false);
   assert.deepEqual(bento.resolveChoices({}, []), { slots: [], removedCount: 0 });

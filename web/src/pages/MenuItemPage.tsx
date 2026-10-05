@@ -210,7 +210,7 @@ export default function MenuItemPage() {
   if (bento && item.rice_component_id && riceText) materials.push(tr(`白飯 ${riceText.label}`, `Rice: ${riceText.labelEn}`));
   const main = mainIndex != null ? mains[mainIndex] : mains[0];
   if (main) materials.push(main.portion_text || main.name);
-  for (const f of item.fixed || []) materials.push(f.name);
+  for (const f of item.fixed || []) materials.push(f.portion_text || f.name);
   (item.slots || []).forEach((slot, i) => {
     const c = choices[i];
     if (c === "none" || c === undefined) return;
@@ -221,7 +221,7 @@ export default function MenuItemPage() {
     }
   });
   const extraOpt = extra ? options.find((o) => o.slot === extra.slot && o.candidate === extra.candidate) : null;
-  if (extra?.mode === "addon" && extraOpt) materials.push(tr(`＋${extraOpt.name}`, `+${extraOpt.name}`));
+  if (extra?.mode === "addon" && extraOpt) materials.push(tr(`＋${extraOpt.portion_text || extraOpt.name}`, `+${extraOpt.portion_text || extraOpt.name}`));
 
   function handleAdd() {
     if (!canAdd || !vendor) return;

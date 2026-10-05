@@ -20,7 +20,7 @@
  * 需要服務帳號（GOOGLE_APPLICATION_CREDENTIALS）或 emulator（FIRESTORE_EMULATOR_HOST）。
  */
 const admin = require("firebase-admin");
-const { dishTags, componentCost, portionLevelFor } = require("../functions/src/bento");
+const { dishTags, componentCost, portionLevelFor, portionText } = require("../functions/src/bento");
 const { allocatePool, tierInfo } = require("../functions/src/rewards");
 const { DEFAULT_PLATFORM_CONFIG } = require("../functions/src/config");
 const { taipeiToday, addDays, mondayOf, weekdayOf } = require("../functions/src/calendar");
@@ -228,22 +228,24 @@ async function seedVendorCatalogs(writer) {
     const itemsById = {};
     for (const item of items) {
       const id = `${v.id}-${item.key}`;
+      // 材料總和（§4.2）的份量文字，跟店家在菜單管理儲存時一樣由配方帶出
+      const portion = (component, name) => portionText(componentsById[component], ingredientsById, name);
       const slots = (item.slots || []).map((s) => {
         const base = componentCost(componentsById[s.default.component], ingredientsById);
         return {
           category: s.category,
-          default: { name: s.default.name, component_id: s.default.component },
+          default: { name: s.default.name, component_id: s.default.component, portion_text: portion(s.default.component, s.default.name) },
           candidates: s.candidates.map((c, ci) => {
             const level = portionLevelFor(base, componentCost(componentsById[c.component], ingredientsById));
-            return { name: c.name, component_id: c.component, portion_level: level ?? 0.5, disabled: level === null, weekly_cap: ci === 0 ? 60 : null, min_qty: null };
+            return { name: c.name, component_id: c.component, portion_text: portion(c.component, c.name), portion_level: level ?? 0.5, disabled: level === null, weekly_cap: ci === 0 ? 60 : null, min_qty: null };
           }),
         };
       });
       const docData = {
         vendor_id: v.id, name: item.name, description: item.description || `${item.main.name}，配菜可許願、可加減飯`, price: item.price,
         category: item.category, is_available: true, image: null, allergens: [], dietary_tags: item.dietary_tags || [], template: item.template,
-        main: { name: item.main.name, component_id: item.main.component }, rice_component_id: item.rice_component || null,
-        fixed: (item.fixed || []).map((f) => ({ name: f.name, component_id: f.component })), slots, weekdays: item.weekdays || [],
+        main: { name: item.main.name, component_id: item.main.component, portion_text: portion(item.main.component, item.main.name) }, rice_component_id: item.rice_component || null,
+        fixed: (item.fixed || []).map((f) => ({ name: f.name, component_id: f.component, portion_text: portion(f.component, f.name) })), slots, weekdays: item.weekdays || [],
         created_at: FieldValue.serverTimestamp(),
       };
       itemsById[id] = { id, ...docData };

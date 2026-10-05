@@ -33,7 +33,7 @@ type PriceSource = Pick<MenuItem, "price" | "mains" | "main" | "image">;
 export function itemMains(item: PriceSource): BentoMain[] {
   const mains = (item.mains || []).filter((m) => m && m.price > 0);
   if (mains.length > 0) return mains;
-  return item.main?.name ? [{ name: item.main.name, component_id: item.main.component_id, price: item.price, image_url: item.image }] : [];
+  return item.main?.name ? [{ name: item.main.name, component_id: item.main.component_id, price: item.price, image_url: item.image, portion_text: item.main.portion_text }] : [];
 }
 
 /** 品項原價：便當以所選主菜為準 */
@@ -54,6 +54,7 @@ export interface SideOption {
   candidate: number | null; // null＝那一格的預設菜
   name: string;
   image_url?: string | null;
+  portion_text?: string | null;
   portion_level: number;
 }
 
@@ -61,9 +62,9 @@ export interface SideOption {
 export function sideOptions(item: Pick<MenuItem, "slots">): SideOption[] {
   const out: SideOption[] = [];
   (item.slots || []).forEach((slot, slotIdx) => {
-    if (slot.default?.name) out.push({ slot: slotIdx, candidate: null, name: slot.default.name, image_url: slot.default.image_url, portion_level: 1 });
+    if (slot.default?.name) out.push({ slot: slotIdx, candidate: null, name: slot.default.name, image_url: slot.default.image_url, portion_text: slot.default.portion_text, portion_level: 1 });
     (slot.candidates || []).forEach((c, ci) => {
-      if (c?.name && !c.disabled) out.push({ slot: slotIdx, candidate: ci, name: c.name, image_url: c.image_url, portion_level: c.portion_level ?? 1 });
+      if (c?.name && !c.disabled) out.push({ slot: slotIdx, candidate: ci, name: c.name, image_url: c.image_url, portion_text: c.portion_text, portion_level: c.portion_level ?? 1 });
     });
   });
   return out;
