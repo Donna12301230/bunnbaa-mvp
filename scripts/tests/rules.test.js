@@ -197,6 +197,14 @@ const results = [];
     await assertSucceeds(updateDoc(doc(A, "locks/lCxR"), { status: "locked" }));
     await assertSucceeds(updateDoc(doc(A, "locks/lCxG"), { status: "locked" }));
   });
+  await t("C-MY-08b", "有人正在付款接手（resale_hold 未過期）時，賣家不能取消轉讓；保留過期後才能", async () => {
+    const future = Timestamp.fromMillis(Date.now() + 15 * 60000);
+    const past = Timestamp.fromMillis(Date.now() - 60000);
+    await seed("locks/lHold", { buyer_uid: "userA", vendor_id: "v1", status: "for_resale", resale_deadline: in24h(), locked_price: 80, resale_hold: { uid: "userB", intent_id: "x", expires_at: future } });
+    await assertFails(updateDoc(doc(A, "locks/lHold"), { status: "locked" }));
+    await seed("locks/lHoldOld", { buyer_uid: "userA", vendor_id: "v1", status: "for_resale", resale_deadline: in24h(), locked_price: 80, resale_hold: { uid: "userB", intent_id: "y", expires_at: past } });
+    await assertSucceeds(updateDoc(doc(A, "locks/lHoldOld"), { status: "locked" }));
+  });
   await t("C-MKT-05", "轉讓期限過後：別人免費領取（locked_price=0、buyer=B）", async () => {
     await seed("locks/lExp", { buyer_uid: "userA", vendor_id: "v1", status: "for_resale", resale_deadline: Timestamp.fromMillis(Date.now() - 60000), locked_price: 80 });
     await assertFails(updateDoc(doc(B, "locks/lExp"), { status: "locked", buyer_uid: "userB", locked_price: 10, transferred_from_uids: ["userA"] }));

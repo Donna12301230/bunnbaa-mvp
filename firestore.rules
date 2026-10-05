@@ -189,8 +189,10 @@ service cloud.firestore {
                     // listing back to locked (TODO.md 2026-09-22 待辦：取消轉讓
                     // 沒有對應規則). Only reachable while buyer_uid is still theirs —
                     // once someone else claims it, buyer_uid has already moved on.
+                    // 有人正在付款接手（resale_hold 未過期）時，賣家不能再取消，否則會跟接手交易打架
                     || (isSignedInUser() && resource.data.buyer_uid == request.auth.uid
                         && resource.data.status in ['for_resale', 'for_gift']
+                        && !(resource.data.get('resale_hold', null) != null && resource.data.resale_hold.expires_at > request.time)
                         && request.resource.data.status == 'locked'
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resale_deadline']))
                     // Anyone claims an expired resale listing for free — replaces a
