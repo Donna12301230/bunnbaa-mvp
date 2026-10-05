@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   addDoc, collection, deleteDoc, deleteField, doc, getDocs, query, updateDoc, where,
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Plus, Pencil, Sparkles, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { AlertTriangle, Camera, Plus, Pencil, Sparkles, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
@@ -27,7 +27,13 @@ import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState, Switch, Tag } from "@/components/ds";
 import BentoEditor, { EMPTY_BENTO, portionTextFor, type BentoForm } from "@/components/BentoEditor";
 import { useVendorCatalog } from "@/hooks/useVendorCatalog";
-import { addDaysStr, mondayOf, todayStr } from "@/lib/pickupSlots";
+import { useVendorMenu } from "@/hooks/useVendorMenu";
+import MenuPrepProgress from "@/components/MenuPrepProgress";
+import { addDaysStr, bookableDateRange, mondayOf, todayStr } from "@/lib/pickupSlots";
+import { costIssueText, itemIssues } from "@/lib/prep";
+import { takePendingEdit } from "@/lib/pendingEdit";
+import { PENDING_STATUSES } from "@/lib/lockOutcome";
+import type { Lock } from "@/types";
 import { Link } from "wouter";
 
 // 拍照上架（functions/src/menuVision.js）回傳的草稿，店主按「填入表單」確認後才寫進 menu_items
@@ -88,16 +94,34 @@ export default function VendorPortalMenu() {
   // 週六 12:00 產生下週叫貨單後，下週主菜鎖定，只能等值替換配菜（§16 暫定）
   const nextWeekLocked = !!myVendor?.menu_locked_week && myVendor.menu_locked_week >= mondayOf(addDaysStr(todayStr(), 7));
 
-  const { data: items = [], isLoading } = useQuery({
-    queryKey: ["vendorMenu", VENDOR_ID],
+  const { data: items = [], isLoading } = useVendorMenu(VENDOR_ID);
+
+  // 每個品項的配方缺漏（未接配方、配方沒原物料、原物料沒單價）
+  const issuesById = useMemo(() => {
+    if (!catalog) return {} as Record<string, ReturnType<typeof itemIssues>>;
+    return Object.fromEntries(items.map((i) => [i.id, itemIssues(i, catalog.componentsById, catalog.ingredientsById)]));
+  }, [items, catalog]);
+
+  // 預覽份數的快捷鍵：下一個營業日已訂份數（依品項）
+  const nextDay = bookableDateRange().find((d) => d > todayStr());
+  const { data: nextDayCounts } = useQuery({
+    queryKey: ["menuNextDayCounts", VENDOR_ID, nextDay],
     queryFn: async () => {
-      const snap = await getDocs(query(collection(db, "menu_items"), where("vendor_id", "==", VENDOR_ID)));
-      return snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }) as MenuItem)
-        .sort((a, b) => a.category.localeCompare(b.category));
+      const snap = await getDocs(query(collection(db, "locks"), where("vendor_id", "==", VENDOR_ID), where("pickup_date", "==", nextDay)));
+      const out: Record<string, number> = {};
+      snap.docs.map((d) => d.data() as Lock).filter((l) => PENDING_STATUSES.has(l.status) && l.menu_item_id).forEach((l) => { out[l.menu_item_id!] = (out[l.menu_item_id!] || 0) + 1; });
+      return out;
     },
-    enabled: !!VENDOR_ID,
+    enabled: !!VENDOR_ID && !!nextDay && dialogOpen,
   });
+
+  // 從配方頁「用在：」或進度條跳過來：直接打開那個品項
+  useEffect(() => {
+    if (!catalog || items.length === 0) return;
+    const id = takePendingEdit("menu_item");
+    const item = id ? items.find((i) => i.id === id) : undefined;
+    if (item) openEdit(item);
+  }, [catalog, items]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -275,7 +299,8 @@ export default function VendorPortalMenu() {
 
   return (
     <VendorPortalLayout>
-      <div className="flex items-center justify-between mb-4">
+      <MenuPrepProgress />
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div>
           <h1 className="font-heading text-3xl md:text-4xl font-semibold">{tr("菜單管理", "Menu")}</h1>
           <p className="text-xs text-muted-foreground">{tr("主菜、配菜格與候選菜；配方在", "Mains, side slots and candidates; recipes live in")} <Link href="/vendor-portal/recipes" className="text-primary underline">{tr("配方與原物料", "Recipes")}</Link></p>
@@ -373,6 +398,13 @@ export default function VendorPortalMenu() {
                               {item.slots!.map((sl) => `${sl.default.name}${sl.candidates.length ? `（+${sl.candidates.map((c) => c.name).join("/")}）` : ""}`).join("、")}
                               {item.weekdays?.length ? `・${tr("週", "")}${item.weekdays.join(",")}` : ""}
                             </div>
+                          )}
+                          {(issuesById[item.id]?.length ?? 0) > 0 && (
+                            <button type="button" className="mt-1 inline-flex flex-wrap items-center gap-1 rounded bg-amber-100 text-amber-900 px-1.5 py-0.5 text-[11px] font-medium text-left hover:bg-amber-200" onClick={() => openEdit(item)}>
+                              <AlertTriangle className="w-3 h-3 shrink-0" />
+                              {issuesById[item.id].slice(0, 2).map((x) => `${x.label}${x.name ? ` ${x.name}` : ""}：${costIssueText(x.issue)}`).join("；")}
+                              {issuesById[item.id].length > 2 ? tr(`…等 ${issuesById[item.id].length} 項`, ` +${issuesById[item.id].length - 2} more`) : ""}
+                            </button>
                           )}
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-orange-600 font-semibold text-sm">NT$ {item.price}{(item.mains?.length ?? 0) > 1 ? tr(" 起", "+") : ""}</span>
@@ -487,7 +519,7 @@ export default function VendorPortalMenu() {
             {nextWeekLocked && bento.itemType === "bento" && (
               <p className="text-xs text-amber-700 bg-amber-50 rounded p-2">{tr("下週叫貨單已產生，下週主菜已鎖定；請只做等值的配菜替換。", "Next week's purchase list is out, so mains are locked — only swap sides for equivalents.")}</p>
             )}
-            <BentoEditor itemName={form.name} itemPrice={Number(form.price) || 0} value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} />
+            <BentoEditor itemName={form.name} itemPrice={Number(form.price) || 0} value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} orderCount={editId && nextDay && nextDayCounts?.[editId] ? { label: tr(`${nextDay.slice(5)} 已訂`, `${nextDay.slice(5)} booked`), n: nextDayCounts[editId] } : undefined} />
             <ImageUploadField label={tr("品項圖片", "Item photo")} vendorId={VENDOR_ID} value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
           </div>
           <DialogFooter>
