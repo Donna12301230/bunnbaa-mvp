@@ -141,7 +141,12 @@ export default function VendorPortalMenu() {
             .filter((f) => f.label && f.options.length > 0)
           : [],
         weekdays: bento.weekdays,
-        component_id: bento.itemType === "single" ? bento.componentId || null : null,
+        // 備料組成一律存在 fixed（單品也是），舊的單一 component_id 清掉，免得備料重複計算
+        fixed: bento.parts.filter((p) => p.component_id).map((p) => {
+          const name = p.name || comps[p.component_id!]?.name || "";
+          return { name, component_id: p.component_id, portions: p.portions > 0 ? p.portions : 1, portion_text: withPortion(p.component_id, name) };
+        }),
+        component_id: null,
       };
       const original = editId ? items.find((i) => i.id === editId) ?? null : null;
       const english = englishOverrides(form, original);
@@ -250,7 +255,10 @@ export default function VendorPortalMenu() {
       mealPeriods: item.meal_periods?.length ? item.meal_periods : ["lunch"],
       mains: item.mains?.length ? item.mains : isBentoItem && item.main?.name ? [{ name: item.main.name, component_id: item.main.component_id ?? null, price: item.price, image_url: item.image }] : [],
       riceComponentId: item.rice_component_id ?? "",
-      componentId: item.component_id ?? "",
+      parts: [
+        ...(item.component_id ? [{ component_id: item.component_id, name: catalog?.components.find((c) => c.id === item.component_id)?.name ?? "", portions: 1 }] : []),
+        ...(item.fixed ?? []).map((f) => ({ component_id: f.component_id ?? null, name: f.name, portions: f.portions ?? 1 })),
+      ],
       weekdays: item.weekdays ?? [],
       slots: item.slots ?? [],
       customFields: item.custom_fields ?? [],
@@ -479,7 +487,7 @@ export default function VendorPortalMenu() {
             {nextWeekLocked && bento.itemType === "bento" && (
               <p className="text-xs text-amber-700 bg-amber-50 rounded p-2">{tr("下週叫貨單已產生，下週主菜已鎖定；請只做等值的配菜替換。", "Next week's purchase list is out, so mains are locked — only swap sides for equivalents.")}</p>
             )}
-            <BentoEditor value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} />
+            <BentoEditor itemName={form.name} itemPrice={Number(form.price) || 0} value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} />
             <ImageUploadField label={tr("品項圖片", "Item photo")} vendorId={VENDOR_ID} value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
           </div>
           <DialogFooter>

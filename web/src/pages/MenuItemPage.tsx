@@ -213,7 +213,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
   if (bento && item.rice_component_id && riceText) materials.push({ label: tr(`白飯 ${riceText.label}`, `Rice: ${riceText.labelEn}`) });
   const main = mainIndex != null ? mains[mainIndex] : mains[0];
   if (main) materials.push({ label: main.portion_text || main.name, image: main.image_url });
-  for (const f of item.fixed || []) materials.push({ label: f.portion_text || f.name });
+  for (const f of item.fixed || []) materials.push({ label: `${f.portion_text || f.name}${f.portions && f.portions !== 1 ? ` ×${f.portions}` : ""}` });
   (item.slots || []).forEach((slot, i) => {
     const c = choices[i];
     if (c === "none" || c === undefined) return;
@@ -296,7 +296,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
             </p>
             <h1 className="font-heading font-semibold text-[clamp(28px,3.6vw,46px)] leading-[1.08] tracking-[-0.02em] mb-2">{loc(item, "name")}</h1>
             <p className="text-muted-foreground leading-relaxed">{loc(item, "description")}</p>
-            {(item.fixed?.length ?? 0) > 0 && <p className="text-sm mt-1">{tr("附：", "Comes with: ")}{item.fixed!.map((f) => f.name).join("、")}</p>}
+            {(item.fixed?.length ?? 0) > 0 && <p className="text-sm mt-1">{bento ? tr("附：", "Comes with: ") : tr("內含：", "Contains: ")}{item.fixed!.map((f) => f.name).join("、")}</p>}
             {(item.dietary_tags?.length > 0 || item.allergens?.length > 0) && (
               <div className="space-y-1.5 mt-2">
                 {item.dietary_tags?.length > 0 && (

@@ -71,7 +71,8 @@ export interface MenuItem {
   mains?: BentoMain[];
   main?: { name: string; component_id?: string | null; portion_text?: string | null } | null;
   rice_component_id?: string | null;
-  fixed?: { name: string; component_id?: string | null; portion_text?: string | null }[]; // 固定附餐（例：滷蛋），不能換也不能減
+  // 備料組成：每份都有、不能換也不能減的半成品（便當的固定附餐例如滷蛋；單品的全部組成例如蛋餅皮＋蛋）。portions 沒設＝1 份
+  fixed?: { name: string; component_id?: string | null; portion_text?: string | null; portions?: number }[];
   slots?: BentoSlot[];
   custom_fields?: BentoCustomField[]; // 配菜下方店家自訂的下拉欄位（例：湯品、飲料、辣度）
   weekdays?: number[]; // 週菜單輪替：只在這幾天供應（沒設＝每天）

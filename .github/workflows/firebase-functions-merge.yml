@@ -1,0 +1,56 @@
+# master 有動到 functions/ 時自動部署 Cloud Functions（前台由 firebase-hosting-merge.yml 部署）。
+# 需要兩個 repo secrets（GitHub repo → Settings → Secrets and variables → Actions）：
+#   FIREBASE_SERVICE_ACCOUNT_BUNNBAA_MVP_5474：跟 Hosting 共用的服務帳號金鑰（已存在）。
+#     GCP IAM 要替這個服務帳號另外加上：Cloud Functions 管理員、服務帳戶使用者、
+#     Artifact Registry 管理員、Cloud Build 編輯者、Cloud Scheduler 管理員（有排程 function）、
+#     Eventarc 管理員（有 Firestore 觸發器）、Firebase 管理員檢視者
+#   FUNCTIONS_ENV：正式站 functions/.env 的完整內容（LINE Pay、Gemini、取餐 QR 金鑰…），整份貼上
+#     沒設就不部署——不然部署上去的 functions 會沒有這些金鑰，付款會壞掉。
+#     之後改 functions/.env 也要同步更新這個 secret。
+name: Deploy Cloud Functions on merge
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "functions/**"
+      - "firebase.json"
+      - ".github/workflows/firebase-functions-merge.yml"
+  workflow_dispatch:
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  deploy_functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: cd functions && npm ci
+      - name: Write functions/.env and credentials
+        env:
+          FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BUNNBAA_MVP_5474 }}
+        run: |
+          if [ -z "$FUNCTIONS_ENV" ]; then
+            echo "::error::FUNCTIONS_ENV secret 沒設定：請把正式站 functions/.env 的內容存成 repo secret，否則部署會清掉 LINE Pay／Gemini 金鑰"
+            exit 1
+          fi
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT_BUNNBAA_MVP_5474 secret 沒設定"
+            exit 1
+          fi
+          printf '%s\n' "$FUNCTIONS_ENV" > functions/.env
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+      # 不加 --force：程式碼裡刪掉的 function 不會被自動刪除，部署會失敗並提示，改由人在本機確認後刪
+      - run: npx --yes firebase-tools@latest deploy --only functions --project bunnbaa-mvp-5474 --non-interactive
+      - name: Remove credentials
+        if: always()
+        run: rm -f functions/.env "$RUNNER_TEMP/sa.json"
