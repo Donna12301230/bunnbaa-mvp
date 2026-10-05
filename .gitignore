@@ -6,8 +6,6 @@ dist/
 *.log
 .DS_Store
 .firebase/
-<<<<<<< HEAD
 # 本機 emulator 存檔（scripts/dev-local.ps1）
-=======
->>>>>>> origin/master
 .emulator-data/
+.emulator-data.bak-*/
