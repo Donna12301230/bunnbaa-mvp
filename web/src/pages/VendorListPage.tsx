@@ -1,6 +1,6 @@
 import { tr, loc } from "@/lib/i18n";
-import { useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import { Link, useSearch } from "wouter";
 import { ArrowUpRight, MapPin, Phone, Store } from "lucide-react";
 import { isClean } from "@/lib/searchFilter";
 import type { Vendor } from "@/types";
@@ -14,7 +14,12 @@ import { areaLabel, setSelectedArea, useSelectedArea, vendorInArea } from "@/lib
 // 商家清單頁 — 消費者瀏覽所有上架商家。真實 vendors collection 沒有
 // isApproved/isActive 這兩個欄位，用 status !== 'disabled' 頂替。
 export default function VendorListPage() {
-  const [search, setSearch] = useState("");
+  // 導覽列搜尋框送出會帶 ?q= 過來（見 MarketplaceHeader.tsx submitSearch）。
+  // 已經在 /vendors 時再從導覽列搜尋一次，路由不會重新掛載這個元件，所以要用
+  // effect 跟著網址同步，不能只在初始化讀一次。
+  const qParam = new URLSearchParams(useSearch()).get("q") ?? "";
+  const [search, setSearch] = useState(qParam);
+  useEffect(() => setSearch(qParam), [qParam]);
 
   const { data: vendors = [], isLoading } = useVendors();
 

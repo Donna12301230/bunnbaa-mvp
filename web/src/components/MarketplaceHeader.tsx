@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -96,6 +96,13 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
     navigate(href);
   }
 
+  // 表單送出（Enter 或放大鏡按鈕，桌機、手機兩個搜尋框共用）
+  function onSearchSubmit(e: FormEvent) {
+    e.preventDefault();
+    setMobileNavOpen(false);
+    submitSearch(searchInput);
+  }
+
   return (
     <header className="sticky top-0 z-40 bg-card/90 backdrop-blur-xl backdrop-saturate-150 border-b border-border">
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 h-16 flex items-center gap-3 md:gap-6">
@@ -129,7 +136,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           ))}
         </nav>
 
-        <div className="flex-1 relative max-w-md hidden sm:block">
+        <form onSubmit={onSearchSubmit} className="flex-1 relative max-w-md hidden sm:flex items-center">
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
           {/* 設計系統 Input：淡灰底無框，hover 出現細框，focus 轉白底 + 品牌橘 ring */}
           <Input
@@ -140,12 +147,18 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
               // 在預購餐點頁直接邊打邊篩；清空也立即恢復
               if (active === "plans" || !e.target.value) submitSearch(e.target.value);
             }}
-            onKeyDown={(e) => { if (e.key === "Enter") submitSearch(searchInput); }}
             placeholder={t("搜尋店家、菜名或料理類型", "Search vendors, dishes or cuisines")}
             aria-label={t("搜尋店家、菜名或料理類型", "Search vendors, dishes or cuisines")}
-            className="h-10 pl-9"
+            className="h-10 pl-9 pr-10"
           />
-        </div>
+          <button
+            type="submit"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={t("開始搜尋", "Search")}
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        </form>
 
         <div className="flex items-center gap-2 md:gap-4 shrink-0 ml-auto text-sm">
           <AreaPicker className="hidden lg:flex" />
@@ -225,6 +238,30 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           )}
         </div>
       </div>
+
+      {/* 手機版搜尋——桌機版用 sm:flex 的那份擠不進窄螢幕，之前整個被 hidden sm:block
+          藏掉，手機完全沒有搜尋入口；改成獨立一排，寬度跟著 header 滿版。 */}
+      <form onSubmit={onSearchSubmit} className="sm:hidden relative px-4 pb-3">
+        <Search className="pointer-events-none absolute left-7 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+        <Input
+          type="search"
+          value={searchInput}
+          onChange={(e) => {
+            setSearchInput(e.target.value);
+            if (active === "plans" || !e.target.value) submitSearch(e.target.value);
+          }}
+          placeholder={t("搜尋店家、菜名或料理類型", "Search vendors, dishes or cuisines")}
+          aria-label={t("搜尋店家、菜名或料理類型", "Search vendors, dishes or cuisines")}
+          className="h-10 pl-9 pr-10"
+        />
+        <button
+          type="submit"
+          className="absolute right-5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={t("開始搜尋", "Search")}
+        >
+          <Search className="w-4 h-4" />
+        </button>
+      </form>
 
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
         <SheetContent side="left" className="w-72 p-0 flex flex-col">

@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useItemImages } from "@/hooks/useItemImages";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2, Star, HeartHandshake, XCircle, Users, Pencil } from "lucide-react";
+import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2, Star, HeartHandshake, XCircle, Users, Pencil, List, CalendarRange } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { getLang, tr, loc } from "@/lib/i18n";
 import { enUS } from "date-fns/locale";
@@ -68,6 +68,7 @@ const statusStyle = (status: string): { label: string; className: string } => {
   return map[status] ?? { label: status, className: "bg-gray-100 text-gray-700" };
 };
 
+const ACTIVE_STATUSES = new Set(["locked", "for_resale", "for_gift"]);
 const FEEDBACK_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled", "no_show", "charity"]);
 // 有實際拿到餐的才能評分（reviews，公開）；no_show 只能留私下回饋給商家校準
 const REVIEW_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled"]);
@@ -148,6 +149,8 @@ export default function MyBookingsPage() {
   function switchTab(tab: "meals" | "market" | "charity") {
     setPageTab(tab);
   }
+  // 多數人期待「我的訂單」先看到清單，不是先找日期；月曆改成次要、可切換的檢視
+  const [view, setView] = useState<"list" | "calendar">("list");
   const confirm = useConfirm();
 
   useEffect(() => {
@@ -191,6 +194,18 @@ export default function MyBookingsPage() {
     const interval = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(interval);
   }, []);
+
+  // 列表預設排序：還能操作的（鎖定中／轉讓中／贈送中）依取餐日由近到遠排最前面；
+  // 已經結束的（取餐完成／取消／愛心餐等）依取餐日由新到舊排在後面。
+  const sortedLocks = useMemo(() => {
+    const active = locks
+      .filter((l) => ACTIVE_STATUSES.has(l.status))
+      .sort((a, b) => a.pickup_date.localeCompare(b.pickup_date) || a.pickup_window.localeCompare(b.pickup_window));
+    const past = locks
+      .filter((l) => !ACTIVE_STATUSES.has(l.status))
+      .sort((a, b) => b.pickup_date.localeCompare(a.pickup_date) || b.pickup_window.localeCompare(a.pickup_window));
+    return [...active, ...past];
+  }, [locks]);
 
   const locksByDate = useMemo(() => {
     const byDate = new Map<string, Lock[]>();
@@ -449,7 +464,7 @@ export default function MyBookingsPage() {
                               <Gift /> {tr("贈送", "Gift")}
                             </Button>
                             <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => handleResell(lock)}>
-                              <Repeat /> {tr("交易", "Transfer")}
+                              <Repeat /> {tr("轉讓", "Transfer")}
                             </Button>
                           </div>
                         </div>
@@ -552,7 +567,7 @@ export default function MyBookingsPage() {
     <div className="min-h-screen bg-background">
       <MarketplaceHeader active="bookings" />
 
-      <PageHero eyebrow={tr("我的預約", "Your bookings")} title={tr("我的餐點", "My meals")} description={tr("週曆上點一筆訂單看詳情、出示取餐碼、截單前修改或取消，或轉讓／贈送／捐為愛心餐。", "Tap an order to see details, show your pickup code, change or cancel before cutoff, or transfer / gift / donate it.")} />
+      <PageHero eyebrow={tr("我的預約", "Your bookings")} title={tr("我的餐點", "My meals")} description={tr("查看訂單詳情、出示取餐碼、截單前修改或取消，或轉讓／贈送／捐為愛心餐。", "See order details, show your pickup code, change or cancel before cutoff, or transfer / gift / donate a meal.")} />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         {/* 頁上方分頁：我的餐點｜轉讓市集｜附近愛心餐（§4.5：「轉讓・愛心餐」併入我的餐點） */}
@@ -584,50 +599,81 @@ export default function MyBookingsPage() {
           />
         ) : (
           <>
-            <div className="space-y-1">
-              <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold tracking-[0.12em] uppercase text-muted-foreground pb-2">
-                {weekdayLabels().map((label) => (
-                  <div key={label}>{label}</div>
-                ))}
-              </div>
-              {calendarWeeks.map((week, wi) => (
-                <div key={wi} className="grid grid-cols-7 gap-1.5">
-                  {week.map((day) => {
-                    const dateStr = toLocalDateStr(day);
-                    const dayLocks = locksByDate.get(dateStr) ?? [];
-                    const isToday = dateStr === toLocalDateStr(new Date());
-                    return (
-                      <div
-                        key={dateStr}
-                        className={`min-h-[104px] rounded-2xl border p-2 flex flex-col gap-1 ${
-                          isToday ? "border-ink bg-secondary/60" : "border-border bg-card"
-                        }`}
-                      >
-                        <span className={`font-heading text-sm font-semibold ${isToday ? "text-foreground" : "text-muted-foreground"}`}>{day.getDate()}{isToday && <span className="sr-only">{tr("（今天）", " (today)")}</span>}</span>
-                        {dayLocks.map((lock) => {
-                          const statusInfo = statusStyle(lock.status);
-                          return (
-                            <button
-                              key={lock.id}
-                              onClick={() => setExpandedId((prev) => (prev === lock.id ? null : lock.id))}
-                              aria-expanded={expandedId === lock.id}
-                              className={`text-left text-micro leading-tight rounded-sm px-1.5 py-1 truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${statusInfo.className} ${
-                                expandedId === lock.id ? "ring-2 ring-primary" : ""
-                              }`}
-                              title={loc(lock, "item_name")}
-                            >
-                              {loc(lock, "item_name")}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+            {/* 檢視切換：預設列表（多數人找訂單想看清單，不是先想「我哪天訂的」）；
+                月曆當作次要、找特定日期時才需要的檢視方式。 */}
+            <div className="inline-flex rounded-full border border-ink p-1 bg-card">
+              <button
+                type="button"
+                onClick={() => setView("list")}
+                className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  view === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <List className="w-4 h-4" aria-hidden="true" /> {tr("列表", "List")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("calendar")}
+                className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  view === "calendar" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <CalendarRange className="w-4 h-4" aria-hidden="true" /> {tr("月曆", "Calendar")}
+              </button>
             </div>
 
-            {expandedLock && <div>{renderLockCard(expandedLock)}</div>}
+            {view === "list" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sortedLocks.map((lock) => renderLockCard(lock))}
+              </div>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold tracking-[0.12em] uppercase text-muted-foreground pb-2">
+                    {weekdayLabels().map((label) => (
+                      <div key={label}>{label}</div>
+                    ))}
+                  </div>
+                  {calendarWeeks.map((week, wi) => (
+                    <div key={wi} className="grid grid-cols-7 gap-1.5">
+                      {week.map((day) => {
+                        const dateStr = toLocalDateStr(day);
+                        const dayLocks = locksByDate.get(dateStr) ?? [];
+                        const isToday = dateStr === toLocalDateStr(new Date());
+                        return (
+                          <div
+                            key={dateStr}
+                            className={`min-h-[104px] rounded-2xl border p-2 flex flex-col gap-1 ${
+                              isToday ? "border-ink bg-secondary/60" : "border-border bg-card"
+                            }`}
+                          >
+                            <span className={`font-heading text-sm font-semibold ${isToday ? "text-foreground" : "text-muted-foreground"}`}>{day.getDate()}{isToday && <span className="sr-only">{tr("（今天）", " (today)")}</span>}</span>
+                            {dayLocks.map((lock) => {
+                              const statusInfo = statusStyle(lock.status);
+                              return (
+                                <button
+                                  key={lock.id}
+                                  onClick={() => setExpandedId((prev) => (prev === lock.id ? null : lock.id))}
+                                  aria-expanded={expandedId === lock.id}
+                                  className={`text-left text-micro leading-tight rounded-sm px-1.5 py-1 truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${statusInfo.className} ${
+                                    expandedId === lock.id ? "ring-2 ring-primary" : ""
+                                  }`}
+                                  title={loc(lock, "item_name")}
+                                >
+                                  {loc(lock, "item_name")}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+
+                {expandedLock && <div>{renderLockCard(expandedLock)}</div>}
+              </>
+            )}
           </>
         )}
       </div>

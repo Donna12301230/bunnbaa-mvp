@@ -94,7 +94,7 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <MarketplaceHeader />
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 pt-10 md:pt-16 pb-16 space-y-8">
+      <div className={`max-w-[1400px] mx-auto px-4 md:px-6 pt-10 md:pt-16 space-y-8 ${lines.length > 0 ? "pb-28 lg:pb-16" : "pb-16"}`}>
         <div>
           <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground mb-4">
             <span className="w-8 h-px bg-current opacity-60" aria-hidden="true" />{tr("結帳", "Checkout")}
@@ -246,6 +246,20 @@ export default function CartPage() {
           </div>
         )}
       </div>
+
+      {/* 手機版結帳按鈕固定在畫面底部，跟品項頁「加入購物車」的黏底列一致，
+          不用捲過所有品項跟聲明勾選框才找得到（桌機版右側訂單明細本來就 sticky，不用重複） */}
+      {lines.length > 0 && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-card border-t border-ink p-3 flex items-center gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">{tr("實付", "Total")}</p>
+            <p className="font-heading text-xl font-semibold truncate">NT${grandTotal}</p>
+          </div>
+          <Button className="flex-1 h-12 rounded-full text-sm" onClick={handleCheckout} disabled={checkingOut || !ack || !!blocked}>
+            {checkingOut ? tr("處理中…", "Working…") : grandTotal === 0 ? tr("折價券全額折抵，送出預購", "Covered by coupons") : tr("送出預購並付款", "Place order & pay")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

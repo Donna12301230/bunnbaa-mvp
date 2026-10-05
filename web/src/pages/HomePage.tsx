@@ -7,7 +7,7 @@ import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { useAuth } from "@/hooks/useAuth";
 import { httpsCallable } from "@/lib/callable";
 import {
-  Clock, Star, MapPin, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, Store, Bot, UtensilsCrossed, Search, X,
+  Clock, Star, MapPin, BadgeCheck, CheckCircle2, AlertTriangle, Repeat, Store, Bot, UtensilsCrossed, Search, X, Plus,
   Sunrise, Sun, Moon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +34,7 @@ import ShoppingAssistant from "@/components/ShoppingAssistant";
 import { avatarUrl } from "@/lib/avatar";
 import { matchesQuery, setSearchQuery, useSearchQuery } from "@/lib/searchQuery";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/hooks/useCart";
 
 const bannedHint = () =>
   tr("您的帳號已被限制下單，請至會員中心提交解封申訴", "Your account can't place orders. Please submit an appeal from My account.");
@@ -72,6 +73,7 @@ export default function HomePage() {
   const { isOrderBanned } = useAuth();
   const { t } = useI18n();
   const [location, navigate] = useLocation();
+  const { add: addToCart, vendorId: cartVendorId } = useCart();
   // 第二排「單點｜方案」是兩個獨立頁面（/home、/plans）
   const mode: "single" | "plans" = location.startsWith("/plans") ? "plans" : "single";
   const [period, setPeriod] = useState<MealPeriod>("lunch");
@@ -233,6 +235,27 @@ export default function HomePage() {
     }
     setPreferredPickup({ date, window: windows[0] ?? itemWindows(vendor, item, period)[0] ?? DEFAULT_PICKUP_WINDOWS[0] });
     navigate(`/item/${item.id}`);
+  }
+
+  // 全站「加入購物車」統一行為（跟 VendorPage.tsx 的 quickAdd 同一套邏輯）：
+  // 便當、有主菜可選的要組，跳到品項頁；單品用選好的日期＋這個餐期最早的時段直接加入，不用跳頁。
+  function quickAdd(item: MenuItem, vendor: Vendor) {
+    const date = searching ? bookableDates.find((d) => openWindowsOn(vendor, d, new Date(), item, period).length > 0) ?? pickupDate : pickupDate;
+    const window = openWindowsOn(vendor, date, new Date(), item, period)[0];
+    if (isBento(item) || (item.mains || []).length > 0 || !window) {
+      openItem(item, vendor);
+      return;
+    }
+    if (cartVendorId && cartVendorId !== item.vendor_id) {
+      toast({
+        title: t("購物車裡有別家商家的品項", "Your cart has items from another vendor"),
+        description: t("一次只能跟一家商家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
+        variant: "destructive",
+      });
+      return;
+    }
+    addToCart({ menuItem: item, vendorId: item.vendor_id, pickupDate: date, pickupWindow: window, choices: [], rice: "normal", quantity: 1, note: "", couponId: null });
+    toast({ title: t("已加入購物車", "Added to cart"), description: `${loc(item, "name")}・${date} ${window}` });
   }
 
   // 計畫（§4.4）：下單時選第一天＋一個時段套用每一天，每天各自算早鳥、遇公休順延；之後到「我的餐點」個別改時段
@@ -404,34 +427,49 @@ export default function HomePage() {
                       const hasMains = (item.mains || []).length > 1;
                       return (
                         <li key={item.id} className="shrink-0 w-[172px] md:w-[188px] snap-start">
-                          <button
-                            type="button"
-                            onClick={() => openItem(item, vendor)}
-                            className="group w-full text-left rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          >
-                            <span className="relative block aspect-[4/3] rounded-2xl overflow-hidden border border-ink bg-secondary">
-                              {item.image ? (
-                                <img src={item.image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]" />
-                              ) : (
-                                <span className="w-full h-full flex items-center justify-center">
-                                  <UtensilsCrossed className="w-7 h-7 text-secondary-foreground/50" strokeWidth={1.5} aria-hidden="true" />
+                          <div className="group w-full text-left">
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => openItem(item, vendor)}
+                                className="block w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              >
+                                <span className="relative block aspect-[4/3] rounded-2xl overflow-hidden border border-ink bg-secondary">
+                                  {item.image ? (
+                                    <img src={item.image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]" />
+                                  ) : (
+                                    <span className="w-full h-full flex items-center justify-center">
+                                      <UtensilsCrossed className="w-7 h-7 text-secondary-foreground/50" strokeWidth={1.5} aria-hidden="true" />
+                                    </span>
+                                  )}
+                                  {discountPercent > 0 && !searching && (
+                                    <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-[#f29e0c] text-[#2b180d]">
+                                      {discountText(discountPercent)}
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                              {discountPercent > 0 && !searching && (
-                                <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-[#f29e0c] text-[#2b180d]">
-                                  {discountText(discountPercent)}
+                              </button>
+                              {/* 全站統一的「加入購物車」動作（跟商家頁同一顆圓形 + 圖示）：便當類點了會跳去組便當，單品直接加進購物車 */}
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); quickAdd(item, vendor); }}
+                                aria-label={t(`加入購物車：${loc(item, "name")}`, `Add to cart: ${loc(item, "name")}`)}
+                                className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm hover:bg-primary-hover active:scale-95 transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              >
+                                <Plus className="w-4 h-4" aria-hidden="true" />
+                              </button>
+                            </div>
+                            <button type="button" onClick={() => openItem(item, vendor)} className="block w-full text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                              <span className="block mt-2.5 text-sm font-semibold truncate">{loc(item, "name")}</span>
+                              <span className="flex items-baseline gap-1.5">
+                                {discountPercent > 0 && !searching && <span className="text-xs text-muted-foreground line-through">${base}</span>}
+                                <span className="font-heading text-lg font-semibold">${searching ? base : lockedPrice}{hasMains ? t(" 起", "+") : ""}</span>
+                                <span className="ml-auto text-xs font-semibold text-primary underline underline-offset-4 decoration-1 group-hover:decoration-2">
+                                  {isBento(item) && item.item_type !== "single" ? t("組便當", "Build") : t("預訂", "Book")}
                                 </span>
-                              )}
-                            </span>
-                            <span className="block mt-2.5 text-sm font-semibold truncate">{loc(item, "name")}</span>
-                            <span className="flex items-baseline gap-1.5">
-                              {discountPercent > 0 && !searching && <span className="text-xs text-muted-foreground line-through">${base}</span>}
-                              <span className="font-heading text-lg font-semibold">${searching ? base : lockedPrice}{hasMains ? t(" 起", "+") : ""}</span>
-                              <span className="ml-auto text-xs font-semibold text-primary underline underline-offset-4 decoration-1 group-hover:decoration-2">
-                                {isBento(item) && item.item_type !== "single" ? t("組便當", "Build") : t("預訂", "Book")}
                               </span>
-                            </span>
-                          </button>
+                            </button>
+                          </div>
                         </li>
                       );
                     })}
