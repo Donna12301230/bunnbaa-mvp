@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
-import { AlertTriangle, ChefHat, Clock, MessageCircleQuestion, Printer, RefreshCw, Replace, Sparkles, TrendingUp } from "lucide-react";
+import { AlertTriangle, ChefHat, ChevronDown, ChevronRight, ClipboardList, Clock, MessageCircle, MessageCircleQuestion, Pencil, Printer, RefreshCw, Replace, Sparkles, TrendingUp } from "lucide-react";
+import { useLocation } from "wouter";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
+import MenuPrepProgress from "@/components/MenuPrepProgress";
+import RecipeCraft from "@/components/RecipeCraft";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +12,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState, Tag } from "@/components/ds";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyVendor } from "@/hooks/useMyVendor";
+import { useVendorCatalog } from "@/hooks/useVendorCatalog";
+import { useVendorMenu } from "@/hooks/useVendorMenu";
+import { useStockOnHand } from "@/hooks/useStockOnHand";
+import { amountText, componentPortions, craftItems, rawNeeds } from "@/lib/prep";
+import { purchaseText, shareToLine, toPurchaseUnits } from "@/lib/purchaseShare";
+import { setPendingEdit } from "@/lib/pendingEdit";
+import { rawAmount } from "@/lib/bento";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { db, functions } from "@/lib/firebase";
@@ -51,6 +62,7 @@ interface PrepPlan {
   timelines?: Partial<Record<MealPeriod, Timeline & { range: string; order_count: number }>>;
   labels: { lock_id: string; pickup_code: string; pickup_window: string; item: string; main: string | null; fixed?: string[]; sides: string[]; rice: string | null; note: string | null }[];
   shortages: { ingredient_id: string; name: string; unit: string; need: number; have: number; short: number }[];
+  raw_needs?: Record<string, number>;
   wish_results: Record<string, { dish: string; count: number; min_qty: number; ok: boolean }>;
   done?: Record<string, boolean>;
   substitutions?: { from: string; to: string }[];
@@ -152,6 +164,15 @@ export default function VendorPortalPrep() {
   const [locks, setLocks] = useState<Lock[]>([]);
   const [busy, setBusy] = useState(false);
   const [sub, setSub] = useState({ from: "", to: "" });
+  // 列印：出餐標籤或領料單（分開印）
+  const [printMode, setPrintMode] = useState<"labels" | "picklist">("labels");
+  const [openTask, setOpenTask] = useState<string | null>(null);
+  const [, navigate] = useLocation();
+  const { data: catalog } = useVendorCatalog(vendorId);
+  const { data: menuItems = [] } = useVendorMenu(vendorId);
+  const { stock, counted } = useStockOnHand(vendorId, date);
+  const ingById = catalog?.ingredientsById ?? {};
+  const compById = catalog?.componentsById ?? {};
 
   useEffect(() => {
     if (!vendorId) return;
@@ -211,13 +232,44 @@ export default function VendorPortalPrep() {
     }
   }
 
+  // 截單前的預估：用目前的訂單在前端先算（跟後端同一套規則，許願結果還沒判定，一律當預設菜）
+  const estimate = useMemo(() => {
+    if (plan || !catalog || locks.length === 0) return null;
+    const itemsById = Object.fromEntries(menuItems.map((i) => [i.id, i]));
+    const portions = componentPortions(locks.filter((l) => PENDING_STATUSES.has(l.status)), itemsById, compById);
+    return { portions, needs: rawNeeds(portions, compById, ingById) };
+  }, [plan, catalog, menuItems, locks]);
+  const planNeeds = useMemo(() => new Map(Object.entries(plan?.raw_needs ?? {})), [plan]);
+  const stockNote = counted ? tr("本週盤點＋到貨−已用", "count + deliveries − used") : tr("理論庫存（本週未盤點）", "theoretical stock (not counted)");
+
+  function printWith(mode: "labels" | "picklist") {
+    setPrintMode(mode);
+    window.setTimeout(() => window.print(), 50);
+  }
+
+  /** 缺料 → LINE 叫貨（依小盤商分組，進位到採購單位） */
+  function shareShortages() {
+    if (!plan || !catalog) return;
+    const lines = plan.shortages.map((s) => {
+      const ing = ingById[s.ingredient_id];
+      return { name: s.name, supplier_id: ing?.supplier_id ?? null, units: toPurchaseUnits(s.short, ing?.purchase_unit_size ?? 1), unit_label: ing?.purchase_unit_label || s.unit };
+    });
+    shareToLine(purchaseText(tr(`${vendor?.name ?? ""} 臨時補貨（${date} 用）`, `${vendor?.name ?? ""} restock for ${date}`), lines, catalog.suppliers));
+  }
+
+  function editComponent(id: string) {
+    setPendingEdit("component", id);
+    navigate("/vendor-portal/recipes");
+  }
+
   const doneCount = plan ? plan.components.filter((c) => plan.done?.[c.component_id]).length : 0;
   const dishes = plan ? [...new Set(plan.labels.flatMap((l) => l.sides))].filter((s) => !s.includes("不要")) : [];
 
   return (
     <VendorPortalLayout>
       <div className="print:hidden">
-        <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-1 flex items-center gap-2"><ChefHat className="w-5 h-5 text-orange-500" /> {tr("每日備料", "Daily prep")}</h1>
+        <MenuPrepProgress />
+        <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-1 flex items-center gap-2"><ChefHat className="w-5 h-5 text-orange-500" /> {tr("今日備料", "Today's prep")}</h1>
         <p className="text-sm text-muted-foreground mb-4">{tr(`前一天 ${vendorCutoffTime(vendor)} 截單後自動產生：半成品份數、流程時間軸、出餐標籤與缺料警示。`, `Generated automatically after the ${vendorCutoffTime(vendor)} cutoff the day before.`)}</p>
         <div className="flex gap-2 mb-4 flex-wrap">
           {dates.map((d) => <Tag key={d} selected={date === d} onClick={() => setDate(d)}>{d === today ? tr("今天", "Today") : d < today ? tr("昨天", "Yesterday") : tr("下一個營業日", "Next day")} {d.slice(5)}</Tag>)}
@@ -237,6 +289,22 @@ export default function VendorPortalPrep() {
           {itemCounts.length > 0 && (
             <Card><CardContent className="p-4 space-y-1">{itemCounts.map(([name, n]) => <div key={name} className="flex justify-between text-sm"><span>{name}</span><span className="font-semibold">× {n}</span></div>)}</CardContent></Card>
           )}
+          {estimate && estimate.portions.size > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">{tr("目前預估要備的料", "Estimated prep so far")}</CardTitle>
+                <p className="text-xs text-muted-foreground">{tr("用目前已確定的訂單先算，許願菜一律當預設菜；截單後以正式備料清單為準。", "Based on confirmed orders, wishes counted as default dishes; the official list comes after cutoff.")}</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-2 text-sm">
+                  {[...estimate.portions].sort((a, b) => b[1] - a[1]).map(([id, n]) => (
+                    <span key={id} className="rounded border border-border px-2 py-0.5">{compById[id]?.name ?? id} <b>{Math.round(n * 10) / 10}</b> {tr("份", "")}</span>
+                  ))}
+                </div>
+                <RecipeCraft items={craftItems(estimate.needs, ingById, stock)} haveNote={stockNote} compact />
+              </CardContent>
+            </Card>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -244,14 +312,22 @@ export default function VendorPortalPrep() {
             <Card className="flex-1 min-w-[160px]"><CardContent className="p-3"><p className="text-xs text-muted-foreground">{tr("總份數", "Meals")}</p><p className="text-2xl font-bold text-orange-600">{plan.order_count}</p></CardContent></Card>
             <Card className="flex-1 min-w-[160px]"><CardContent className="p-3"><p className="text-xs text-muted-foreground">{tr("任務完成", "Tasks done")}</p><p className="text-2xl font-bold">{doneCount}/{plan.components.length}</p></CardContent></Card>
             <Button variant="outline" onClick={() => runCutoff(true)} disabled={busy}><RefreshCw /> {tr("重新計算", "Recalculate")}</Button>
-            <Button variant="outline" onClick={() => window.print()}><Printer /> {tr("列印出餐標籤", "Print labels")}</Button>
+            <Button variant="outline" onClick={() => printWith("labels")}><Printer /> {tr("列印出餐標籤", "Print labels")}</Button>
+            <Button variant="outline" onClick={() => printWith("picklist")}><ClipboardList /> {tr("列印領料單", "Print pick list")}</Button>
           </div>
 
           {plan.shortages.length > 0 && (
             <Card className="border-red-300 print:hidden">
-              <CardHeader className="pb-2"><CardTitle className="text-base text-red-700 flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> {tr("缺料警示：當日需求超過週庫存，請臨時補貨", "Shortage: today's need exceeds this week's stock")}</CardTitle></CardHeader>
-              <CardContent className="text-sm space-y-1">
-                {plan.shortages.map((s) => <div key={s.ingredient_id} className="flex justify-between"><span>{s.name}</span><span>{tr(`需要 ${s.need}${s.unit}，庫存 ${s.have}，缺 ${s.short}${s.unit}`, `need ${s.need}${s.unit}, have ${s.have}, short ${s.short}`)}</span></div>)}
+              <CardHeader className="pb-2 flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+                <CardTitle className="text-base text-red-700 flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> {tr("缺料警示：當日需求超過週庫存，請臨時補貨", "Shortage: today's need exceeds this week's stock")}</CardTitle>
+                <Button size="sm" onClick={shareShortages} disabled={!catalog}><MessageCircle /> {tr("LINE 叫貨", "Order via LINE")}</Button>
+              </CardHeader>
+              <CardContent className="text-sm space-y-2">
+                <RecipeCraft items={plan.shortages.map((s) => ({ id: s.ingredient_id, name: s.name, need: s.need, unit: s.unit, have: s.have }))} compact />
+                <p className="text-xs text-muted-foreground">{plan.shortages.map((s) => {
+                  const ing = ingById[s.ingredient_id];
+                  return tr(`${s.name} 缺 ${amountText(s.short, s.unit)}${ing ? `（叫 ${toPurchaseUnits(s.short, ing.purchase_unit_size)} ${ing.purchase_unit_label}）` : ""}`, `${s.name}: short ${amountText(s.short, s.unit)}`);
+                }).join("、")}</p>
               </CardContent>
             </Card>
           )}
@@ -271,13 +347,40 @@ export default function VendorPortalPrep() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-base">{tr("半成品任務清單", "Prep tasks")}</CardTitle></CardHeader>
               <CardContent className="space-y-2">
-                {plan.components.map((c) => (
-                  <label key={c.component_id} className={`flex items-center gap-2 text-sm rounded-md px-2 py-1.5 ${plan.done?.[c.component_id] ? "bg-green-50 line-through text-muted-foreground" : ""}`}>
-                    <Checkbox checked={!!plan.done?.[c.component_id]} onCheckedChange={(v) => toggleDone(c.component_id, !!v)} />
-                    <span className="flex-1">{c.name}</span>
-                    <span className="font-semibold">{c.portions} {tr("份", "")}</span>
-                  </label>
-                ))}
+                {plan.components.map((c) => {
+                  const comp = compById[c.component_id];
+                  const open = openTask === c.component_id;
+                  const done = !!plan.done?.[c.component_id];
+                  return (
+                    <div key={c.component_id} className={cn("rounded-md", done && "bg-green-50")}>
+                      <div className="flex items-center gap-2 text-sm px-2 py-1.5">
+                        <Checkbox checked={done} onCheckedChange={(v) => toggleDone(c.component_id, !!v)} aria-label={c.name} />
+                        <button type="button" className={cn("flex-1 text-left flex items-center gap-1", done && "line-through text-muted-foreground")} onClick={() => setOpenTask(open ? null : c.component_id)} aria-expanded={open}>
+                          {open ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}{c.name}
+                        </button>
+                        <span className="font-semibold">{c.portions} {tr("份", "")}</span>
+                      </div>
+                      {open && (
+                        <div className="pl-9 pr-2 pb-2 text-xs space-y-1.5">
+                          {comp ? (
+                            <>
+                              <p className="text-muted-foreground">{tr(`${comp.equipment}・每批 ${comp.batch_capacity} 份 → 做 ${Math.ceil(c.portions / Math.max(1, comp.batch_capacity))} 批・每批 ${comp.prep_minutes} 分鐘`, `${comp.equipment} · ${Math.ceil(c.portions / Math.max(1, comp.batch_capacity))} batch(es) × ${comp.prep_minutes} min`)}</p>
+                              <RecipeCraft
+                                items={comp.ingredients.flatMap((l) => {
+                                  const ing = ingById[l.ingredient_id];
+                                  return ing ? [{ id: l.ingredient_id, name: ing.name, need: rawAmount((l.grams || 0) * c.portions, ing), unit: ing.unit || "g" }] : [];
+                                })}
+                                target={{ name: comp.name, sub: tr(`${c.portions} 份`, `× ${c.portions}`) }}
+                                compact
+                              />
+                              <button type="button" className="text-primary underline inline-flex items-center gap-0.5" onClick={() => editComponent(comp.id)}><Pencil className="w-3 h-3" /> {tr("編輯配方", "Edit recipe")}</button>
+                            </>
+                          ) : <p className="text-muted-foreground">{tr("找不到這個半成品的配方（可能已刪除）", "Recipe not found")}</p>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 {doneCount === plan.components.length && plan.components.length > 0 && <p className="text-sm text-green-700 font-semibold">{tr("全部完成，辛苦了！", "All done — great work!")}</p>}
               </CardContent>
             </Card>
@@ -299,6 +402,26 @@ export default function VendorPortalPrep() {
             </Card>
           </div>
 
+          {/* 領料單：今天從冰箱、倉庫拿出的生料（prepPlans.raw_needs） */}
+          {planNeeds.size > 0 && (
+            <Card className={printMode === "picklist" ? "" : "print:hidden"}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> {tr(`領料單（${date}，${plan.order_count} 份）`, `Pick list (${date}, ${plan.order_count} meals)`)}</CardTitle>
+                <p className="text-xs text-muted-foreground print:hidden">{tr("今天要從冰箱、倉庫拿出的生料；紅色＝現有不夠，請看上面的缺料警示。", "Raw ingredients to take out today; red = not enough on hand.")}</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="print:hidden"><RecipeCraft items={craftItems(planNeeds, ingById, stock)} haveNote={stockNote} compact /></div>
+                <table className="hidden print:table w-full text-sm">
+                  <tbody>
+                    {craftItems(planNeeds, ingById).map((i) => (
+                      <tr key={i.id} className="border-b"><td className="py-1 w-6">☐</td><td className="py-1">{i.name}</td><td className="py-1 text-right font-semibold">{amountText(i.need, i.unit)}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="print:hidden">
             <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-1.5"><Replace className="w-4 h-4" /> {tr("天災期間等值替換配菜", "Substitute a side (disasters)")}</CardTitle></CardHeader>
             <CardContent className="flex flex-wrap gap-2 items-center">
@@ -314,7 +437,7 @@ export default function VendorPortalPrep() {
           </Card>
 
           {/* 出餐標籤：每盒一張，不印姓名（便當可能轉為愛心餐） */}
-          <div>
+          <div className={printMode === "labels" ? "" : "print:hidden"}>
             <h3 className="font-semibold mb-2 print:hidden">{tr(`出餐標籤（${plan.labels.length} 張）`, `Labels (${plan.labels.length})`)}</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 print:grid-cols-3">
               {plan.labels.map((l) => (

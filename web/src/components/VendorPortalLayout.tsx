@@ -29,10 +29,11 @@ const navGroups = () => [
   {
     title: tr("菜單與備料", "Menu & prep"),
     items: [
+      // 照使用頻率排：每天（備料）→ 每週（叫貨）→ 換菜時（菜單）→ 開店／漲價時（配方）
+      { href: "/vendor-portal/prep", label: tr("今日備料", "Today's prep"), icon: ChefHat },
+      { href: "/vendor-portal/purchasing", label: tr("採購叫貨", "Purchasing"), icon: ShoppingBasket },
       { href: "/vendor-portal/menu", label: tr("菜單管理", "Menu"), icon: UtensilsCrossed },
       { href: "/vendor-portal/recipes", label: tr("配方原物料", "Recipes"), icon: BookOpen },
-      { href: "/vendor-portal/purchasing", label: tr("採購叫貨", "Purchasing"), icon: ShoppingBasket },
-      { href: "/vendor-portal/prep", label: tr("每日備料", "Daily prep"), icon: ChefHat },
     ],
   },
   {
