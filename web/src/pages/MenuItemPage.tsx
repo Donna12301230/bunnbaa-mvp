@@ -23,7 +23,7 @@ import { usePlatformConfig } from "@/lib/platformConfig";
 import { useSideWishes } from "@/hooks/useSideWishes";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
 import { getPreferredPickup, mealPeriodLabel, mealPeriodOf, priceDays, slotLabel, vendorCutoffTime, weekdayOf } from "@/lib/pickupSlots";
-import { BB_CART_ADDED_EVENT } from "@/components/CartPreview";
+import { notifyCartAdded } from "@/components/CartPreview";
 
 /** 點圖片選菜的卡片（§4.2）：選取加框打勾、再點一次取消；不能點的灰色 */
 function DishCard({
@@ -77,6 +77,11 @@ function DishCard({
 // 金額只是預覽，結帳時伺服器會重算。
 export default function MenuItemPage() {
   const { id } = useParams<{ id: string }>();
+  return <MenuItemOrder id={id} />;
+}
+
+// 品項點餐內容：路由頁與商家頁的彈窗共用。dialog 模式不顯示回上一頁連結，加入後呼叫 onAdded。
+export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dialog?: boolean; onAdded?: () => void }) {
   const { toast } = useToast();
   const { add, vendorId: cartVendorId } = useCart();
   const { data: config } = usePlatformConfig();
@@ -249,8 +254,8 @@ export default function MenuItemPage() {
       quantity: qty, note: note.trim(), couponId: null,
     });
     setConfirmOpen(false);
-    globalThis.dispatchEvent(new Event(BB_CART_ADDED_EVENT));
-    toast({ title: tr("已加入購物車", "Added to cart"), description: `${loc(item, "name")} ${date} x${qty}` });
+    notifyCartAdded();
+    onAdded?.();
   }
 
   function choiceName(i: number): string {
@@ -263,9 +268,11 @@ export default function MenuItemPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-4">
-      <Link href="/home" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("回預購餐點", "Back to pre-order")}
-      </Link>
+      {!dialog && (
+        <Link href="/home" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("回預購餐點", "Back to pre-order")}
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 gap-8 lg:gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start">
         <div className="min-w-0 lg:sticky lg:top-24 space-y-4">
