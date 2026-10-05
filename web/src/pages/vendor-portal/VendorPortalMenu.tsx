@@ -333,7 +333,7 @@ export default function VendorPortalMenu() {
             {categories.map(cat => (
               <div key={cat}>
                 <h2 className="font-heading text-2xl font-semibold mb-3">{cat}</h2>
-                <div className="grid gap-4 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   {items.filter(i => i.category === cat).map(item => (
                     <Card key={item.id}>
                       <CardContent className="p-4 md:p-5 flex items-center gap-4">

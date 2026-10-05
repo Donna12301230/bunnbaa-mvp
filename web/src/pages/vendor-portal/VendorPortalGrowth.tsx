@@ -176,7 +176,7 @@ export default function VendorPortalGrowth() {
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-base">{tr("查詢單張券", "Look up a coupon")}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
@@ -189,7 +189,7 @@ export default function VendorPortalGrowth() {
           <CardHeader className="pb-2"><CardTitle className="text-base">{tr("匯出 CSV 與設定", "Export & settings")}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             <div className="flex gap-2 items-center text-sm">
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" /> ～ <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" />
+              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 min-w-0" /> ～ <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 min-w-0" />
               <Button size="sm" variant="outline" onClick={exportCsv}><Download /> CSV</Button>
             </div>
             <Button size="sm" variant="outline" onClick={togglePause} disabled={busy}>

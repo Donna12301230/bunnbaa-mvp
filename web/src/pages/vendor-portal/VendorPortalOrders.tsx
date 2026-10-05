@@ -61,7 +61,7 @@ export default function VendorPortalOrders() {
         <SkeletonBlocks count={4} height={88} className="space-y-3" />
       ) : (
         <Tabs defaultValue="pending">
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 max-w-full justify-start overflow-x-auto">
             {tabs().map((t) => (
               <TabsTrigger key={t.value} value={t.value}>
                 {t.label}（{filtered.filter(t.match).length}）
