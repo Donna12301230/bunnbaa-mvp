@@ -4,7 +4,7 @@ import { addDoc, collection, deleteDoc, doc, getDocs, writeBatch } from "firebas
 import { AlertTriangle, BookOpen, Plus, Sparkles, Trash2, Pencil, Wand2 } from "lucide-react";
 import { useLocation } from "wouter";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
-import MenuPrepProgress from "@/components/MenuPrepProgress";
+import InfoTip from "@/components/InfoTip";
 import { ComponentDialog, EMPTY_COMP, EMPTY_ING, FREQ_LABEL, IngredientDialog, saveCatalogDoc, type ComponentDraft, type IngredientDraft } from "@/components/CatalogEditors";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,7 +55,7 @@ export default function VendorPortalRecipes() {
   const [draftName, setDraftName] = useState("");
   const [drafting, setDrafting] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
-  const [tab, setTab] = useState("components");
+  const [tab, setTab] = useState("ingredients");
   const [onlyIssues, setOnlyIssues] = useState(false);
 
   const { data: templates = [] } = useQuery({
@@ -217,30 +217,20 @@ export default function VendorPortalRecipes() {
 
   return (
     <VendorPortalLayout>
-      <MenuPrepProgress />
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-        <h1 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-2"><BookOpen className="w-5 h-5 text-orange-500" /> {tr("配方與原物料", "Recipes & ingredients")}</h1>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+        <h1 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-2">
+          <BookOpen className="w-6 h-6 text-orange-500" /> {tr("食材與供應商", "Ingredients & suppliers")}
+          <InfoTip>{tr("這裡管單價、供應商與熟成率；每道菜用什麼，直接在菜單管理點便當格子改。標 ⚠ 的會讓成本或叫貨算錯。", "Prices, suppliers and yields live here; what goes into each dish is edited by tapping bento cells in Menu. Items marked ⚠ make cost or purchasing wrong.")}</InfoTip>
+        </h1>
         <Button variant="outline" onClick={() => setTemplateOpen(true)}><Wand2 /> {tr("從定式模板開店", "Start from a template")}</Button>
       </div>
-      <p className="text-sm text-muted-foreground mb-4">{tr("原物料 → 半成品 → 菜單品項。配方算出每日備料、叫貨量、成本與候選菜份量級距；標 ⚠ 的會讓成本或叫貨算錯，請補齊。", "Ingredients → components → menu items. Recipes drive prep counts, purchasing, cost and portion levels; fix anything marked ⚠.")}</p>
-
-      <Card className="mb-4">
-        <CardContent className="p-3 flex flex-wrap gap-2 items-center">
-          <Sparkles className="w-4 h-4 text-orange-500" />
-          <span className="text-sm">{tr("輸入菜名，AI 產生配方草稿：", "Type a dish and AI drafts a recipe:")}</span>
-          <Input className="w-48" value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder={tr("例：地瓜葉", "e.g. sweet potato leaves")} />
-          <Button size="sm" onClick={draftRecipe} disabled={drafting || !draftName.trim()}>{drafting ? tr("產生中…", "Drafting…") : tr("產生草稿", "Draft")}</Button>
-          <span className="text-xs text-muted-foreground">{tr("數字只是起點，請改成店內實際值再儲存。", "Numbers are a starting point — edit before saving.")}</span>
-        </CardContent>
-      </Card>
-
       {isLoading ? <SkeletonBlocks count={3} height={64} className="space-y-2" /> : (
         <Tabs value={tab} onValueChange={setTab}>
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <TabsList className="max-w-full justify-start overflow-x-auto">
-              <TabsTrigger value="components">{tr("半成品", "Components")}（{catalog?.components.length ?? 0}{compIssueCount ? `・⚠${compIssueCount}` : ""}）</TabsTrigger>
-              <TabsTrigger value="ingredients">{tr("原物料", "Ingredients")}（{catalog?.ingredients.length ?? 0}{ingIssueCount ? `・⚠${ingIssueCount}` : ""}）</TabsTrigger>
-              <TabsTrigger value="suppliers">{tr("小盤商", "Suppliers")}（{catalog?.suppliers.length ?? 0}）</TabsTrigger>
+              <TabsTrigger value="ingredients">{tr("食材", "Ingredients")}（{catalog?.ingredients.length ?? 0}{ingIssueCount ? `・⚠${ingIssueCount}` : ""}）</TabsTrigger>
+              <TabsTrigger value="suppliers">{tr("供應商", "Suppliers")}（{catalog?.suppliers.length ?? 0}）</TabsTrigger>
+              <TabsTrigger value="components">{tr("配菜", "Dishes")}（{catalog?.components.length ?? 0}{compIssueCount ? `・⚠${compIssueCount}` : ""}）</TabsTrigger>
             </TabsList>
             {tab !== "suppliers" && (
               <div className="flex gap-1.5">
@@ -251,8 +241,18 @@ export default function VendorPortalRecipes() {
           </div>
 
           <TabsContent value="components" className="space-y-2">
-            <Button size="sm" onClick={() => setComp({ ...EMPTY_COMP })}><Plus /> {tr("新增半成品", "Add component")}</Button>
-            {catalog?.components.length === 0 && <EmptyState size="compact" icon={<BookOpen size={32} />} title={tr("還沒有半成品", "No components yet")} description={tr("白飯、滷雞腿、炒高麗菜…可以直接裝盒的成品。也可以在菜單管理編輯品項時直接建立。", "Rice, braised chicken, stir-fried cabbage… You can also create them while editing a menu item.")} />}
+            <p className="text-xs text-muted-foreground">{tr("配菜通常在菜單管理點便當格子建立；這裡列出全部，方便一次檢查。", "Dishes are usually created from bento cells in Menu; this lists them all.")}</p>
+            <Card>
+              <CardContent className="p-3 flex flex-wrap gap-2 items-center">
+                <Sparkles className="w-4 h-4 text-orange-500" />
+                <span className="text-sm">{tr("輸入菜名，AI 產生配方草稿：", "Type a dish and AI drafts a recipe:")}</span>
+                <Input className="w-48" value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder={tr("例：地瓜葉", "e.g. sweet potato leaves")} />
+                <Button size="sm" onClick={draftRecipe} disabled={drafting || !draftName.trim()}>{drafting ? tr("產生中…", "Drafting…") : tr("產生草稿", "Draft")}</Button>
+                <span className="text-xs text-muted-foreground">{tr("數字只是起點，請改成店內實際值再儲存。", "Numbers are a starting point — edit before saving.")}</span>
+              </CardContent>
+            </Card>
+            <Button size="sm" onClick={() => setComp({ ...EMPTY_COMP })}><Plus /> {tr("新增配菜", "Add dish")}</Button>
+            {catalog?.components.length === 0 && <EmptyState size="compact" icon={<BookOpen size={32} />} title={tr("還沒有配菜", "No dishes yet")} description={tr("白飯、滷雞腿、炒高麗菜…可以直接裝盒的成品。也可以在菜單管理編輯品項時直接建立。", "Rice, braised chicken, stir-fried cabbage… You can also create them while editing a menu item.")} />}
             {components.map((c) => {
               const users = usage.get(c.id) ?? [];
               return (

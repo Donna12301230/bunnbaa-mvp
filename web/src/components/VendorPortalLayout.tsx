@@ -9,7 +9,8 @@ import { getSubscriptionState, PLATFORM_CONTACT_EMAIL } from "@/lib/subscription
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
-// 用函式包起來，每次 render 依目前語言組標籤；依功能分組，側欄顯示組標題
+// 用函式包起來，每次 render 依目前語言組標籤。
+// 依「時間」分組（簡化提案 §3-6）：今天要做的、這週要做的、有空時回顧的、偶爾調整的
 const navGroups = () => [
   {
     title: null,
@@ -18,29 +19,26 @@ const navGroups = () => [
     ],
   },
   {
-    title: tr("訂單出餐", "Orders & pickup"),
+    title: tr("今天", "Today"),
     items: [
-      { href: "/vendor-portal/orders", label: tr("訂單管理", "Orders"), icon: ClipboardList },
+      { href: "/vendor-portal/orders", label: tr("訂單", "Orders"), icon: ClipboardList },
       // 取餐掃碼指向 /lock/vendor/redeem（舊路徑，跟 MarketplaceHeader 同一個入口）
       { href: "/lock/vendor/redeem", label: tr("取餐掃碼", "Pickup scan"), icon: ScanLine },
-      { href: "/vendor-portal/sessions", label: tr("訂餐時段", "Pickup slots"), icon: CalendarDays },
+      { href: "/vendor-portal/prep", label: tr("今日備料", "Today's prep"), icon: ChefHat },
     ],
   },
   {
-    title: tr("菜單與備料", "Menu & prep"),
+    title: tr("這週", "This week"),
     items: [
-      // 照使用頻率排：每天（備料）→ 每週（叫貨）→ 換菜時（菜單）→ 開店／漲價時（配方）
-      { href: "/vendor-portal/prep", label: tr("今日備料", "Today's prep"), icon: ChefHat },
       { href: "/vendor-portal/purchasing", label: tr("採購叫貨", "Purchasing"), icon: ShoppingBasket },
       { href: "/vendor-portal/menu", label: tr("菜單管理", "Menu"), icon: UtensilsCrossed },
-      { href: "/vendor-portal/recipes", label: tr("配方原物料", "Recipes"), icon: BookOpen },
     ],
   },
   {
-    title: tr("營運統計", "Analytics"),
+    title: tr("看數據", "Insights"),
     items: [
       { href: "/vendor-portal/reports", label: tr("統計報表", "Reports"), icon: TrendingUp },
-      { href: "/vendor-portal/insights", label: tr("區域洞察", "Insights"), icon: MapPinned },
+      { href: "/vendor-portal/insights", label: tr("區域洞察", "Area insights"), icon: MapPinned },
       { href: "/vendor-portal/growth", label: tr("券負債看板", "Rewards"), icon: Trophy },
     ],
   },
@@ -48,6 +46,9 @@ const navGroups = () => [
     title: tr("店家", "Store"),
     items: [
       { href: "/vendor-portal/charity", label: tr("愛心餐", "Charity"), icon: HeartHandshake },
+      // 食材、單價、供應商：開店或漲價時才改，菜色的組成在菜單管理裡直接改
+      { href: "/vendor-portal/recipes", label: tr("食材與供應商", "Ingredients"), icon: BookOpen },
+      { href: "/vendor-portal/sessions", label: tr("訂餐時段", "Pickup slots"), icon: CalendarDays },
       { href: "/vendor-portal/settings", label: tr("店家設定", "Store settings"), icon: Settings },
     ],
   },

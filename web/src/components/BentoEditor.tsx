@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ImageThumbUpload } from "@/components/ImageUploadField";
 import DishPicker, { type DishValue } from "@/components/DishPicker";
 import RecipeCraft from "@/components/RecipeCraft";
+import BentoBox, { dishCell, type BentoCell } from "@/components/BentoBox";
 import { ComponentDialog, EMPTY_COMP, IngredientDialog, saveCatalogDoc, type ComponentDraft, type IngredientDraft } from "@/components/CatalogEditors";
 import { useStockOnHand } from "@/hooks/useStockOnHand";
 import { useToast } from "@/hooks/use-toast";
@@ -278,6 +279,9 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
   // 疊開的配方／原物料視窗；建好後呼叫 assign 把新半成品接回原本那一格
   const [compDraft, setCompDraft] = useState<{ draft: ComponentDraft; assign?: (id: string, name: string) => void } | null>(null);
   const [ingDraft, setIngDraft] = useState<IngredientDraft | null>(null);
+  // 「加一格」：先挑或建一道菜，挑好才真的加進去
+  const [adding, setAdding] = useState<DishValue | null>(null);
+  const [advanced, setAdvanced] = useState(value.weekdays.length > 0 || value.customFields.length > 0);
 
   async function createComponent(name: string, withRecipe: boolean, assign: (id: string, name: string) => void) {
     if (withRecipe) {
@@ -355,6 +359,40 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
     </div>
   );
 
+  // 便當格子：點一格＝改那道菜的組成與份量；沒組成的格子點了直接建配方
+  const openCell = (name: string, componentId: string | null | undefined, assign: (id: string, name: string) => void) => {
+    const comp = componentId ? byId[componentId] : undefined;
+    if (comp) setCompDraft({ draft: comp });
+    else setCompDraft({ draft: { ...EMPTY_COMP, name }, assign });
+  };
+  const cells: BentoCell[] = [];
+  if (isBento) {
+    if (value.riceComponentId) cells.push({ ...dishCell("rice", tr("白飯", "Rice"), value.riceComponentId, byId, ingredientsById, 1, true), onClick: () => openCell(tr("白飯", "Rice"), value.riceComponentId, (id) => onChange({ ...value, riceComponentId: id })) });
+    const m = value.mains[0];
+    if (m?.name) cells.push({ ...dishCell("main", m.name, m.component_id, byId, ingredientsById), onClick: () => openCell(m.name, m.component_id, (id, n) => setMain(0, { ...m, component_id: id, name: m.name || n })) });
+  }
+  value.parts.forEach((p, i) => (p.name || p.component_id) && cells.push({ ...dishCell(`part${i}`, p.name, p.component_id, byId, ingredientsById, p.portions || 1), onClick: () => openCell(p.name, p.component_id, (id, n) => setPart(i, { ...p, component_id: id, name: p.name || n })) }));
+  if (isBento) value.slots.forEach((sl, i) => sl.default.name && cells.push({ ...dishCell(`slot${i}`, sl.default.name, sl.default.component_id, byId, ingredientsById), onClick: () => openCell(sl.default.name, sl.default.component_id, (id, n) => setSlot(i, { ...sl, default: { ...sl.default, component_id: id, name: sl.default.name || n } })) }));
+  const commitAdd = (v: DishValue) => {
+    if (!v.component_id) { setAdding(v); return; }
+    if (isBento) onChange({ ...value, slots: [...value.slots.filter((sl) => sl.default.name), { category: "青菜類", default: { name: v.name, component_id: v.component_id }, candidates: [] }] });
+    else onChange({ ...value, parts: [...value.parts, { component_id: v.component_id, name: v.name, portions: 1 }] });
+    setAdding(null);
+  };
+  const canAdd = !isBento || value.slots.filter((sl) => sl.default.name).length < DEFAULT_PLATFORM_CONFIG.maxSides;
+  const bentoGrid = (
+    <div className="rounded-md border border-border bg-white p-2 space-y-2">
+      <p className="text-xs font-semibold">{tr("便當格子：點格子改配菜和份量，按「加一格」新增配菜", "Bento cells: tap a cell to edit it, Add for a new dish")}</p>
+      <BentoBox size="edit" cells={cells} onAdd={canAdd && !adding ? () => setAdding({ name: "", component_id: null }) : undefined} />
+      {adding && (
+        <div className="flex gap-2 items-start">
+          <DishPicker value={adding} onChange={commitAdd} components={components} placeholder={tr("新的一格：打菜名找或建立", "New cell: type a dish")} onCreate={(name, withRecipe) => createComponent(name, withRecipe, (id, n) => commitAdd({ name: adding.name || n, component_id: id }))} />
+          <Button variant="ghost" size="sm" onClick={() => setAdding(null)}>{tr("取消", "Cancel")}</Button>
+        </div>
+      )}
+    </div>
+  );
+
   const preview = <BentoPreview value={value} itemName={itemName} itemPrice={itemPrice} componentsById={byId} ingredientsById={ingredientsById} vendorId={vendorId} orderCount={orderCount} />;
 
   return (
@@ -397,19 +435,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
       </div>
       {value.mealPeriods.length === 0 && <p className="text-xs text-red-600">{tr("至少勾一個餐期；取餐時段到「店家設定」依餐期設定。", "Pick at least one meal period.")}</p>}
 
-      <div>
-        <Label className="text-xs">{tr("週菜單輪替：只在這幾天供應（都不勾＝每天）", "Weekly rotation: served only on (none = every day)")}</Label>
-        <div className="flex gap-2 text-sm flex-wrap">
-          {WEEKDAYS.map((d) => (
-            <label key={d} className="flex items-center gap-1">
-              <input type="checkbox" checked={value.weekdays.includes(d)} onChange={(e) => onChange({ ...value, weekdays: e.target.checked ? [...value.weekdays, d].sort() : value.weekdays.filter((x) => x !== d) })} />
-              {tr(`週${WD[d]}`, ["", "Mon", "Tue", "Wed", "Thu", "Fri"][d])}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <p className="text-xs text-muted-foreground">{tr("每道菜的欄位打菜名就會找配方（半成品）；✓ 表示已接上配方。沒接配方的菜不會算進備料和叫貨。", "Type a dish name to find its recipe; ✓ means linked. Unlinked dishes aren't counted in prep or purchasing.")}</p>
+      {bentoGrid}
 
       {partsEditor}
       {!isBento ? preview : (
@@ -486,34 +512,60 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
             <Button size="sm" variant="outline" disabled={value.slots.length >= DEFAULT_PLATFORM_CONFIG.maxSides} onClick={() => onChange({ ...value, slots: [...value.slots, { category: "青菜類", default: { name: "" }, candidates: [] }] })}><Plus /> {tr("配菜", "Side")}</Button>
             <Button size="sm" variant="outline" onClick={recalc}><Calculator /> {tr("依成本計算份量級距", "Calculate portion levels")}</Button>
           </div>
-          {value.customFields.map((field, i) => (
-            <div key={i} className="rounded-md border border-border bg-white p-2 space-y-2">
-              <div className="flex gap-2 items-center">
-                <span className="text-xs font-semibold shrink-0">{tr("自訂欄位", "Custom field")}</span>
-                <Input className="h-9 w-40" placeholder={tr("欄位名稱（例：湯品）", "Name (e.g. Soup)")} value={field.label} onChange={(e) => setCustom(i, { ...field, label: e.target.value })} />
-                <Button variant="ghost" size="icon" className="ml-auto h-8 w-8" aria-label={tr("刪除欄位", "Remove field")} onClick={() => onChange({ ...value, customFields: value.customFields.filter((_, j) => j !== i) })}><Trash2 className="w-3.5 h-3.5" /></Button>
-              </div>
-              {field.options.map((opt, oi) => (
-                <div key={oi} className="flex gap-2 items-center pl-3">
-                  <Input className="h-9 w-40" placeholder={oi === 0 ? tr("選項（第一個是預設）", "Option (first = default)") : tr("選項", "Option")} value={opt.name} onChange={(e) => setCustom(i, { ...field, options: field.options.map((o, k) => (k === oi ? { ...o, name: e.target.value } : o)) })} />
-                  <Input className="h-9 w-24" type="number" step={1} placeholder={tr("加減價", "± price")} title={tr("加減價（0＝不加價，可填負數）", "Price change (0 = free, negative allowed)")} value={opt.price || ""} onChange={(e) => setCustom(i, { ...field, options: field.options.map((o, k) => (k === oi ? { ...o, price: Math.round(Number(e.target.value) || 0) } : o)) })} />
-                  {oi === 0 && <span className="text-xs text-muted-foreground shrink-0">{tr("預設", "default")}</span>}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={tr("刪除選項", "Remove option")} disabled={field.options.length <= 1} onClick={() => setCustom(i, { ...field, options: field.options.filter((_, k) => k !== oi) })}><Trash2 className="w-3.5 h-3.5" /></Button>
-                </div>
-              ))}
-              <Button size="sm" variant="outline" className="ml-3" onClick={() => setCustom(i, { ...field, options: [...field.options, { name: "", price: 0 }] })}><Plus /> {tr("選項", "Option")}</Button>
-            </div>
-          ))}
-          <Button size="sm" variant="outline" onClick={() => onChange({ ...value, customFields: [...value.customFields, { label: "", options: [{ name: "", price: 0 }, { name: "", price: 0 }] }] })}>
-            <Plus /> {tr("自訂欄位（例：湯品、飲料、辣度）", "Custom field (e.g. soup, drink, spice)")}
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            {tr(`標準配菜數＝上面的配菜數（建議 3 道）；消費者最多選 ${DEFAULT_PLATFORM_CONFIG.maxSides} 道，第四道可選「備案」（不加價，許願沒成立時遞補）或「加菜」+${DEFAULT_PLATFORM_CONFIG.addonSidePrice}。份量比例＝預設菜單份成本 ÷ 候選菜單份成本；截單後份量鎖定。`,
-              `Standard sides = the sides above (3 recommended). Customers can pick up to ${DEFAULT_PLATFORM_CONFIG.maxSides}; the 4th is a free backup or a +${DEFAULT_PLATFORM_CONFIG.addonSidePrice} add-on.`)}
-          </p>
           {preview}
         </>
       )}
+
+      <div className="rounded-md border border-border bg-white">
+        <button type="button" className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold" onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}>
+          {isBento ? tr("進階（週菜單輪替、自訂欄位）", "Advanced (weekly rotation, custom fields)") : tr("進階（週菜單輪替）", "Advanced (weekly rotation)")}
+          <span className="text-muted-foreground">{advanced ? "−" : "+"}</span>
+        </button>
+        {advanced && (
+          <div className="space-y-3 px-3 pb-3">
+            <div>
+              <Label className="text-xs">{tr("週菜單輪替：只在這幾天供應（都不勾＝每天）", "Weekly rotation: served only on (none = every day)")}</Label>
+              <div className="flex gap-2 text-sm flex-wrap">
+                {WEEKDAYS.map((d) => (
+                  <label key={d} className="flex items-center gap-1">
+                    <input type="checkbox" checked={value.weekdays.includes(d)} onChange={(e) => onChange({ ...value, weekdays: e.target.checked ? [...value.weekdays, d].sort() : value.weekdays.filter((x) => x !== d) })} />
+                    {tr(`週${WD[d]}`, ["", "Mon", "Tue", "Wed", "Thu", "Fri"][d])}
+                  </label>
+                ))}
+              </div>
+            </div>
+            {isBento && (
+              <>
+              {value.customFields.map((field, i) => (
+                <div key={i} className="rounded-md border border-border bg-white p-2 space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <span className="text-xs font-semibold shrink-0">{tr("自訂欄位", "Custom field")}</span>
+                    <Input className="h-9 w-40" placeholder={tr("欄位名稱（例：湯品）", "Name (e.g. Soup)")} value={field.label} onChange={(e) => setCustom(i, { ...field, label: e.target.value })} />
+                    <Button variant="ghost" size="icon" className="ml-auto h-8 w-8" aria-label={tr("刪除欄位", "Remove field")} onClick={() => onChange({ ...value, customFields: value.customFields.filter((_, j) => j !== i) })}><Trash2 className="w-3.5 h-3.5" /></Button>
+                  </div>
+                  {field.options.map((opt, oi) => (
+                    <div key={oi} className="flex gap-2 items-center pl-3">
+                      <Input className="h-9 w-40" placeholder={oi === 0 ? tr("選項（第一個是預設）", "Option (first = default)") : tr("選項", "Option")} value={opt.name} onChange={(e) => setCustom(i, { ...field, options: field.options.map((o, k) => (k === oi ? { ...o, name: e.target.value } : o)) })} />
+                      <Input className="h-9 w-24" type="number" step={1} placeholder={tr("加減價", "± price")} title={tr("加減價（0＝不加價，可填負數）", "Price change (0 = free, negative allowed)")} value={opt.price || ""} onChange={(e) => setCustom(i, { ...field, options: field.options.map((o, k) => (k === oi ? { ...o, price: Math.round(Number(e.target.value) || 0) } : o)) })} />
+                      {oi === 0 && <span className="text-xs text-muted-foreground shrink-0">{tr("預設", "default")}</span>}
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={tr("刪除選項", "Remove option")} disabled={field.options.length <= 1} onClick={() => setCustom(i, { ...field, options: field.options.filter((_, k) => k !== oi) })}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    </div>
+                  ))}
+                  <Button size="sm" variant="outline" className="ml-3" onClick={() => setCustom(i, { ...field, options: [...field.options, { name: "", price: 0 }] })}><Plus /> {tr("選項", "Option")}</Button>
+                </div>
+              ))}
+              <Button size="sm" variant="outline" onClick={() => onChange({ ...value, customFields: [...value.customFields, { label: "", options: [{ name: "", price: 0 }, { name: "", price: 0 }] }] })}>
+                <Plus /> {tr("自訂欄位（例：湯品、飲料、辣度）", "Custom field (e.g. soup, drink, spice)")}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                {tr(`標準配菜數＝上面的配菜數（建議 3 道）；消費者最多選 ${DEFAULT_PLATFORM_CONFIG.maxSides} 道，第四道可選「備案」（不加價，許願沒成立時遞補）或「加菜」+${DEFAULT_PLATFORM_CONFIG.addonSidePrice}。份量比例＝預設菜單份成本 ÷ 候選菜單份成本；截單後份量鎖定。`,
+                  `Standard sides = the sides above (3 recommended). Customers can pick up to ${DEFAULT_PLATFORM_CONFIG.maxSides}; the 4th is a free backup or a +${DEFAULT_PLATFORM_CONFIG.addonSidePrice} add-on.`)}
+              </p>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       <ComponentDialog vendorId={vendorId} value={compDraft?.draft ?? null} onClose={() => setCompDraft(null)} onSaved={(id, name) => compDraft?.assign?.(id, name)} />
       <IngredientDialog vendorId={vendorId} value={ingDraft} onClose={() => setIngDraft(null)} />
