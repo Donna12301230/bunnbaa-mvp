@@ -586,7 +586,7 @@ export default function MyBookingsPage() {
         </div>
 
         {pageTab === "market" ? (
-          <TransferMarketPage embedded />
+          <TransferMarketPage />
         ) : pageTab === "charity" ? (
           <CharityMealsSection />
         ) : !authLoading && !uid ? (
