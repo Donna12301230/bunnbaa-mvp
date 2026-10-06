@@ -11,6 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { tr } from "@/lib/i18n";
 import { MEAL_PERIODS, mealPeriodLabel, todayStr } from "@/lib/pickupSlots";
 import { cn } from "@/lib/utils";
+import InfoTip from "@/components/InfoTip";
+import { useVendorCatalog } from "@/hooks/useVendorCatalog";
+import { GROUP_DOT, ingredientGroup } from "@/lib/foodColors";
 import { queryClient } from "@/lib/queryClient";
 import { myVendorDocKey } from "@/hooks/useMyVendor";
 import type { MealPeriod, Vendor } from "@/types";
@@ -67,6 +70,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
   const [period, setPeriod] = useState<MealPeriod | "all">("all");
   const [costsOpen, setCostsOpen] = useState(false);
   const autoRefreshed = useRef(false);
+  const { data: catalog } = useVendorCatalog(vendor?.id);
 
   useEffect(() => {
     if (!vendor?.id) return;
@@ -102,101 +106,159 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
   }, [loaded, data, vendor?.id]);
 
   const byPeriod = period !== "all" && data ? data.by_meal_period?.[period] : null;
-  const warnItems = (data?.item_margins || []).filter((m) => m.warn);
 
   return (
     <Card className="mb-8 border-ink">
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3 flex-wrap">
-        <div>
-          <CardTitle className="text-lg flex items-center gap-2"><Wallet className="w-5 h-5 text-primary" /> {tr(`本月收益看板（${Number(month.slice(5))} 月）`, `This month's earnings (${month})`)}</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">{tr("預估數字僅供參考，月底以實際數字結算。", "Estimates are for reference; the month settles on actual numbers.")}</p>
-        </div>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Wallet className="w-5 h-5 text-primary" /> {tr(`${Number(month.slice(5))} 月賺多少`, `This month (${month})`)}
+          <InfoTip>{tr("預估數字僅供參考，月底以實際數字結算。營收＝已確定訂單＋未下單日期的預估；回饋池不另扣，折價券已反映在實付金額。", "Estimates for reference; the month settles on actual numbers. Revenue = confirmed + forecast for open dates.")}</InfoTip>
+        </CardTitle>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setCostsOpen(true)}><Settings2 /> {tr("成本設定", "Costs")}</Button>
-          <Button size="sm" variant="outline" onClick={refresh} disabled={busy}><RefreshCw className={cn(busy && "animate-spin")} /> {tr("重新計算", "Recalculate")}</Button>
+          <Button size="sm" variant="ghost" onClick={refresh} disabled={busy} aria-label={tr("重新計算", "Recalculate")}><RefreshCw className={cn(busy && "animate-spin")} /></Button>
         </div>
       </CardHeader>
       <CardContent>
         {!data ? (
           <div className="h-40 rounded-xl bg-muted animate-pulse" aria-label={tr("計算中", "Calculating")} />
-        ) : (
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-accent border border-ink p-4">
-                  <p className="text-xs text-muted-foreground">{tr("預估淨利", "Est. net profit")}</p>
-                  <p className={cn("font-heading text-4xl font-semibold tabular-nums", data.net_profit < 0 && "text-red-600")}>{nt(data.net_profit)}</p>
+        ) : (() => {
+          // 錢去哪裡：營收拆成各項成本＋淨利，一條色條
+          const parts = [
+            { key: "mat", label: tr("材料", "Materials"), v: data.material_cost, cls: "bg-rose-400" },
+            { key: "labor", label: tr("備料人工", "Prep labor"), v: data.labor_cost, cls: "bg-amber-400" },
+            { key: "fee", label: tr("手續費", "Fees"), v: data.payment_fee + data.maintenance_fee, cls: "bg-violet-400" },
+            { key: "fixed", label: tr("薪資與固定", "Salaries & fixed"), v: data.staff_salary + data.other_fixed_costs, cls: "bg-stone-400" },
+            { key: "net", label: tr("淨利", "Profit"), v: Math.max(0, data.net_profit), cls: "bg-green-500" },
+          ].filter((x) => x.v > 0);
+          const base = Math.max(1, data.revenue, parts.reduce((s, x) => s + x.v, 0));
+          const sold = data.confirmed_qty;
+          const beTotal = data.break_even_qty != null ? sold + data.break_even_qty : 0;
+          const needMax = Math.max(1, ...data.top_needs.map((n) => n.cost));
+          return (
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className={cn("rounded-2xl border-2 p-4", data.net_profit < 0 ? "border-red-300 bg-red-50" : "border-green-300 bg-green-50")}>
+                    <p className="text-xs text-muted-foreground">{tr("預估淨利", "Est. net profit")}</p>
+                    <p className={cn("font-heading text-2xl sm:text-3xl md:text-4xl font-semibold tabular-nums whitespace-nowrap", data.net_profit < 0 ? "text-red-600" : "text-green-800")}>{nt(data.net_profit)}</p>
+                  </div>
+                  <div className="rounded-2xl border-2 border-border p-4">
+                    <p className="text-xs text-muted-foreground">{tr("老闆實際時薪", "Your real hourly")}</p>
+                    <p className="font-heading text-2xl sm:text-3xl md:text-4xl font-semibold tabular-nums whitespace-nowrap">{data.owner_hourly != null ? nt(data.owner_hourly) : "—"}</p>
+                    {data.owner_hours <= 0 && <button type="button" className="text-xs text-primary underline" onClick={() => setCostsOpen(true)}>{tr("填每天工時", "Set your hours")}</button>}
+                  </div>
                 </div>
-                <div className="rounded-2xl border border-border p-4">
-                  <p className="text-xs text-muted-foreground">{tr("老闆實際時薪", "Your real hourly")}</p>
-                  <p className="font-heading text-4xl font-semibold tabular-nums">{data.owner_hourly != null ? nt(data.owner_hourly) : "—"}</p>
-                  <p className="text-micro text-muted-foreground">{data.owner_hours > 0 ? tr(`淨利 ÷ 本月 ${data.owner_hours} 小時（老闆時間不列成本）`, `Net ÷ ${data.owner_hours} h`) : tr("到成本設定填每天工時", "Set your daily hours in Costs")}</p>
-                </div>
-              </div>
-              <p className="text-sm rounded-xl bg-secondary px-3 py-2">
-                <Calculator className="inline w-4 h-4 mr-1 text-primary" />
-                {data.break_even_qty == null
-                  ? tr("目前每份沒有正貢獻，請檢查售價與材料成本。", "Each meal doesn't cover its costs yet — check prices and materials.")
-                  : data.break_even_qty === 0
-                    ? tr("本月已打平固定成本 🎉", "Fixed costs are covered this month 🎉")
-                    : tr(`本月還要賣 ${data.break_even_qty} 份才打平固定成本`, `Sell ${data.break_even_qty} more meals to cover fixed costs`)}
-              </p>
-              <dl className="text-sm">
-                <Row label={tr(`本月營收（已確定 ${data.confirmed_qty} 份）`, `Revenue (confirmed, ${data.confirmed_qty})`)} value={data.confirmed_revenue} />
-                <Row label={tr(`＋預估（未下單日期 ${data.forecast_qty} 份）`, `+ forecast (${data.forecast_qty})`)} value={data.forecast_revenue} />
-                <Row label={tr("預計材料成本", "Materials")} value={data.material_cost} minus />
-                <Row label={tr(`備料人工（${data.labor_hours} 小時 × ${data.hourly_wage}）`, `Prep labor (${data.labor_hours} h × ${data.hourly_wage})`)} value={data.labor_cost} minus />
-                <Row label={tr(`LINE Pay 手續費（${(data.payment_fee_rate * 100).toFixed(2)}%）`, `LINE Pay fee (${(data.payment_fee_rate * 100).toFixed(2)}%)`)} value={data.payment_fee} minus />
-                <Row label={data.maintenance_fee === 0 ? tr("平台維護費（首月免費）", "Platform fee (first month free)") : tr("平台維護費（含稅）", "Platform fee (incl. tax)")} value={data.maintenance_fee} minus />
-                {data.staff_salary > 0 && <Row label={tr("員工固定薪資", "Staff salaries")} value={data.staff_salary} minus />}
-                {data.other_fixed_costs > 0 && <Row label={tr("其他固定成本", "Other fixed costs")} value={data.other_fixed_costs} minus />}
-                <Row label={tr("預估淨利", "Est. net profit")} value={data.net_profit} strong />
-              </dl>
-              <p className="text-micro text-muted-foreground">{tr("回饋池不另扣：折價券已反映在實付金額。", "Reward pool isn't deducted separately — coupons are already in the paid amounts.")}</p>
-            </div>
 
-            <div className="space-y-4">
-              <div>
-                <div className="flex gap-1.5 mb-2" role="tablist" aria-label={tr("依餐期", "By meal")}>
-                  {(["all", ...MEAL_PERIODS] as const).map((p) => (
-                    <button key={p} type="button" role="tab" aria-selected={period === p} onClick={() => setPeriod(p)}
-                      className={cn("text-xs font-semibold px-3 py-1 rounded-full border", period === p ? "bg-ink text-[var(--text-on-inverse)] border-ink" : "border-border")}>
-                      {p === "all" ? tr("全部", "All") : mealPeriodLabel(p)}
-                    </button>
-                  ))}
+                {/* 打平進度 */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold flex items-center gap-1"><Calculator className="w-4 h-4 text-primary" />{tr("打平固定成本", "Break-even")}</span>
+                    <span className="text-muted-foreground">
+                      {data.break_even_qty == null ? tr("每份沒賺錢", "No margin per meal") : data.break_even_qty === 0 ? tr("已打平 🎉", "Covered 🎉") : tr(`還差 ${data.break_even_qty} 份`, `${data.break_even_qty} to go`)}
+                    </span>
+                  </div>
+                  <div className="h-4 overflow-hidden rounded-full bg-stone-200" role="img" aria-label={tr(`已賣 ${sold} 份`, `${sold} sold`)}>
+                    <div className={cn("h-full transition-all", data.break_even_qty == null ? "bg-red-400" : "bg-green-500")} style={{ width: `${data.break_even_qty == null ? 100 : beTotal > 0 ? Math.min(100, (sold / beTotal) * 100) : 100}%` }} />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{tr(`已確定 ${sold} 份`, `${sold} confirmed`)}{beTotal > 0 ? tr(` / 打平要 ${beTotal} 份`, ` / ${beTotal} to break even`) : ""}</p>
                 </div>
-                {byPeriod ? (
-                  <p className="text-sm">{tr(`${mealPeriodLabel(period as MealPeriod)}：已確定 ${byPeriod.qty} 份、營收 ${nt(byPeriod.revenue)}、材料 ${nt(byPeriod.material_cost)}`, `${byPeriod.qty} meals, revenue ${nt(byPeriod.revenue)}, materials ${nt(byPeriod.material_cost)}`)}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{tr("切換早／中／晚看各餐期的已確定營收與材料。", "Switch meals to see each one's confirmed revenue and materials.")}</p>
-                )}
+
+                {/* 錢去哪裡 */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">{tr("營收去哪裡", "Where revenue goes")}</span>
+                    <span className="tabular-nums">{nt(data.revenue)}</span>
+                  </div>
+                  <div className="flex h-6 overflow-hidden rounded-lg" role="img" aria-label={parts.map((x) => `${x.label} ${nt(x.v)}`).join("，")}>
+                    {parts.map((x) => <div key={x.key} className={cn("h-full", x.cls)} style={{ width: `${(x.v / base) * 100}%` }} title={`${x.label} ${nt(x.v)}`} />)}
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                    {parts.map((x) => <span key={x.key} className="inline-flex items-center gap-1"><span className={cn("w-2.5 h-2.5 rounded-sm", x.cls)} />{x.label} <span className="text-muted-foreground tabular-nums">{nt(x.v)}</span></span>)}
+                  </div>
+                  {data.net_profit < 0 && <p className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{tr(`成本比營收多 ${nt(-data.net_profit)}`, `Costs exceed revenue by ${nt(-data.net_profit)}`)}</p>}
+                </div>
+
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-xs text-muted-foreground">{tr("看明細", "Details")}</summary>
+                  <dl className="mt-1">
+                    <Row label={tr(`本月營收（已確定 ${data.confirmed_qty} 份）`, `Revenue (confirmed, ${data.confirmed_qty})`)} value={data.confirmed_revenue} />
+                    <Row label={tr(`＋預估（未下單日期 ${data.forecast_qty} 份）`, `+ forecast (${data.forecast_qty})`)} value={data.forecast_revenue} />
+                    <Row label={tr("預計材料成本", "Materials")} value={data.material_cost} minus />
+                    <Row label={tr(`備料人工（${data.labor_hours} 小時 × ${data.hourly_wage}）`, `Prep labor (${data.labor_hours} h × ${data.hourly_wage})`)} value={data.labor_cost} minus />
+                    <Row label={tr(`LINE Pay 手續費（${(data.payment_fee_rate * 100).toFixed(2)}%）`, `LINE Pay fee (${(data.payment_fee_rate * 100).toFixed(2)}%)`)} value={data.payment_fee} minus />
+                    <Row label={data.maintenance_fee === 0 ? tr("平台維護費（首月免費）", "Platform fee (first month free)") : tr("平台維護費（含稅）", "Platform fee (incl. tax)")} value={data.maintenance_fee} minus />
+                    {data.staff_salary > 0 && <Row label={tr("員工固定薪資", "Staff salaries")} value={data.staff_salary} minus />}
+                    {data.other_fixed_costs > 0 && <Row label={tr("其他固定成本", "Other fixed costs")} value={data.other_fixed_costs} minus />}
+                    <Row label={tr("預估淨利", "Est. net profit")} value={data.net_profit} strong />
+                  </dl>
+                </details>
               </div>
-              <div>
-                <p className="text-sm font-semibold mb-1">{tr("本月預計備料（前 10 項）", "This month's prep (top 10)")}</p>
-                <ul className="text-sm divide-y divide-border">
-                  {data.top_needs.length === 0 && <li className="py-1 text-muted-foreground">{tr("還沒有配方資料", "No recipe data yet")}</li>}
-                  {data.top_needs.map((n) => (
-                    <li key={n.ingredient_id} className="flex justify-between py-1"><span>{n.name}</span><span className="text-muted-foreground tabular-nums">{n.amount.toLocaleString()} {n.unit}・{nt(n.cost)}</span></li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <p className="text-sm font-semibold mb-1">{tr("每份毛利（8 折後售價 − 材料成本）", "Margin per meal (20% off price − materials)")}</p>
-                {warnItems.length > 0 && (
-                  <p className="text-xs text-red-600 flex gap-1 mb-1"><AlertTriangle className="w-3.5 h-3.5 shrink-0" />{tr(`${warnItems.length} 項毛利低於材料成本 30%`, `${warnItems.length} item(s) earn less than 30% of material cost`)}</p>
-                )}
-                <ul className="text-sm divide-y divide-border max-h-48 overflow-y-auto bb-thin-scroll">
-                  {data.item_margins.map((m) => (
-                    <li key={`${m.menu_item_id}-${m.name}`} className={cn("flex justify-between gap-2 py-1", m.warn && "text-red-600 font-semibold")}>
-                      <span className="truncate">{m.name}</span>
-                      <span className="tabular-nums shrink-0">${m.discounted_price} − ${m.material_cost} = ${m.margin}</span>
-                    </li>
-                  ))}
-                </ul>
+
+              <div className="space-y-5">
+                <div>
+                  <div className="flex gap-1.5 mb-2" role="tablist" aria-label={tr("依餐期", "By meal")}>
+                    {(["all", ...MEAL_PERIODS] as const).map((p) => (
+                      <button key={p} type="button" role="tab" aria-selected={period === p} onClick={() => setPeriod(p)}
+                        className={cn("text-xs font-semibold px-3 py-1 rounded-full border", period === p ? "bg-ink text-[var(--text-on-inverse)] border-ink" : "border-border")}>
+                        {p === "all" ? tr("全部", "All") : mealPeriodLabel(p)}
+                      </button>
+                    ))}
+                  </div>
+                  {byPeriod && (
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-xl bg-stone-100 p-2"><p className="text-xs text-muted-foreground">{tr("份數", "Meals")}</p><p className="text-xl font-bold">{byPeriod.qty}</p></div>
+                      <div className="rounded-xl bg-stone-100 p-2"><p className="text-xs text-muted-foreground">{tr("營收", "Revenue")}</p><p className="text-xl font-bold tabular-nums">{nt(byPeriod.revenue)}</p></div>
+                      <div className="rounded-xl bg-stone-100 p-2"><p className="text-xs text-muted-foreground">{tr("材料", "Materials")}</p><p className="text-xl font-bold tabular-nums">{nt(byPeriod.material_cost)}</p></div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold mb-2">{tr("本月最花錢的材料", "Top materials this month")}</p>
+                  {data.top_needs.length === 0 ? <p className="text-sm text-muted-foreground">{tr("還沒有配方資料", "No recipe data yet")}</p> : (
+                    <ul className="space-y-1.5">
+                      {data.top_needs.map((n) => {
+                        const g = ingredientGroup(catalog?.ingredientsById[n.ingredient_id]?.category);
+                        return (
+                          <li key={n.ingredient_id} className="grid grid-cols-[5rem_1fr_auto] items-center gap-2 text-sm">
+                            <span className="truncate">{n.name}</span>
+                            <div className="h-3 rounded-full bg-stone-100 overflow-hidden"><div className={cn("h-full", GROUP_DOT[g])} style={{ width: `${(n.cost / needMax) * 100}%` }} /></div>
+                            <span className="text-xs text-muted-foreground tabular-nums w-20 text-right">{nt(n.cost)}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold mb-2 flex items-center gap-1">
+                    {tr("每份賺多少", "Margin per meal")}
+                    <InfoTip>{tr("8 折後售價 − 材料成本。紅色＝毛利低於材料成本 30%。", "Price after 20% off − materials. Red = margin under 30% of material cost.")}</InfoTip>
+                  </p>
+                  <ul className="space-y-2 max-h-56 overflow-y-auto bb-thin-scroll pr-1">
+                    {data.item_margins.map((m) => {
+                      const costPct = m.discounted_price > 0 ? Math.min(100, (m.material_cost / m.discounted_price) * 100) : 100;
+                      return (
+                        <li key={`${m.menu_item_id}-${m.name}`} className="space-y-0.5">
+                          <div className={cn("flex justify-between gap-2 text-sm", m.warn && "text-red-600 font-semibold")}>
+                            <span className="truncate">{m.warn && <AlertTriangle className="inline w-3.5 h-3.5 mr-0.5" />}{m.name}</span>
+                            <span className="tabular-nums shrink-0">+${m.margin}</span>
+                          </div>
+                          <div className="flex h-2.5 overflow-hidden rounded-full" role="img" aria-label={tr(`售價 ${m.discounted_price}，材料 ${m.material_cost}`, `price ${m.discounted_price}, materials ${m.material_cost}`)}>
+                            <div className={cn("h-full", m.warn ? "bg-red-500" : "bg-rose-400")} style={{ width: `${costPct}%` }} />
+                            <div className="h-full flex-1 bg-green-500" />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </CardContent>
       <CostSettingsDialog open={costsOpen} onClose={() => setCostsOpen(false)} vendor={vendor} minimumWage={data?.minimum_wage} onSaved={refresh} />
     </Card>
