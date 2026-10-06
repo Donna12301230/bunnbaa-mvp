@@ -21,9 +21,8 @@ const navGroups = () => [
   {
     title: tr("今天", "Today"),
     items: [
-      { href: "/vendor-portal/orders", label: tr("訂單", "Orders"), icon: ClipboardList },
-      // 取餐掃碼指向 /lock/vendor/redeem（舊路徑，跟 MarketplaceHeader 同一個入口）
-      { href: "/lock/vendor/redeem", label: tr("取餐掃碼", "Pickup scan"), icon: ScanLine },
+      // 訂單、取餐掃碼、訂餐時段合成一頁（三個分頁）；舊路徑也算在這一項
+      { href: "/vendor-portal/orders", label: tr("訂單取餐", "Orders & pickup"), icon: ScanLine, also: ["/lock/vendor/redeem", "/vendor-portal/sessions"] },
       { href: "/vendor-portal/prep", label: tr("今日備料", "Today's prep"), icon: ChefHat },
     ],
   },
@@ -48,13 +47,15 @@ const navGroups = () => [
       { href: "/vendor-portal/charity", label: tr("愛心餐", "Charity"), icon: HeartHandshake },
       // 食材、單價、供應商：開店或漲價時才改，菜色的組成在菜單管理裡直接改
       { href: "/vendor-portal/recipes", label: tr("食材與供應商", "Ingredients"), icon: BookOpen },
-      { href: "/vendor-portal/sessions", label: tr("訂餐時段", "Pickup slots"), icon: CalendarDays },
       { href: "/vendor-portal/settings", label: tr("店家設定", "Store settings"), icon: Settings },
     ],
   },
 ];
 
 const navItems = () => navGroups().flatMap((g) => g.items);
+
+type NavItem = { href: string; also?: string[] };
+const isActive = (location: string, item: NavItem) => [item.href, ...(item.also ?? [])].some((h) => location === h || location.startsWith(h));
 
 // Ported from BunnBaa Parse_Ref's client/src/components/VendorLayout.tsx.
 // 訂閱狀態讀真實 vendors/{id}（lib/subscription.ts）：到期後整個廠商後台擋住，
@@ -138,11 +139,11 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
                 {group.title && (
                   <div className="px-4 pb-1 text-xs font-semibold tracking-wide text-muted-foreground/80">{group.title}</div>
                 )}
-                {group.items.map(({ href, label, icon: Icon }) => (
-                  <Link key={href} href={href} aria-current={location === href || location.startsWith(href) ? "page" : undefined} className="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                {group.items.map((item) => { const { href, label, icon: Icon } = item; const active = isActive(location, item); return (
+                  <Link key={href} href={href} aria-current={active ? "page" : undefined} className="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <div className={cn(
                       "flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm cursor-pointer transition-colors",
-                      location === href || location.startsWith(href)
+                      active
                         ? "bg-secondary text-secondary-foreground font-semibold shadow-[inset_0_0_0_1px_var(--border-ink)]"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     )}>
@@ -150,7 +151,7 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
                       <span>{label}</span>
                     </div>
                   </Link>
-                ))}
+                ); })}
               </div>
             ))}
           </nav>
@@ -161,17 +162,17 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
 
         {/* Mobile bottom nav */}
         <nav aria-label={tr("商家後台", "Vendor portal")} className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border flex md:hidden z-50 overflow-x-auto">
-          {navItems().map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} aria-current={location === href || location.startsWith(href) ? "page" : undefined} className="flex-1 min-w-[64px]">
+          {navItems().map((item) => { const { href, label, icon: Icon } = item; const active = isActive(location, item); return (
+            <Link key={href} href={href} aria-current={active ? "page" : undefined} className="flex-1 min-w-[64px]">
               <div className={cn(
                 "flex flex-col items-center py-2 text-xs",
-                location === href || location.startsWith(href) ? "text-primary" : "text-muted-foreground"
+                active ? "text-primary" : "text-muted-foreground"
               )}>
                 <Icon className="w-5 h-5 mb-0.5" />
                 {label}
               </div>
             </Link>
-          ))}
+          ); })}
         </nav>
 
         {/* Content */}

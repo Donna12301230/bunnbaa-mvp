@@ -1,89 +1,74 @@
-import { tr } from "@/lib/i18n";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { CalendarDays, ClipboardList, ScanLine } from "lucide-react";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
-import LockOrderRow from "@/components/LockOrderRow";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, Search } from "lucide-react";
-import { EmptyState } from "@/components/ds";
-import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import PickupPanel from "@/components/orders/PickupPanel";
+import OrdersListPanel from "@/components/orders/OrdersListPanel";
+import SlotsPanel from "@/components/orders/SlotsPanel";
+import { useAuth } from "@/hooks/useAuth";
+import { useMyVendor } from "@/hooks/useMyVendor";
 import { useVendorLocks } from "@/hooks/useVendorLocks";
-import { DONE_STATUSES, PENDING_STATUSES, pickupCode } from "@/lib/lockOutcome";
+import { db } from "@/lib/firebase";
+import { PENDING_STATUSES } from "@/lib/lockOutcome";
+import { todayStr } from "@/lib/pickupSlots";
+import { tr } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { Lock } from "@/types";
 
-// 訂單管理：2026-09-28 改用真實 locks（原本是 Parse 雛型的預約單／現場單 mock，
-// TODO §7 決定不做揪團預購與現場點餐）。依狀態分頁，可用取餐編號或品名搜尋，
-// 還沒取餐的可以直接確認取餐／登記未取餐。
-// 用函式包起來，每次 render 依目前語言組標籤
-const tabs = () => [
-  { value: "pending", label: tr("待取餐", "To pick up"), match: (l: Lock) => PENDING_STATUSES.has(l.status) },
-  { value: "done", label: tr("已完成", "Done"), match: (l: Lock) => DONE_STATUSES.has(l.status) },
-  { value: "no_show", label: tr("未取餐", "No-show"), match: (l: Lock) => l.status === "no_show" },
-  { value: "all", label: tr("全部", "All"), match: () => true },
-] as const;
+export type OrdersTab = "pickup" | "orders" | "slots";
 
-export default function VendorPortalOrders() {
+/**
+ * 訂單取餐（2026-10-06 整合）：原本的「訂單管理」「取餐掃碼」「訂餐時段」三頁合成一頁三個大分頁。
+ * 舊路徑都保留：/vendor-portal/orders（取餐）、/lock/vendor/redeem（取餐）、/vendor-portal/sessions（時段）。
+ * 訂單列表、時段用最近 500 筆（vendor_id + created_at 索引）；取餐用今天的訂單（pickup_date 查詢，不受 500 筆限制）。
+ */
+export function OrdersHub({ initial = "pickup" }: { initial?: OrdersTab }) {
+  const vendorId = useAuth().user?.vendorId;
+  const { data: vendor } = useMyVendor();
+  const [tab, setTab] = useState<OrdersTab>(initial);
   const { locks, loading, truncated } = useVendorLocks(500);
-  const [search, setSearch] = useState("");
+  const [todayLocks, setTodayLocks] = useState<Lock[]>([]);
+  const [loadingToday, setLoadingToday] = useState(true);
+  const today = todayStr();
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toUpperCase().replace(/\s+/g, "");
-    const rows = q
-      ? locks.filter((l) => pickupCode(l).includes(q) || l.item_name.toUpperCase().includes(q))
-      : locks;
-    // 待取餐依取餐時間由近到遠，其餘也照取餐時間排
-    return [...rows].sort((a, b) =>
-      `${a.pickup_date} ${a.pickup_window}`.localeCompare(`${b.pickup_date} ${b.pickup_window}`)
-    );
-  }, [locks, search]);
+  useEffect(() => {
+    if (!vendorId) return;
+    return onSnapshot(query(collection(db, "locks"), where("vendor_id", "==", vendorId), where("pickup_date", "==", today)), (snap) => {
+      setTodayLocks(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Lock).sort((a, b) => (a.pickup_code ?? "").localeCompare(b.pickup_code ?? "")));
+      setLoadingToday(false);
+    }, () => setLoadingToday(false));
+  }, [vendorId, today]);
+
+  const waitingToday = todayLocks.filter((l) => PENDING_STATUSES.has(l.status)).length;
+  const pendingAll = useMemo(() => locks.filter((l) => PENDING_STATUSES.has(l.status)).length, [locks]);
+  const upcoming = useMemo(() => locks.filter((l) => l.pickup_date >= today && l.status !== "cancelled" && l.status !== "no_show").length, [locks, today]);
+
+  const tabs = [
+    { key: "pickup" as const, icon: ScanLine, label: tr("取餐", "Pickup"), n: waitingToday, sub: tr("今天待取", "waiting today") },
+    { key: "orders" as const, icon: ClipboardList, label: tr("訂單", "Orders"), n: pendingAll, sub: tr("待取餐", "to pick up") },
+    { key: "slots" as const, icon: CalendarDays, label: tr("時段", "Slots"), n: upcoming, sub: tr("份已訂", "booked ahead") },
+  ];
 
   return (
     <VendorPortalLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-1 flex items-center gap-2">
-        <ClipboardList className="w-5 h-5 text-orange-500" /> {tr("訂單管理", "Orders")}
-      </h1>
-      <p className="text-sm text-muted-foreground mb-4">
-        {tr("消費者預付鎖定的訂單", "Meals customers have prepaid and locked")}{truncated ? tr("（只列最近 500 筆）", " (latest 500 only)") : ""}{tr("。", ".")}
-      </p>
-
-      <div className="relative mb-4 max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={tr("取餐編號末 8 碼或品名", "Pickup code or item name")}
-          aria-label={tr("搜尋訂單", "Search orders")}
-          className="pl-9"
-        />
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-4">{tr("訂單取餐", "Orders & pickup")}</h1>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5" role="tablist">
+        {tabs.map((t) => (
+          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
+            className={cn("rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", tab === t.key ? "border-foreground bg-card shadow-sm" : "border-border bg-card/60 hover:bg-card")}>
+            <span className="flex items-center gap-1.5 font-semibold"><t.icon className="w-5 h-5 text-orange-500" />{t.label}</span>
+            <span className="mt-1 block text-2xl font-bold leading-none">{t.n}</span>
+            <span className="text-xs text-muted-foreground">{t.sub}</span>
+          </button>
+        ))}
       </div>
-
-      {loading ? (
-        <SkeletonBlocks count={4} height={88} className="space-y-3" />
-      ) : (
-        <Tabs defaultValue="pending">
-          <TabsList className="mb-4 max-w-full justify-start overflow-x-auto">
-            {tabs().map((t) => (
-              <TabsTrigger key={t.value} value={t.value}>
-                {t.label}（{filtered.filter(t.match).length}）
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {tabs().map((t) => {
-            const rows = filtered.filter(t.match);
-            return (
-              <TabsContent key={t.value} value={t.value}>
-                {rows.length === 0 ? (
-                  <EmptyState size="compact" icon={<ClipboardList size={32} />} title={tr("沒有符合的訂單", "No matching orders")} />
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {rows.map((l) => <LockOrderRow key={l.id} lock={l} />)}
-                  </div>
-                )}
-              </TabsContent>
-            );
-          })}
-        </Tabs>
-      )}
+      {tab === "pickup" && <PickupPanel todayLocks={todayLocks} loading={loadingToday} />}
+      {tab === "orders" && <OrdersListPanel locks={locks} loading={loading} truncated={truncated} />}
+      {tab === "slots" && <SlotsPanel vendor={vendor} locks={locks} loading={loading} />}
     </VendorPortalLayout>
   );
+}
+
+export default function VendorPortalOrders() {
+  return <OrdersHub initial="pickup" />;
 }
