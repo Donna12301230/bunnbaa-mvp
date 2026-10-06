@@ -36,9 +36,8 @@ const navGroups = () => [
   {
     title: tr("看數據", "Insights"),
     items: [
-      { href: "/vendor-portal/reports", label: tr("統計報表", "Reports"), icon: TrendingUp },
-      { href: "/vendor-portal/insights", label: tr("區域洞察", "Area insights"), icon: MapPinned },
-      { href: "/vendor-portal/growth", label: tr("券負債看板", "Rewards"), icon: Trophy },
+      // 統計報表、區域洞察、券負債看板合成一頁（三個分頁）；舊路徑也算在這一項
+      { href: "/vendor-portal/reports", label: tr("報表與洞察", "Reports & insights"), icon: TrendingUp, also: ["/vendor-portal/insights", "/vendor-portal/growth"] },
     ],
   },
   {
