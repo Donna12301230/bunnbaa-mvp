@@ -364,6 +364,8 @@ export interface Component {
   advance_hours: number;
   method?: string;
   flavors?: string[];
+  /** AI 產生的配方草稿，店家還沒確認過（菜單上會標「AI 草稿」） */
+  ai_draft?: boolean;
 }
 
 export interface Supplier {

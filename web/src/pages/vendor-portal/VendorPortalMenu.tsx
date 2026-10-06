@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Camera, Plus, Pencil, Sparkles, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
@@ -28,9 +29,13 @@ import { EmptyState, Switch, Tag } from "@/components/ds";
 import BentoEditor, { EMPTY_BENTO, portionTextFor, type BentoForm } from "@/components/BentoEditor";
 import { useVendorCatalog } from "@/hooks/useVendorCatalog";
 import { useVendorMenu } from "@/hooks/useVendorMenu";
-import MenuPrepProgress from "@/components/MenuPrepProgress";
+import BentoBox, { itemCells, MarginBar } from "@/components/BentoBox";
+import InfoTip from "@/components/InfoTip";
+import { fillingText, useRecipeGaps } from "@/components/RecipeGapCard";
+import { recipeTargets } from "@/lib/aiFill";
+import { GROUP_DOT, groupLabel, type FoodGroup } from "@/lib/foodColors";
 import { addDaysStr, bookableDateRange, mondayOf, todayStr } from "@/lib/pickupSlots";
-import { costIssueText, itemIssues } from "@/lib/prep";
+import { componentPortionsForLock, costIssueText, itemIssues, portionsCost } from "@/lib/prep";
 import { takePendingEdit } from "@/lib/pendingEdit";
 import { PENDING_STATUSES } from "@/lib/lockOutcome";
 import type { Lock } from "@/types";
@@ -95,6 +100,10 @@ export default function VendorPortalMenu() {
   const nextWeekLocked = !!myVendor?.menu_locked_week && myVendor.menu_locked_week >= mondayOf(addDaysStr(todayStr(), 7));
 
   const { data: items = [], isLoading } = useVendorMenu(VENDOR_ID);
+  const gaps = useRecipeGaps();
+  /** 品項裡有 AI 產生、店家還沒確認過的配方 */
+  const hasAiDraft = (item: MenuItem) => !!catalog && [item.rice_component_id, item.main?.component_id, ...(item.mains ?? []).map((m) => m.component_id), ...(item.fixed ?? []).map((f) => f.component_id), ...(item.slots ?? []).map((sl) => sl.default?.component_id)]
+    .some((id) => !!id && !!catalog.componentsById[id]?.ai_draft);
 
   // 每個品項的配方缺漏（未接配方、配方沒原物料、原物料沒單價）
   const issuesById = useMemo(() => {
@@ -299,12 +308,11 @@ export default function VendorPortalMenu() {
 
   return (
     <VendorPortalLayout>
-      <MenuPrepProgress />
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div>
-          <h1 className="font-heading text-3xl md:text-4xl font-semibold">{tr("菜單管理", "Menu")}</h1>
-          <p className="text-xs text-muted-foreground">{tr("主菜、配菜格與候選菜；配方在", "Mains, side slots and candidates; recipes live in")} <Link href="/vendor-portal/recipes" className="text-primary underline">{tr("配方與原物料", "Recipes")}</Link></p>
-        </div>
+        <h1 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-1">
+          {tr("菜單管理", "Menu")}
+          <InfoTip>{tr("每道菜長得像一個便當：每格是一道配菜，顏色是食材類別。格子都填好，系統就能算每份成本、毛利，並自動產生叫貨單和備料。單價、供應商在「食材與供應商」。", "Each item looks like a bento box: each cell is a dish, colored by food group. Fill the cells and cost, margin, purchasing and prep are calculated for you. Prices and suppliers live in Ingredients.")}</InfoTip>
+        </h1>
         <div className="flex gap-2">
           <input
             ref={photoInput}
@@ -325,6 +333,37 @@ export default function VendorPortalMenu() {
           </Button>
         </div>
       </div>
+
+      {/* 菜單完成度：只回答「哪些菜可以算成本」 */}
+      {gaps.stats && gaps.listed.length > 0 && (
+        <Card className="mb-5">
+          <CardContent className="p-4 flex flex-wrap items-center gap-4">
+            <div className="flex-1 min-w-[12rem] space-y-1.5">
+              <p className="text-sm text-muted-foreground">{tr("可以算成本的菜", "Items with full cost")}</p>
+              <p className="font-heading text-3xl font-semibold leading-none">
+                {gaps.stats.ready.length}<span className="text-lg text-muted-foreground"> / {gaps.listed.length} {tr("道", "")}</span>
+              </p>
+              <div className="h-2.5 w-full max-w-xs overflow-hidden rounded-full bg-stone-200">
+                <div className="h-full bg-green-500 transition-all" style={{ width: `${Math.round((gaps.stats.ready.length / gaps.listed.length) * 100)}%` }} />
+              </div>
+            </div>
+            {gaps.stats.gapItems.length > 0 ? (
+              <Button size="lg" onClick={() => gaps.fill()} disabled={!!gaps.progress}>
+                <Sparkles /> {gaps.progress ? fillingText(gaps.progress) : tr(`一次補完全部（${gaps.stats.gapItems.length} 道）`, `Fill them all (${gaps.stats.gapItems.length})`)}
+              </Button>
+            ) : gaps.stats.unpriced.length > 0 ? (
+              <Link href="/vendor-portal/recipes" className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-200">
+                <AlertTriangle className="w-4 h-4" />{tr(`缺單價：${gaps.stats.unpriced.slice(0, 2).map(([, n]) => n).join("、")}`, `No price: ${gaps.stats.unpriced.slice(0, 2).map(([, n]) => n).join(", ")}`)}{gaps.stats.unpriced.length > 2 ? tr(` 等 ${gaps.stats.unpriced.length} 項`, "…") : ""}
+              </Link>
+            ) : null}
+            <div className="w-full flex flex-wrap gap-3 text-xs text-muted-foreground">
+              {(["rice", "protein", "veg", "pack"] as FoodGroup[]).map((g) => (
+                <span key={g} className="inline-flex items-center gap-1"><span className={cn("w-2.5 h-2.5 rounded-sm", GROUP_DOT[g])} />{groupLabel(g)}</span>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {drafts.length > 0 && (
         <Card className="mb-5 border-orange-200 bg-orange-50/40">
@@ -365,7 +404,7 @@ export default function VendorPortalMenu() {
       {isLoading ? (
         <SkeletonBlocks count={3} height={64} className="space-y-2" />
       ) : items.length === 0 ? (
-        <EmptyState icon={<UtensilsCrossed size={32} />} title={tr("尚無菜單品項", "No menu items yet")} description={tr("點擊上方「新增品項」，上架第一道餐點。", "Click Add item above to list your first dish.")} />
+        <EmptyState icon={<UtensilsCrossed size={32} />} title={tr("尚無菜單品項", "No menu items yet")} description={tr("拍一張菜單照片，AI 幫你一次上架。", "Snap your menu and AI lists it for you.")} action={<Button onClick={() => photoInput.current?.click()} disabled={reading || !VENDOR_ID}><Camera /> {tr("拍照上架", "From a photo")}</Button>} />
       ) : (() => {
         const categories = Array.from(new Set(items.map(i => i.category)));
         return (
@@ -376,45 +415,48 @@ export default function VendorPortalMenu() {
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   {items.filter(i => i.category === cat).map(item => (
                     <Card key={item.id}>
-                      <CardContent className="p-4 md:p-5 flex items-center gap-4">
-                        <div className="w-20 h-20 rounded-2xl overflow-hidden border border-ink bg-secondary shrink-0 flex items-center justify-center">
-                          {item.image
-                            ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                            : <UtensilsCrossed className="w-6 h-6 text-secondary-foreground/50" aria-hidden="true" />
-                          }
-                        </div>
-                        <div className="flex-1 min-w-0">
+                      <CardContent className="p-4 md:p-5 flex items-start gap-4">
+                        {(() => {
+                          const cells = catalog ? itemCells(item, catalog.componentsById, catalog.ingredientsById) : [];
+                          return <BentoBox cells={cells} empty={cells.length === 0} />;
+                        })()}
+                        <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-heading text-lg font-semibold">{item.name}</span>
+                            <button type="button" className="font-heading text-lg font-semibold text-left hover:underline" onClick={() => openEdit(item)}>{item.name}</button>
                             {!item.is_available && <Badge variant="secondary" className="text-xs">{tr("已下架", "Unavailable")}</Badge>}
-                            {item.dietary_tags?.map(t => (
-                              <Badge key={t} variant="outline" className="text-xs text-green-700 border-green-200">{tr(t, tagEn(t))}</Badge>
-                            ))}
-                          </div>
-                          <div className="text-xs text-muted-foreground truncate">{item.description}</div>
-                          {(item.slots?.length ?? 0) > 0 && (
-                            <div className="text-xs text-muted-foreground truncate">
-                              {item.main?.name && <>{tr("主菜", "Main")} {item.main.name}・</>}
-                              {item.slots!.map((sl) => `${sl.default.name}${sl.candidates.length ? `（+${sl.candidates.map((c) => c.name).join("/")}）` : ""}`).join("、")}
-                              {item.weekdays?.length ? `・${tr("週", "")}${item.weekdays.join(",")}` : ""}
-                            </div>
-                          )}
-                          {(issuesById[item.id]?.length ?? 0) > 0 && (
-                            <button type="button" className="mt-1 inline-flex flex-wrap items-center gap-1 rounded bg-amber-100 text-amber-900 px-1.5 py-0.5 text-[11px] font-medium text-left hover:bg-amber-200" onClick={() => openEdit(item)}>
-                              <AlertTriangle className="w-3 h-3 shrink-0" />
-                              {issuesById[item.id].slice(0, 2).map((x) => `${x.label}${x.name ? ` ${x.name}` : ""}：${costIssueText(x.issue)}`).join("；")}
-                              {issuesById[item.id].length > 2 ? tr(`…等 ${issuesById[item.id].length} 項`, ` +${issuesById[item.id].length - 2} more`) : ""}
-                            </button>
-                          )}
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-orange-600 font-semibold text-sm">NT$ {item.price}{(item.mains?.length ?? 0) > 1 ? tr(" 起", "+") : ""}</span>
-                            {item.allergens?.length > 0 && (
-                              <span className="text-xs text-red-500">{tr("含：", "Contains: ")}{item.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</span>
+                            {hasAiDraft(item) && (
+                              <Badge variant="outline" className="text-xs text-orange-700 border-orange-300"><Sparkles className="w-3 h-3 mr-0.5" />{tr("AI 草稿", "AI draft")}</Badge>
                             )}
                           </div>
+                          <div className="text-orange-600 font-semibold text-sm">NT$ {item.price}{(item.mains?.length ?? 0) > 1 ? tr(" 起", "+") : ""}</div>
+                          {(() => {
+                            if (!catalog) return null;
+                            const targets = recipeTargets(item, catalog);
+                            if (targets.length > 0) {
+                              return (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">{tr(`${targets.length} 格還沒有組成`, `${targets.length} cell(s) missing`)}</span>
+                                  <Button size="sm" variant="outline" onClick={() => gaps.fill([item])} disabled={!!gaps.progress}>
+                                    <Sparkles /> {gaps.progress ? fillingText(gaps.progress) : tr("AI 幫我填", "Let AI fill it")}
+                                  </Button>
+                                </div>
+                              );
+                            }
+                            const issue = issuesById[item.id]?.[0];
+                            if (issue) {
+                              return (
+                                <button type="button" className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-xs font-medium hover:bg-amber-200" onClick={() => openEdit(item)}>
+                                  <AlertTriangle className="w-3 h-3 shrink-0" />{costIssueText(issue.issue)}
+                                </button>
+                              );
+                            }
+                            const portions = componentPortionsForLock({ rice: "normal", slots: [], extra_side: null }, item, catalog.componentsById);
+                            const price = item.mains?.[0]?.price || item.price || 0;
+                            return <div className="max-w-xs"><MarginBar cost={portionsCost(portions, catalog.componentsById, catalog.ingredientsById)} price={price} /></div>;
+                          })()}
                         </div>
                         <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => openEdit(item)}>
+                          <Button variant="ghost" size="icon" className="w-8 h-8" aria-label={tr(`編輯「${item.name}」`, `Edit ${item.name}`)} onClick={() => openEdit(item)}>
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon" className="w-8 h-8 text-red-500"

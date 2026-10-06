@@ -13,6 +13,7 @@ import { queryClient } from "@/lib/queryClient";
 import { db } from "@/lib/firebase";
 import { componentCost, rawAmount } from "@/lib/bento";
 import { tr } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { Component, Ingredient } from "@/types";
 
 // 半成品、原物料的編輯視窗：配方頁用，菜單編輯也會疊開（找不到半成品時直接建、成本缺單價時直接補），
@@ -159,6 +160,34 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
   );
 }
 
+// 烹調方式與設備帶出預設值（簡化提案 §3-4）：選了做法就自動填設備、每批份數、製程分鐘，店家不用自己想
+const METHOD_PRESET: Record<string, { equipment: string; batch_capacity: number; prep_minutes: number }> = {
+  炒: { equipment: "炒鍋", batch_capacity: 10, prep_minutes: 15 },
+  煮: { equipment: "電鍋", batch_capacity: 20, prep_minutes: 50 },
+  滷: { equipment: "滷鍋", batch_capacity: 40, prep_minutes: 90 },
+  炸: { equipment: "炸鍋", batch_capacity: 15, prep_minutes: 20 },
+  烤: { equipment: "烤箱", batch_capacity: 20, prep_minutes: 30 },
+  蒸: { equipment: "蒸籠", batch_capacity: 30, prep_minutes: 40 },
+  涼拌: { equipment: "工作台", batch_capacity: 20, prep_minutes: 15 },
+};
+const EQUIPMENT_PRESET: Record<string, { batch_capacity: number; prep_minutes: number }> = {
+  炒鍋: { batch_capacity: 10, prep_minutes: 15 }, 電鍋: { batch_capacity: 20, prep_minutes: 50 }, 炸鍋: { batch_capacity: 15, prep_minutes: 20 },
+  烤箱: { batch_capacity: 20, prep_minutes: 30 }, 滷鍋: { batch_capacity: 40, prep_minutes: 90 }, 蒸籠: { batch_capacity: 30, prep_minutes: 40 },
+  湯鍋: { batch_capacity: 40, prep_minutes: 60 }, 工作台: { batch_capacity: 20, prep_minutes: 15 },
+};
+
+/** 熟重 = 生重 × 熟成率 ×（1 − 損耗率）；rawAmount 的反函數 */
+function cookedFromRaw(raw: number, ing: Pick<Ingredient, "yield_rate" | "loss_rate">): number {
+  return raw / rawAmount(1, ing);
+}
+const round1 = (n: number) => Math.round(n * 10) / 10;
+/** 以克、毫升計的才有生熟之分；片、顆、支照數量算 */
+const isWeight = (unit: string | undefined) => !unit || ["g", "ml", "克", "毫升"].includes(unit);
+
+/**
+ * 半成品（一道配菜）的編輯視窗。預設只有三樣：名稱、原物料、份量；做法選了會帶出設備與批量，其餘收進「進階」。
+ * 份量可以填生重或熟重（資料一律存熟重，備料、叫貨用熟成率換回生料）：五穀米 180 g 是生重，煮熟後遠大於 180 g，兩個要分開標。
+ */
 export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
   vendorId: string | undefined;
   value: ComponentDraft | null;
@@ -170,9 +199,12 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
   const ingById = catalog?.ingredientsById ?? {};
   const [comp, setComp] = useState<ComponentDraft | null>(value);
   const [opened, setOpened] = useState(value);
+  const [basis, setBasis] = useState<"raw" | "cooked">("raw");
+  const [advanced, setAdvanced] = useState(false);
   if (value !== opened) {
     setOpened(value);
     setComp(value);
+    setAdvanced(false);
   }
   // 疊開的原物料視窗：建好後填回第 lineIdx 行
   const [newIng, setNewIng] = useState<{ draft: IngredientDraft; lineIdx: number } | null>(null);
@@ -183,7 +215,8 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
   async function save() {
     if (!vendorId || !comp) return;
     try {
-      const id = await saveCatalogDoc(vendorId, "components", { ...comp, ingredients: comp.ingredients.filter((l) => l.ingredient_id) });
+      // 店家按過儲存＝確認過，AI 草稿標記拿掉
+      const id = await saveCatalogDoc(vendorId, "components", { ...comp, ingredients: comp.ingredients.filter((l) => l.ingredient_id), ai_draft: false });
       toast({ title: tr("已儲存", "Saved"), description: comp.name });
       onSaved?.(id, comp.name);
       onClose();
@@ -192,59 +225,121 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
     }
   }
 
+  const cost = comp ? componentCost({ id: "", ...comp }, ingById) : 0;
+
   return (
     <>
       <Dialog open={!!value} onOpenChange={(o) => !o && onClose()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{comp?.id ? tr("編輯半成品", "Edit component") : tr("新增半成品", "Add component")}</DialogTitle>
-            <DialogDescription>{tr("每份熟重、製程時間、設備與容量、可提前時間，決定每日備料清單與流程時間軸。", "Portion weight, prep time, equipment, batch size and lead time drive the daily prep list and timeline.")}</DialogDescription>
+            <DialogTitle>{comp?.id ? tr("編輯配菜", "Edit dish") : tr("新增配菜", "Add dish")}</DialogTitle>
+            {comp?.ai_draft && <DialogDescription className="text-orange-700">{tr("這是 AI 估的草稿，份量照店裡實際做法改一改，按儲存就算確認。", "AI draft — adjust to how you actually cook it; saving confirms it.")}</DialogDescription>}
           </DialogHeader>
           {comp && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2"><Label>{tr("名稱", "Name")}</Label><Input value={comp.name} onChange={(e) => setComp({ ...comp, name: e.target.value })} /></div>
-              <div className="col-span-2 space-y-1.5 rounded-md border border-border p-2">
-                <Label>{tr("原物料（每份熟重）", "Ingredients (cooked per portion)")}</Label>
-                {comp.ingredients.map((line, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <select
-                      className="flex-1 h-9 rounded-md border border-input bg-background px-2 text-sm min-w-0"
-                      value={line.ingredient_id}
-                      onChange={(e) => {
-                        if (e.target.value === NEW_ING) setNewIng({ draft: { ...EMPTY_ING }, lineIdx: idx });
-                        else setLine(idx, { ingredient_id: e.target.value });
-                      }}
-                    >
-                      <option value="">—</option>
-                      {catalog?.ingredients.map((i) => <option key={i.id} value={i.id}>{i.name}{i.unit_price > 0 ? "" : tr("（未填單價）", " (no price)")}</option>)}
-                      <option value={NEW_ING}>{tr("＋ 新增原物料…", "+ New ingredient…")}</option>
-                    </select>
-                    <Input className="w-24 h-9" type="number" value={line.grams} onChange={(e) => setLine(idx, { grams: Number(e.target.value) })} />
-                    <span className="text-xs self-center w-8">{ingById[line.ingredient_id]?.unit ?? "g"}</span>
-                    <Button variant="ghost" size="icon" className="h-9 w-9" aria-label={tr("刪除", "Remove")} onClick={() => setComp({ ...comp, ingredients: comp.ingredients.filter((_, j) => j !== idx) })}><Trash2 className="w-3.5 h-3.5" /></Button>
+            <div className="space-y-4">
+              <div><Label>{tr("名稱", "Name")}</Label><Input value={comp.name} onChange={(e) => setComp({ ...comp, name: e.target.value })} placeholder={tr("例：炒小白菜", "e.g. stir-fried bok choy")} /></div>
+
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label>{tr("一份用什麼", "What goes into one portion")}</Label>
+                  <div className="inline-flex rounded-full border border-border p-0.5 text-xs" role="radiogroup" aria-label={tr("份量填生重還是熟重", "Amounts are raw or cooked")}>
+                    {(["raw", "cooked"] as const).map((b) => (
+                      <button key={b} type="button" role="radio" aria-checked={basis === b} onClick={() => setBasis(b)} className={cn("rounded-full px-3 py-1", basis === b ? "bg-foreground text-background font-semibold" : "text-muted-foreground")}>
+                        {b === "raw" ? tr("填生重（買來秤的）", "Raw (as bought)") : tr("填熟重（煮好裝盒）", "Cooked (in the box)")}
+                      </button>
+                    ))}
                   </div>
-                ))}
-                <Button size="sm" variant="outline" onClick={() => setComp({ ...comp, ingredients: [...comp.ingredients, { ingredient_id: "", grams: 0 }] })}><Plus /> {tr("加原物料", "Add ingredient")}</Button>
-                <p className="text-xs text-muted-foreground">{tr("每份成本", "Cost per portion")} NT${componentCost({ id: "", ...comp }, ingById).toFixed(1)}</p>
+                </div>
+                {comp.ingredients.map((line, idx) => {
+                  const ing = ingById[line.ingredient_id];
+                  const weight = isWeight(ing?.unit);
+                  const raw = ing ? rawAmount(line.grams || 0, ing) : line.grams || 0;
+                  const shown = basis === "raw" && ing && weight ? round1(raw) : line.grams;
+                  return (
+                    <div key={idx} className="space-y-0.5">
+                      <div className="flex gap-2">
+                        <select
+                          className="flex-1 h-10 rounded-md border border-input bg-background px-2 text-sm min-w-0"
+                          value={line.ingredient_id}
+                          onChange={(e) => {
+                            if (e.target.value === NEW_ING) setNewIng({ draft: { ...EMPTY_ING }, lineIdx: idx });
+                            else setLine(idx, { ingredient_id: e.target.value });
+                          }}
+                          aria-label={tr("原物料", "Ingredient")}
+                        >
+                          <option value="">{tr("選原物料…", "Pick an ingredient…")}</option>
+                          {catalog?.ingredients.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                          <option value={NEW_ING}>{tr("＋ 新增原物料…", "+ New ingredient…")}</option>
+                        </select>
+                        <Input
+                          className="w-24 h-10"
+                          type="number"
+                          min={0}
+                          value={shown || ""}
+                          aria-label={weight ? (basis === "raw" ? tr("每份生重", "Raw per portion") : tr("每份熟重", "Cooked per portion")) : tr("每份數量", "Count per portion")}
+                          onChange={(e) => {
+                            const n = Number(e.target.value) || 0;
+                            setLine(idx, { grams: basis === "raw" && ing && weight ? round1(cookedFromRaw(n, ing)) : n });
+                          }}
+                        />
+                        <span className="text-xs self-center w-8">{ing?.unit ?? "g"}</span>
+                        <Button variant="ghost" size="icon" className="h-10 w-10" aria-label={tr("刪除", "Remove")} onClick={() => setComp({ ...comp, ingredients: comp.ingredients.filter((_, j) => j !== idx) })}><Trash2 className="w-3.5 h-3.5" /></Button>
+                      </div>
+                      {ing && weight && Math.abs(raw - (line.grams || 0)) > 0.05 && (
+                        <p className="text-[11px] text-muted-foreground pl-1">
+                          {basis === "raw" ? tr(`生重 ${round1(raw)}${ing.unit} → 熟重約 ${round1(line.grams)}${ing.unit}`, `raw ${round1(raw)} → cooked ≈ ${round1(line.grams)}`) : tr(`熟重 ${round1(line.grams)}${ing.unit} ← 生重約 ${round1(raw)}${ing.unit}`, `cooked ${round1(line.grams)} ← raw ≈ ${round1(raw)}`)}
+                          {tr(`（熟成率 ${ing.yield_rate}${ing.loss_rate ? `、損耗 ${Math.round(ing.loss_rate * 100)}%` : ""}）`, ` (yield ${ing.yield_rate})`)}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+                <div className="flex items-center justify-between gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setComp({ ...comp, ingredients: [...comp.ingredients, { ingredient_id: "", grams: 0 }] })}><Plus /> {tr("加原物料", "Add ingredient")}</Button>
+                  <span className="text-sm">{tr("每份成本", "Cost/portion")} <b>NT${cost.toFixed(1)}</b></span>
+                </div>
               </div>
-              <div><Label>{tr("每份熟重 (g)", "Portion (g)")}</Label><Input type="number" value={comp.portion_grams} onChange={(e) => setComp({ ...comp, portion_grams: Number(e.target.value) })} /></div>
-              <div><Label>{tr("烹調方式", "Method")}</Label>
-                <select className={SELECT} value={comp.method} onChange={(e) => setComp({ ...comp, method: e.target.value })}>
-                  {METHODS.map((m) => <option key={m}>{m}</option>)}
-                </select></div>
-              <div><Label>{tr("設備", "Equipment")}</Label>
-                <select className={SELECT} value={comp.equipment} onChange={(e) => setComp({ ...comp, equipment: e.target.value })}>
-                  {EQUIPMENT.map((m) => <option key={m}>{m}</option>)}
-                </select></div>
-              <div><Label>{tr("每批份數（設備容量）", "Batch size")}</Label><Input type="number" value={comp.batch_capacity} onChange={(e) => setComp({ ...comp, batch_capacity: Number(e.target.value) })} /></div>
-              <div><Label>{tr("每批製程（分）", "Minutes per batch")}</Label><Input type="number" value={comp.prep_minutes} onChange={(e) => setComp({ ...comp, prep_minutes: Number(e.target.value) })} /></div>
-              <div><Label>{tr("可提前製作（小時）", "Can be made ahead (h)")}</Label><Input type="number" value={comp.advance_hours} onChange={(e) => setComp({ ...comp, advance_hours: Number(e.target.value) })} /></div>
-              <div className="col-span-2 flex gap-3 text-sm">
-                {FLAVORS.map((f) => (
-                  <label key={f} className="flex items-center gap-1">
-                    <input type="checkbox" checked={comp.flavors?.includes(f) ?? false} onChange={(e) => setComp({ ...comp, flavors: e.target.checked ? [...(comp.flavors ?? []), f] : (comp.flavors ?? []).filter((x) => x !== f) })} /> {f}
-                  </label>
-                ))}
+
+              <div className="space-y-1.5">
+                <Label>{tr("做法", "Method")}</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {METHODS.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setComp({ ...comp, method: m, ...METHOD_PRESET[m] })}
+                      className={cn("rounded-full border px-3 py-1.5 text-sm", comp.method === m ? "border-foreground bg-foreground text-background font-semibold" : "border-border hover:bg-accent")}
+                    >{m}</button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">{tr(`${comp.equipment}・每批 ${comp.batch_capacity} 份・${comp.prep_minutes} 分鐘`, `${comp.equipment} · ${comp.batch_capacity}/batch · ${comp.prep_minutes} min`)}</p>
+              </div>
+
+              <div className="rounded-md border border-border">
+                <button type="button" className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium" onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}>
+                  {tr("進階（設備、批量、製程時間、口味）", "Advanced (equipment, batch, timing, flavor)")}
+                  <span className="text-muted-foreground">{advanced ? "−" : "+"}</span>
+                </button>
+                {advanced && (
+                  <div className="grid grid-cols-2 gap-3 px-3 pb-3">
+                    <div><Label>{tr("設備", "Equipment")}</Label>
+                      <select className={SELECT} value={comp.equipment} onChange={(e) => setComp({ ...comp, equipment: e.target.value, ...EQUIPMENT_PRESET[e.target.value] })}>
+                        {EQUIPMENT.map((m) => <option key={m}>{m}</option>)}
+                      </select></div>
+                    <div><Label>{tr("每份熟重 (g)", "Cooked portion (g)")}</Label><Input type="number" value={comp.portion_grams} onChange={(e) => setComp({ ...comp, portion_grams: Number(e.target.value) })} /></div>
+                    <div><Label>{tr("每批份數", "Batch size")}</Label><Input type="number" value={comp.batch_capacity} onChange={(e) => setComp({ ...comp, batch_capacity: Number(e.target.value) })} /></div>
+                    <div><Label>{tr("每批製程（分）", "Minutes per batch")}</Label><Input type="number" value={comp.prep_minutes} onChange={(e) => setComp({ ...comp, prep_minutes: Number(e.target.value) })} /></div>
+                    <div><Label>{tr("可提前製作（小時）", "Can be made ahead (h)")}</Label><Input type="number" value={comp.advance_hours} onChange={(e) => setComp({ ...comp, advance_hours: Number(e.target.value) })} /></div>
+                    <div className="flex items-end gap-3 text-sm pb-2">
+                      {FLAVORS.map((f) => (
+                        <label key={f} className="flex items-center gap-1">
+                          <input type="checkbox" checked={comp.flavors?.includes(f) ?? false} onChange={(e) => setComp({ ...comp, flavors: e.target.checked ? [...(comp.flavors ?? []), f] : (comp.flavors ?? []).filter((x) => x !== f) })} /> {f}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="col-span-2 text-xs text-muted-foreground">{tr("設備、批量、製程時間只用在今日備料的詳細排程；量不大的店不用填。", "Only used for the detailed prep schedule; small shops can skip.")}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
