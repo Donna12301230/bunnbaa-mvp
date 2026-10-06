@@ -493,7 +493,21 @@ function geohash(lat, lng, precision = 7) {
     assert(Math.abs(after.測試標籤 - 5) < 0.01, `半衰後 ${after.測試標籤}`);
   });
 
-  await test("C-WSH-04 C-WSH-05", "近 30 天 20 人許願同一道 → 通知店家、notified；超過 30 天不算；按已上架通知許願者", async () => {
+  await test("C-WSH-01", "從菜色庫許願：openWishes/{vendor}_{uid}_{dish} 建立（菜名、dish_id）；同一道再許一次不重複；不存在的菜 → not-found", async () => {
+    const VW1 = await mkVendor(vid("wish1"));
+    const U = await freshUser("wish1");
+    const dish = (await db.collection("dishLibrary").limit(1).get()).docs[0];
+    assert(dish, "菜色庫沒有資料（要先灌 seed-phase1 --catalog-only）");
+    const r = expectOk(await U.call("placeOpenWish", { vendor_id: VW1, dish_id: dish.id }));
+    eq(r.dish_name, dish.data().name);
+    const w = await get(`openWishes/${VW1}_${U.uid}_${r.dish_key}`);
+    eq([w.user_id, w.vendor_id, w.dish_id, w.dish_name], [U.uid, VW1, dish.id, dish.data().name]);
+    expectOk(await U.call("placeOpenWish", { vendor_id: VW1, dish_id: dish.id }));
+    eq((await db.collection("openWishes").where("vendor_id", "==", VW1).get()).size, 1, "同一道不重複");
+    expectCode(await U.call("placeOpenWish", { vendor_id: VW1, dish_id: "no-such-dish" }), "not-found");
+  });
+
+  await test("C-WSH-04 C-WSH-05","近 30 天 20 人許願同一道 → 通知店家、notified；超過 30 天不算；按已上架通知許願者", async () => {
     const ownerW = `zz2-owner-wish-${RUN}`;
     const VW = await mkVendor(vid("wish"), { owner_uid: ownerW });
     const key = "打拋豬";
@@ -982,6 +996,90 @@ function geohash(lat, lng, precision = 7) {
     });
   }
 
+  // ════ 備案／加菜的其他截單情境（C-BNT-20～23）：獨立一家店，每個案例一位會員，通知不互相干擾 ════
+  {
+    const VW = await mkVendor(vid("backup"), { pickup_windows: ["11:00-11:30"] });
+    // 標「難」的候選菜要 10 份才成立（每個案例最多一兩份，一定不成立）；標「易」的 1 份就成立
+    const ITEM = await mkBento(VW, {
+      slots: [
+        { category: "青菜類", default: { name: "高麗菜", component_id: "zzb-cabbage" }, candidates: [
+          { name: "地瓜葉", component_id: "zzb-yam", portion_level: 1, weekly_cap: 1000, min_qty: 10 }, // 難
+          { name: "筊白筍", component_id: "zzb-bamboo", portion_level: 1, weekly_cap: 1000, min_qty: 1 }, // 易
+        ] },
+        { category: "蛋豆類", default: { name: "滷蛋", component_id: "zzb-egg" }, candidates: [
+          { name: "豆干", component_id: "zzb-tofu", portion_level: 1, weekly_cap: 1000, min_qty: 10 }, // 難
+        ] },
+      ],
+    });
+    const orderAs = async (U, extra) => {
+      const r = expectOk(await U.call("createCartLinePayReservation", { lines: [{
+        menu_item_id: ITEM, pickup_date: OPEN_DAY, pickup_window: "11:00-11:30", quantity: 1, rice: "normal",
+        coupon_id: await coupon(U.uid, VW, 1000), ...extra,
+      }] }));
+      const draft = (await get(`payment_intents/${r.order_id}`)).lock_drafts[0];
+      const lockId = expectOk(await U.call("confirmLinePayPayment", { order_id: r.order_id })).lock_ids[0];
+      return { draft, lockId };
+    };
+    const cutoff = async () => expectOk(await OWNER.call("triggerLockOrdersNow", { vendor_id: VW, date: OPEN_DAY, force: true }), "截單");
+    const wishBodies = async (uid) => (await notes(uid, { kind: "wish" })).map((x) => x.body);
+
+    // 先全部下單再截單一次：截單會重判同店同日所有訂單。setup 失敗時四個案例各自記 FAIL，不中斷整個測試
+    const setup = (async () => {
+      const [U20, U21, U22, U23] = [await freshUser("bnt20"), await freshUser("bnt21"), await freshUser("bnt22"), await freshUser("bnt23")];
+      const o20 = await orderAs(U20, { slots: [{ choice: 1 }, { choice: "default" }], extra_side: { slot: 0, candidate: null, mode: "backup" } });
+      const o21 = await orderAs(U21, { slots: [{ choice: 0 }, { choice: 0 }], extra_side: { slot: 0, candidate: 1, mode: "backup" } });
+      const o22 = await orderAs(U22, { slots: [{ choice: "default" }, { choice: 0 }], extra_side: { slot: 0, candidate: 0, mode: "backup" } });
+      const o23 = await orderAs(U23, { slots: [{ choice: "default" }, { choice: "default" }], extra_side: { slot: 0, candidate: 0, mode: "addon" } });
+      await cutoff();
+      const plan = await get(`vendors/${VW}/prepPlans/${OPEN_DAY}`);
+      const portionsOf = (id) => plan.components.find((c) => c.component_id === id)?.portions || 0;
+      return { U20, U21, U22, U23, o20, o21, o22, o23, portionsOf };
+    })();
+    setup.catch(() => {});
+
+    await test("C-BNT-20", "備案沒用到：許願成立 → extra_side.resolved=null、used_for_slot=null、不備料、不退錢", async () => {
+      const { U20, o20 } = await setup;
+      eq(o20.draft.adjust_amount, 0, "備案不加價");
+      const l = await get(`locks/${o20.lockId}`);
+      eq([l.slots[0].resolved, !!l.slots[0].backup_used], ["筊白筍", false], "許願成立");
+      eq([l.extra_side.resolved, l.extra_side.used_for_slot], [null, null], "備案沒放進便當");
+      eq(await wishBodies(U20.uid), [], "沒有許願未成立通知");
+      eq(l.locked_price, o20.draft.locked_price, "金額不變（不退錢）");    });
+
+    await test("C-BNT-21", "兩格都沒成立、一個備案：只有第一格遞補備案，第二格換回預設；通知兩件事都寫", async () => {
+      const { U21, o21 } = await setup;
+      const l = await get(`locks/${o21.lockId}`);
+      eq([l.slots[0].resolved, l.slots[0].backup_used], ["筊白筍", true], "第一格遞補備案");
+      eq([l.slots[1].resolved, !!l.slots[1].backup_used], ["滷蛋", false], "第二格換回預設");
+      eq([l.extra_side.used_for_slot, l.extra_side.resolved], [0, "筊白筍"]);
+      const b = (await wishBodies(U21.uid)).join("\n");
+      assert(/「地瓜葉」.*已幫你換成備案「筊白筍」/.test(b) && /「豆干」.*已幫你換回「滷蛋」/.test(b), b);
+    });
+
+    await test("C-BNT-22", "備案本身是候選菜也沒成立：不遞補，未成立的格子換回預設菜", async () => {
+      const { U22, o22 } = await setup;
+      const l = await get(`locks/${o22.lockId}`);
+      eq([l.slots[1].resolved, !!l.slots[1].backup_used], ["滷蛋", false], "換回預設、沒用備案");
+      eq([l.extra_side.used_for_slot, l.extra_side.resolved], [null, null], "備案沒用到");
+      const b = (await wishBodies(U22.uid)).join("\n");
+      assert(/「豆干」.*已幫你換回「滷蛋」/.test(b) && !/備案/.test(b), b);
+    });
+
+    await test("C-BNT-23", "加菜的候選菜沒成立：改放那一格預設菜、仍是第四道、不退 10 元；推播「加菜…未成立，已改為…」；備料算預設菜", async () => {
+      const { U23, o23, portionsOf } = await setup;
+      eq(o23.draft.adjust_amount, 10, "加菜 +10");
+      const l = await get(`locks/${o23.lockId}`);
+      eq([l.extra_side.mode, l.extra_side.resolved, l.extra_side.resolved_component_id], ["addon", "高麗菜", "zzb-cabbage"]);
+      eq(l.locked_price, o23.draft.locked_price, "不退 10 元");
+      const b = (await wishBodies(U23.uid)).join("\n");
+      assert(/加菜「地瓜葉」未成立，已改為「高麗菜」/.test(b), b);
+      // 備料：地瓜葉一份都不做（全部未成立）；高麗菜＝o22、o23 兩格預設＋o23 第四道＝3 份（o20 的備案高麗菜沒用到、不算）
+      eq(portionsOf("zzb-yam"), 0, "地瓜葉不備料");
+      eq(portionsOf("zzb-cabbage"), 3, "高麗菜份數");
+      eq(portionsOf("zzb-bamboo"), 2, "筊白筍＝o20 許願＋o21 備案");
+    });
+  }
+
   await test("C-CHR-16 C-CHR-19", "早、午兩個餐期各自轉愛心餐（時鐘模擬 09:00、12:30）；重跑不重複", async () => {
     if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
     const owner = `zz2-owner-period-${RUN}`;
@@ -1061,6 +1159,30 @@ function geohash(lat, lng, precision = 7) {
     assert(r.material_cost > 0 && r.labor_cost > 0, `材料 ${r.material_cost}、人工 ${r.labor_cost}`);
     eq(r.by_meal_period.lunch.qty, expQty, "依餐期");
     eq((await get(`vendors/${VRV}/revenueForecast/${month}`)).net_profit, r.net_profit, "寫入 revenueForecast");
+  });
+
+  await test("V-REV-03", "人工用當天的基本工資：月中調漲前用舊時薪、之後用新時薪；店家自設較高時用店家的", async () => {
+    // 用上個月（整月都已過去，沒有預測份數）：5 號、25 號各一筆同樣的單 → 兩天人工分鐘數相同，比例只看時薪
+    const ref = db.doc("platformConfig/minimumWage");
+    const original = (await ref.get()).data() || null;
+    const VW3 = await mkVendor(vid("rev3"));
+    const ids = await cloneCatalog("cafe-renheya-demo", VW3);
+    const item = ids.classic || Object.values(ids)[0];
+    const month = addDays(`${TODAY.slice(0, 7)}-01`, -1).slice(0, 7);
+    for (const d of ["05", "25"]) await lock(`zz2-rv3-${RUN}`, VW3, { menu_item_id: item, pickup_date: `${month}-${d}`, pickup_window: "11:00-11:30", status: "fulfilled", locked_price: 90 });
+    const labor = async () => expectOk(await OWNER.call("refreshRevenueForecast", { vendor_id: VW3, month })).labor_cost;
+    const flat = { monthly: 20000, hourly: 100, effectiveFrom: "2020-01-01" };
+    try {
+      await ref.set({ ...flat, history: [flat] });
+      const base = await labor(); // 兩天都 100
+      assert(base > 0, `人工 ${base}`);
+      await ref.set({ ...flat, history: [flat, { monthly: 80000, hourly: 400, effectiveFrom: `${month}-15` }] });
+      const raised = await labor(); // 5 號 100、25 號 400
+      assert(Math.abs(raised / base - 2.5) < 0.02, `月中調漲：${raised} / ${base} 應為 2.5`);
+      await db.doc(`vendors/${VW3}`).update({ hourly_wage: 300 });
+      const own = await labor(); // 5 號店家 300、25 號基本工資 400
+      assert(Math.abs(own / base - 3.5) < 0.02, `店家較高：${own} / ${base} 應為 3.5`);
+    } finally { if (original) await ref.set(original); else await ref.delete(); }
   });
 
   await test("C-CHR-19", "舊旗標相容：prepPlans 只有 reminder_sent／charity_converted／charity_closed → 午餐不再處理，早餐照常", async () => {
