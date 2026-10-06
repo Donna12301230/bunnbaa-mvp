@@ -21,8 +21,8 @@ const navGroups = () => [
   {
     title: tr("今天", "Today"),
     items: [
-      // 訂單、取餐掃碼、訂餐時段合成一頁（三個分頁）；舊路徑也算在這一項
-      { href: "/vendor-portal/orders", label: tr("訂單取餐", "Orders & pickup"), icon: ScanLine, also: ["/lock/vendor/redeem", "/vendor-portal/sessions"] },
+      // 訂單、取餐掃碼、愛心餐、訂餐時段合成一頁（四個分頁）；舊路徑也算在這一項
+      { href: "/vendor-portal/orders", label: tr("訂單取餐", "Orders & pickup"), icon: ScanLine, also: ["/lock/vendor/redeem", "/vendor-portal/sessions", "/vendor-portal/charity"] },
       { href: "/vendor-portal/prep", label: tr("今日備料", "Today's prep"), icon: ChefHat },
     ],
   },
@@ -43,7 +43,6 @@ const navGroups = () => [
   {
     title: tr("店家", "Store"),
     items: [
-      { href: "/vendor-portal/charity", label: tr("愛心餐", "Charity"), icon: HeartHandshake },
       // 食材、單價、供應商：開店或漲價時才改，菜色的組成在菜單管理裡直接改
       { href: "/vendor-portal/recipes", label: tr("食材與供應商", "Ingredients"), icon: BookOpen },
       { href: "/vendor-portal/settings", label: tr("店家設定", "Store settings"), icon: Settings },
