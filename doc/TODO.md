@@ -2,7 +2,7 @@
 
 **截止日：10/18 前提交 Demo ＋ 英文版 Proposal。**
 
-對應文件：`BunnBaa_0到1架構文件.docx`（唯一權威文件）、`BunnBaa_技術規格文件_v6_消費者端補強版.docx`（都在 repo 根目錄）。舊雛型：`../BunnBaa Parse_Ref/`。架構與開發設定見 [README.md](README.md)。舊版詳細紀錄（每項的來龍去脈、測試過程）請看 git 歷史 `26469e2` 以前的 TODO.md。
+對應文件：`BunnBaa_0到1架構文件.docx`（唯一權威文件）、`BunnBaa_技術規格文件_v6_消費者端補強版.docx`（都在 `doc/`）。舊雛型：`../BunnBaa Parse_Ref/`。架構與開發設定見 [README.md](README.md)。舊版詳細紀錄（每項的來龍去脈、測試過程）請看 git 歷史 `26469e2` 以前的 TODO.md。
 
 正式站：https://bunnbaa-mvp-5474.web.app ｜ 目前正式站版本：master `abdb4c4`（2026-10-05 21:28 hosting 由 GitHub Actions 部署、Functions 由本機 `firebase deploy --only functions` 手動部署；rules／indexes 仍是 09-30 部署的版本）
 
@@ -10,7 +10,7 @@
 
 ## 🆕 第一階段規格改版（`spec-phase1` 分支，2026-09-30，部署中）
 
-依 `doc/BunnBaa 飯飽｜第一階段技術規格.md` 改版，保留鎖定折扣＋轉讓＋LINE Pay（對照表見 README「第一階段規格」）。
+依 `doc/BunnBaa 飯飽｜第一階段技術規格1002.md` 改版，保留鎖定折扣＋轉讓＋LINE Pay（對照表見 README「第一階段規格」）。
 emulator 端對端測試已跑過：截單判定許願、備料清單／時間軸、QR 簽章與防截圖、備援取餐號、抽獎券累計、抽獎、截單前取消退券、捐愛心餐→預約→核銷、週／月叫貨單、區域洞察、開放許願、停班自動取消。**瀏覽器畫面還沒實際點過。**
 
 **2026-09-30 SU 補充**：master 這次 fast-forward 進來時，GitHub Actions 已經自動把前端 Hosting 部署上去了（推上 master 就會觸發，跟 Functions/rules 是分開的部署目標）——代表這段時間正式站是「新前端＋舊後端」不一致的狀態，直到下面 rules/indexes 補上為止才恢復一致。之後如果又要 merge 大改版到 master，最好先確認 Functions/rules 能不能一起跟上，不然會有同樣的空窗期。

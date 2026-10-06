@@ -11,10 +11,6 @@ export function setSearchQuery(q: string) {
   listeners.forEach((fn) => fn());
 }
 
-export function getSearchQuery() {
-  return current;
-}
-
 export function useSearchQuery() {
   return useSyncExternalStore(
     (fn) => {

@@ -69,12 +69,6 @@ export function itemMealPeriods(item: Pick<MenuItem, "meal_periods"> | null | un
   return (item?.meal_periods || []).filter((p): p is MealPeriod => MEAL_PERIODS.includes(p));
 }
 
-/** 這家店有供應的餐期（看取餐時段） */
-export function vendorMealPeriods(vendor: MaybeSchedule): MealPeriod[] {
-  const set = new Set(vendorWindows(vendor).map(mealPeriodOf));
-  return MEAL_PERIODS.filter((p) => set.has(p));
-}
-
 /** 品項可選的取餐時段（限品項供應的餐期；給 period 再限縮到該餐期） */
 export function itemWindows(vendor: MaybeSchedule, item?: Pick<MenuItem, "meal_periods"> | null, period?: MealPeriod | null): string[] {
   const periods = itemMealPeriods(item);
@@ -87,14 +81,6 @@ export function itemWindows(vendor: MaybeSchedule, item?: Pick<MenuItem, "meal_p
 /** 品項是否供應某餐期（首頁依餐期分類） */
 export function servesPeriod(vendor: MaybeSchedule, item: Pick<MenuItem, "meal_periods"> | null | undefined, period: MealPeriod): boolean {
   return itemWindows(vendor, item, period).length > 0;
-}
-
-/** 整個取餐時段（最早開始～最晚結束），例 "11:00-13:00" */
-export function vendorPickupRange(vendor: MaybeSchedule): string {
-  const windows = vendorWindows(vendor);
-  const starts = windows.map((w) => w.split("-")[0]).sort();
-  const ends = windows.map((w) => w.split("-")[1]).sort();
-  return `${starts[0]}-${ends[ends.length - 1]}`;
 }
 
 /** 截單時間：店家只能比平台早 */

@@ -12,7 +12,7 @@ const { generateVendorCalibrationReport } = require("./vendorCalibration");
 const { generateDiscountExplanation } = require("./consumerExplanation");
 const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./translate");
 
-// 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格.md）的功能拆在各模組：
+// 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格1002.md）的功能拆在各模組：
 //   orders.js     下單計價、LINE Pay、截單判定許願、每日備料、QR 取餐、取消退款
 //   charity.js    捐為愛心餐、未取餐轉愛心餐、預約／逾時、報廢登記
 //   rewardsFns.js 回饋池、抽獎券、折價券、異常偵測
