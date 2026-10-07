@@ -25,7 +25,7 @@ const {
   validatePickup, planPickupDates, applyEarlyBirdPrice, vendorSlotCapacity, cutoffAt, isPastCutoff,
   mealPeriodOf, mealPeriodLabel, vendorPeriodRanges, MEAL_PERIODS,
 } = require("./pricing");
-const { isBento, resolveChoices, resolveMain, resolveExtraSide, adjustAmount, RICE_OPTIONS } = require("./bento");
+const { isBento, resolveChoices, resolveMain, resolveExtraSide, resolveCustomPicks, adjustAmount, RICE_OPTIONS } = require("./bento");
 const { ACTIVE_LOCK_STATUSES, componentPortions, rawNeeds, buildTimeline, buildLabels } = require("./prep");
 const { taipeiToday, taipeiTime, addDays, mondayOf, at, splitWindow } = require("./calendar");
 const { recordMatchedClaim } = require("./resaleMatch").helpers;
@@ -108,10 +108,11 @@ async function loadUsableCoupon(couponId, uid, vendorId) {
 }
 
 /**
- * 驗證並展開一份便當的選擇（主菜、飯量、配菜、第四道），下單與截單前修改共用。
- * 回傳 { rice, resolved, extra, main, listPrice, adjust }；不合法丟 HttpsError。
+ * 驗證並展開一份便當的選擇（主菜、飯量、配菜、第四道、店家自訂欄位），下單與截單前修改共用。
+ * 回傳 { rice, resolved, extra, custom, main, listPrice, adjust }；不合法丟 HttpsError。
+ * keptCustom：截單前修改沒動自訂欄位時，直接沿用訂單上記錄的選擇與金額（店家之後刪改選項也不影響舊訂單）。
  */
-function resolveOrderChoices(item, line, config) {
+function resolveOrderChoices(item, line, config, keptCustom = null) {
   const bento = isBento(item);
   const rice = bento && item.rice_component_id && RICE_OPTIONS.includes(line.rice) ? line.rice : "normal";
   const mainPick = resolveMain(item, line.main_index);
@@ -121,8 +122,12 @@ function resolveOrderChoices(item, line, config) {
   const extraPick = resolveExtraSide(item, line.extra_side, resolved.slots, config);
   if (extraPick.problem) throw new HttpsError("invalid-argument", extraPick.problem);
   const extra = extraPick.extra;
-  const adjust = adjustAmount({ rice, removedCount: resolved.removedCount, extraMode: extra?.mode }, config);
-  return { rice, resolved, extra, main: mainPick.main, listPrice: mainPick.price, adjust };
+  const customPick = keptCustom
+    ? { custom: keptCustom, amount: keptCustom.reduce((sum, c) => sum + (Number(c.price) || 0), 0) }
+    : resolveCustomPicks(item, line.custom_picks);
+  if (customPick.problem) throw new HttpsError("invalid-argument", customPick.problem);
+  const adjust = adjustAmount({ rice, removedCount: resolved.removedCount, extraMode: extra?.mode }, config) + customPick.amount;
+  return { rice, resolved, extra, custom: customPick.custom, main: mainPick.main, listPrice: mainPick.price, adjust };
 }
 
 /** 這份便當的許願：每格選的候選菜＋第四道（候選菜）。sideWishes 計數、週上限都用這份 */
@@ -172,7 +177,7 @@ async function buildDrafts(line, ctx) {
   }
 
   const choice = resolveOrderChoices(item, line, ctx.config);
-  const { rice, resolved, extra, main, listPrice, adjust } = choice;
+  const { rice, resolved, extra, custom, main, listPrice, adjust } = choice;
 
   // 候選菜週供應上限（§4.3）；第四道選候選菜也算
   const week = mondayOf(pickupDate);
@@ -213,6 +218,7 @@ async function buildDrafts(line, ctx) {
       meal_period: mealPeriodOf(pickupWindow, ctx.config),
       slots: resolved.slots,
       extra_side: extra,
+      custom_options: custom,
       main_dish: main?.name || null,
       main_component_id: main?.component_id || null,
       main_index: main?.index ?? null,
@@ -888,14 +894,14 @@ exports.updateLockChoices = onCall({}, async (request) => {
   }
 
   // 便當內容（計畫的每日餐點沒有選項，只能改時段）
-  const changesChoices = ["slots", "rice", "main_index", "extra_side"].some((k) => k in data);
+  const changesChoices = ["slots", "rice", "main_index", "extra_side", "custom_picks"].some((k) => k in data);
   const patch = { pickup_window: newWindow, meal_period: mealPeriodOf(newWindow, config) };
   let newLocked = lock.locked_price;
   let next = lock;
   if (changesChoices) {
     if (!item || lock.plan_id) throw new HttpsError("failed-precondition", t("這筆餐點沒有可修改的選項，只能改取餐時段", "Only the pickup time can be changed for this meal"));
-    const merged = { ...currentChoices(lock), ...Object.fromEntries(["slots", "rice", "main_index", "extra_side"].filter((k) => k in data).map((k) => [k, data[k]])) };
-    const choice = resolveOrderChoices(item, merged, config);
+    const merged = { ...currentChoices(lock), ...Object.fromEntries(["slots", "rice", "main_index", "extra_side", "custom_picks"].filter((k) => k in data).map((k) => [k, data[k]])) };
+    const choice = resolveOrderChoices(item, merged, config, "custom_picks" in data ? null : lock.custom_options || []);
     const early = Math.round(choice.listPrice * (1 - (lock.discount_percent || 0) / 100));
     const subtotal = Math.max(0, early + choice.adjust);
     let couponDiscount = 0;
@@ -913,6 +919,7 @@ exports.updateLockChoices = onCall({}, async (request) => {
     Object.assign(patch, {
       slots: choice.resolved.slots,
       extra_side: choice.extra,
+      custom_options: choice.custom,
       rice: choice.rice,
       main_dish: choice.main?.name || null,
       main_component_id: choice.main?.component_id || null,
@@ -1048,6 +1055,7 @@ function lockSummary(id, lock, extra = {}) {
       backup_used: !!s.backup_used,
     })),
     extra_side: lock.extra_side ? { dish: lock.extra_side.resolved || lock.extra_side.dish, mode: lock.extra_side.mode, used: lock.extra_side.used_for_slot != null } : null,
+    custom_options: (lock.custom_options || []).map((c) => ({ label: c.label, choice: c.choice, price: c.price })),
     adjust_amount: lock.adjust_amount || 0,
     rice: lock.rice || "normal",
     coupon_discount: lock.coupon_discount || 0,
@@ -1137,19 +1145,26 @@ async function completeCharityReservation(parsed, vendorId, preview) {
  * 截單（§4.3、§5.4）：判定候選菜許願、產生每日備料與出餐標籤、缺料警示
  * ------------------------------------------------------------------ */
 
-/** 截單後的當日需求 vs 本週理論庫存 → 缺料清單 */
+/**
+ * 截單後的當日需求 vs 本週理論庫存 → 缺料清單。
+ * 期初庫存＝上週六的盤點（記在 inventory/{上週一}，跟 purchasing.js currentStock 同一個語意）；
+ * 沒盤點就用本週叫貨單產生時採用的庫存（lines[].stock）。再加本週到貨、扣掉這天之前的備料用量。
+ * web/src/hooks/useStockOnHand.ts 用同一套算法，要一起改。
+ */
 async function shortageFor(vendorId, date, needs, ingredientsById) {
   const week = mondayOf(date);
   const vendorRef = db().collection("vendors").doc(vendorId);
   const [invSnap, weeklySnap, plansSnap] = await Promise.all([
-    vendorRef.collection("inventory").doc(week).get(),
+    vendorRef.collection("inventory").doc(addDays(week, -7)).get(),
     vendorRef.collection("purchaseLists").doc(`weekly_${week}`).get(),
     vendorRef.collection("prepPlans").where("week", "==", week).get(),
   ]);
-  const stock = new Map(Object.entries(invSnap.exists ? invSnap.data().counts || {} : {}));
-  if (weeklySnap.exists) {
-    for (const line of weeklySnap.data().lines || []) stock.set(line.ingredient_id, (stock.get(line.ingredient_id) || 0) + (line.order_amount || 0));
-  }
+  const lines = weeklySnap.exists ? weeklySnap.data().lines || [] : [];
+  const counted = invSnap.exists && invSnap.data().counted;
+  const stock = counted
+    ? new Map(Object.entries(invSnap.data().counts || {}))
+    : new Map(lines.map((line) => [line.ingredient_id, Number(line.stock) || 0]));
+  for (const line of lines) stock.set(line.ingredient_id, (stock.get(line.ingredient_id) || 0) + (line.order_amount || 0));
   for (const plan of plansSnap.docs) {
     if (plan.id >= date) continue;
     for (const [id, amount] of Object.entries(plan.data().raw_needs || {})) stock.set(id, (stock.get(id) || 0) - amount);

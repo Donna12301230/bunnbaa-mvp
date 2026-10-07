@@ -20,7 +20,7 @@ import { httpsCallable } from "@/lib/callable";
 import PickupQr from "@/components/PickupQr";
 import EditWishesDialog from "@/components/EditWishesDialog";
 import { useConfirm } from "@/components/ConfirmDialog";
-import { extraSideText, riceLabel, slotText } from "@/lib/bento";
+import { customOptionTexts, extraSideText, riceLabel, slotText } from "@/lib/bento";
 import { isPastCutoff, todayStr } from "@/lib/pickupSlots";
 import { refundOnTakeover, resalePrice } from "@/lib/transfers";
 import type { Lock } from "@/types";
@@ -393,6 +393,7 @@ export default function MyBookingsPage() {
                           {lock.main_dish && <li>• {tr("主菜：", "Main: ")}{lock.main_dish}</li>}
                           {lock.slots!.map((slot, i) => <li key={i}>• {slotText(slot)}</li>)}
                           {extraSideText(lock.extra_side) && <li>• {extraSideText(lock.extra_side)}</li>}
+                          {customOptionTexts(lock.custom_options).map((text, i) => <li key={`c${i}`}>• {text}</li>)}
                           {riceLabel(lock.rice) && <li>• {riceLabel(lock.rice)}</li>}
                         </ul>
                       )}
@@ -585,7 +586,7 @@ export default function MyBookingsPage() {
         </div>
 
         {pageTab === "market" ? (
-          <TransferMarketPage embedded />
+          <TransferMarketPage />
         ) : pageTab === "charity" ? (
           <CharityMealsSection />
         ) : !authLoading && !uid ? (

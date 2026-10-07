@@ -26,7 +26,8 @@ function componentPortionsForLock(lock, item, componentsById, config) {
   const mainId = lock.main_component_id || item.main?.component_id || (Array.isArray(item.mains) ? item.mains[0]?.component_id : null);
   if (mainId) add(out, mainId, 1);
   if (!mainId && item.component_id) add(out, item.component_id, 1); // 單品（非便當）
-  for (const f of item.fixed || []) add(out, f.component_id, 1); // 固定附餐（例：經典便當的滷蛋）
+  // 備料組成／固定附餐（例：經典便當的滷蛋、蛋餅的餅皮＋蛋），portions 沒設＝1 份
+  for (const f of item.fixed || []) add(out, f.component_id, Number(f.portions) > 0 ? Number(f.portions) : 1);
   const riceId = item.rice_component_id;
   if (riceId) {
     const riceGrams = Number(componentsById[riceId]?.portion_grams) || 0;
@@ -142,6 +143,7 @@ function buildLabels(locks, itemsById) {
       const sides = (lock.slots || []).map((s) => (s.removed ? `${s.category || "配菜"}：不要` : s.resolved || s.default_dish)).filter(Boolean);
       const extra = lock.extra_side;
       if (extra?.mode === "addon" && (extra.resolved || extra.dish)) sides.push(`＋${extra.resolved || extra.dish}`);
+      for (const c of lock.custom_options || []) sides.push(`${c.label}：${c.choice}`);
       const rice = lock.rice === "add" ? "白飯一碗半" : lock.rice === "less" ? "白飯半碗" : null;
       return {
         lock_id: lock.id,

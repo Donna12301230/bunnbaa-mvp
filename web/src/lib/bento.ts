@@ -1,7 +1,7 @@
 import { tr } from "@/lib/i18n";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
 import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
-import type { BentoMain, Component, ExtraSideChoice, Ingredient, LockExtraSide, LockSlot, MenuItem, RiceOption, SlotChoice } from "@/types";
+import type { BentoCustomField, BentoMain, Component, ExtraSideChoice, Ingredient, LockExtraSide, LockSlot, MenuItem, RiceOption, SlotChoice } from "@/types";
 
 // 便當計價與配方換算（規格 §3、§4）。跟 functions/src/bento.js 同一套規則；
 // 這裡只給畫面預覽與店家菜單編輯用，下單金額以伺服器為準。
@@ -27,7 +27,7 @@ export function riceLabel(rice: RiceOption | undefined): string | null {
   return null;
 }
 
-type PriceSource = Pick<MenuItem, "price" | "mains" | "main" | "image">;
+type PriceSource = Pick<MenuItem, "price" | "mains" | "main" | "image" | "custom_fields">;
 
 /** 可選主菜（mains 各自定價）；舊品項只有 main＋price 時回傳一道 */
 export function itemMains(item: PriceSource): BentoMain[] {
@@ -80,6 +80,26 @@ export function adjustAmount(rice: RiceOption, choices: SlotChoice[], config = D
   return amount;
 }
 
+/** 店家自訂欄位（配菜下方的下拉選單）：只留有名稱、有選項的 */
+export function customFields(item: Pick<MenuItem, "custom_fields"> | null | undefined): BentoCustomField[] {
+  return (item?.custom_fields || []).filter((f) => f?.label && f.options?.length);
+}
+
+/** 自訂欄位選擇的加減價合計；picks[i] 沒給＝第一個選項 */
+export function customAmount(item: Pick<MenuItem, "custom_fields"> | null | undefined, picks: number[] | null | undefined): number {
+  return customFields(item).reduce((sum, f, i) => sum + (Number(f.options[picks?.[i] ?? 0]?.price) || 0), 0);
+}
+
+/** 加減價文字：+10、−5；0 不顯示 */
+export function priceDeltaText(price: number): string {
+  return price > 0 ? `+${price}` : price < 0 ? `−${Math.abs(price)}` : "";
+}
+
+/** 訂單上自訂欄位的文字：「湯品：玉米濃湯（+10）」 */
+export function customOptionTexts(options: { label: string; choice: string; price?: number }[] | null | undefined): string[] {
+  return (options || []).map((c) => `${c.label}：${c.choice}${c.price ? `（${priceDeltaText(c.price)}）` : ""}`);
+}
+
 /** 一份便當的金額拆解（早鳥只打在品項原價上，加減金額不打折） */
 export function priceBreakdown(
   item: PriceSource,
@@ -87,11 +107,11 @@ export function priceBreakdown(
   rice: RiceOption,
   choices: SlotChoice[],
   couponDiscount = 0,
-  opts: { mainIndex?: number | null; extra?: ExtraSideChoice | null } = {}
+  opts: { mainIndex?: number | null; extra?: ExtraSideChoice | null; customPicks?: number[] | null } = {}
 ) {
   const listPrice = itemListPrice(item, opts.mainIndex);
   const { lockedPrice: early, discountPercent } = applyEarlyBirdPrice(listPrice, pickupDate);
-  const adjust = adjustAmount(rice, choices, DEFAULT_PLATFORM_CONFIG, opts.extra);
+  const adjust = adjustAmount(rice, choices, DEFAULT_PLATFORM_CONFIG, opts.extra) + customAmount(item, opts.customPicks);
   const subtotal = Math.max(0, early + adjust);
   const coupon = Math.min(couponDiscount, subtotal);
   return { listPrice, discountPercent, earlyBird: listPrice - early, adjust, subtotal, coupon, total: subtotal - coupon };

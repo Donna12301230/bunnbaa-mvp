@@ -110,6 +110,7 @@ async function buildWeekly(vendor, weekStart) {
   const excluded = excludedDates(vendor);
   const perDay = [];
   const board = [];
+  const sources = new Map(); // menu_item_id → { confirmed, forecast 份數, confirmedNeeds, forecastNeeds: Map(ingredient_id → 用量) }
   for (const date of days) {
     const snap = await db().collection("locks").where("vendor_id", "==", vendor.id).where("pickup_date", "==", date).get();
     const locks = snap.docs.map((d) => d.data()).filter((l) => ACTIVE_LOCK_STATUSES.includes(l.status));
@@ -120,6 +121,18 @@ async function buildWeekly(vendor, weekStart) {
     const confirmedNeeds = rawNeeds(componentPortions(locks, catalog.itemsById, catalog.componentsById, config), catalog.componentsById, catalog.ingredientsById);
     const forecastNeeds = rawNeeds(componentPortions(predicted, catalog.itemsById, catalog.componentsById, config), catalog.componentsById, catalog.ingredientsById);
     perDay.push({ date, confirmedNeeds, forecastNeeds });
+    // 需求來源：這天每個品項各用掉多少原物料（叫貨頁展開「這週為什麼要這麼多」）
+    for (const [list, kind] of [[locks, "confirmed"], [predicted, "forecast"]]) {
+      const byItem = new Map();
+      list.forEach((l) => l.menu_item_id && byItem.set(l.menu_item_id, [...(byItem.get(l.menu_item_id) || []), l]));
+      for (const [itemId, itemLocks] of byItem) {
+        const src = sources.get(itemId) || { confirmed: 0, forecast: 0, confirmedNeeds: new Map(), forecastNeeds: new Map() };
+        src[kind] += itemLocks.length;
+        const needs = rawNeeds(componentPortions(itemLocks, catalog.itemsById, catalog.componentsById, config), catalog.componentsById, catalog.ingredientsById);
+        for (const [ingId, amount] of needs) src[`${kind}Needs`].set(ingId, (src[`${kind}Needs`].get(ingId) || 0) + amount);
+        sources.set(itemId, src);
+      }
+    }
     board.push({ date, closed, confirmed: locks.length, forecast: predicted.length });
   }
   const { stock, counted } = await currentStock(vendor.id, weekStart);
@@ -151,6 +164,11 @@ async function buildWeekly(vendor, weekStart) {
       need: Math.round(need), stock: Math.round(have), order_units: units, order_amount: amount,
       deliveries: deliveries.filter((d) => d.units > 0), unit_price: Number(ing.unit_price) || 0,
       est_cost: Math.round(units * (Number(ing.unit_price) || 0)),
+      sources: [...sources].flatMap(([itemId, src]) => {
+        const amount = (src.confirmedNeeds.get(ing.id) || 0) + (src.forecastNeeds.get(ing.id) || 0) * (1 + safety);
+        if (!(amount > 0)) return [];
+        return [{ menu_item_id: itemId, name: catalog.itemsById[itemId]?.name || itemId, confirmed: src.confirmed, forecast: src.forecast, amount: Math.round(amount * 10) / 10 }];
+      }).sort((a, b) => b.amount - a.amount),
     });
   }
   lines.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));

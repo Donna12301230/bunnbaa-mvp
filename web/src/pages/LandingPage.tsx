@@ -11,7 +11,7 @@ import { AnimatedNumber, Badge, Button, Tabs, ToastProvider } from "@/components
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { db } from "@/lib/firebase";
 import type { MenuItem } from "@/types";
-import { EARLY_BIRD_TIERS, VISIBLE_EARLY_BIRD_TIERS, discountText } from "@/lib/pricing";
+import { EARLY_BIRD_TIERS, discountText } from "@/lib/pricing";
 import { useReviews } from "@/hooks/useReviews";
 import { slotLabel, vendorWindows } from "@/lib/pickupSlots";
 import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
@@ -42,7 +42,7 @@ const TICKER: Bi[] = [
 ];
 
 // 早鳥最高折扣（預訂 30 天內的階梯），跟 lib/pricing 同一套級距與四捨五入
-const BEST_EARLY_BIRD = Math.max(...VISIBLE_EARLY_BIRD_TIERS.map((t) => t.discountPercent));
+const BEST_EARLY_BIRD = Math.max(...EARLY_BIRD_TIERS.map((t) => t.discountPercent));
 const earlyBird = (price: number, pct = BEST_EARLY_BIRD) => Math.round(price * (1 - pct / 100));
 const discountFor = (days: number) => EARLY_BIRD_TIERS.find((t) => days >= t.minDays && days <= t.maxDays)?.discountPercent ?? 0;
 const MENU_TAB_LIMIT = 5;
@@ -583,7 +583,7 @@ function LandingContent() {
                 )}
               </p>
               <ul className="lp-tiers" data-reveal>
-                {VISIBLE_EARLY_BIRD_TIERS.map((tier) => (
+                {EARLY_BIRD_TIERS.map((tier) => (
                   <li key={tier.minDays}>
                     <span>{tier.minDays <= 1 ? t("訂明天", "Tomorrow") : t(`提前 ${tier.minDays} 天以上`, `${tier.minDays}+ days ahead`)}</span>
                     <strong>{discountText(tier.discountPercent)}</strong>

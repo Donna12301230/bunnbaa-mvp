@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMyCoupons, millis } from "@/hooks/useMyRewards";
 import { bookingProblem, slotLabel, vendorCutoffTime } from "@/lib/pickupSlots";
 import { discountText } from "@/lib/pricing";
-import { itemMains, portionLabel, priceBreakdown, riceLabel, sideOptions } from "@/lib/bento";
+import { customFields, itemMains, portionLabel, priceBreakdown, priceDeltaText, riceLabel, sideOptions } from "@/lib/bento";
 import { couponTitle } from "@/lib/rewards";
 import { tr, loc } from "@/lib/i18n";
 
@@ -50,7 +50,7 @@ export default function CartPage() {
   const couponOf = (l: CartLine) => vendorCoupons.find((c) => c.id === l.couponId);
 
   const priced = lines.map((l) => {
-    const unit = priceBreakdown(l.menuItem, l.pickupDate, l.rice, l.choices, 0, { mainIndex: l.mainIndex, extra: l.extraSide });
+    const unit = priceBreakdown(l.menuItem, l.pickupDate, l.rice, l.choices, 0, { mainIndex: l.mainIndex, extra: l.extraSide, customPicks: l.customPicks });
     const coupon = couponOf(l);
     const couponDiscount = coupon ? Math.min(coupon.discount, unit.subtotal) : 0;
     return { line: l, unit, couponDiscount, total: unit.subtotal * l.quantity - couponDiscount, problem: vendor ? bookingProblem(vendor, l.pickupDate) : null };
@@ -76,6 +76,7 @@ export default function CartPage() {
           rice: l.rice,
           main_index: l.mainIndex ?? null,
           extra_side: l.extraSide ?? null,
+          custom_picks: l.customPicks ?? [],
           quantity: l.quantity,
           note: l.note,
           coupon_id: l.couponId || null,
@@ -157,6 +158,10 @@ export default function CartPage() {
                       const o = sideOptions(line.menuItem).find((x) => x.slot === line.extraSide!.slot && x.candidate === line.extraSide!.candidate);
                       return o ? <p className="text-xs text-muted-foreground">{line.extraSide.mode === "addon" ? tr(`第四道加菜：${o.name}（+10）`, `Add-on: ${o.name} (+10)`) : tr(`第四道備案：${o.name}`, `Backup: ${o.name}`)}</p> : null;
                     })()}
+                    {customFields(line.menuItem).map((f, i) => {
+                      const o = f.options[line.customPicks?.[i] ?? 0];
+                      return o ? <p key={i} className="text-xs text-muted-foreground">{f.label}：{o.name}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</p> : null;
+                    })}
                     {riceLabel(line.rice) && <p className="text-xs text-muted-foreground">{riceLabel(line.rice)}</p>}
                     {line.note && <p className="text-xs text-muted-foreground">{tr("備註：", "Note: ")}{line.note}</p>}
                     <p className="font-heading text-lg font-semibold">

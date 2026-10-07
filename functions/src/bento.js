@@ -7,7 +7,7 @@
 //   mains: [{ name, component_id, price, image_url }] 可選主菜，各自定價（便當價以所選主菜為準）
 //   main: { name, component_id }                 舊版單一主菜（沒有 mains 時用）
 //   rice_component_id                            主食半成品（白飯等），加飯／減飯作用在它
-//   fixed: [{ name, component_id }]              固定附餐，不能換也不能減（例：經典便當的滷蛋）
+//   fixed: [{ name, component_id, portions }]    備料組成／固定附餐，不能換也不能減（例：滷蛋；單品的全部組成）
 //   slots: [{ category, default: { name, component_id },
 //             candidates: [{ name, component_id, portion_level, weekly_cap, min_qty }] }]
 //   weekdays: [1..5]                             週菜單輪替：只在這幾天供應（沒設＝每天）
@@ -189,6 +189,23 @@ function resolveChoices(item, choices) {
   return { slots: out, removedCount };
 }
 
+/**
+ * 店家自訂欄位（配菜下方的下拉選單）：picks[i] 是第 i 個欄位選的選項 index，沒送＝第一個。
+ * 回傳 { custom: [{ label, index, choice, price }], amount } 或 { problem }；金額以品項設定為準，不信前端。
+ */
+function resolveCustomPicks(item, picks) {
+  const fields = Array.isArray(item.custom_fields) ? item.custom_fields.filter((f) => f?.label && f.options?.length) : [];
+  const list = Array.isArray(picks) ? picks : [];
+  const custom = [];
+  for (let i = 0; i < fields.length; i++) {
+    const idx = list[i] ?? 0;
+    const opt = Number.isInteger(idx) ? fields[i].options[idx] : null;
+    if (!opt) return { problem: `「${fields[i].label}」的選擇不存在` };
+    custom.push({ label: fields[i].label, index: idx, choice: opt.name, price: Number(opt.price) || 0 });
+  }
+  return { custom, amount: custom.reduce((s, c) => s + c.price, 0) };
+}
+
 /** 加減金額（§4.2）：一碗半 +10、半碗 −5、少一道 −5、第四道加菜 +10（備案 0）；直接反映在訂單金額 */
 function adjustAmount({ rice, removedCount, extraMode }, config = DEFAULT_PLATFORM_CONFIG) {
   let amount = removedCount > 0 ? removedCount * config.slotRemovePrice : 0;
@@ -219,5 +236,5 @@ function dishTags(component, ingredientsById) {
 
 module.exports = {
   RICE_OPTIONS, rawAmount, componentCost, portionLevelFor, portionText, portionLabel, isBento, resolveChoices, resolveMain, sideOptions,
-  resolveExtraSide, adjustAmount, dishTags,
+  resolveExtraSide, resolveCustomPicks, adjustAmount, dishTags,
 };

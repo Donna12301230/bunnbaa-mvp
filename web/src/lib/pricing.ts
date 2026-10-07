@@ -15,8 +15,6 @@ export const EARLY_BIRD_TIERS: EarlyBirdTier[] = [
   { minDays: 2, maxDays: 30, discountPercent: 20 },
 ];
 
-export const VISIBLE_EARLY_BIRD_TIERS = EARLY_BIRD_TIERS;
-
 // 取餐日跟「今天」之間差幾天，四捨五入到整天；已過期或就是今天算 0 天。
 export function daysUntilPickup(pickupDate: string, today: Date = new Date()): number {
   const pickup = new Date(`${pickupDate}T00:00:00`);
