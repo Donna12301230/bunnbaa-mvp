@@ -35,7 +35,7 @@ export default function VendorCardHeader({ vendor, subtitle, reward }: { vendor:
       <div className="flex items-center gap-3 shrink-0 text-sm">
         {reward && !reward.paused && (
           <Link href="/rewards" className="text-xs font-semibold text-muted-foreground hover:text-foreground">
-            {reward.pool_open ? t("開獎中", "Draw open") : t(`再 ${reward.amount_to_open} 元開獎`, `NT$${reward.amount_to_open} to the draw`)}
+            {reward.pool_open ? t("開獎中", "Draw open") : reward.amount_to_open <= 0 ? t("已達標，週一開獎", "Target reached — draw opens Monday") : t(`再 ${reward.amount_to_open} 元開獎`, `NT$${reward.amount_to_open} to the draw`)}
           </Link>
         )}
         <Link href={`/vendor/${vendor.id}`} className="font-semibold text-blue-600 underline underline-offset-4 decoration-1 hover:decoration-2 hover:text-blue-700">

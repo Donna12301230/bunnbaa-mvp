@@ -351,7 +351,7 @@ export default function MyBookingsPage() {
       const coupon = name === "cancelLock" ? res.data?.coupon : null;
       toast({
         title: done,
-        ...(coupon ? { description: tr(`已發一張折 ${coupon.discount} 元的折價券，${couponDays} 天內有效，可在「回饋」查看。`, `A NT$${coupon.discount} coupon was issued, valid for ${couponDays} days.`) } : {}),
+        ...(coupon ? { description: tr(`已發一張折 ${coupon.discount} 元的折價券，${couponDays} 天內有效，可在「成長獎勵」查看。`, `A NT$${coupon.discount} coupon was issued, valid for ${couponDays} days.`) } : {}),
       });
     } catch (err) {
       toast({ title: tr("操作失敗", "Something went wrong"), description: (err as Error).message, variant: "destructive" });
@@ -369,6 +369,8 @@ export default function MyBookingsPage() {
         `取消不退現金${coupon > 0 ? `，改發一張這家店的折價券：折 ${coupon} 元（原價的 ${pct}%），${couponDays} 天內有效` : ""}。${lock.coupon_id ? "下單時用的折價券會退回並保留原到期日。" : ""}想拿回較多金額可以改用「轉讓」。`,
         `No cash refund${coupon > 0 ? ` — you'll get a NT$${coupon} coupon for this vendor (${pct}% of the list price), valid for ${couponDays} days` : ""}.${lock.coupon_id ? " The coupon you used is returned." : ""} To recover more, transfer it instead.`),
       confirmLabel: coupon > 0 ? tr("取消並換折價券", "Cancel for a coupon") : tr("確定取消", "Cancel meal"),
+      // 這個視窗是在問要不要「取消餐點」，放棄鈕不能也叫「取消」
+      cancelLabel: tr("保留餐點", "Keep the meal"),
       destructive: true,
     });
     if (ok) await callLock(lock, "cancelLock", tr("已取消", "Cancelled"));
@@ -428,7 +430,7 @@ export default function MyBookingsPage() {
                       {lock.status === "cancelled" && ((lock.refund_coupon_amount ?? 0) > 0 || (lock.refunded_amount ?? 0) > 0) && (
                         <p className="text-caption text-muted-foreground">
                           {(lock.refund_coupon_amount ?? 0) > 0
-                            ? tr(`已發一張折 ${lock.refund_coupon_amount} 元的折價券，可在「回饋」查看。`, `A NT$${lock.refund_coupon_amount} coupon was issued.`)
+                            ? tr(`已發一張折 ${lock.refund_coupon_amount} 元的折價券，可在「成長獎勵」查看。`, `A NT$${lock.refund_coupon_amount} coupon was issued.`)
                             : tr(`已退款 NT$${lock.refunded_amount}（原付款方式）。`, `NT$${lock.refunded_amount} refunded.`)}
                         </p>
                       )}
