@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Camera, Plus, Pencil, Sparkles, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { AlertTriangle, Camera, FolderTree, Plus, Pencil, Sparkles, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -19,7 +19,11 @@ import { queryClient } from "@/lib/queryClient";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
 import { imageToBase64 } from "@/lib/imageData";
-import { useMyVendor } from "@/hooks/useMyVendor";
+import { myVendorDocKey, useMyVendor } from "@/hooks/useMyVendor";
+import MenuCatalogManager from "@/components/MenuCatalogManager";
+import { catalogOrder, groupByCatalog } from "@/lib/menuCatalog";
+import { usePlatformConfig } from "@/lib/platformConfig";
+import { netOfCommission, withCommission } from "@/lib/pricing";
 import type { MenuItem } from "@/types";
 import { ALLERGEN_LIST, DIETARY_TAGS, tagEn } from "@/types";
 import { tr } from "@/lib/i18n";
@@ -52,7 +56,7 @@ interface MenuDraft {
   description: string;
 }
 
-const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
+const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", catalog: "", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
 
 // 英文名稱／說明：Functions 會自動翻（translateMenuItem），商家也可以手動改。
 // 手動改過的欄位把 i18n_src 設成目前的中文，觸發器就認定「已翻過」不會蓋掉；
@@ -90,6 +94,10 @@ export default function VendorPortalMenu() {
   const [drafts, setDrafts] = useState<MenuDraft[]>([]);
   const [draftNote, setDraftNote] = useState("");
   const [activeDraft, setActiveDraft] = useState<number | null>(null);
+  const [catalogsOpen, setCatalogsOpen] = useState(false);
+  const { data: platformConfig } = usePlatformConfig();
+  const commissionRate = platformConfig?.commissionRate ?? 0.05;
+  const commissionPct = Math.round(commissionRate * 1000) / 10;
 
   // 登入店主綁定（vendors/{id}.owner_uid）的商家；寫入權限由 firestore.rules 的
   // isVendorOwner 把關，這裡不另外檢查。
@@ -101,6 +109,7 @@ export default function VendorPortalMenu() {
 
   const { data: items = [], isLoading } = useVendorMenu(VENDOR_ID);
   const gaps = useRecipeGaps();
+  const catalogNames = useMemo(() => catalogOrder(myVendor?.menu_catalogs, items), [myVendor?.menu_catalogs, items]);
   /** 品項裡有 AI 產生、店家還沒確認過的配方 */
   const hasAiDraft = (item: MenuItem) => !!catalog && [item.rice_component_id, item.main?.component_id, ...(item.mains ?? []).map((m) => m.component_id), ...(item.fixed ?? []).map((f) => f.component_id), ...(item.slots ?? []).map((sl) => sl.default?.component_id)]
     .some((id) => !!id && !!catalog.componentsById[id]?.ai_draft);
@@ -150,6 +159,7 @@ export default function VendorPortalMenu() {
         // 便當有多道主菜時，price 存最低主菜價（卡片「$50 起」、舊程式相容）
         price: bento.itemType === "bento" && mains.length > 0 ? Math.min(...mains.map((m) => m.price)) : Number(form.price),
         category: form.category,
+        catalog: form.catalog.trim() || null,
         is_available: form.isAvailable,
         image: form.image || null, // Firestore SDK throws on `undefined` field values
         allergens: form.allergens,
@@ -195,9 +205,14 @@ export default function VendorPortalMenu() {
         }
         await addDoc(collection(db, "menu_items"), { ...data, ...extra, ...(Object.keys(src).length ? { i18n_src: src } : {}), created_at: new Date() });
       }
+      // 表單裡打了新的目錄名稱：接在店家目錄清單最後面（順序之後可在「管理目錄」調整）
+      if (data.catalog && !catalogNames.includes(data.catalog)) {
+        await updateDoc(doc(db, "vendors", myVendor.id), { menu_catalogs: [...catalogNames, data.catalog] });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendorMenu", VENDOR_ID] });
+      queryClient.invalidateQueries({ queryKey: myVendorDocKey(VENDOR_ID) });
       setDialogOpen(false);
       setEditId(null);
       setForm(EMPTY_FORM);
@@ -281,7 +296,7 @@ export default function VendorPortalMenu() {
   function openEdit(item: MenuItem) {
     setActiveDraft(null);
     setEditId(item.id);
-    setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [], nameEn: item.name_en ?? "", descriptionEn: item.description_en ?? "" });
+    setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, catalog: item.catalog ?? "", isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [], nameEn: item.name_en ?? "", descriptionEn: item.description_en ?? "" });
     const isBentoItem = item.item_type ? item.item_type === "bento" : (item.slots?.length ?? 0) > 0;
     setBento({
       itemType: isBentoItem ? "bento" : "single",
@@ -325,6 +340,9 @@ export default function VendorPortalMenu() {
               if (file) readMenuPhoto(file);
             }}
           />
+          <Button variant="outline" onClick={() => setCatalogsOpen(true)} disabled={!VENDOR_ID}>
+            <FolderTree className="w-4 h-4 mr-1" /> {tr("管理目錄", "Catalogs")}
+          </Button>
           <Button variant="outline" onClick={() => photoInput.current?.click()} disabled={reading || !VENDOR_ID}>
             <Camera className="w-4 h-4 mr-1" /> {reading ? tr("AI 辨識中…", "Reading…") : tr("拍照上架", "From a photo")}
           </Button>
@@ -406,14 +424,22 @@ export default function VendorPortalMenu() {
       ) : items.length === 0 ? (
         <EmptyState icon={<UtensilsCrossed size={32} />} title={tr("尚無菜單品項", "No menu items yet")} description={tr("拍一張菜單照片，AI 幫你一次上架。", "Snap your menu and AI lists it for you.")} action={<Button onClick={() => photoInput.current?.click()} disabled={reading || !VENDOR_ID}><Camera /> {tr("拍照上架", "From a photo")}</Button>} />
       ) : (() => {
-        const categories = Array.from(new Set(items.map(i => i.category)));
+        // 目錄 > 分類 兩層；店家沒用目錄時就只有分類一層
+        const groups = groupByCatalog(items, myVendor?.menu_catalogs, (i) => i.category);
+        const hasCatalogs = groups.some((g) => g.catalog);
+        const sections = groups.flatMap((g) => g.categories.map((c, idx) => ({ key: `${g.catalog}/${c.category}`, catalog: g.catalog, first: idx === 0, cat: c.category, items: c.items })));
         return (
           <div className="space-y-10">
-            {categories.map(cat => (
-              <div key={cat}>
+            {sections.map(({ key, catalog: catalogName, first, cat, items: sectionItems }) => (
+              <div key={key}>
+                {hasCatalogs && first && (
+                  <p className="mb-4 flex items-center gap-2 border-b border-ink pb-2 font-heading text-xl font-semibold">
+                    <FolderTree className="w-5 h-5 text-primary" aria-hidden="true" />{catalogName || tr("未分目錄", "No catalog")}
+                  </p>
+                )}
                 <h2 className="font-heading text-2xl font-semibold mb-3">{cat}</h2>
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  {items.filter(i => i.category === cat).map(item => (
+                  {sectionItems.map(item => (
                     <Card key={item.id}>
                       <CardContent className="p-4 md:p-5 flex items-start gap-4">
                         {(() => {
@@ -522,10 +548,24 @@ export default function VendorPortalMenu() {
               <div>
                 <Label>{bento.itemType === "bento" ? tr("價格（便當依主菜定價，下方設定）", "Price (set per main below)") : tr("價格 (NT$) *", "Price (NT$) *")}</Label>
                 <Input type="number" value={form.price} disabled={bento.itemType === "bento"} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+                {/* 合作方案：每份抽成，定價時加上去 */}
+                {bento.itemType !== "bento" && Number(form.price) > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {tr(`平台抽成 ${commissionPct}%，原價賣出實收約 NT$${netOfCommission(Number(form.price), commissionRate)}。`, `After the ${commissionPct}% commission you net about NT$${netOfCommission(Number(form.price), commissionRate)} at full price.`)}{" "}
+                    <button type="button" className="font-semibold text-primary underline underline-offset-2" onClick={() => setForm(f => ({ ...f, price: String(withCommission(Number(f.price), commissionRate)) }))}>
+                      {tr(`加 ${commissionPct}% → NT$${withCommission(Number(form.price), commissionRate)}`, `Add ${commissionPct}% → NT$${withCommission(Number(form.price), commissionRate)}`)}
+                    </button>
+                  </p>
+                )}
               </div>
               <div>
                 <Label>{tr("分類", "Category")}</Label>
                 <Input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder={tr("例：便當、湯品", "e.g. Bento, Soup")} />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="menu-item-catalog">{tr("目錄（分類的上一層，選填）", "Catalog (above category, optional)")}</Label>
+                <Input id="menu-item-catalog" list="menu-catalog-options" maxLength={30} value={form.catalog} onChange={e => setForm(f => ({ ...f, catalog: e.target.value }))} placeholder={tr("例：午餐便當；可選現有的或直接打新的", "e.g. Lunch bentos — pick one or type a new one")} />
+                <datalist id="menu-catalog-options">{catalogNames.map((n) => <option key={n} value={n} />)}</datalist>
               </div>
             </div>
             {/* 上架與否是即時生效的開關設定 → 設計系統用 Switch */}
@@ -576,6 +616,13 @@ export default function VendorPortalMenu() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    {VENDOR_ID && (
+        <MenuCatalogManager open={catalogsOpen} onClose={() => setCatalogsOpen(false)} vendorId={VENDOR_ID} listed={myVendor?.menu_catalogs} items={items}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ["vendorMenu", VENDOR_ID] });
+            queryClient.invalidateQueries({ queryKey: myVendorDocKey(VENDOR_ID) });
+          }} />
+      )}
     </VendorPortalLayout>
   );
 }

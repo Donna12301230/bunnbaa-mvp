@@ -1,22 +1,19 @@
-// 店家財務（規格 §1、§9.3）：平台維護費（月費、寬限、暫停接單）、基本工資、本月收益看板。
+// 店家財務（規格 §1、§9.3）：平台抽成、基本工資、本月收益看板。
+// 合作方案 2026-10-05 改版：不收月費（原本的維護費、寬限、暫停接單、首月免費都拿掉），改成每份餐點實付金額抽成
+// commissionRate（預設 5%）；撥款時扣（index.js settleVendorPayout），收益看板列為一項成本。
 // 金額、份數一律由程式計算（AI 不參與）。純函式放 module.exports.helpers，給測試用。
 //
 // vendors/{id} 相關欄位：
-//   subscription_status / subscription_end_date   既有月費訂閱（web/src/lib/subscription.ts）：首月免費 30 天、之後每 30 天一期
-//   billing { status: active|grace|suspended, due_at, grace_until, reminded_on }   billingCycle 每天寫
-//   billing { first_listed_at, free_until }   onMenuItemListed 在第一個品項上架時寫（首月從這天起算）
 //   hourly_wage（備料人工時薪，只能調高）、staff_salaries[]（正職月薪）、fixed_costs（其他固定成本／月）
 //   owner_hours_per_day（老闆每天工時，算老闆實際時薪）、linepay_fee_rate（LINE Pay 合約費率）
 // vendors/{id}/revenueForecast/{YYYY-MM}：buildRevenueForecast 每天 21:00 寫
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { onDocumentWritten } = require("firebase-functions/v2/firestore");
-const { Timestamp } = require("firebase-admin/firestore");
 const {
   REGION, db, onCall, HttpsError, FieldValue, t, logger, callerVendorId, notifyVendor, loadVendorCatalog, forEachVendor,
 } = require("./common");
-const { loadPlatformConfig, loadMinimumWage, wageOn, DEFAULT_PLATFORM_CONFIG } = require("./config");
+const { loadPlatformConfig, loadMinimumWage, wageOn } = require("./config");
 const { componentPortions, rawNeeds, buildTimeline } = require("./prep");
-const { mealPeriodOf, vendorPeriodRanges, MEAL_PERIODS } = require("./pricing");
+const { mealPeriodOf, vendorPeriodRanges, MEAL_PERIODS, commissionOf } = require("./pricing");
 const { taipeiToday, addDays, weekdayOf, mondayOf, splitWindow, toMinutes } = require("./calendar");
 const { helpers: purchasing } = require("./purchasing");
 
@@ -24,102 +21,6 @@ const DAY_MS = 86400000;
 const DEFAULT_LINEPAY_FEE_RATE = 0.0275;
 // 全額預付且沒退款（未取餐、轉愛心餐也不退）。跟 web/src/lib/lockOutcome.ts 的 REVENUE_STATUSES 一致
 const PAID_STATUSES = ["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "charity", "no_show"];
-
-/* ------------------------------------------------------------------ *
- * 平台維護費（§1）：首月免費；逾期寬限 7 天並每天提醒；仍未繳暫停接新訂單（已成立訂單照常出餐）
- * ------------------------------------------------------------------ */
-
-function toMillis(v) {
-  if (!v) return null;
-  if (typeof v.toMillis === "function") return v.toMillis();
-  if (v instanceof Date) return v.getTime();
-  return null;
-}
-
-/**
- * 依既有訂閱欄位算出計費狀態。沒有任何訂閱欄位的舊資料當成 active（不擋）。
- * 申請取消的店家到期就暫停（不給寬限）。
- */
-function billingStateOf(vendor, now = Date.now(), config = DEFAULT_PLATFORM_CONFIG) {
-  const due = toMillis(vendor?.subscription_end_date);
-  if (!vendor?.subscription_status || due == null) return { status: "active", due_at: null, grace_until: null, trial: false };
-  const graceUntil = due + (config.billingGraceDays ?? 7) * DAY_MS;
-  const trial = vendor.subscription_status === "trial";
-  if (now < due) return { status: "active", due_at: due, grace_until: graceUntil, trial };
-  if (vendor.subscription_status === "cancelled" || vendor.subscription_status === "expired") {
-    return { status: "suspended", due_at: due, grace_until: due, trial: false };
-  }
-  if (now < graceUntil) return { status: "grace", due_at: due, grace_until: graceUntil, trial, days_left: Math.ceil((graceUntil - now) / DAY_MS) };
-  return { status: "suspended", due_at: due, grace_until: graceUntil, trial };
-}
-
-exports.billingCycle = onSchedule({ schedule: "0 9 * * *", timeZone: "Asia/Taipei", region: REGION }, async () => {
-  const config = await loadPlatformConfig(db());
-  const today = taipeiToday();
-  const snap = await db().collection("vendors").get();
-  for (const doc of snap.docs) {
-    const vendor = { id: doc.id, ...doc.data() };
-    try {
-      const state = billingStateOf(vendor, Date.now(), config);
-      const prev = vendor.billing?.status || "active";
-      const patch = {
-        "billing.status": state.status,
-        "billing.due_at": state.due_at ? Timestamp.fromMillis(state.due_at) : null,
-        "billing.grace_until": state.grace_until ? Timestamp.fromMillis(state.grace_until) : null,
-        "billing.fee": config.maintenanceFee,
-      };
-      if (state.status === "grace" && vendor.billing?.reminded_on !== today) {
-        patch["billing.reminded_on"] = today;
-        await notifyVendor(vendor.id, {
-          title: t("平台維護費已到期", "Platform fee is due"),
-          body: t(
-            `本期維護費 NT$ ${config.maintenanceFee}（含稅）尚未繳，寬限期還剩 ${state.days_left} 天；逾期將暫停接新訂單（已成立訂單照常出餐）。`,
-            `Your NT$ ${config.maintenanceFee} platform fee is overdue. ${state.days_left} day(s) left before new orders are paused.`
-          ),
-          link: "/vendor-portal/settings",
-        });
-      }
-      if (state.status === "suspended" && prev !== "suspended") {
-        await notifyVendor(vendor.id, {
-          title: t("已暫停接新訂單", "New orders paused"),
-          body: t("維護費逾期超過寬限期，已暫停接新訂單；已成立的訂單請照常出餐。繳清後立即恢復。", "The platform fee is past the grace period. Existing orders still need to be served; paying restores ordering right away."),
-          link: "/vendor-portal/settings",
-        });
-      }
-      if (state.status === "active" && prev === "suspended") {
-        await notifyVendor(vendor.id, { title: t("已恢復接單", "Ordering restored"), body: t("謝謝，維護費已繳清。", "Thanks — your fee is paid."), link: "/vendor-portal" });
-      }
-      await doc.ref.update(patch);
-    } catch (err) {
-      logger.error(`billingCycle failed for ${vendor.id}`, err);
-    }
-  }
-});
-
-/**
- * 首月免費從第一次上架起算（§1）：核准時只標 subscription_status = trial、不給到期日；
- * 第一個品項上架（is_available 變成 true）時寫 billing.first_listed_at、billing.free_until，
- * 並把 subscription_end_date 設成上架日 + 30 天。只處理「trial 且沒有到期日」的店家，
- * 已在計費中或沒有訂閱欄位的舊資料不動。
- */
-exports.onMenuItemListed = onDocumentWritten({ document: "menu_items/{itemId}", region: REGION }, async (event) => {
-  const before = event.data?.before?.data();
-  const after = event.data?.after?.data();
-  if (!after?.is_available || before?.is_available || !after.vendor_id) return;
-  const config = await loadPlatformConfig(db());
-  const vendorRef = db().collection("vendors").doc(after.vendor_id);
-  await db().runTransaction(async (tx) => {
-    const vendor = (await tx.get(vendorRef)).data();
-    if (!vendor || vendor.subscription_status !== "trial" || vendor.subscription_end_date || vendor.billing?.first_listed_at) return;
-    const now = Date.now();
-    const freeUntil = Timestamp.fromMillis(now + (config.billingCycleDays ?? 30) * DAY_MS);
-    tx.update(vendorRef, {
-      subscription_end_date: freeUntil,
-      "billing.first_listed_at": Timestamp.fromMillis(now),
-      "billing.free_until": freeUntil,
-    });
-  });
-});
 
 /* ------------------------------------------------------------------ *
  * 基本工資（§9.3）：平台自動更新（以勞動部公告為準、生效日套用）；
@@ -201,7 +102,7 @@ exports.updateVendorCosts = onCall({}, async (request) => {
 });
 
 /* ------------------------------------------------------------------ *
- * 本月收益看板（§9.3）：營收（已確定＋預估）、材料、人工、手續費、維護費、薪資、固定成本 → 預估淨利
+ * 本月收益看板（§9.3）：營收（已確定＋預估）、材料、人工、手續費、平台抽成、薪資、固定成本 → 預估淨利
  * ------------------------------------------------------------------ */
 
 function monthDays(month) {
@@ -350,18 +251,18 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
 
   const revenue = confirmedRevenue + forecastRevenue;
   const paymentFee = revenue * feeRate;
-  const state = billingStateOf(vendor, Date.parse(`${first}T00:00:00+08:00`), config);
-  // 首月免費：本月第一天還在試用期內就不收
-  const maintenanceFee = state.trial && state.due_at && state.due_at >= Date.parse(`${last}T23:59:59+08:00`) ? 0 : config.maintenanceFee;
+  // 平台抽成：已確定的逐份算，預估的用預估營收 × 比例
+  const commissionRate = Number(config.commissionRate) || 0;
+  const commissionFee = commissionOf(inMonth, commissionRate) + forecastRevenue * commissionRate;
   const salaries = (Array.isArray(vendor.staff_salaries) ? vendor.staff_salaries : []).reduce((s, n) => s + (Number(n) || 0), 0);
   const otherFixed = Number(vendor.fixed_costs) || 0;
-  const netProfit = revenue - materialCost - laborCost - paymentFee - maintenanceFee - salaries - otherFixed;
+  const netProfit = revenue - materialCost - laborCost - paymentFee - commissionFee - salaries - otherFixed;
   const ownerHours = (Number(vendor.owner_hours_per_day) || 0) * businessDays;
 
-  // 損益兩平：本月還要賣幾份才打平固定成本（每份貢獻 = 平均實付 − 平均材料 − 平均人工 − 手續費）
+  // 損益兩平：本月還要賣幾份才打平固定成本（每份貢獻 = 平均實付 − 平均材料 − 平均人工 − 手續費 − 平台抽成）
   const qty = confirmedQty + forecastQty;
-  const perServing = qty > 0 ? (revenue - materialCost - laborCost - paymentFee) / qty : 0;
-  const fixed = maintenanceFee + salaries + otherFixed;
+  const perServing = qty > 0 ? (revenue - materialCost - laborCost - paymentFee - commissionFee) / qty : 0;
+  const fixed = salaries + otherFixed;
   const confirmedContribution = confirmedQty > 0 && qty > 0 ? perServing * confirmedQty : 0;
   const breakEvenQty = perServing > 0 ? Math.max(0, Math.ceil((fixed - confirmedContribution) / perServing)) : null;
 
@@ -388,7 +289,8 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
     hourly_wage: Math.max(ownHourly, wageOn(wageDoc, today).hourly),
     payment_fee: round(paymentFee),
     payment_fee_rate: feeRate,
-    maintenance_fee: maintenanceFee,
+    commission_fee: round(commissionFee),
+    commission_rate: commissionRate,
     staff_salary: round(salaries),
     other_fixed_costs: round(otherFixed),
     net_profit: round(netProfit),
@@ -451,4 +353,4 @@ exports.getDailyRevenueSeries = onCall({ timeoutSeconds: 60 }, async (request) =
   return { days: await dailySeries(vendor, taipeiToday()) };
 });
 
-module.exports.helpers = { billingStateOf, raiseToMinimum, needsCost, timelineMinutes, itemMargins, monthDays };
+module.exports.helpers = { raiseToMinimum, needsCost, timelineMinutes, itemMargins, monthDays };

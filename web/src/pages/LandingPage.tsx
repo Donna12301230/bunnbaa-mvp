@@ -36,7 +36,7 @@ const pick = (text: Bi, lang: Lang) => text[lang];
 const TICKER: Bi[] = [
   { zh: "訂明天 95 折，提前 2 天以上 8 折", en: "5% off for tomorrow, 20% off 2+ days ahead" },
   { zh: "臨時去不了？轉讓或捐為愛心餐", en: "Can't make it? Transfer it or donate it as a charity meal" },
-  { zh: "截單前免費取消，全額退款", en: "Free cancellation before cutoff — full refund" },
+  { zh: "取餐 48 小時前可取消，換成原價 30% 的折價券", en: "Cancel up to 48 hours ahead for a coupon worth 30% of the price" },
   { zh: "取餐前推播提醒，不怕忘記", en: "Push reminders before pickup" },
   { zh: "每 100 元一張抽獎券，人人有獎", en: "A reward ticket every NT$100 — everyone wins" },
 ];
@@ -512,7 +512,7 @@ function LandingContent() {
               )}
               <div className="lp-float lp-float--a"><Ticket /> {t("可轉讓・贈送", "Transfer or gift")}</div>
               <div className="lp-float lp-float--b"><BellRing /> {t("取餐前提醒", "Pickup reminder")}</div>
-              <div className="lp-float lp-float--c"><ShieldCheck /> {t("截單前免費取消", "Free cancellation before cutoff")}</div>
+              <div className="lp-float lp-float--c"><ShieldCheck /> {t("48 小時前可取消換券", "Cancel 48h ahead for a coupon")}</div>
             </div>
           </div>
         </section>

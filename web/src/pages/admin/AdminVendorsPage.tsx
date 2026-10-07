@@ -9,8 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, XCircle, Store, Link2Off, CalendarPlus } from "lucide-react";
-import { adminRenewSubscription, getSubscriptionState, initialTrialFields, trialNotStarted } from "@/lib/subscription";
+import { CheckCircle, XCircle, Store, Link2Off } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
@@ -92,17 +91,11 @@ export default function AdminVendorsPage() {
             verified: false,
             phone: app.phone,
             owner_uid: app.id,
-            ...initialTrialFields(),
             created_at: serverTimestamp(),
           });
         } else {
           vendorId = target;
-          const existing = vendors.find((v) => v.id === target);
-          // 既有商家還沒有訂閱欄位的話，一起開始首月免費試用
-          batch.update(doc(db, "vendors", target), {
-            owner_uid: app.id,
-            ...(existing?.subscription_status ? {} : initialTrialFields()),
-          });
+          batch.update(doc(db, "vendors", target), { owner_uid: app.id });
         }
       }
       batch.update(doc(db, "vendor_applications", app.id), {
@@ -141,24 +134,6 @@ export default function AdminVendorsPage() {
     },
     onError: (err: Error) => toast({ variant: "destructive", title: tr("操作失敗", "Action failed"), description: err.message }),
   });
-
-  const renewMutation = useMutation({
-    mutationFn: (vendor: Vendor) => adminRenewSubscription(vendor),
-    onSuccess: (newEnd, vendor) => {
-      invalidate();
-      toast({ title: tr(`已為「${vendor.name}」續約`, `Renewed ${vendor.name}`), description: tr(`新的到期日：${newEnd.toLocaleDateString("zh-TW")}`, `New end date: ${newEnd.toLocaleDateString("en-US")}`) });
-    },
-    onError: (err: Error) => toast({ variant: "destructive", title: tr("操作失敗", "Action failed"), description: err.message }),
-  });
-
-  async function handleRenew(vendor: Vendor) {
-    const ok = await confirm({
-      title: tr(`確認已收到「${vendor.name}」的月費？`, `Confirm you received ${vendor.name}'s monthly fee?`),
-      description: tr("會把訂閱延長 30 天（從目前到期日或今天起算，取較晚者），並恢復正常使用。", "This extends the subscription by 30 days (from the current end date or today, whichever is later) and restores access."),
-      confirmLabel: tr("續約 30 天", "Renew 30 days"),
-    });
-    if (ok) renewMutation.mutate(vendor);
-  }
 
   async function handleUnbind(vendor: Vendor) {
     const ok = await confirm({
@@ -246,18 +221,8 @@ export default function AdminVendorsPage() {
                   <div className="text-xs text-muted-foreground truncate">
                     {vendor.id}{vendor.status === "disabled" ? tr(" · 已停用", " · disabled") : ""}
                   </div>
-                  <SubscriptionLine vendor={vendor} />
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    disabled={renewMutation.isPending}
-                    onClick={() => handleRenew(vendor)}
-                  >
-                    <CalendarPlus className="w-3.5 h-3.5 mr-1" /> {tr("續約 30 天", "Renew 30 days")}
-                  </Button>
                   {vendor.owner_uid ? (
                     <>
                       <Badge className="bg-green-100 text-green-800 border-0">{tr("已綁定帳號", "Account linked")}</Badge>
@@ -281,25 +246,5 @@ export default function AdminVendorsPage() {
         </div>
       )}
     </AdminLayout>
-  );
-}
-
-const subLabel = (status: string) =>
-  ({
-    trial: tr("試用中", "Trial"),
-    active: tr("訂閱中", "Active"),
-    cancelled: tr("已申請取消", "Cancelling"),
-    expired: tr("已到期（後台已暫停）", "Expired (portal paused)"),
-  } as Record<string, string>)[status] ?? status;
-
-function SubscriptionLine({ vendor }: { vendor: Vendor }) {
-  const sub = getSubscriptionState(vendor);
-  if (sub.unset) return <div className="text-xs text-muted-foreground">{tr("訂閱：尚未設定", "Subscription: not set")}</div>;
-  return (
-    <div className={`text-xs ${sub.blocked ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
-      {tr("訂閱：", "Subscription: ")}{subLabel(sub.status)}
-      {sub.endDate ? tr(`，到期 ${sub.endDate.toLocaleDateString("zh-TW")}`, `, ends ${sub.endDate.toLocaleDateString("en-US")}`) : ""}
-      {trialNotStarted(vendor) ? tr("（尚未上架，首月未開始）", " (no item listed yet; free month not started)") : ""}
-    </div>
   );
 }

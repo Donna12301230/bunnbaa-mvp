@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, ClipboardList, Search } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ChevronRight, ClipboardList, Search } from "lucide-react";
 import LockOrderRow from "@/components/LockOrderRow";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ds";
@@ -9,7 +9,8 @@ import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Lock } from "@/types";
 
-// 訂單列表：依狀態篩選（色塊按鈕），可用取餐編號或品名搜尋；依取餐日期分組。
+// 訂單列表：依狀態篩選（色塊按鈕），可用取餐編號或品名搜尋。
+// 排序可切換：取餐時間（由近到遠，依取餐日期分組）或下單時間（最新的在前，依下單日期分組）。
 const filters = () => [
   { value: "pending", label: tr("待取餐", "To pick up"), dot: "bg-amber-400", match: (l: Lock) => PENDING_STATUSES.has(l.status) },
   { value: "done", label: tr("已完成", "Done"), dot: "bg-green-500", match: (l: Lock) => DONE_STATUSES.has(l.status) },
@@ -17,24 +18,50 @@ const filters = () => [
   { value: "all", label: tr("全部", "All"), dot: "bg-stone-400", match: () => true },
 ] as const;
 
+type SortMode = "pickup" | "ordered";
+const SORT_KEY = "bb.vendorOrders.sort";
+
+function createdMillis(lock: Lock): number {
+  const ts = lock.created_at as { toMillis?: () => number } | null | undefined;
+  return ts?.toMillis ? ts.toMillis() : 0;
+}
+/** 下單日期（台北，YYYY-MM-DD）；沒有時間戳的舊資料歸在一起 */
+function orderedDate(lock: Lock): string {
+  const ms = createdMillis(lock);
+  return ms ? new Date(ms).toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }) : "";
+}
+
 export default function OrdersListPanel({ locks, loading, truncated }: { locks: Lock[]; loading: boolean; truncated: boolean }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("pending");
   // 日期分組預設只展開第一天，其他點開才看；搜尋時全部展開
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [sort, setSort] = useState<SortMode>(() => {
+    try { return localStorage.getItem(SORT_KEY) === "ordered" ? "ordered" : "pickup"; } catch { return "pickup"; }
+  });
+  function changeSort(mode: SortMode) {
+    setSort(mode);
+    setOpen({});
+    try { localStorage.setItem(SORT_KEY, mode); } catch { /* 無痕模式等存不了就算了 */ }
+  }
 
   const searched = useMemo(() => {
     const q = search.trim().toUpperCase().replace(/\s+/g, "");
     const rows = q ? locks.filter((l) => pickupCode(l).includes(q) || l.item_name.toUpperCase().includes(q)) : locks;
-    return [...rows].sort((a, b) => `${a.pickup_date} ${a.pickup_window}`.localeCompare(`${b.pickup_date} ${b.pickup_window}`));
-  }, [locks, search]);
+    return [...rows].sort(sort === "ordered"
+      ? (a, b) => createdMillis(b) - createdMillis(a)
+      : (a, b) => `${a.pickup_date} ${a.pickup_window}`.localeCompare(`${b.pickup_date} ${b.pickup_window}`));
+  }, [locks, search, sort]);
   const current = filters().find((f) => f.value === filter) ?? filters()[0];
   const rows = searched.filter(current.match);
   const byDate = useMemo(() => {
     const map = new Map<string, Lock[]>();
-    for (const l of rows) map.set(l.pickup_date, [...(map.get(l.pickup_date) ?? []), l]);
+    for (const l of rows) {
+      const key = sort === "ordered" ? orderedDate(l) : l.pickup_date;
+      map.set(key, [...(map.get(key) ?? []), l]);
+    }
     return [...map.entries()];
-  }, [rows]);
+  }, [rows, sort]);
 
   return (
     <div className="space-y-4">
@@ -46,7 +73,16 @@ export default function OrdersListPanel({ locks, loading, truncated }: { locks: 
             <span className="text-lg font-bold leading-none">{searched.filter(f.match).length}</span>
           </button>
         ))}
-        <div className="relative ml-auto w-full sm:w-64">
+        <div className="ml-auto inline-flex items-center gap-1 rounded-xl border-2 border-border bg-card/60 p-1 text-sm" role="radiogroup" aria-label={tr("排序方式", "Sort by")}>
+          <ArrowDownWideNarrow className="ml-1.5 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+          {([["pickup", tr("取餐時間", "Pickup time")], ["ordered", tr("下單時間", "Order time")]] as const).map(([mode, label]) => (
+            <button key={mode} type="button" role="radio" aria-checked={sort === mode} onClick={() => changeSort(mode)}
+              className={cn("rounded-lg px-2.5 py-1", sort === mode ? "bg-foreground text-background font-semibold" : "hover:bg-accent")}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tr("取餐號或品名", "Code or item")} aria-label={tr("搜尋訂單", "Search orders")} className="pl-9" />
         </div>
@@ -67,12 +103,13 @@ export default function OrdersListPanel({ locks, loading, truncated }: { locks: 
                   <>
                     <button type="button" onClick={() => setOpen((o) => ({ ...o, [date]: !isOpen }))} aria-expanded={isOpen} className="w-full flex items-center gap-2 rounded-lg px-1 py-1 text-left font-semibold hover:bg-accent">
                       {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                      {date.slice(5).replace("-", "/")}
+                      {sort === "ordered" && <span className="text-xs font-normal text-muted-foreground">{tr("下單", "Ordered")}</span>}
+                      {date ? date.slice(5).replace("-", "/") : tr("時間不明", "Unknown")}
                       <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-normal">{list.length} {tr("份", "")}</span>
                     </button>
                     {isOpen && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {list.map((l) => <LockOrderRow key={l.id} lock={l} showDate={false} />)}
+                        {list.map((l) => <LockOrderRow key={l.id} lock={l} showDate={sort === "ordered"} />)}
                       </div>
                     )}
                   </>

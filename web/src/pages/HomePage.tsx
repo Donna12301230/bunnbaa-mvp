@@ -63,7 +63,7 @@ function WaiverText() {
   return (
     <>
       {t("我了解本商品為現做餐點，依消保法通訊交易解除權合理例外情事適用準則，", "I understand these are freshly made meals. Under Taiwan's Consumer Protection Act exceptions for distance sales, ")}
-      <strong className="text-foreground">{t(`取餐前一天 ${vendorCutoffTime(null)} 截單前可免費取消，截單後不適用 7 天猶豫期、恕不退款`, `meals can be cancelled for free until ${vendorCutoffTime(null)} the day before; after cutoff the 7-day cooling-off period doesn't apply and there are no refunds`)}</strong>
+      <strong className="text-foreground">{t(`取餐前一天 ${vendorCutoffTime(null)} 截單；取餐 48 小時前可取消並換成原價 30% 的折價券（不退現金），不適用 7 天猶豫期`, `orders close at ${vendorCutoffTime(null)} the day before; up to 48 hours before pickup you can cancel for a coupon worth 30% of the list price (no cash refund), and the 7-day cooling-off period doesn't apply`)}</strong>
       {t("（可轉讓、贈送或捐為愛心餐；停班停課自動全額退款，天災期間店家可等值替換配菜）", " (you can still transfer, gift or donate it; work-suspension days are refunded automatically, and vendors may substitute an equivalent side during disasters)")}
     </>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, documentId, getDocs, limit, onSnapshot, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
+import { collection, deleteField, doc, documentId, getDocs, limit, onSnapshot, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useItemImages } from "@/hooks/useItemImages";
 import { format } from "date-fns";
@@ -12,7 +12,8 @@ import MarketplaceHeader from "@/components/MarketplaceHeader";
 import PageHero from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { db, functions } from "@/lib/firebase";
@@ -22,7 +23,9 @@ import EditWishesDialog from "@/components/EditWishesDialog";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { customOptionTexts, extraSideText, riceLabel, slotText } from "@/lib/bento";
 import { isPastCutoff, todayStr } from "@/lib/pickupSlots";
-import { refundOnTakeover, resalePrice } from "@/lib/transfers";
+import { defaultResalePrice, refundOnTakeover, resaleCap, resalePrice } from "@/lib/transfers";
+import { cancelCouponAmount, cancelDeadlineAt } from "@/lib/pricing";
+import { usePlatformConfig } from "@/lib/platformConfig";
 import type { Lock } from "@/types";
 import { EmptyState, Tag } from "@/components/ds";
 import TransferMarketPage from "@/pages/TransferMarketPage";
@@ -64,7 +67,7 @@ const statusStyle = (status: string): { label: string; className: string } => {
     no_show: { label: tr("已登記未取餐", "No-show"), className: "bg-red-100 text-red-700" },
     charity: { label: tr("已轉為愛心餐", "Charity meal"), className: "bg-pink-100 text-pink-700" },
     cancelling: { label: tr("退款中", "Refunding"), className: "bg-gray-100 text-gray-700" },
-    cancelled: { label: tr("已取消・已退款", "Cancelled · refunded"), className: "bg-gray-100 text-gray-700" },
+    cancelled: { label: tr("已取消", "Cancelled"), className: "bg-gray-100 text-gray-700" },
   };
   return map[status] ?? { label: status, className: "bg-gray-100 text-gray-700" };
 };
@@ -153,6 +156,13 @@ export default function MyBookingsPage() {
   // 多數人期待「我的訂單」先看到清單，不是先找日期；月曆改成次要、可切換的檢視
   const [view, setView] = useState<"list" | "calendar">("list");
   const confirm = useConfirm();
+  const { data: config } = usePlatformConfig();
+  const cancelHours = config?.cancelHoursBefore ?? 48;
+  const cancelRate = config?.cancelCouponRate ?? 0.3;
+  const couponDays = config?.couponValidDays ?? 30;
+  // 上架轉讓前先讓轉讓人填轉讓價（0 ～ 原價）
+  const [reselling, setReselling] = useState<Lock | null>(null);
+  const [resaleDraft, setResaleDraft] = useState("");
 
   useEffect(() => {
     if (!uid) return;
@@ -258,14 +268,21 @@ export default function MyBookingsPage() {
     }
   }
 
-  async function handleResell(lock: Lock) {
+  function openResell(lock: Lock) {
+    setResaleDraft(String(defaultResalePrice(lock)));
+    setReselling(lock);
+  }
+
+  async function handleResell(lock: Lock, price: number) {
     setBusyId(lock.id);
     try {
       const deadline = pickupWindowEnd(lock.pickup_date, lock.pickup_window);
       await updateDoc(doc(db, "locks", lock.id), {
         status: "for_resale",
+        resale_price: price,
         ...(deadline ? { resale_deadline: Timestamp.fromDate(deadline) } : {}),
       });
+      setReselling(null);
       toast({ title: tr("已上架轉讓市集", "Listed on the transfer market") });
     } catch (err) {
       toast({ title: tr("上架失敗", "Couldn't list it"), description: (err as Error).message, variant: "destructive" });
@@ -277,7 +294,7 @@ export default function MyBookingsPage() {
   async function handleCancelTransfer(lock: Lock) {
     setBusyId(lock.id);
     try {
-      await updateDoc(doc(db, "locks", lock.id), { status: "locked" });
+      await updateDoc(doc(db, "locks", lock.id), { status: "locked", ...(lock.resale_price != null ? { resale_price: deleteField() } : {}) });
       toast({ title: lock.status === "for_gift" ? tr("已取消贈送", "Gift cancelled") : tr("已取消轉讓", "Transfer cancelled") });
     } catch (err) {
       toast({ title: tr("取消失敗", "Couldn't cancel"), description: (err as Error).message, variant: "destructive" });
@@ -330,8 +347,12 @@ export default function MyBookingsPage() {
   async function callLock(lock: Lock, name: "cancelLock" | "donateLock", done: string) {
     setBusyId(lock.id);
     try {
-      await httpsCallable(functions, name)({ lock_id: lock.id });
-      toast({ title: done });
+      const res = await httpsCallable<{ lock_id: string }, { coupon?: { discount: number } | null }>(functions, name)({ lock_id: lock.id });
+      const coupon = name === "cancelLock" ? res.data?.coupon : null;
+      toast({
+        title: done,
+        ...(coupon ? { description: tr(`已發一張折 ${coupon.discount} 元的折價券，${couponDays} 天內有效，可在「回饋」查看。`, `A NT$${coupon.discount} coupon was issued, valid for ${couponDays} days.`) } : {}),
+      });
     } catch (err) {
       toast({ title: tr("操作失敗", "Something went wrong"), description: (err as Error).message, variant: "destructive" });
     } finally {
@@ -340,13 +361,17 @@ export default function MyBookingsPage() {
   }
 
   async function handleCancel(lock: Lock) {
+    const coupon = cancelCouponAmount(lock, cancelRate);
+    const pct = Math.round(cancelRate * 100);
     const ok = await confirm({
-      title: tr("取消這份並退款？", "Cancel and refund this meal?"),
-      description: tr(`將退回 NT$${lock.locked_price}（原付款方式）${lock.coupon_id ? "，折價券退回並保留原到期日" : ""}。`, `NT$${lock.locked_price} will be refunded${lock.coupon_id ? " and your coupon returned" : ""}.`),
-      confirmLabel: tr("取消並退款", "Cancel & refund"),
+      title: tr("取消這份餐點？", "Cancel this meal?"),
+      description: tr(
+        `取消不退現金${coupon > 0 ? `，改發一張這家店的折價券：折 ${coupon} 元（原價的 ${pct}%），${couponDays} 天內有效` : ""}。${lock.coupon_id ? "下單時用的折價券會退回並保留原到期日。" : ""}想拿回較多金額可以改用「轉讓」。`,
+        `No cash refund${coupon > 0 ? ` — you'll get a NT$${coupon} coupon for this vendor (${pct}% of the list price), valid for ${couponDays} days` : ""}.${lock.coupon_id ? " The coupon you used is returned." : ""} To recover more, transfer it instead.`),
+      confirmLabel: coupon > 0 ? tr("取消並換折價券", "Cancel for a coupon") : tr("確定取消", "Cancel meal"),
       destructive: true,
     });
-    if (ok) await callLock(lock, "cancelLock", tr("已取消，退款處理中", "Cancelled — refund on its way"));
+    if (ok) await callLock(lock, "cancelLock", tr("已取消", "Cancelled"));
   }
 
   async function handleDonate(lock: Lock) {
@@ -400,6 +425,13 @@ export default function MyBookingsPage() {
                       {(lock.coupon_discount ?? 0) > 0 && (
                         <p className="text-caption text-green-700">{tr(`已用折價券折抵 ${lock.coupon_discount} 元`, `Coupon: −NT$${lock.coupon_discount}`)}</p>
                       )}
+                      {lock.status === "cancelled" && ((lock.refund_coupon_amount ?? 0) > 0 || (lock.refunded_amount ?? 0) > 0) && (
+                        <p className="text-caption text-muted-foreground">
+                          {(lock.refund_coupon_amount ?? 0) > 0
+                            ? tr(`已發一張折 ${lock.refund_coupon_amount} 元的折價券，可在「回饋」查看。`, `A NT$${lock.refund_coupon_amount} coupon was issued.`)
+                            : tr(`已退款 NT$${lock.refunded_amount}（原付款方式）。`, `NT$${lock.refunded_amount} refunded.`)}
+                        </p>
+                      )}
                       {lock.status === "charity" && (
                         <p className="text-caption text-pink-700">
                           {lock.charity_source === "donated"
@@ -410,24 +442,31 @@ export default function MyBookingsPage() {
 
                       {["locked", "for_resale", "for_gift"].includes(lock.status) && (() => {
                         const beforeCutoff = !isPastCutoff(lock.pickup_date);
+                        const canCancel = now <= cancelDeadlineAt(lock.pickup_date, lock.pickup_window, cancelHours).getTime();
+                        const pct = Math.round(cancelRate * 100);
                         const isPayer = (lock.payer_uid ?? lock.buyer_uid) === uid;
                         const pickupDay = lock.pickup_date === todayStr();
                         const windowOpen = (pickupWindowEnd(lock.pickup_date, lock.pickup_window)?.getTime() ?? 0) > now;
                         return (
                           <div className="flex flex-col gap-2 pt-1">
                             {beforeCutoff ? (
-                              <p className="text-caption text-muted-foreground">{tr("取餐前一天截單前可免費取消，或修改取餐時段、主菜、配菜、飯量。", "Until the cutoff the day before you can cancel for free, or change the pickup time, main, sides or rice.")}</p>
+                              <p className="text-caption text-muted-foreground">
+                                {tr("取餐前一天截單前可修改取餐時段、主菜、配菜、飯量。", "Until the cutoff the day before you can change the pickup time, main, sides or rice.")}
+                                {canCancel
+                                  ? tr(`取餐 ${cancelHours} 小時前可取消，換成原價 ${pct}% 的折價券。`, ` Up to ${cancelHours} hours before pickup you can cancel for a coupon worth ${pct}% of the list price.`)
+                                  : tr(`已進入取餐前 ${cancelHours} 小時，不能取消；可以轉讓、贈送或捐為愛心餐。`, ` It's within ${cancelHours} hours of pickup, so it can't be cancelled — transfer, gift or donate it instead.`)}
+                              </p>
                             ) : (
-                              <p className="text-caption text-muted-foreground">{tr("已截單，不能退款；可以轉讓、贈送或捐為愛心餐。", "Past cutoff — no refunds, but you can transfer, gift or donate it.")}</p>
+                              <p className="text-caption text-muted-foreground">{tr("已截單，不能取消或修改；可以轉讓、贈送或捐為愛心餐。", "Past cutoff — no changes or cancellation, but you can transfer, gift or donate it.")}</p>
                             )}
                             {lock.status === "locked" && beforeCutoff && (
                               <div className="flex gap-2">
                                 <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => setEditing(lock)}>
                                   <Pencil /> {lock.plan_id ? tr("改時段", "Change time") : tr("修改", "Change")}
                                 </Button>
-                                {isPayer && (
+                                {isPayer && canCancel && (
                                   <Button variant="outline" size="sm" className="flex-1 border-red-300 text-red-600 hover:bg-red-50" disabled={isBusy} onClick={() => handleCancel(lock)}>
-                                    <XCircle /> {tr("取消退款", "Cancel")}
+                                    <XCircle /> {tr("取消換券", "Cancel")}
                                   </Button>
                                 )}
                               </div>
@@ -465,7 +504,7 @@ export default function MyBookingsPage() {
                             <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => handleGift(lock)}>
                               <Gift /> {tr("贈送", "Gift")}
                             </Button>
-                            <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => handleResell(lock)}>
+                            <Button variant="outline" size="sm" className="flex-1" disabled={isBusy} onClick={() => openResell(lock)}>
                               <Repeat /> {tr("轉讓", "Transfer")}
                             </Button>
                           </div>
@@ -494,9 +533,9 @@ export default function MyBookingsPage() {
                           </p>
                           <p className="text-caption text-muted-foreground">
                             {(lock.payer_uid ?? lock.buyer_uid) === lock.buyer_uid && refundOnTakeover(lock) > 0
-                              ? tr(`接手價 NT$${resalePrice(lock)}；有人付款接手後，你付的 NT$${refundOnTakeover(lock)} 會退回原付款方式。逾時沒人接手會開放免費領取、不退款。`,
-                                `Listed at NT$${resalePrice(lock)}. Once someone pays, your NT$${refundOnTakeover(lock)} goes back to you. If nobody takes it in time it becomes free to claim, with no refund.`)
-                              : tr(`接手價 NT$${resalePrice(lock)}。`, `Listed at NT$${resalePrice(lock)}.`)}
+                              ? tr(`轉讓價 NT$${resalePrice(lock)}；有人付款接手後，NT$${refundOnTakeover(lock)} 會退回你的原付款方式。逾時沒人接手會開放免費領取、不退款。`,
+                                `Listed at NT$${resalePrice(lock)}. Once someone pays, NT$${refundOnTakeover(lock)} goes back to you. If nobody takes it in time it becomes free to claim, with no refund.`)
+                              : tr(`轉讓價 NT$${resalePrice(lock)}。`, `Listed at NT$${resalePrice(lock)}.`)}
                           </p>
                           <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-600" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
                             {tr("取消轉讓", "Cancel transfer")}
@@ -575,7 +614,7 @@ export default function MyBookingsPage() {
     <div className="min-h-screen bg-background">
       <MarketplaceHeader active="bookings" />
 
-      <PageHero eyebrow={tr("我的預約", "Your bookings")} title={tr("我的餐點", "My meals")} description={tr("查看訂單詳情、出示取餐碼、截單前修改或取消，或轉讓／贈送／捐為愛心餐。", "See order details, show your pickup code, change or cancel before cutoff, or transfer / gift / donate a meal.")} />
+      <PageHero eyebrow={tr("我的預約", "Your bookings")} title={tr("我的餐點", "My meals")} description={tr("查看訂單詳情、出示取餐碼、截單前修改、取餐 48 小時前取消換折價券，或轉讓／贈送／捐為愛心餐。", "See order details, show your pickup code, change or cancel before cutoff, or transfer / gift / donate a meal.")} />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         {/* 頁上方分頁：我的餐點｜轉讓市集｜附近愛心餐（§4.5：「轉讓・愛心餐」併入我的餐點） */}
@@ -697,6 +736,46 @@ export default function MyBookingsPage() {
         </DialogContent>
       </Dialog>
       <EditWishesDialog lock={editing} onClose={() => setEditing(null)} />
+      <Dialog open={!!reselling} onOpenChange={(open) => !open && setReselling(null)}>
+        <DialogContent className="max-w-sm">
+          {reselling && (() => {
+            const cap = resaleCap(reselling);
+            const price = Number(resaleDraft);
+            const valid = resaleDraft.trim() !== "" && Number.isInteger(price) && price >= 0 && price <= cap;
+            const isPayer = (reselling.payer_uid ?? reselling.buyer_uid) === reselling.buyer_uid;
+            const back = valid ? refundOnTakeover(reselling, price) : 0;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{tr("上架轉讓", "List for transfer")}</DialogTitle>
+                  <DialogDescription>{loc(reselling, "item_name")}・{formatDateLabel(reselling.pickup_date)} {reselling.pickup_window}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                  <Label htmlFor="resale-price">{tr(`轉讓價（NT$0 ～ ${cap}，不能高於原價）`, `Price (NT$0 – ${cap}, no higher than the list price)`)}</Label>
+                  <Input id="resale-price" type="number" inputMode="numeric" min={0} max={cap} step={1} value={resaleDraft} onChange={(e) => setResaleDraft(e.target.value)} />
+                  {!valid ? (
+                    <p className="text-caption text-red-600">{tr(`請填 0 ～ ${cap} 的整數`, `Enter a whole number from 0 to ${cap}`)}</p>
+                  ) : isPayer && back > 0 ? (
+                    <p className="text-caption text-muted-foreground">
+                      {tr(`有人付款接手後，NT$${back} 會退回你的原付款方式。`, `Once someone pays, NT$${back} goes back to you.`)}
+                      {price > back && tr("退款不會超過你實付的金額，多的部分歸店家。", " Refunds can't exceed what you paid; the rest goes to the vendor.")}
+                    </p>
+                  ) : isPayer ? (
+                    <p className="text-caption text-muted-foreground">{tr("被接手後沒有款項會退給你。", "Nothing will be refunded to you.")}</p>
+                  ) : (
+                    <p className="text-caption text-muted-foreground">{tr("這份不是你付款的，被接手後款項不會退給你。", "You didn't pay for this meal, so nothing is refunded to you.")}</p>
+                  )}
+                  <p className="text-caption text-muted-foreground">{tr("取餐時段結束還沒人接手，會開放免費領取、不退款。", "If nobody takes it by the end of the pickup window it becomes free to claim, with no refund.")}</p>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setReselling(null)}>{tr("先不要", "Not now")}</Button>
+                  <Button disabled={!valid || busyId === reselling.id} onClick={() => handleResell(reselling, price)}>{tr("上架", "List it")}</Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

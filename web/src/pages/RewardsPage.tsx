@@ -12,7 +12,7 @@ import { httpsCallable } from "@/lib/callable";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMyCoupons, useMyTickets, millis } from "@/hooks/useMyRewards";
-import { couponTitle, tierLabel } from "@/lib/rewards";
+import { couponTitle, openProgress, tierLabel } from "@/lib/rewards";
 import { tr } from "@/lib/i18n";
 import type { RewardStatus } from "@/types";
 
@@ -89,11 +89,11 @@ export default function RewardsPage() {
                         </p>
                         {st && !st.pool_open && (
                           <>
-                            <div className="h-2.5 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={st.min_tickets} aria-valuenow={st.tickets_so_far} aria-label={tr("開獎進度", "Draw progress")}>
-                              <div className="h-full rounded-full bg-[#f29e0c] transition-[width] duration-700" style={{ width: `${Math.min(100, (st.tickets_so_far / st.min_tickets) * 100)}%` }} />
+                            <div className="h-2.5 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(openProgress(st))} aria-label={tr("開獎進度", "Draw progress")}>
+                              <div className="h-full rounded-full bg-[#f29e0c] transition-[width] duration-700" style={{ width: `${openProgress(st)}%` }} />
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              {st.paused ? tr("店家暫停參加本期", "Vendor paused this period") : tr(`全店再 ${st.amount_to_open} 元開獎（${st.tickets_so_far}/${st.min_tickets} 張）`, `NT$${st.amount_to_open} more to open (${st.tickets_so_far}/${st.min_tickets})`)}
+                              {st.paused ? tr("店家暫停參加本期", "Vendor paused this period") : tr(`全店再賣 ${st.amount_to_open} 元開獎`, `NT$${st.amount_to_open} more in sales to open`)}
                             </p>
                           </>
                         )}

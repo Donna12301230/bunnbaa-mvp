@@ -238,8 +238,8 @@ export default function CartPage() {
                 <Checkbox checked={ack} onCheckedChange={() => setAck((v) => !v)} className="mt-0.5 shrink-0" />
                 <span className="text-caption leading-relaxed text-muted-foreground">
                   {tr(
-                    `我了解：取餐前一天 ${vendorCutoffTime(vendor)} 截單，截單前可免費取消全額退款；截單後店家已依訂單備料，不可退款，但可以轉讓、贈送或捐為愛心餐。取餐時段結束 30 分鐘仍未取餐，將轉為愛心餐、不退款（照常發抽獎券）。停班停課當日訂單自動全額退款；天災期間店家可等值替換配菜。`,
-                    `I understand: orders close at ${vendorCutoffTime(vendor)} the day before pickup and can be cancelled for a full refund until then. After cutoff there are no refunds, but you can transfer, gift or donate the meal. Meals not picked up 30 min after the window become charity meals (no refund; reward tickets still issued). Orders are refunded automatically on work-suspension days; during disasters the vendor may substitute an equivalent side.`
+                    `我了解：取餐前一天 ${vendorCutoffTime(vendor)} 截單。取餐 48 小時前可以取消，但不退現金，改發原價 30% 的折價券（30 天內有效）；之後不能取消，但可以轉讓、贈送或捐為愛心餐。取餐時段結束 30 分鐘仍未取餐，將轉為愛心餐、不退款（照常發抽獎券）。停班停課當日訂單自動全額退款；天災期間店家可等值替換配菜。`,
+                    `I understand: orders close at ${vendorCutoffTime(vendor)} the day before pickup. Up to 48 hours before pickup you can cancel, but not for cash — you get a coupon worth 30% of the list price, valid for 30 days. After that you can't cancel, but you can transfer, gift or donate the meal. Meals not picked up 30 min after the window become charity meals (no refund; reward tickets still issued). Orders are refunded automatically on work-suspension days; during disasters the vendor may substitute an equivalent side.`
                   )}
                 </span>
               </label>

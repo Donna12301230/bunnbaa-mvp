@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useMyVendor, myVendorDocKey } from "@/hooks/useMyVendor";
-import { getSubscriptionState, requestCancelSubscription, trialNotStarted, undoCancelSubscription, PLATFORM_CONTACT_EMAIL } from "@/lib/subscription";
+import { PLATFORM_CONTACT_EMAIL } from "@/lib/subscription";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
 import {
   Settings, Plus, Minus, CreditCard, AlertTriangle, CheckCircle2, Image as ImageIcon, LocateFixed, Mail, MapPin, Phone, Save, SlidersHorizontal, Store,
@@ -22,13 +21,14 @@ import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, parseISO, sta
 import { deleteField, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DEFAULT_PICKUP_WINDOWS, MAX_HOLIDAYS, MAX_PICKUP_RANGE_MINUTES, MAX_PICKUP_WINDOWS, MEAL_PERIODS, isValidWindow, mealPeriodLabel, mealPeriodOf, pickupRangeMinutes, slotLabel, windowsOverlap } from "@/lib/pickupSlots";
-import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
+import { DEFAULT_PLATFORM_CONFIG, usePlatformConfig } from "@/lib/platformConfig";
+import { withCommission } from "@/lib/pricing";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { currentPosition } from "@/lib/geo";
 import type { MenuItem } from "@/types";
 import { dateLocale, getLang, tr } from "@/lib/i18n";
-import type { BusinessHour, Vendor } from "@/types";
+import type { BusinessHour } from "@/types";
 
 const ORDER_DEADLINE_OFFSET = 30;
 const dayNames = () =>
@@ -80,46 +80,6 @@ function pickupWindowsProblem(windows: string[]): string | null {
   return null;
 }
 
-// ── Subscription buttons（真實 vendors/{id}，轉換限制見 firestore.rules）──────────
-function SubscriptionCancelButton({ vendor }: { vendor: Vendor }) {
-  const { toast } = useToast();
-  const confirm = useConfirm();
-  const mut = useMutation({
-    mutationFn: () => requestCancelSubscription(vendor),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: myVendorDocKey(vendor.id) });
-      toast({ title: tr("已申請取消訂閱", "Cancellation requested"), description: tr("帳號將於到期日後暫停，資料持續保留。", "Your account will be suspended after the end date; your data is kept.") });
-    },
-    onError: (err: Error) => toast({ variant: "destructive", title: tr("操作失敗", "Action failed"), description: err.message }),
-  });
-  return (
-    <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
-      disabled={mut.isPending}
-      onClick={async () => {
-        if (await confirm({ title: tr("要申請取消訂閱嗎？", "Cancel your subscription?"), description: tr("帳號將於到期日後暫停，您的資料仍會保留；到期前都可以恢復。", "Your account will be suspended after the end date. Your data is kept, and you can undo this before then."), confirmLabel: tr("確定取消訂閱", "Cancel subscription"), destructive: true })) mut.mutate();
-      }}>
-      {mut.isPending ? tr("處理中...", "Working...") : tr("申請取消訂閱", "Cancel subscription")}
-    </Button>
-  );
-}
-
-function SubscriptionUndoCancelButton({ vendor }: { vendor: Vendor }) {
-  const { toast } = useToast();
-  const mut = useMutation({
-    mutationFn: () => undoCancelSubscription(vendor),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: myVendorDocKey(vendor.id) });
-      toast({ title: tr("已恢復訂閱", "Subscription restored"), description: tr("取消申請已撤回，帳號會照常續約。", "Your cancellation was withdrawn; the account will renew as usual.") });
-    },
-    onError: (err: Error) => toast({ variant: "destructive", title: tr("操作失敗", "Action failed"), description: err.message }),
-  });
-  return (
-    <Button size="sm" className="text-xs" disabled={mut.isPending} onClick={() => mut.mutate()}>
-      {mut.isPending ? tr("處理中...", "Working...") : tr("撤回取消、繼續訂閱", "Undo cancellation")}
-    </Button>
-  );
-}
-
 // ── Main Component ───────────────────────────────────────────────────────────
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/settings.tsx.
 // 2026-09-25：簡介／地址／電話／營業日／公休日／取餐時段／份數上限改讀寫真實
@@ -149,6 +109,7 @@ export default function VendorPortalSettings() {
   const [lng, setLng] = useState("");
   const [forecast, setForecast] = useState<Record<string, string>>({});
   const [section, setSection] = useState<"store" | "hours" | "pickup" | "rules" | "plan">("store");
+  const { data: platformConfig } = usePlatformConfig();
 
   const { data: realVendor, isLoading: realVendorLoading } = useMyVendor();
   const { data: menuItems = [] } = useQuery({
@@ -271,20 +232,17 @@ export default function VendorPortalSettings() {
 
   const openDays = businessHours.filter(h => h.open);
   const openDaysCount = openDays.length;
-  const sub = realVendor ? getSubscriptionState(realVendor) : null;
   const windowsProblem = pickupWindowsProblem(pickupWindows);
   const today = format(new Date(), "yyyy-MM-dd");
   const upcomingHolidays = holidays.filter((d) => d >= today);
-  const subLabel: Record<string, string> = {
-    trial: tr("免費試用中", "Free trial"), active: tr("訂閱中", "Active"), cancelled: tr("已申請取消", "Cancelling"), expired: tr("已到期", "Expired"),
-  };
+  const commissionPct = Math.round((platformConfig?.commissionRate ?? DEFAULT_PLATFORM_CONFIG.commissionRate) * 1000) / 10;
 
   const sections = [
     { key: "store" as const, icon: Store, label: tr("店面", "Store"), sub: coverImage ? tr("封面、簡介、地址", "Cover, about, address") : tr("還沒放封面", "No cover yet"), warn: !coverImage || !address.trim() },
     { key: "hours" as const, icon: Clock, label: tr("營業", "Hours"), sub: tr(`每週 ${openDaysCount} 天・公休 ${upcomingHolidays.length} 天`, `${openDaysCount} days/wk · ${upcomingHolidays.length} closures`), warn: openDaysCount === 0 },
     { key: "pickup" as const, icon: Timer, label: tr("取餐", "Pickup"), sub: tr(`${pickupWindows.length} 個時段・${Number(slotCapacity) > 0 ? `每段 ${slotCapacity} 份` : "不限份數"}`, `${pickupWindows.length} times · ${Number(slotCapacity) > 0 ? `${slotCapacity}/slot` : "no limit"}`), warn: !!windowsProblem },
     { key: "rules" as const, icon: SlidersHorizontal, label: tr("預購規則", "Rules"), sub: tr(`前一天 ${cutoffTime} 截單`, `Cutoff ${cutoffTime} day before`), warn: !lat || !lng },
-    { key: "plan" as const, icon: CreditCard, label: tr("訂閱", "Plan"), sub: sub ? (sub.unset ? tr("尚未設定", "Not set") : subLabel[sub.status] ?? sub.status) : "—", warn: sub?.status === "expired" || sub?.status === "cancelled" },
+    { key: "plan" as const, icon: CreditCard, label: tr("合作方案", "Plan"), sub: tr(`每份抽成 ${commissionPct}%`, `${commissionPct}% per meal`) },
   ];
 
   // 取餐時間軸範圍：06:00–20:30，三個餐期是底色帶
@@ -528,42 +486,29 @@ export default function VendorPortalSettings() {
           </>
         )}
 
-        {/* ── 訂閱 ── */}
-        {section === "plan" && realVendor && sub && (() => {
-          const tone = sub.status === "expired" ? "border-red-300 bg-red-50" : sub.status === "cancelled" ? "border-amber-300 bg-amber-50" : "border-green-300 bg-green-50";
-          const daysLeft = sub.endDate ? Math.ceil((sub.endDate.getTime() - Date.now()) / 86_400_000) : null;
-          return (
-            <Card className={cn("border-2", tone)}>
-              <CardContent className="p-5 space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <CreditCard className="w-8 h-8 text-orange-500" />
-                  <div className="flex-1">
-                    <p className="text-2xl font-bold">{sub.unset ? tr("尚未設定方案", "No plan set") : subLabel[sub.status]}</p>
-                    <p className="text-sm text-muted-foreground">{tr("每月 NT$1,999", "NT$1,999 / month")}</p>
-                  </div>
-                  {daysLeft !== null && daysLeft >= 0 && (
-                    <div className="text-right">
-                      <p className="text-3xl font-bold leading-none">{daysLeft}</p>
-                      <p className="text-xs text-muted-foreground">{sub.status === "trial" ? tr("天後試用結束", "days of trial left") : sub.status === "cancelled" ? tr("天後暫停", "days until suspended") : tr("天後續約", "days to renewal")}</p>
-                    </div>
-                  )}
+        {/* ── 合作方案：不收月費，每份餐點抽成 ── */}
+        {section === "plan" && realVendor && (
+          <Card className="border-2 border-green-300 bg-green-50">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <CreditCard className="w-8 h-8 text-orange-500" />
+                <div className="flex-1">
+                  <p className="text-2xl font-bold">{tr("合作方案", "Partner plan")}</p>
+                  <p className="text-sm text-muted-foreground">{tr("沒有月費、沒有上架費", "No monthly fee, no listing fee")}</p>
                 </div>
-                {daysLeft !== null && daysLeft >= 0 && (
-                  <div className="h-3 rounded-full bg-white/70 overflow-hidden"><div className={cn("h-full", sub.status === "cancelled" ? "bg-amber-400" : "bg-green-500")} style={{ width: `${Math.max(3, Math.min(100, (daysLeft / 30) * 100))}%` }} /></div>
-                )}
-                {sub.endDate && <p className="text-sm">{sub.status === "trial" ? tr("試用到期日", "Trial ends") : sub.status === "cancelled" ? tr("帳號暫停日", "Suspends on") : sub.status === "expired" ? tr("到期日", "Expired on") : tr("下次續約日", "Renews on")}：<b>{sub.endDate.toLocaleDateString(tr("zh-TW", "en-US"))}</b></p>}
-                {sub.unset && <p className="text-sm text-muted-foreground">{tr("平台尚未為這個店家設定訂閱方案，目前可正常使用，之後由平台通知續約。", "No plan set yet; everything works, and the platform will contact you.")}</p>}
-                {!sub.unset && sub.status === "trial" && trialNotStarted(realVendor) && <p className="text-sm text-muted-foreground">{tr("首月免費從第一次上架品項那天起算 30 天，目前還沒開始計算。", "Your free month starts the day you first list an item.")}</p>}
-                {sub.canUndoCancel && <p className="text-sm text-amber-800 flex gap-1.5"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />{tr("資料完整保留，暫停日前都可以撤回。", "Your data is kept; you can undo before the suspension date.")}</p>}
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {sub.canUndoCancel && <SubscriptionUndoCancelButton vendor={realVendor} />}
-                  <Button asChild size="sm" variant="outline"><a href={`mailto:${PLATFORM_CONTACT_EMAIL}?subject=${encodeURIComponent(`訂閱：${realVendor.name}`)}`}><Mail /> {tr("聯絡平台", "Contact us")}</a></Button>
-                  {sub.canCancel && <SubscriptionCancelButton vendor={realVendor} />}
+                <div className="text-right">
+                  <p className="text-3xl font-bold leading-none">{commissionPct}%</p>
+                  <p className="text-xs text-muted-foreground">{tr("每份餐點抽成", "per meal")}</p>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
+              </div>
+              <p className="text-sm">{tr(`平台從每份餐點的實付金額抽 ${commissionPct}%，撥款時直接扣除；沒有訂單就沒有費用。`, `The platform takes ${commissionPct}% of what the customer pays for each meal, deducted at payout. No orders, no fee.`)}</p>
+              <p className="text-sm text-muted-foreground">{tr(`定價時請把抽成加進去：想實收 100 元，售價訂 ${withCommission(100, commissionPct / 100)} 元。菜單編輯畫面的價格欄位旁有「加 ${commissionPct}%」可以一鍵換算。`, `Add the commission when pricing: to net NT$100, list at NT$${withCommission(100, commissionPct / 100)}. The menu editor has a one-tap "+${commissionPct}%" next to the price.`)}</p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button asChild size="sm" variant="outline"><a href={`mailto:${PLATFORM_CONTACT_EMAIL}?subject=${encodeURIComponent(`合作方案：${realVendor.name}`)}`}><Mail /> {tr("聯絡平台", "Contact us")}</a></Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* 儲存：固定在下方，哪個分頁都按得到 */}

@@ -25,8 +25,8 @@ const VALUES = [
     icon: ShieldCheck,
     title: tr("履約有保障", "Guaranteed fulfilment"),
     body: tr(
-      "截單前免費取消、全額退款；去不了可以轉讓或捐為愛心餐。颱風停班停課時，當天訂單自動取消並全額退款；每累計 100 元一張抽獎券，人人有獎。",
-      "Free cancellation with a full refund before cutoff; transfer or donate if you can't make it. On typhoon or work-suspension days, orders are cancelled and fully refunded automatically; every NT$100 you pay earns a reward ticket and everyone wins."
+      "取餐 48 小時前可以取消，換成原價 30% 的折價券；去不了也可以轉讓或捐為愛心餐。颱風停班停課時，當天訂單自動取消並全額退款；每累計 100 元一張抽獎券，人人有獎。",
+      "Cancel up to 48 hours before pickup for a coupon worth 30% of the price, or transfer or donate if you can't make it. On typhoon or work-suspension days, orders are cancelled and fully refunded automatically; every NT$100 you pay earns a reward ticket and everyone wins."
     ),
   },
   {

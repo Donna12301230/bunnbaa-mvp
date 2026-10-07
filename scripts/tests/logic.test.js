@@ -300,15 +300,22 @@ test("V-PRP-11b", "備料：選的主菜、備案遞補、第四道加菜都算�
 
 let fin;
 try { fin = req("finance.js").helpers; } catch (e) { fin = null; }
-test("V-BIL-01", "維護費：到期前 active、寬限 7 天 grace、之後 suspended；舊資料不擋", () => {
-  if (!fin) throw new Error("finance.js 無法載入");
-  const due = Date.parse("2026-10-10T00:00:00+08:00");
-  const v = { subscription_status: "active", subscription_end_date: { toMillis: () => due } };
-  assert.equal(fin.billingStateOf(v, due - 1, CFG).status, "active");
-  assert.equal(fin.billingStateOf(v, due + 3 * 86400000, CFG).status, "grace");
-  assert.equal(fin.billingStateOf(v, due + 8 * 86400000, CFG).status, "suspended");
-  assert.equal(fin.billingStateOf({}, due, CFG).status, "active");
-  assert.equal(fin.billingStateOf({ ...v, subscription_status: "cancelled" }, due + 1, CFG).status, "suspended");
+test("V-FEE-01", "合作方案：不收月費，每份實付抽成 5%（逐份四捨五入）", () => {
+  assert.equal(CFG.commissionRate, 0.05);
+  assert.equal(CFG.maintenanceFee, undefined, "月費參數應已移除");
+  assert.equal(pricing.commissionOf([{ locked_price: 80 }, { locked_price: 90 }, { locked_price: 0 }], 0.05), 4 + 5);
+  assert.equal(pricing.commissionOf([{ locked_price: 110 }], 0.05), 6, "5.5 進位");
+  assert.equal(pricing.commissionOf([], 0.05), 0);
+});
+test("C-CXL-01", "取消期限：取餐時段開始前 48 小時；折價券＝原價（含加減項）30%，不超過實付", () => {
+  const deadline = pricing.cancelDeadlineAt("2026-10-05", "11:00-11:30", CFG);
+  assert.equal(deadline.toISOString(), new Date("2026-10-03T11:00:00+08:00").toISOString());
+  assert.equal(pricing.cancelDeadlineAt("2026-10-05", "11:00-11:30", { cancelHoursBefore: 24 }).toISOString(), new Date("2026-10-04T11:00:00+08:00").toISOString());
+  assert.equal(pricing.cancelCouponAmount({ list_price: 100, adjust_amount: 0, paid_amount: 80 }, CFG), 30);
+  assert.equal(pricing.cancelCouponAmount({ list_price: 100, adjust_amount: 10, paid_amount: 88 }, CFG), 33);
+  assert.equal(pricing.cancelCouponAmount({ list_price: 100, adjust_amount: 0, paid_amount: 20 }, CFG), 20, "不超過實付");
+  assert.equal(pricing.cancelCouponAmount({ list_price: 100, adjust_amount: 0, paid_amount: 0 }, CFG), 0, "0 元單不發券");
+  assert.equal(pricing.cancelCouponAmount({ list_price: 100, locked_price: 80 }, CFG), 30, "舊資料沒有 paid_amount 用 locked_price");
 });
 test("V-WAGE-01", "基本工資：依生效日取值；低於標準的時薪／月薪自動上調", () => {
   if (!fin) throw new Error("finance.js 無法載入");

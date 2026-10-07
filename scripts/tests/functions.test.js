@@ -95,6 +95,8 @@ function nextBusinessDay(from) {
 let OPEN_DAY = nextBusinessDay(TODAY);
 while (isPastCutoff(OPEN_DAY, {}, CFG)) OPEN_DAY = nextBusinessDay(OPEN_DAY);
 const TODAY_IS_BUSINESS = CFG.businessWeekdays.includes(weekdayOf(TODAY));
+// 還能取消的最近營業日：取餐時段開始前 48 小時才能取消（WINDOW 從 00:00 開始，所以至少要大後天）
+const CANCEL_DAY = nextBusinessDay(addDays(TODAY, 2));
 
 // ── 測試資料 ──
 const V1 = "zz-test-vendor";
@@ -323,32 +325,47 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   });
 
   // ════ 3.7 我的餐點：取消、修改、捐出、QR ════
-  await test("C-MY-14", "截單前取消：cancelled、customer、份數與券退回", async () => {
-    const c = await coupon(uids.A, V1, 100);
-    const r = expectOk(await cart([line({ coupon_id: c })]));
+  await test("C-MY-14", "取餐 48 小時前取消：cancelled、customer、不退現金改發原價 30% 折價券、份數與原本用的券退回", async () => {
+    const c = await coupon(uids.A, V1, 10);
+    const r = expectOk(await cart([line({ coupon_id: c, pickup_date: CANCEL_DAY })]));
     const id = expectOk(await A.call("confirmLinePayPayment", { order_id: r.order_id })).lock_ids[0];
-    const before = (await get(counterId(V1, OPEN_DAY, WINDOW))).count;
-    expectOk(await A.call("cancelLock", { lock_id: id }));
+    const placed = await get(`locks/${id}`);
+    const before = (await get(counterId(V1, CANCEL_DAY, WINDOW))).count;
+    const res = expectOk(await A.call("cancelLock", { lock_id: id }));
     const l = await get(`locks/${id}`);
     eq(l.status, "cancelled"); eq(l.cancel_reason, "customer");
-    eq((await get(counterId(V1, OPEN_DAY, WINDOW))).count, before - 1, "slot_counters");
+    eq(l.refunded_amount, 0, "不退現金");
+    eq(l.kept_amount, placed.paid_amount, "款項留在店家");
+    const expected = Math.min(Math.round((placed.list_price + (placed.adjust_amount || 0)) * CFG.cancelCouponRate), placed.paid_amount);
+    assert(expected > 0, `預期折價券面額應 > 0（實付 ${placed.paid_amount}）`);
+    eq(l.refund_coupon_amount, expected, "折價券面額");
+    eq(res.coupon.discount, expected);
+    const issued = await get(`coupons/${l.refund_coupon_id}`);
+    eq([issued.status, issued.user_id, issued.vendor_id, issued.tier, issued.discount, issued.source_lock_id], ["owned", uids.A, V1, "refund", expected, id]);
+    const days = (issued.expires_at.toMillis() - Date.now()) / 86400000;
+    assert(days > CFG.couponValidDays - 0.1 && days <= CFG.couponValidDays, `效期約 ${CFG.couponValidDays} 天（實際 ${days.toFixed(2)}）`);
+    eq((await get(counterId(V1, CANCEL_DAY, WINDOW))).count, before - 1, "slot_counters");
     const cp = await get(`coupons/${c}`);
     eq(cp.status, "owned"); assert(!cp.lock_id, "lock_id 應清掉");
+    // 退的券可以拿來下一筆訂單折抵
+    const again = expectOk(await cart([line({ coupon_id: l.refund_coupon_id, pickup_date: CANCEL_DAY })]));
+    assert(again.order_id, "退款券可用於下單");
   });
 
-  await test("C-MY-14b", "同一筆同時按兩次取消：份數只退一次", async () => {
-    const { id } = await lock(uids.A);
-    await db.doc(counterId(V1, OPEN_DAY, WINDOW)).set({ count: 50 }, { merge: true });
+  await test("C-MY-14b", "同一筆同時按兩次取消：份數只退一次、折價券只發一張", async () => {
+    const { id } = await lock(uids.A, { pickup_date: CANCEL_DAY });
+    await db.doc(counterId(V1, CANCEL_DAY, WINDOW)).set({ count: 50 }, { merge: true });
     const rs = await Promise.all([A.call("cancelLock", { lock_id: id }), A.call("cancelLock", { lock_id: id })]);
-    const n = (await get(counterId(V1, OPEN_DAY, WINDOW))).count;
+    const n = (await get(counterId(V1, CANCEL_DAY, WINDOW))).count;
     eq(n, 49, `成功 ${rs.filter((r) => r.ok).length} 次，份數`);
+    eq((await db.collection("coupons").where("source_lock_id", "==", id).get()).size, 1, "折價券張數");
   });
 
-  await test("C-MY-15", "截單後不能取消", async () => {
-    if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
-    const { id } = await lock(uids.A, { pickup_date: TODAY });
+  await test("C-MY-15", "取餐前 48 小時內不能取消（明天的單）", async () => {
+    const { id } = await lock(uids.A, { pickup_date: addDays(TODAY, 1) });
     const r = expectCode(await A.call("cancelLock", { lock_id: id }), "failed-precondition");
-    assert(/截單/.test(r.message), r.message);
+    assert(/48 小時/.test(r.message), r.message);
+    eq((await get(`locks/${id}`)).status, "locked");
   });
 
   await test("C-MY-16", "轉讓取得的不能退款", async () => {

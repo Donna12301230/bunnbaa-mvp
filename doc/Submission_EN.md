@@ -39,7 +39,7 @@ BunnBaa is a pre-order "lock" platform:
 3. **Pass it on** — a diner who can't come can resell, gift, or donate the meal as a free charity meal. Unclaimed meals become charity meals automatically.
 4. **Pick up** — a signed QR code is scanned at the counter.
 
-Vendors pay a flat NT$1,999/month (first month free) with zero commission.
+Vendors pay no monthly fee: the platform takes a 5% commission on each meal sold, deducted at payout.
 
 ### How we use Google AI (Gemini)
 
@@ -72,7 +72,7 @@ Gemini also writes plain-language discount explanations (`onLockCreated`), draft
 
 ### Impact
 
-- **Vendors:** cook to confirmed, prepaid demand; purchase and prep lists built for them; onboard with one photo; no commission.
+- **Vendors:** cook to confirmed, prepaid demand; purchase and prep lists built for them; onboard with one photo; no monthly fee, just 5% per meal sold.
 - **Diners:** up to 20% off for booking early; a guaranteed meal with no queue; find meals in one sentence; resell or gift if plans change.
 - **Community:** less food cooked for nobody. Meals rescued through AI matching (`claimed_by_match`), resold meals (`resold_and_fulfilled`) and charity meals claimed are all recorded in Firestore, so impact is measured, not estimated.
 

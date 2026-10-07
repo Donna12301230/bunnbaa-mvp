@@ -437,16 +437,19 @@ async function seedRewards(writer, revenueByVendorWeek) {
   const cafeNow = revenueByVendorWeek[`${cafe}|${thisWeek}`] || 0;
   await writer.set(periods.doc(thisWeek), { period_id: thisWeek, net_revenue: cafeNow, tickets: Math.floor(cafeNow / 100) }, { merge: true });
   await writer.set(db.collection("rewardStatus").doc(cafe), {
-    vendor_name: "仁和雅咖啡", tickets_so_far: Math.floor(cafeNow / 100), min_tickets: 100, amount_to_open: Math.max(0, (100 - Math.floor(cafeNow / 100)) * 100),
+    vendor_name: "仁和雅咖啡", tickets_so_far: Math.floor(cafeNow / 100), revenue_so_far: cafeNow, min_revenue: DEFAULT_PLATFORM_CONFIG.minRevenueToOpen,
+    amount_to_open: Math.max(0, DEFAULT_PLATFORM_CONFIG.minRevenueToOpen - cafeNow),
     pool_open: true, pool_period: lastWeek, draw_deadline: deadline, remaining_total: Object.values(remaining).reduce((s, n) => s + n, 0), paused: false,
   });
   const wm = DEMO_VENDORS[1].id;
-  const wmRevenue = revenueByVendorWeek[`${wm}|${lastWeek}`] || 0;
+  // 上週累積淨營業額 6,300（63 張抽獎券）沒到 1 萬開池門檻，結轉到本週
   const wmTickets = 63;
-  await writer.set(db.collection("vendors").doc(wm).collection("rewardPeriods").doc(lastWeek), { period_id: lastWeek, status: "carried", net_revenue: Math.round(wmRevenue * 0.5), total_tickets: wmTickets });
-  await writer.set(db.collection("vendors").doc(wm).collection("rewardPeriods").doc(thisWeek), { period_id: thisWeek, carried_revenue: Math.round(wmRevenue * 0.5), carried_tickets: wmTickets, net_revenue: 0, tickets: 0 }, { merge: true });
+  const wmCarried = wmTickets * DEFAULT_PLATFORM_CONFIG.ticketUnit;
+  await writer.set(db.collection("vendors").doc(wm).collection("rewardPeriods").doc(lastWeek), { period_id: lastWeek, status: "carried", net_revenue: wmCarried, total_revenue: wmCarried, total_tickets: wmTickets });
+  await writer.set(db.collection("vendors").doc(wm).collection("rewardPeriods").doc(thisWeek), { period_id: thisWeek, carried_revenue: wmCarried, carried_tickets: wmTickets, net_revenue: 0, tickets: 0 }, { merge: true });
   await writer.set(db.collection("rewardStatus").doc(wm), {
-    vendor_name: "王媽媽便當", tickets_so_far: wmTickets, min_tickets: 100, amount_to_open: (100 - wmTickets) * 100, pool_open: false, pool_period: null, draw_deadline: null, remaining_total: 0, paused: false,
+    vendor_name: "王媽媽便當", tickets_so_far: wmTickets, revenue_so_far: wmCarried, min_revenue: DEFAULT_PLATFORM_CONFIG.minRevenueToOpen,
+    amount_to_open: DEFAULT_PLATFORM_CONFIG.minRevenueToOpen - wmCarried, pool_open: false, pool_period: null, draw_deadline: null, remaining_total: 0, paused: false,
   });
   console.log(`rewards: 仁和雅 ${lastWeek} pool NT$${pool}, ${N} tickets (${JSON.stringify(counts)}), demo customer ${demoUid ? "found" : "not found"}`);
 }

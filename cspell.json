@@ -19,8 +19,8 @@
     "mklink",
     "mnifr",
     "muoa",
-    "nosniff",
     "noshow",
+    "nosniff",
     "pitr",
     "preorder",
     "qrcode",
@@ -31,11 +31,17 @@
     "shadcn",
     "stfu",
     "subcollection",
+    "uids",
     "unsub",
     "vendoruser",
     "whatif",
     "winget",
-    "wouter"
+    "wouter",
+    "zaoan"
+  ],
+  "ignoreRegExpList": [
+    "/\\b[A-Za-z0-9]{20}\\b/g",
+    "/\\b[A-Z0-9]{8}\\b/g"
   ],
   "ignorePaths": [
     "**/node_modules/**",

@@ -3,20 +3,37 @@ import { arrayUnion, doc, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Lock } from "@/types";
 
-/**
- * 轉讓市集的接手價（規格 §4.1）：早鳥價＋加減，折價券前。接手者付這個價錢，
- * 原付款人退回他實付的金額（functions/src/orders.js resalePriceOf 同一套算法）。
- */
-export function resalePrice(lock: Pick<Lock, "list_price" | "early_bird_amount" | "adjust_amount" | "locked_price" | "coupon_discount">): number {
+type PriceFields = Pick<Lock, "list_price" | "early_bird_amount" | "adjust_amount" | "locked_price" | "coupon_discount">;
+
+/** 預設轉讓價（規格 §4.1）：早鳥價＋加減，折價券前。轉讓人沒自訂時用這個 */
+export function defaultResalePrice(lock: PriceFields): number {
   if (Number.isFinite(lock.list_price) && Number.isFinite(lock.early_bird_amount)) {
     return Math.max(0, lock.list_price! - lock.early_bird_amount! + (lock.adjust_amount ?? 0));
   }
   return Math.max(0, (lock.locked_price ?? 0) + (lock.coupon_discount ?? 0));
 }
 
-/** 原付款人被接手後會拿回的金額（付款人實付；舊資料用 locked_price） */
-export function refundOnTakeover(lock: Pick<Lock, "paid_amount" | "locked_price">): number {
-  return Number.isFinite(lock.paid_amount) ? lock.paid_amount! : lock.locked_price ?? 0;
+/** 轉讓價上限＝原價（品項原價＋加減項，不含早鳥折扣）：不能加價賣 */
+export function resaleCap(lock: PriceFields): number {
+  return Number.isFinite(lock.list_price) ? Math.max(0, lock.list_price! + (lock.adjust_amount ?? 0)) : defaultResalePrice(lock);
+}
+
+/**
+ * 接手者要付的轉讓價：轉讓人自訂的 resale_price（0 ～ 原價），沒填用預設轉讓價
+ * （functions/src/orders.js resalePriceOf 同一套算法，金額以伺服器為準）。
+ */
+export function resalePrice(lock: PriceFields & Pick<Lock, "resale_price">): number {
+  if (Number.isInteger(lock.resale_price) && lock.resale_price! >= 0) return Math.min(lock.resale_price!, resaleCap(lock));
+  return defaultResalePrice(lock);
+}
+
+/**
+ * 原付款人被接手後會拿回的金額：他實付與轉讓價取小的（舊資料實付用 locked_price）。
+ * 賣得比實付低，差額自己吸收；賣得比實付高，多的留在店家（LINE Pay 退款不能超過原付款額）。
+ */
+export function refundOnTakeover(lock: PriceFields & Pick<Lock, "paid_amount" | "resale_price">, price: number = resalePrice(lock)): number {
+  const paid = Number.isFinite(lock.paid_amount) ? lock.paid_amount! : lock.locked_price ?? 0;
+  return Math.min(paid, price);
 }
 
 // 免費領取／接受贈送都是 client 直接寫 locks，接手時要把原持有人記進

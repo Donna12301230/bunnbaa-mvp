@@ -11,6 +11,8 @@ export const BASE_TIER = { code: "t95", label: "九五折券", labelEn: "5% off"
 export const ALL_TIERS = [...COUPON_TIERS, BASE_TIER];
 
 export function tierLabel(code: string): string {
+  // 取消訂單退的折價券（functions/src/orders.js cancelForCoupon），不經回饋池
+  if (code === "refund") return tr("取消退款券", "Cancellation coupon");
   const t = ALL_TIERS.find((x) => x.code === code);
   return t ? tr(t.label, t.labelEn) : code;
 }
@@ -52,4 +54,11 @@ export function allocatePool(pool: number, tickets: number) {
   }
   counts[BASE_TIER.code] = N - upgraded;
   return { counts, spent: P - remaining, leftover: remaining };
+}
+
+/** 開池進度（0–100）：累積淨營業額 ÷ 開池門檻。舊的 rewardStatus 沒有營業額欄位時用「還差多少」回推 */
+export function openProgress(st: { revenue_so_far?: number; min_revenue?: number; amount_to_open: number }, fallbackMin = 10000): number {
+  const min = st.min_revenue ?? fallbackMin;
+  const so = st.revenue_so_far ?? Math.max(0, min - st.amount_to_open);
+  return min > 0 ? Math.max(0, Math.min(100, (so / min) * 100)) : 0;
 }

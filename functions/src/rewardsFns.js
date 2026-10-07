@@ -5,11 +5,12 @@
 //   status: accumulating|carried|pooled|closed|paused, pool, allocation{code:n}, remaining{code:n},
 //   draw_deadline, leftover, unclaimed_amount
 // rewardStatus/{vendorId}（公開，只有進度，不含金額）：
-//   tickets_so_far, min_tickets, amount_to_open（再 X 元開獎）, pool_open, draw_deadline, pool_period
+//   tickets_so_far, revenue_so_far, min_revenue, amount_to_open（再 X 元開獎）, pool_open, draw_deadline, pool_period
 // userSpend/{vendorId}_{uid}：carry（未滿 100 元的餘額，結轉下一期）, cumulative, tickets_issued
 // rewardTickets/{id}：vendor_id, user_id, period_id, status: pending|drawable|drawn|forfeited|revoked, pool_period, coupon_id
 // coupons/{id}：vendor_id, tier, discount, status: issued|owned|redeemed|expired|unclaimed, pool_period,
 //   user_id, owned_at, expires_at, lock_id
+//   tier: "refund" 是取消訂單退的折價券（orders.js cancelLock 直接發成 owned，不經回饋池；source_lock_id 記來源訂單）
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { Timestamp } = require("firebase-admin/firestore");
@@ -33,14 +34,16 @@ async function refreshRewardStatus(vendorId) {
   const current = mondayOf(taipeiToday());
   const cur = (await periodRef(vendorId, current).get()).data() || {};
   const ticketsSoFar = (cur.tickets || 0) + (cur.carried_tickets || 0);
+  const revenueSoFar = (cur.net_revenue || 0) + (cur.carried_revenue || 0);
   const pooled = await db().collection("vendors").doc(vendorId).collection("rewardPeriods").where("status", "==", "pooled").get();
   const open = pooled.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.id.localeCompare(a.id))[0];
   const vendor = (await db().collection("vendors").doc(vendorId).get()).data() || {};
   await db().collection("rewardStatus").doc(vendorId).set({
     vendor_name: vendor.name || "",
     tickets_so_far: ticketsSoFar,
-    min_tickets: config.minTicketsToOpen,
-    amount_to_open: Math.max(0, (config.minTicketsToOpen - ticketsSoFar) * config.ticketUnit),
+    revenue_so_far: Math.max(0, revenueSoFar),
+    min_revenue: config.minRevenueToOpen,
+    amount_to_open: Math.max(0, config.minRevenueToOpen - revenueSoFar),
     pool_open: !!open,
     pool_period: open?.id || null,
     draw_deadline: open?.draw_deadline || null,
@@ -134,7 +137,8 @@ async function uncountLock(lockRef) {
 }
 
 /**
- * 結算上一期（§8.1、§8.4）：抽獎券 ≥ 100 張才開池，否則營業額與抽獎券結轉下一期（不設強制開池）。
+ * 結算上一期（§8.1、§8.4）：累積淨營業額（含前期結轉）滿 minRevenueToOpen（1 萬元）才開池，
+ * 回饋池＝營業額 × rewardRate（5%）；否則營業額與抽獎券結轉下一期（不設強制開池）。
  * 冪等：已 pooled／carried／paused 的期別不重算。
  */
 async function closePeriodFor(vendor, periodId, config) {
@@ -152,7 +156,7 @@ async function closePeriodFor(vendor, periodId, config) {
   const pendingAll = await db().collection("rewardTickets").where("vendor_id", "==", vendor.id).where("status", "==", "pending").get();
   const pending = { docs: pendingAll.docs.filter((d) => (d.data().period_id || "") <= periodId) };
   const N = pending.docs.length;
-  if (N < config.minTicketsToOpen) {
+  if (totalRevenue < config.minRevenueToOpen || N === 0) {
     await ref.set({ period_id: periodId, status: "carried", total_revenue: totalRevenue, total_tickets: N, closed_at: FieldValue.serverTimestamp() }, { merge: true });
     await periodRef(vendor.id, nextId).set({ period_id: nextId, carried_revenue: totalRevenue, carried_tickets: N }, { merge: true });
     return "carried";

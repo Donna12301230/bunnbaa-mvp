@@ -5,6 +5,7 @@ import { collection, doc, getDoc, getDocs, query, where } from "firebase/firesto
 import { AlertCircle, AlertTriangle, ArrowLeft, MapPin, Phone, Plus, Sparkles, Star, Store, UtensilsCrossed } from "lucide-react";
 import { db } from "@/lib/firebase";
 import type { Vendor, MenuItem } from "@/types";
+import { catalogOf, groupByCatalog } from "@/lib/menuCatalog";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ function scrollToCategory(category: string) {
 export default function VendorPage() {
   const { id } = useParams<{ id: string }>();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCatalog, setActiveCatalog] = useState<string | null>(null);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const { add, vendorId: cartVendorId } = useCart();
   const [, navigate] = useLocation();
@@ -65,16 +67,22 @@ export default function VendorPage() {
     enabled: !!id,
   });
 
-  // 依 category 分組，保留品項在資料庫裡原本的順序，只是把同分類的拉在一起。
+  // 目錄 > 分類 兩層（lib/menuCatalog.ts）：店家有用目錄、而且不只一個目錄時，先切目錄再看分類；
+  // 否則維持只有分類一層。分類保留品項在資料庫裡原本的順序，只是把同分類的拉在一起。
+  const categoryOf = (item: MenuItem) => loc(item, "category").trim() || tr("其他", "Other");
+  const catalogGroups = useMemo(() => groupByCatalog(items, vendor?.menu_catalogs, categoryOf), [items, vendor?.menu_catalogs]); // eslint-disable-line react-hooks/exhaustive-deps
+  const showCatalogs = catalogGroups.length > 1 && catalogGroups.some((g) => g.catalog);
+  const effectiveCatalog = showCatalogs ? (catalogGroups.find((g) => g.catalog === activeCatalog) ?? catalogGroups[0]).catalog : null;
   const categories = useMemo(() => {
+    const shown = showCatalogs ? items.filter((item) => catalogOf(item) === effectiveCatalog) : items;
     const groups = new Map<string, MenuItem[]>();
-    for (const item of items) {
-      const cat = loc(item, "category").trim() || tr("其他", "Other");
+    for (const item of shown) {
+      const cat = categoryOf(item);
       if (!groups.has(cat)) groups.set(cat, []);
       groups.get(cat)!.push(item);
     }
     return [...groups.entries()];
-  }, [items]);
+  }, [items, showCatalogs, effectiveCatalog]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rating = useMemo(() => {
     if (!id) return null;
@@ -196,6 +204,29 @@ export default function VendorPage() {
           <EmptyState size="compact" icon={<UtensilsCrossed size={32} />} title={tr("這家商家目前沒有上架品項", "This vendor has no items available right now")} />
         ) : (
           <>
+            {showCatalogs && (
+              <div className="mb-5 flex gap-2 overflow-x-auto bb-thin-scroll" role="tablist" aria-label={tr("菜單目錄", "Menu catalogs")}>
+                {catalogGroups.map((g) => (
+                  <button
+                    key={g.catalog || "_none"}
+                    type="button"
+                    role="tab"
+                    aria-selected={effectiveCatalog === g.catalog}
+                    onClick={() => {
+                      setActiveCatalog(g.catalog);
+                      setActiveCategory(null);
+                    }}
+                    className={cn(
+                      "shrink-0 h-11 px-5 rounded-full text-base font-semibold border transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      effectiveCatalog === g.catalog ? "border-ink bg-primary text-primary-foreground" : "border-ink bg-card hover:bg-accent"
+                    )}
+                  >
+                    {g.catalog ? loc(g.categories[0].items[0], "catalog") : tr("其他", "Other")}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {categories.length > 1 && (
               <div className="sticky top-16 z-10 -mx-4 md:-mx-6 mb-6 bg-background/90 backdrop-blur-md border-b border-border">
                 <div className="flex gap-2 overflow-x-auto px-4 md:px-6 py-3 bb-thin-scroll">

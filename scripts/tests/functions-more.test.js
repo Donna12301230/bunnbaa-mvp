@@ -111,6 +111,8 @@ function nextBusinessDay(from) {
 let OPEN_DAY = nextBusinessDay(TODAY);
 while (isPastCutoff(OPEN_DAY, {}, CFG)) OPEN_DAY = nextBusinessDay(OPEN_DAY);
 const TODAY_IS_BUSINESS = CFG.businessWeekdays.includes(weekdayOf(TODAY));
+// 還能取消的最近營業日：取餐時段開始前 48 小時才能取消（WINDOW 從 00:00 開始，所以至少要大後天）
+const CANCEL_DAY = nextBusinessDay(addDays(TODAY, 2));
 const prevBusinessDays = (n) => {
   const out = [];
   let d = TODAY;
@@ -312,7 +314,7 @@ function geohash(lat, lng, precision = 7) {
 
   // ════ 3.14 回饋池結算、券過期、抽獎期結束、到期提醒、退款扣回 ════
   const P = addDays(mondayOf(TODAY), -7); // 上一期
-  await test("C-RWD-03 C-RWD-17", "不到 100 張不開池：carried、結轉下一期、rewardStatus 再 X 元開獎；重跑不重算", async () => {
+  await test("C-RWD-03 C-RWD-17", "累積淨營業額不到 1 萬不開池：carried、結轉下一期、rewardStatus 再 X 元開獎；重跑不重算", async () => {
     const VR = await mkVendor(vid("carry"));
     for (let i = 0; i < 60; i++) {
       await db.collection("rewardTickets").add({ vendor_id: VR, user_id: `zz2-u${i % 7}-${RUN}`, period_id: P, status: "pending", created_at: Timestamp.now() });
@@ -322,12 +324,12 @@ function geohash(lat, lng, precision = 7) {
     const next = await get(`vendors/${VR}/rewardPeriods/${mondayOf(TODAY)}`);
     eq([next.carried_revenue, next.carried_tickets], [6000, 60], "結轉");
     const st = await get(`rewardStatus/${VR}`);
-    eq([st.pool_open, st.tickets_so_far, st.amount_to_open], [false, 60, 4000]);
+    eq([st.pool_open, st.tickets_so_far, st.revenue_so_far, st.min_revenue, st.amount_to_open], [false, 60, 6000, 10000, 4000]);
     eq(expectOk(await OWNER.call("triggerRewardPeriodNow", { vendor_id: VR, period_id: P }))[VR], "carried");
     eq((await get(`vendors/${VR}/rewardPeriods/${mondayOf(TODAY)}`)).carried_tickets, 60, "重跑不應再結轉一次");
   });
 
-  await test("C-RWD-04 C-RWD-17", "§8.4 範例（100,000 元、1,000 張）實際開池：分配、leftover、發 1,000 張券；重跑不重複發券", async () => {
+  await test("C-RWD-04 C-RWD-17", "100,000 元、1,000 張實際開池（回饋 5%）：回饋池 5,000 剛好是保底、全部九五折券；重跑不重複發券", async () => {
     const VP = await mkVendor(vid("pool"));
     let batch = db.batch();
     for (let i = 0; i < 1000; i++) {
@@ -338,8 +340,8 @@ function geohash(lat, lng, precision = 7) {
     await db.doc(`vendors/${VP}/rewardPeriods/${P}`).set({ period_id: P, net_revenue: 100000, tickets: 1000 });
     eq(expectOk(await OWNER.call("triggerRewardPeriodNow", { vendor_id: VP, period_id: P }))[VP], "pooled");
     const p = await get(`vendors/${VP}/rewardPeriods/${P}`);
-    eq(p.pool, 10000); eq(p.leftover, 20);
-    eq(Object.fromEntries(Object.entries(p.allocation).sort()), { free: 15, t50: 79, t95: 906 });
+    eq(p.pool, 5000); eq(p.leftover, 0);
+    eq(Object.fromEntries(Object.entries(p.allocation).sort()), { free: 0, t50: 0, t95: 1000 });
     const issued = await db.collection("coupons").where("vendor_id", "==", VP).where("pool_period", "==", P).get();
     eq(issued.size, 1000, "發出的券");
     const drawable = await db.collection("rewardTickets").where("vendor_id", "==", VP).where("status", "==", "drawable").get();
@@ -413,7 +415,7 @@ function geohash(lat, lng, precision = 7) {
   await test("C-RWD-13", "用券的訂單取消時券已過期 → 不退券（expired）", async () => {
     const U = await freshUser("cpx");
     const c = await coupon(U.uid, VO, 1000);
-    const r = expectOk(await U.call("createCartLinePayReservation", { lines: [line({ coupon_id: c })] }));
+    const r = expectOk(await U.call("createCartLinePayReservation", { lines: [line({ coupon_id: c, pickup_date: CANCEL_DAY })] }));
     const id = expectOk(await U.call("confirmLinePayPayment", { order_id: r.order_id })).lock_ids[0];
     await db.doc(`coupons/${c}`).update({ expires_at: Timestamp.fromMillis(Date.now() - 1000) });
     expectOk(await U.call("cancelLock", { lock_id: id }));
@@ -785,15 +787,18 @@ function geohash(lat, lng, precision = 7) {
   });
 
   // ════ 1b. 撥款 ════
-  await test("F-01 A-PAY-01", "手動結算：已取餐＋愛心餐＋轉讓取餐計入、未取餐的不算；重按不重複結算", async () => {
+  await test("F-01 A-PAY-01", "手動結算：已取餐＋愛心餐＋轉讓取餐＋取消換券留下的款項計入，未取餐、已退款的不算；扣 5% 抽成；重按不重複結算", async () => {
     const VS3 = await mkVendor(vid("pay"));
     await lock(`zz2-pa-${RUN}`, VS3, { status: "fulfilled", locked_price: 80 });
     await lock(`zz2-pb-${RUN}`, VS3, { status: "charity", locked_price: 100 });
     await lock(`zz2-pc-${RUN}`, VS3, { status: "resold_and_fulfilled", locked_price: 50 });
     await lock(`zz2-pd-${RUN}`, VS3, { status: "locked", locked_price: 70 });
+    await lock(`zz2-pe-${RUN}`, VS3, { status: "cancelled", cancel_reason: "customer", locked_price: 60, kept_amount: 60, refunded_amount: 0 }); // 取消換券：款項留在店家
+    await lock(`zz2-pf-${RUN}`, VS3, { status: "cancelled", cancel_reason: "disaster", locked_price: 90, refunded_amount: 90 }); // 停班全額退款：不撥
     const r = expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VS3 }));
     const p = await get(`payouts/${r.payout_id}`);
-    eq([p.amount, p.lock_count], [230, 3]);
+    // 抽成逐份四捨五入：80→4、100→5、50→3、60→3
+    eq([p.gross_amount, p.commission_amount, p.amount, p.lock_count], [290, 15, 275, 4]);
     eq(expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VS3 })).payout_id, null, "重按");
   });
 
@@ -1109,21 +1114,15 @@ function geohash(lat, lng, precision = 7) {
     eq(titles, ["午餐 1 份未取餐已轉為愛心餐", "早餐 1 份未取餐已轉為愛心餐"]);
   });
 
-  await test("V-BIL-02 V-ACC-06", "billingCycle：到期 3 天 grace＋提醒一次；8 天 suspended＋通知、下單被擋", async () => {
-    const day = 86400000;
-    const [og, os] = [`zz2-owner-grace-${RUN}`, `zz2-owner-susp-${RUN}`];
-    const VGR = await mkVendor(vid("grace"), { owner_uid: og, subscription_end_date: Timestamp.fromMillis(Date.now() - 3 * day) });
-    const VSU = await mkVendor(vid("susp"), { owner_uid: os, subscription_end_date: Timestamp.fromMillis(Date.now() - 8 * day) });
-    await mkBento(VSU);
-    await runSchedule("finance.js", "billingCycle");
-    await runSchedule("finance.js", "billingCycle");
-    eq((await get(`vendors/${VGR}`)).billing.status, "grace");
-    eq((await get(`vendors/${VSU}`)).billing.status, "suspended");
-    eq((await notes(og, { title: /維護費已到期/ })).length, 1, "寬限提醒同一天只一次");
-    eq((await notes(os, { title: /已暫停接新訂單/ })).length, 1, "暫停通知只一次");
-    const U = await freshUser("susp");
-    const r = expectCode(await U.call("createCartLinePayReservation", { lines: [{ menu_item_id: `${VSU}-bento`, pickup_date: OPEN_DAY, pickup_window: WINDOW, quantity: 1, slots: [{ choice: "default" }, { choice: "default" }], coupon_id: await coupon(U.uid, VSU, 1000) }] }), "failed-precondition");
-    assert(/暫停接單/.test(r.message), r.message);
+  await test("V-FEE-02", "撥款扣平台抽成 5%：gross、commission（逐份四捨五入）、amount＝gross − commission；重跑不重複撥", async () => {
+    const VC = await mkVendor(vid("commission"));
+    const buyer = `zz2-cm-${RUN}`;
+    for (const price of [80, 90, 110]) await lock(buyer, VC, { status: "fulfilled", locked_price: price, created_at: Timestamp.now() });
+    await lock(buyer, VC, { status: "locked", locked_price: 500, created_at: Timestamp.now() }); // 還沒取餐的不撥
+    const id = expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VC })).payout_id;
+    const p = await get(`payouts/${id}`);
+    eq([p.gross_amount, p.commission_amount, p.amount, p.commission_rate, p.lock_count], [280, 4 + 5 + 6, 265, CFG.commissionRate, 3]);
+    eq(expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VC })).payout_id, null, "已撥過的不重複");
   });
 
   await test("V-WAGE-02", "updateVendorCosts：時薪、月薪低於基本工資被擋；高於可存", async () => {
@@ -1139,7 +1138,7 @@ function geohash(lat, lng, precision = 7) {
     eq([v.hourly_wage, v.staff_salaries], [wage.hourly + 4, [wage.monthly + 500]]);
   });
 
-  await test("V-REV-02", "本月收益看板：已確定營收與份數對得上、維護費 1,999、淨利＝營收 − 各項成本", async () => {
+  await test("V-REV-02", "本月收益看板：已確定營收與份數對得上、平台抽成 5%（沒有月費）、淨利＝營收 − 各項成本", async () => {
     const VRV = await mkVendor(vid("rev"), { fixed_costs: 3000, staff_salaries: [30000], hourly_wage: 200 });
     const ids = await cloneCatalog("cafe-renheya-demo", VRV);
     const item = ids.classic || Object.values(ids)[0];
@@ -1153,8 +1152,9 @@ function geohash(lat, lng, precision = 7) {
     await mk(past[0] || TODAY, "cancelled", 500); // 取消的不算
     const r = expectOk(await OWNER.call("refreshRevenueForecast", { vendor_id: VRV, month }));
     eq([r.confirmed_revenue, r.confirmed_qty], [expRevenue, expQty], "已確定");
-    eq([r.maintenance_fee, r.staff_salary, r.other_fixed_costs, r.hourly_wage], [1999, 30000, 3000, 200]);
-    const net = r.revenue - r.material_cost - r.labor_cost - r.payment_fee - r.maintenance_fee - r.staff_salary - r.other_fixed_costs;
+    eq([r.maintenance_fee, r.commission_rate, r.staff_salary, r.other_fixed_costs, r.hourly_wage], [undefined, CFG.commissionRate, 30000, 3000, 200]);
+    assert(r.commission_fee >= Math.floor(expRevenue * CFG.commissionRate) - expQty && r.commission_fee > 0, `抽成 ${r.commission_fee}（已確定營收 ${expRevenue}）`);
+    const net = r.revenue - r.material_cost - r.labor_cost - r.payment_fee - r.commission_fee - r.staff_salary - r.other_fixed_costs;
     assert(Math.abs(net - r.net_profit) <= 3, `淨利 ${r.net_profit} vs 手算 ${net}`);
     assert(r.material_cost > 0 && r.labor_cost > 0, `材料 ${r.material_cost}、人工 ${r.labor_cost}`);
     eq(r.by_meal_period.lunch.qty, expQty, "依餐期");
@@ -1215,19 +1215,18 @@ function geohash(lat, lng, precision = 7) {
     eq([plan.reminder_sent_lunch ?? null, plan.charity_converted_lunch ?? null, plan.charity_closed_lunch ?? null], [null, null, null]);
   });
 
-  await test("V-ACC-06", "暫停接單（維護費逾期，即時判斷）：計畫下單被擋；已成立的訂單照常核銷、截單、取消", async () => {
-    const VS = await mkVendor(vid("suspall"), { subscription_end_date: Timestamp.fromMillis(Date.now() - 8 * 86400000) });
+  await test("V-ACC-06", "沒有月費：舊資料訂閱已過期的店照常接單（計畫、單點）、核銷、截單、取消換券", async () => {
+    const VS = await mkVendor(vid("suspall"), { subscription_end_date: Timestamp.fromMillis(Date.now() - 8 * 86400000), billing: { status: "suspended" } });
     await mkBento(VS);
     const U = await freshUser("suspall");
     const planRef = db.collection("meal_plans").doc(uniq("zzmp"));
     await planRef.set({ vendor_id: VS, name: "測試週餐", label: "週方案", days: 3, price_per_meal: 90, menu_item_id: `${VS}-bento` });
-    const p = expectCode(await U.call("createPlanLinePayReservation", { plan_id: planRef.id, start_date: OPEN_DAY, pickup_window: WINDOW }), "failed-precondition", "計畫");
-    assert(/暫停接單/.test(p.message), p.message);
-    // 已成立的訂單
+    const p = expectOk(await U.call("createPlanLinePayReservation", { plan_id: planRef.id, start_date: OPEN_DAY, pickup_window: WINDOW, preview: true }), "計畫");
+    eq(p.days.length, 3, "不再因訂閱到期擋下單");
     const later = await lock(U.uid, VS, { pickup_date: OPEN_DAY });
     const r = expectOk(await OWNER.call("triggerLockOrdersNow", { vendor_id: VS, date: OPEN_DAY, force: true }), "截單");
     assert(!r.skipped && (await get(`vendors/${VS}/prepPlans/${OPEN_DAY}`))?.locked_at, "產生備料");
-    expectOk(await U.call("cancelLock", { lock_id: (await lock(U.uid, VS, { pickup_date: OPEN_DAY })).id }), "截單前取消");
+    expectOk(await U.call("cancelLock", { lock_id: (await lock(U.uid, VS, { pickup_date: CANCEL_DAY })).id }), "48 小時前取消");
     if (TODAY_IS_BUSINESS) {
       const today = await lock(U.uid, VS, { pickup_date: TODAY });
       expectOk(await OWNER.call("completePickup", { vendor_id: VS, lock_id: today.id }), "核銷");
@@ -1282,12 +1281,13 @@ function geohash(lat, lng, precision = 7) {
     });
 
     await test("C-BNT-24", "第四道選候選菜也算許願：sideWishes +1、取消 −1；weekly_cap 滿了也擋第四道", async () => {
-      const wid = `sideWishes/${VX}_${OPEN_DAY}_${MAINS}_0_0`;
+      // 用還能取消的日期（取餐前 48 小時才能取消）
+      const wid = `sideWishes/${VX}_${CANCEL_DAY}_${MAINS}_0_0`;
       const before = (await get(wid))?.count || 0;
-      const r = expectOk(await reserve({ extra_side: { slot: 0, candidate: 0, mode: "backup" } }));
+      const r = expectOk(await reserve({ pickup_date: CANCEL_DAY, extra_side: { slot: 0, candidate: 0, mode: "backup" } }));
       const lockId = expectOk(await U.call("confirmLinePayPayment", { order_id: r.order_id })).lock_ids[0];
       eq((await get(wid)).count, before + 1, "下單 +1");
-      const full = expectCode(await reserve({ extra_side: { slot: 0, candidate: 0, mode: "addon" } }), "resource-exhausted", "weekly_cap=1 已滿");
+      const full = expectCode(await reserve({ pickup_date: CANCEL_DAY, extra_side: { slot: 0, candidate: 0, mode: "addon" } }), "resource-exhausted", "weekly_cap=1 已滿");
       assert(/本週已滿/.test(full.message), full.message);
       expectOk(await U.call("cancelLock", { lock_id: lockId }));
       eq((await get(wid)).count, before, "取消 −1");
@@ -1376,46 +1376,12 @@ function geohash(lat, lng, precision = 7) {
     eq(titles, ["午餐愛心餐已截止", "早餐愛心餐已截止"], "各一次");
   });
 
-  await test("V-BIL-03", "暫停接單的店續約後跑 billingCycle → active、通知「已恢復接單」、可以下單", async () => {
-    const owner = `zz2-owner-restore-${RUN}`;
-    const VR = await mkVendor(vid("restore"), { owner_uid: owner, subscription_end_date: Timestamp.fromMillis(Date.now() - 8 * 86400000) });
-    await mkBento(VR);
-    await runSchedule("finance.js", "billingCycle");
-    eq((await get(`vendors/${VR}`)).billing.status, "suspended");
-    await db.doc(`vendors/${VR}`).update({ subscription_end_date: future() });
-    await runSchedule("finance.js", "billingCycle");
-    eq((await get(`vendors/${VR}`)).billing.status, "active");
-    eq((await notes(owner, { title: /已恢復接單/ })).length, 1);
-    const U = await freshUser("restore");
-    expectOk(await U.call("createCartLinePayReservation", { lines: [{ menu_item_id: `${VR}-bento`, pickup_date: OPEN_DAY, pickup_window: WINDOW, quantity: 1, slots: [{ choice: "default" }, { choice: "default" }], coupon_id: await coupon(U.uid, VR, 1000) }] }), "恢復後下單");
-  });
-
   await test("V-ACC-05", "沒有任何訂閱欄位的舊店家不擋下單", async () => {
     const VN = vid("nosub");
     await db.doc(`vendors/${VN}`).set({ name: "沒訂閱的店", address: "臺北市大安區測試路 9 號", pickup_windows: [WINDOW], owner_uid: OWNER_UID });
     await mkBento(VN);
     const U = await freshUser("nosub");
     expectOk(await U.call("createCartLinePayReservation", { lines: [{ menu_item_id: `${VN}-bento`, pickup_date: OPEN_DAY, pickup_window: WINDOW, quantity: 1, slots: [{ choice: "default" }, { choice: "default" }], coupon_id: await coupon(U.uid, VN, 1000) }] }));
-  });
-
-  await test("V-BIL-04", "首月免費從第一次上架起算：trial 沒到期日的店上架品項 → 到期日＝上架日＋30 天；已有到期日的不動", async () => {
-    const VT = await mkVendor(vid("firstlist"), { subscription_status: "trial", subscription_end_date: null });
-    const fixedEnd = future();
-    const VK = await mkVendor(vid("haveend"), { subscription_status: "trial", subscription_end_date: fixedEnd });
-    const before = Date.now();
-    await mkBento(VT, { is_available: true });
-    await mkBento(VK, { is_available: true });
-    const v = await waitFor(async () => { const x = await get(`vendors/${VT}`); return x.subscription_end_date ? x : null; });
-    const days = (v.subscription_end_date.toMillis() - before) / 86400000;
-    eq(days > 29.9 && days < 30.1, true, `到期日約 30 天後（實際 ${days.toFixed(2)} 天）`);
-    eq(v.billing.free_until.toMillis(), v.subscription_end_date.toMillis());
-    eq(!!v.billing.first_listed_at, true);
-    // 下架再上架不會重算
-    await db.doc(`menu_items/${VT}-bento`).update({ is_available: false });
-    await db.doc(`menu_items/${VT}-bento`).update({ is_available: true });
-    await new Promise((r) => setTimeout(r, 5000));
-    eq((await get(`vendors/${VT}`)).subscription_end_date.toMillis(), v.subscription_end_date.toMillis(), "重新上架不重算");
-    eq((await get(`vendors/${VK}`)).subscription_end_date.toMillis(), fixedEnd.toMillis(), "已有到期日的不動");
   });
 
   await test("V-WAGE-03", "基本工資今天調漲 → syncMinimumWage 更新標準、低於的店家拉到新標準並通知、較高的不動", async () => {

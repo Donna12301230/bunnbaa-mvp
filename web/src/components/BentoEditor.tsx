@@ -11,6 +11,9 @@ import { ComponentDialog, EMPTY_COMP, IngredientDialog, saveCatalogDoc, type Com
 import { useStockOnHand } from "@/hooks/useStockOnHand";
 import { useToast } from "@/hooks/use-toast";
 import { RICE_OPTIONS, componentCost, portionLabel, portionLevelFor, priceDeltaText } from "@/lib/bento";
+import { DEFAULT_PLATFORM_CONFIG as PLATFORM_DEFAULTS } from "@/lib/platformConfig";
+
+const COMMISSION_PCT = Math.round(PLATFORM_DEFAULTS.commissionRate * 1000) / 10;
 import { componentPortionsForLock, costIssue, costIssueText, craftItems, portionsCost, rawNeeds, type CostIssue } from "@/lib/prep";
 import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
 import { MEAL_PERIODS, mealPeriodLabel } from "@/lib/pickupSlots";
@@ -441,7 +444,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
       {!isBento ? preview : (
         <>
           <div className="rounded-md border border-border bg-white p-2 space-y-2">
-            <p className="text-xs font-semibold">{tr("主菜（消費者單選，各自定價，便當價以所選主菜為準）", "Mains (customer picks one; each has its own price)")}</p>
+            <p className="text-xs font-semibold">{tr(`主菜（消費者單選，各自定價，便當價以所選主菜為準；平台每份抽成 ${COMMISSION_PCT}%，定價請加上去）`, `Mains (customer picks one; each has its own price — add the ${COMMISSION_PCT}% platform commission when pricing)`)}</p>
             {value.mains.map((m, i) => (
               <div key={i} className="flex gap-2 items-start flex-wrap sm:flex-nowrap">
                 <ImageThumbUpload vendorId={vendorId} value={m.image_url} onChange={(url) => setMain(i, { ...m, image_url: url || null })} label={tr("主菜照片", "Main photo")} />

@@ -14,11 +14,7 @@ export interface Vendor {
   phone?: string;
   cover_image?: string; // 店家封面圖（Firebase Storage 下載網址），店主在店家設定頁上傳
   owner_uid?: string | null; // 平台審核後綁定的真實 Firebase Auth uid，只有 admin 能寫
-  // 商家訂閱，見 lib/subscription.ts；舊資料可能沒有這些欄位
-  subscription_status?: "trial" | "active" | "cancelled" | "expired";
-  subscription_end_date?: unknown; // Firestore Timestamp
-  cancelled_from?: "trial" | "active";
-  cancel_requested_at?: unknown; // Firestore Timestamp
+  menu_catalogs?: string[]; // 菜單目錄（目錄 > 分類 兩層）的名稱與順序，店主在菜單管理頁維護
   // 取餐排程（店家設定頁，店主可改），沒設定＝預設時段、每天營業，見 lib/pickupSlots.ts
   pickup_windows?: string[]; // "11:30-12:00"
   business_hours?: BusinessHour[];
@@ -36,8 +32,6 @@ export interface Vendor {
   typhoon_notice?: { dates: string[]; event_id: string } | null;
   menu_locked_week?: string;
   rewards_paused_from?: string;
-  // 平台維護費（§1，functions/src/finance.js billingCycle 每天寫）
-  billing?: { status: "active" | "grace" | "suspended"; due_at?: unknown; grace_until?: unknown; fee?: number } | null;
   // 收益看板成本參數（§9.3），由 updateVendorCosts 寫，薪資不得低於基本工資
   hourly_wage?: number;
   staff_salaries?: number[];
@@ -55,6 +49,9 @@ export interface MenuItem {
   name_en?: string;
   description_en?: string;
   category_en?: string;
+  // 目錄（分類的上一層，選填）：名稱存這裡，順序存 vendors.menu_catalogs，見 lib/menuCatalog.ts
+  catalog?: string | null;
+  catalog_en?: string;
   description: string;
   price: number;
   category: string;
@@ -184,7 +181,7 @@ export type LockStatus =
   | "no_show" // 舊制（未取餐停權），現在改轉愛心餐
   | "charity" // 未取餐轉入或主動捐出的愛心餐
   | "cancelling"
-  | "cancelled"; // 截單前取消、停班停課自動退款
+  | "cancelled"; // 消費者取消（取餐 48 小時前，換折價券）、停班停課自動退款
 
 export interface Lock {
   id: string;
@@ -200,6 +197,8 @@ export interface Lock {
   // Set alongside status "for_resale"; a lock past this deadline can be
   // claimed for free (firestore.rules), no scheduled function needed.
   resale_deadline?: unknown; // Firestore Timestamp
+  phone_last3?: string | null; // 下單時手機末三碼，店家核對用（跟 4 碼取餐號一起當核銷碼）
+  resale_price?: number; // 轉讓人自訂的轉讓價（0 ～ 原價）；沒填用早鳥價，見 lib/transfers.ts
   no_show_note?: string | null;
   note?: string; // 消費者下單時的備註（例如「不要香菜」），購物車結帳才會有
   consumer_feedback?: string | null;
@@ -244,6 +243,10 @@ export interface Lock {
   charity_source?: "noshow" | "donated";
   cancel_reason?: "customer" | "disaster";
   refunded_amount?: number;
+  // 消費者取消不退現金，改發折價券（原價 30%）：券的面額與 id；kept_amount 是留在店家的款項
+  refund_coupon_amount?: number;
+  refund_coupon_id?: string | null;
+  kept_amount?: number;
   tickets_issued?: number;
   tags?: string[];
 }
@@ -251,7 +254,10 @@ export interface Lock {
 export interface Payout {
   id: string;
   vendor_id: string;
-  amount: number;
+  amount: number; // 撥給店家的金額（已扣平台抽成）
+  gross_amount?: number; // 消費者實付加總
+  commission_amount?: number; // 平台抽成；2026-10-05 以前的紀錄沒有（當時全額撥款）
+  commission_rate?: number;
   lock_count: number;
   status: "pending_manual_export";
   created_at: unknown; // Firestore Timestamp
@@ -406,7 +412,10 @@ export interface RewardStatus {
   id: string;
   vendor_name: string;
   tickets_so_far: number;
-  min_tickets: number;
+  // 開池門檻改成累積淨營業額（2026-10-05）；舊資料只有 min_tickets，前端用 amount_to_open 回推
+  revenue_so_far?: number;
+  min_revenue?: number;
+  min_tickets?: number;
   amount_to_open: number;
   pool_open: boolean;
   pool_period: string | null;

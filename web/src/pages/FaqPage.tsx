@@ -22,8 +22,8 @@ const FAQS = [
   {
     q: tr("臨時去不了怎麼辦？", "What if I can't make it after ordering?"),
     a: tr(
-      "截單前可以直接取消，全額退款。截單後可以到「我的餐點」轉讓、贈送、分享代領連結，或在取餐當天按「捐為愛心餐」。",
-      "Before cutoff you can cancel for a full refund. After cutoff you can transfer, gift, share a proxy pickup link, or donate it as a charity meal on the day."
+      "取餐 48 小時前可以到「我的餐點」取消：不退現金，會換成一張同店家的折價券（原價的 30%，30 天內有效）。來不及取消的話，可以轉讓、贈送、分享代領連結，或在取餐當天按「捐為愛心餐」。",
+      "Up to 48 hours before pickup you can cancel from My meals: there's no cash refund, but you get a coupon for the same vendor worth 30% of the list price, valid for 30 days. After that you can transfer, gift, share a proxy pickup link, or donate it as a charity meal on the day."
     ),
   },
   {

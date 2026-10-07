@@ -94,9 +94,15 @@ const results = [];
   await t("R-11", "未封鎖卻建立 ban_appeals 被拒", () => assertFails(setDoc(doc(A, "ban_appeals/x"), { buyer_uid: "userA", status: "pending", reason: "x" })));
   await t("R-12a", "店主改店名被拒", () => assertFails(updateDoc(doc(OWNER, "vendors/v1"), { name: "新名" })));
   await t("R-12b", "店主改 verified 被拒", () => assertFails(updateDoc(doc(OWNER, "vendors/v1"), { verified: true })));
-  await t("R-12c", "店主延長訂閱被拒", () => assertFails(updateDoc(doc(OWNER, "vendors/v1"), { subscription_end_date: Timestamp.fromMillis(Date.now() + 999 * 86400000) })));
-  await t("R-12+", "（對照）店主申請取消允許", async () => {
-    await assertSucceeds(updateDoc(doc(OWNER, "vendors/v1"), { subscription_status: "cancelled", cancelled_from: "active", cancel_requested_at: serverTimestamp() }));
+  await t("R-12c", "沒有月費訂閱了：店主改任何訂閱欄位都被拒", async () => {
+    await assertFails(updateDoc(doc(OWNER, "vendors/v1"), { subscription_end_date: Timestamp.fromMillis(Date.now() + 999 * 86400000) }));
+    await assertFails(updateDoc(doc(OWNER, "vendors/v1"), { subscription_status: "cancelled", cancelled_from: "active", cancel_requested_at: serverTimestamp() }));
+  });
+  await t("R-12d", "店主可以改菜單目錄（menu_catalogs，最多 30 個）；別家店主被拒", async () => {
+    await assertSucceeds(updateDoc(doc(OWNER, "vendors/v1"), { menu_catalogs: ["午餐便當", "飲料"] }));
+    await assertFails(updateDoc(doc(OWNER, "vendors/v1"), { menu_catalogs: "午餐便當" }));
+    await assertFails(updateDoc(doc(OWNER, "vendors/v1"), { menu_catalogs: Array.from({ length: 31 }, (_, i) => `目錄${i}`) }));
+    await assertFails(updateDoc(doc(OWNER2, "vendors/v1"), { menu_catalogs: ["亂改"] }));
   });
   await t("R-13", "cover_image 設 http:// 被拒", () => assertFails(updateDoc(doc(OWNER, "vendors/v1"), { cover_image: "http://x.com/a.png" })));
   await t("R-14", "店主改 i18n_src.name 被拒", () => assertFails(updateDoc(doc(OWNER, "vendors/v1"), { i18n_src: { name: "hack" } })));
@@ -234,11 +240,23 @@ const results = [];
     await assertFails(getDoc(doc(B, "tasteProfiles/userA")));
   });
   await t("C-MTC-06 C-CHR-13", "會員可以關掉通知類別（muted_kinds）", () => assertSucceeds(updateDoc(doc(A, "users/userA"), { muted_kinds: ["charity", "resale_match"] })));
-  await t("V-ACC-04", "訂閱中商家：申請取消 → 撤回，兩個轉換都允許", async () => {
-    await seed("vendors/vSub", { name: "訂閱店", owner_uid: "owner1", subscription_status: "active", subscription_end_date: Timestamp.fromMillis(Date.now() + 10 * 86400000) });
-    await assertSucceeds(updateDoc(doc(OWNER, "vendors/vSub"), { subscription_status: "cancelled", cancelled_from: "active", cancel_requested_at: serverTimestamp() }));
+  await t("C-MY-18", "上架轉讓自訂轉讓價：0 ～ 原價（原價＋加減項）可以；超過原價、負數、小數被拒；取消轉讓可清掉轉讓價", async () => {
+    const base = { buyer_uid: "userA", vendor_id: "v1", status: "locked", locked_price: 80, list_price: 100, adjust_amount: 10 };
     const { deleteField } = require("firebase/firestore");
-    await assertSucceeds(updateDoc(doc(OWNER, "vendors/vSub"), { subscription_status: "active", cancelled_from: deleteField(), cancel_requested_at: deleteField() }));
+    await seed("locks/lPriceOk", base);
+    await assertSucceeds(updateDoc(doc(A, "locks/lPriceOk"), { status: "for_resale", resale_price: 110, resale_deadline: windowEnd(3) }));
+    await assertSucceeds(updateDoc(doc(A, "locks/lPriceOk"), { status: "locked", resale_price: deleteField() }));
+    await assertSucceeds(updateDoc(doc(A, "locks/lPriceOk"), { status: "for_resale", resale_price: 0, resale_deadline: windowEnd(3) }));
+    for (const [id, price] of [["lPriceHigh", 111], ["lPriceNeg", -1], ["lPriceFloat", 50.5], ["lPriceStr", "50"]]) {
+      await seed(`locks/${id}`, base);
+      await assertFails(updateDoc(doc(A, `locks/${id}`), { status: "for_resale", resale_price: price, resale_deadline: windowEnd(3) }));
+    }
+    // 舊資料沒有 list_price：上限用 locked_price
+    await seed("locks/lPriceOld", { buyer_uid: "userA", vendor_id: "v1", status: "locked", locked_price: 80 });
+    await assertFails(updateDoc(doc(A, "locks/lPriceOld"), { status: "for_resale", resale_price: 81 }));
+    await assertSucceeds(updateDoc(doc(A, "locks/lPriceOld"), { status: "for_resale", resale_price: 80 }));
+    // 別人不能改轉讓價
+    await assertFails(updateDoc(doc(B, "locks/lPriceOk"), { resale_price: 1 }));
   });
 
   await t("R-30", "我的最愛：只有本人能建立（vendor_id＋created_at）、讀、刪；不能更新、不能多帶欄位、別人讀寫被拒", async () => {

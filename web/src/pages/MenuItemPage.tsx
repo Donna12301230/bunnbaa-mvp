@@ -341,7 +341,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              {tr(`取餐前一天 ${vendorCutoffTime(vendor)} 截單，截單前可免費修改或取消。`, `Orders close at ${vendorCutoffTime(vendor)} the day before; change or cancel for free until then.`)}
+              {tr(`取餐前一天 ${vendorCutoffTime(vendor)} 截單，截單前可免費修改；取餐 48 小時前可取消換折價券（原價 30%）。`, `Orders close at ${vendorCutoffTime(vendor)} the day before; change for free until then, or cancel up to 48 hours before pickup for a coupon (30% of the price).`)}
             </p>
             {typhoon && (
               <div className="flex gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">

@@ -36,13 +36,15 @@ function PayoutsContent() {
   }, []);
 
   const totalAmount = useMemo(() => payouts.reduce((sum, p) => sum + (p.amount || 0), 0), [payouts]);
+  // 2026-10-05 改成每份抽成；之前的撥款紀錄沒有 commission_amount（當時全額撥款）
+  const totalCommission = useMemo(() => payouts.reduce((sum, p) => sum + (p.commission_amount || 0), 0), [payouts]);
 
   return (
     <>
       <Card className="p-5 mb-4 bg-orange-50 border-orange-100">
         <div className="text-2xl font-bold text-orange-600">NT${totalAmount}</div>
         <p className="text-sm text-muted-foreground mt-1">
-          {tr(`近 ${payouts.length} 筆撥款紀錄加總 · 全額撥款商家，平台不抽成`, `Total of the latest ${payouts.length} payouts · paid to vendors in full, no commission`)}
+          {tr(`近 ${payouts.length} 筆撥款紀錄加總（已扣平台抽成 NT$${totalCommission}）`, `Total of the latest ${payouts.length} payouts (after NT$${totalCommission} platform commission)`)}
         </p>
       </Card>
 
