@@ -43,7 +43,7 @@ export function BottomSheet({
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descId = useId();
-  const drag = useRef<{ startY: number; pointerId: number } | null>(null);
+  const drag = useRef<{ startY: number; pointerId: number; dy: number } | null>(null);
   const [dragY, setDragY] = useState(0);
 
   const safeClose = () => {
@@ -54,17 +54,20 @@ export function BottomSheet({
 
   function onPointerDown(e: PointerEvent<HTMLDivElement>) {
     if (loading) return;
-    drag.current = { startY: e.clientY, pointerId: e.pointerId };
+    drag.current = { startY: e.clientY, pointerId: e.pointerId, dy: 0 };
     e.currentTarget.setPointerCapture(e.pointerId);
   }
   function onPointerMove(e: PointerEvent<HTMLDivElement>) {
     if (!drag.current) return;
-    setDragY(Math.max(0, e.clientY - drag.current.startY));
+    drag.current.dy = Math.max(0, e.clientY - drag.current.startY);
+    setDragY(drag.current.dy);
   }
+  // 用 ref 裡的位移判斷：快速下滑時 pointerup 可能比重新渲染早到，state 的 dragY 還是舊值
   function onPointerUp() {
     if (!drag.current) return;
+    const { dy } = drag.current;
     drag.current = null;
-    if (dragY > dismissThreshold) safeClose();
+    if (dy > dismissThreshold) safeClose();
     setDragY(0);
   }
 

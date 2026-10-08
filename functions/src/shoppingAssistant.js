@@ -16,7 +16,8 @@ const {
 } = require("./common");
 const { loadPlatformConfig } = require("./config");
 const { runWithTools } = require("./gemini");
-const { validatePickup, closedReason, vendorWindows, vendorSlotCapacity, applyEarlyBirdPrice } = require("./pricing");
+const { validatePickup, closedReason, itemWindows, vendorSlotCapacity, applyEarlyBirdPrice } = require("./pricing");
+const { resolveMain } = require("./bento");
 const { taipeiToday, addDays, weekdayOf, lastBookableDate } = require("./calendar");
 
 const ASSISTANT_DAILY_LIMIT = 30;
@@ -28,6 +29,15 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
 
 const normalize = (s) => String(s || "").replace(/台/g, "臺").replace(/\s+/g, "");
+
+// 模型偶爾還是只寫「牛」：換成具體的詞，免得把牛蒡、牛奶也排掉（C-AST-05）
+const EXCLUDE_EXPAND = { 牛: ["牛肉", "牛腩", "牛排", "牛筋", "牛雜", "牛小排", "牛丼", "牛五花"] };
+
+/** 結帳時的原價：有多個主菜就用第一個（品項頁預設），沒有就用 item.price（同 bento.resolveMain） */
+const basePrice = (item) => {
+  const price = Number(resolveMain(item, null).price);
+  return price > 0 ? price : null;
+};
 
 const S = (description) => ({ type: "STRING", description });
 const N = (description) => ({ type: "NUMBER", description });
@@ -151,6 +161,7 @@ function itemText(item) {
   const sides = (item.slots || []).flatMap((s) => [s.default?.name, ...(s.candidates || []).map((c) => c.name)]);
   return [
     item.name, item.name_en, item.description, item.description_en, item.category, item.main?.name,
+    ...(item.mains || []).map((m) => m?.name),
     ...(item.fixed || []).map((f) => f.name), ...sides,
   ].filter(Boolean).join(" ");
 }
@@ -168,15 +179,60 @@ function summarizeItem(item, vendor) {
     vendor: vendor.name,
     address: vendor.address || "",
     name: item.name,
-    price: item.price,
+    price: basePrice(item),
     category: item.category,
     dietary_tags: item.dietary_tags || [],
     allergens: item.allergens || [],
-    main: item.main?.name || null,
+    main: item.mains?.length ? item.mains.map((m) => m?.name).filter(Boolean).join("／") : item.main?.name || null,
     sides: (item.slots || []).map((s) => s.default?.name).filter(Boolean),
     weekdays: item.weekdays?.length ? item.weekdays : [1, 2, 3, 4, 5],
     description: String(item.description || "").slice(0, 80),
   };
+}
+
+/**
+ * 品項在這幾天能不能訂，判斷跟下單（orders.buildDrafts）一致：營業日／公休、品項供應的星期與餐期、
+ * 停班停課、截單、時段名額。
+ */
+async function checkDates(item, vendor, dates, config, now = new Date()) {
+  const capacity = vendorSlotCapacity(vendor);
+  const price = basePrice(item);
+  const out = [];
+  for (const date of dates) {
+    const closed = closedReason(date, vendor, config);
+    if (closed) {
+      out.push({ date, available: false, reason: closed });
+      continue;
+    }
+    if (item.weekdays?.length && !item.weekdays.includes(weekdayOf(date))) {
+      out.push({ date, available: false, reason: t("這個品項當天沒有供應", "Not served that day") });
+      continue;
+    }
+    if (Array.isArray(vendor.disaster_dates) && vendor.disaster_dates.includes(date)) {
+      out.push({ date, available: false, reason: t(`${date} 因停班停課暫停供餐`, `No service on ${date} (work suspension)`) });
+      continue;
+    }
+    const windows = [];
+    let problem = null;
+    for (const window of itemWindows(vendor, item, config)) {
+      problem = validatePickup(date, window, vendor, config, now, item);
+      if (problem) continue;
+      let left = null;
+      if (capacity !== null) {
+        const counter = await db().collection("slot_counters").doc(`${vendor.id}__${date}__${window}`).get();
+        left = Math.max(0, capacity - (counter.exists ? counter.data().count ?? 0 : 0));
+        if (left === 0) continue;
+      }
+      windows.push({ window, left });
+    }
+    if (windows.length) {
+      const { discountPercent, lockedPrice } = applyEarlyBirdPrice(price, date, now);
+      out.push({ date, available: true, windows, early_bird_percent: discountPercent, estimated_price: lockedPrice });
+    } else {
+      out.push({ date, available: false, reason: problem || t("各時段已額滿", "All slots are full") });
+    }
+  }
+  return out;
 }
 
 function toolHandlers({ loadCatalog, taste, config, availability }) {
@@ -187,14 +243,16 @@ function toolHandlers({ loadCatalog, taste, config, availability }) {
       const category = normalize(args.category);
       const maxPrice = Number(args.maxPrice) > 0 ? Number(args.maxPrice) : null;
       const needTags = Array.isArray(args.dietaryTags) ? args.dietaryTags : [];
-      const exclude = (Array.isArray(args.excludeKeywords) ? args.excludeKeywords : []).map(normalize).filter(Boolean);
+      const exclude = (Array.isArray(args.excludeKeywords) ? args.excludeKeywords : [])
+        .map(normalize).filter(Boolean).flatMap((w) => EXCLUDE_EXPAND[w] || [w]);
       const weekday = Number(args.weekday);
       const results = [];
       for (const item of items.values()) {
         const vendor = vendors.get(item.vendor_id);
         if (!inArea(vendor, args.county, args.town)) continue;
-        if (typeof item.price !== "number" || item.price <= 0) continue;
-        if (maxPrice && item.price > maxPrice) continue;
+        const price = basePrice(item);
+        if (!price) continue;
+        if (maxPrice && price > maxPrice) continue;
         if ((item.allergens || []).some((a) => taste.allergies.includes(a))) continue;
         if (!needTags.every((tag) => hasDietaryTag(item, tag))) continue;
         if (weekday >= 1 && weekday <= 5 && item.weekdays?.length && !item.weekdays.includes(weekday)) continue;
@@ -203,9 +261,9 @@ function toolHandlers({ loadCatalog, taste, config, availability }) {
         if (category && !normalize(item.category).includes(category) && !text.includes(category)) continue;
         const score = keyword ? (normalize(item.name).includes(keyword) ? 2 : text.includes(keyword) ? 1 : 0) : 1;
         if (keyword && score === 0) continue;
-        results.push({ score, item, vendor });
+        results.push({ score, price, item, vendor });
       }
-      results.sort((a, b) => b.score - a.score || a.item.price - b.item.price);
+      results.sort((a, b) => b.score - a.score || a.price - b.price);
       return {
         count: results.length,
         allergies_excluded: taste.allergies,
@@ -218,40 +276,10 @@ function toolHandlers({ loadCatalog, taste, config, availability }) {
       const item = items.get(String(args.menuItemId || ""));
       if (!item) return { error: "unknown menuItemId" };
       const vendor = vendors.get(item.vendor_id);
-      const capacity = vendorSlotCapacity(vendor);
       const dates = (Array.isArray(args.dates) ? args.dates : []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 10);
-      const out = [];
-      for (const date of dates) {
-        const closed = closedReason(date, vendor, config);
-        const weekday = weekdayOf(date);
-        if (closed) {
-          out.push({ date, available: false, reason: closed });
-          continue;
-        }
-        if (item.weekdays?.length && !item.weekdays.includes(weekday)) {
-          out.push({ date, available: false, reason: t("這個品項當天沒有供應", "Not served that day") });
-          continue;
-        }
-        const windows = [];
-        for (const window of vendorWindows(vendor)) {
-          const problem = validatePickup(date, window, vendor, config);
-          if (problem) continue;
-          let left = null;
-          if (capacity !== null) {
-            const counter = await db().collection("slot_counters").doc(`${vendor.id}__${date}__${window}`).get();
-            left = Math.max(0, capacity - (counter.exists ? counter.data().count ?? 0 : 0));
-            if (left === 0) continue;
-          }
-          windows.push({ window, left });
-        }
-        const { discountPercent, lockedPrice } = applyEarlyBirdPrice(item.price, date);
-        const entry = windows.length
-          ? { date, available: true, windows, early_bird_percent: discountPercent, estimated_price: lockedPrice }
-          : { date, available: false, reason: validatePickup(date, vendorWindows(vendor)[0], vendor, config) || t("各時段已額滿", "All slots are full") };
-        out.push(entry);
-      }
+      const out = await checkDates(item, vendor, dates, config);
       availability.set(item.id, out);
-      return { menuItemId: item.id, list_price: item.price, results: out };
+      return { menuItemId: item.id, list_price: basePrice(item), results: out };
     },
 
     async searchMealPlans(args) {
@@ -259,6 +287,7 @@ function toolHandlers({ loadCatalog, taste, config, availability }) {
       const maxPrice = Number(args.maxPricePerMeal) > 0 ? Number(args.maxPricePerMeal) : null;
       const minDays = Number(args.minDays) > 0 ? Number(args.minDays) : 0;
       const results = [...plans.values()]
+        .filter((p) => Number.isInteger(p.days) && p.days > 0 && typeof p.price_per_meal === "number" && p.price_per_meal > 0)
         .filter((p) => inArea(vendors.get(p.vendor_id), args.county, args.town))
         .filter((p) => !maxPrice || p.price_per_meal <= maxPrice)
         .filter((p) => (p.days || 0) >= minDays)
@@ -282,7 +311,7 @@ function toolHandlers({ loadCatalog, taste, config, availability }) {
 }
 
 /** 模型給的 id 比對目錄，查無、下架的丟掉；價格一律用伺服器的 */
-async function buildCards(finish, loadCatalog, availability, lang) {
+async function buildCards(finish, loadCatalog, availability, lang, config, now = new Date()) {
   const { vendors, items, plans } = await loadCatalog();
   const en = lang === "en";
   const pick = (v, key) => (en && v?.[`${key}_en`]) || v?.[key] || "";
@@ -292,10 +321,19 @@ async function buildCards(finish, loadCatalog, availability, lang) {
     const item = items.get(String(id));
     if (!item || cards.length >= MAX_CARDS) continue;
     const vendor = vendors.get(item.vendor_id);
-    const checked = availability.get(item.id) || [];
-    const firstOpen = checked.find((c) => c.available && (!suggestedDates.length || suggestedDates.includes(c.date)));
-    const date = firstOpen?.date || suggestedDates[0] || null;
-    const earlyBird = date ? applyEarlyBirdPrice(item.price, date) : null;
+    const price = basePrice(item);
+    if (!price) continue;
+    // 模型沒查過的建議日期，這裡補查，卡片不會帶到公休、截單或額滿的日子
+    const checked = [...(availability.get(item.id) || [])];
+    const unchecked = suggestedDates.filter((d) => !checked.some((c) => c.date === d)).slice(0, 5);
+    if (unchecked.length) {
+      checked.push(...(await checkDates(item, vendor, unchecked, config, now)));
+      checked.sort((a, b) => a.date.localeCompare(b.date));
+    }
+    const open = checked.filter((c) => c.available);
+    const firstOpen = open.find((c) => suggestedDates.includes(c.date)) || open[0] || null;
+    const date = firstOpen?.date || null;
+    const earlyBird = date ? applyEarlyBirdPrice(price, date, now) : null;
     cards.push({
       type: "item",
       id: item.id,
@@ -303,20 +341,20 @@ async function buildCards(finish, loadCatalog, availability, lang) {
       vendor_name: pick(vendor, "name"),
       name: pick(item, "name"),
       image: item.image || null,
-      list_price: item.price,
+      list_price: price,
       dietary_tags: item.dietary_tags || [],
       allergens: item.allergens || [],
       date,
       window: firstOpen?.windows?.find((w) => w.window === finish.suggestedWindow)?.window || firstOpen?.windows?.[0]?.window || null,
       estimated_price: earlyBird?.lockedPrice ?? null,
       early_bird_percent: earlyBird?.discountPercent ?? 0,
-      open_dates: checked.filter((c) => c.available).map((c) => c.date),
+      open_dates: open.map((c) => c.date),
       closed_dates: checked.filter((c) => !c.available).map((c) => c.date),
     });
   }
   for (const id of [...new Set(Array.isArray(finish.mealPlanIds) ? finish.mealPlanIds : [])].slice(0, 3)) {
     const plan = plans.get(String(id));
-    if (!plan) continue;
+    if (!plan || !(plan.price_per_meal > 0) || !(plan.days > 0)) continue;
     const vendor = vendors.get(plan.vendor_id);
     cards.push({
       type: "plan",
@@ -399,7 +437,7 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
   await takeUsage(uid, today);
 
   const config = await loadPlatformConfig(db());
-  const last = lastBookableDate(today);
+  const last = lastBookableDate(today, config.bookingRangeDays);
   const dates = [];
   for (let d = today; d <= last; d = addDays(d, 1)) {
     if (config.businessWeekdays.includes(weekdayOf(d))) dates.push({ date: d, weekday: weekdayOf(d) });
@@ -423,7 +461,7 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
   }
 
   const finish = result.finish || { reply: result.text, menuItemIds: [], mealPlanIds: [] };
-  const cards = await buildCards(finish, loadCatalog, availability, lang);
+  const cards = await buildCards(finish, loadCatalog, availability, lang, config);
   const reply = String(finish.reply || "").trim().slice(0, 1200)
     || t("抱歉，這次沒找到合適的選項，可以換個條件再問一次。", "Sorry, I couldn't find a good match. Try different conditions.");
 
@@ -433,4 +471,4 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
   return { reply, cards, disclaimer };
 });
 
-module.exports.helpers = { toolHandlers, buildCards };
+module.exports.helpers = { toolHandlers, buildCards, checkDates, basePrice };

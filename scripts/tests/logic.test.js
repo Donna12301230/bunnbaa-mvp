@@ -369,8 +369,82 @@ test("C-NAV-01", "web/src 畫面文字沒有「最高 7 折」「提前 14 天�
   assert.deepEqual(hits, []);
 });
 
-const pad = (s, n) => (s + " ".repeat(n)).slice(0, n);
-for (const [id, st, name, msg] of results) console.log(`${st}  ${pad(id, 11)} ${name}${msg ? "  → " + msg : ""}`);
-const fails = results.filter((r) => r[1] === "FAIL").length;
-console.log(`\n${results.length - fails}/${results.length} passed`);
-process.exit(fails ? 1 : 0);
+// 預購助理的工具（functions/src/shoppingAssistant.js）：不呼叫 Gemini，直接餵假目錄。
+// 店家沒設 slot_capacity，所以不會讀 slot_counters（不需要 emulator）。
+const asyncTests = [];
+const testAsync = (id, name, fn) => asyncTests.push([id, name, fn]);
+const assistant = req("shoppingAssistant.js").helpers;
+const AST_VENDOR = { id: "v1", name: "大安小館", address: "臺北市大安區復興南路一段 1 號", holidays: ["2026-10-02"], disaster_dates: ["2026-10-05"] };
+const AST_ITEMS = [
+  { id: "beef", vendor_id: "v1", name: "紅燒牛肉便當", price: 120, dietary_tags: ["葷食"] },
+  { id: "burdock", vendor_id: "v1", name: "雞腿便當", price: 110, slots: [{ default: { name: "牛蒡絲" } }] },
+  { id: "mains", vendor_id: "v1", name: "主菜任選便當", mains: [{ name: "排骨", price: 100 }, { name: "雞腿", price: 120 }] },
+  { id: "soy", vendor_id: "v1", name: "素食便當", price: 90, dietary_tags: ["素食"], allergens: ["大豆"] },
+  { id: "dinner", vendor_id: "v1", name: "晚餐咖哩", price: 100, meal_periods: ["dinner"] },
+];
+const astCatalog = () => async () => ({
+  vendors: new Map([["v1", AST_VENDOR]]),
+  items: new Map(AST_ITEMS.map((i) => [i.id, i])),
+  plans: new Map([["p1", { id: "p1", vendor_id: "v1", name: "一週雞腿", label: "週方案", days: 5, price_per_meal: 100 }], ["bad", { id: "bad", vendor_id: "v1", name: "壞方案", days: 0 }]]),
+});
+const astTools = (allergies = []) => assistant.toolHandlers({ loadCatalog: astCatalog(), taste: { prefs: [], allergies }, config: CFG, availability: new Map() });
+
+testAsync("C-AST-05", "只寫「不吃牛」也不會誤排牛蒡；牛肉便當被排掉", async () => {
+  const r = await astTools().searchMenuItems({ excludeKeywords: ["牛"] });
+  const ids = r.items.map((i) => i.id);
+  assert.ok(ids.includes("burdock"), ids.join());
+  assert.ok(!ids.includes("beef"), ids.join());
+});
+testAsync("C-AST-03", "多主菜品項（沒有 item.price）用第一個主菜的價格，跟結帳一致", async () => {
+  assert.equal(assistant.basePrice(AST_ITEMS[2]), bento.resolveMain(AST_ITEMS[2], null).price);
+  const r = await astTools().searchMenuItems({ maxPrice: 100 });
+  const mains = r.items.find((i) => i.id === "mains");
+  assert.ok(mains, "多主菜品項要查得到");
+  assert.equal(mains.price, 100);
+});
+testAsync("C-AST-04", "會員過敏原（大豆）在伺服器端排除", async () => {
+  const r = await astTools(["大豆"]).searchMenuItems({ dietaryTags: ["素食"] });
+  assert.equal(r.count, 0);
+  assert.deepEqual(r.allergies_excluded, ["大豆"]);
+});
+testAsync("C-AST-08", "可訂判斷跟下單一致：截單、公休、停班停課、品項餐期", async () => {
+  const [today, tomorrow, holiday, disaster] = await assistant.checkDates(AST_ITEMS[0], AST_VENDOR, ["2026-09-30", "2026-10-01", "2026-10-02", "2026-10-05"], CFG, NOW);
+  assert.equal(today.available, false, "今天已截單");
+  assert.equal(tomorrow.available, true);
+  assert.equal(tomorrow.estimated_price, 114, "明天 95 折");
+  assert.equal(holiday.available, false);
+  assert.match(holiday.reason, /公休/);
+  assert.equal(disaster.available, false);
+  assert.match(disaster.reason, /停班停課/);
+  const [dinner] = await assistant.checkDates(AST_ITEMS[4], AST_VENDOR, ["2026-10-01"], CFG, NOW);
+  assert.equal(dinner.available, false, "只供晚餐的品項不能訂午餐時段");
+});
+testAsync("C-AST-08b", "模型建議的日期沒查過、而且是公休：卡片不帶那天", async () => {
+  const cards = await assistant.buildCards({ menuItemIds: ["beef"], suggestedDates: ["2026-10-02"] }, astCatalog(), new Map(), "zh", CFG, NOW);
+  assert.equal(cards[0].date, null);
+  assert.equal(cards[0].estimated_price, null);
+  assert.deepEqual(cards[0].closed_dates, ["2026-10-02"]);
+});
+testAsync("C-AST-02", "卡片帶入可訂的日期與時段（品項頁預填要兩者都有）", async () => {
+  const cards = await assistant.buildCards({ menuItemIds: ["mains"], suggestedDates: ["2026-10-01"], suggestedWindow: "12:00-12:30" }, astCatalog(), new Map(), "zh", CFG, NOW);
+  assert.equal(cards[0].date, "2026-10-01");
+  assert.equal(cards[0].window, "12:00-12:30");
+  assert.equal(cards[0].list_price, 100);
+  assert.equal(cards[0].estimated_price, 95);
+});
+testAsync("F-16", "模型回不存在的品項／方案 id 被丟掉；設定壞掉的方案也不出卡", async () => {
+  const cards = await assistant.buildCards({ menuItemIds: ["nope", "beef"], mealPlanIds: ["ghost", "bad", "p1"] }, astCatalog(), new Map(), "zh", CFG, NOW);
+  assert.deepEqual(cards.map((c) => `${c.type}:${c.id}`), ["item:beef", "plan:p1"]);
+});
+
+(async () => {
+  for (const [id, name, fn] of asyncTests) {
+    try { await fn(); results.push([id, "PASS", name, ""]); }
+    catch (e) { results.push([id, "FAIL", name, e.message.split("\n")[0]]); }
+  }
+  const pad = (s, n) => (s + " ".repeat(n)).slice(0, n);
+  for (const [id, st, name, msg] of results) console.log(`${st}  ${pad(id, 11)} ${name}${msg ? "  → " + msg : ""}`);
+  const fails = results.filter((r) => r[1] === "FAIL").length;
+  console.log(`\n${results.length - fails}/${results.length} passed`);
+  process.exit(fails ? 1 : 0);
+})();
