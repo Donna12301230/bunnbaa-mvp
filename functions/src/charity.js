@@ -87,7 +87,7 @@ exports.donateLock = onCall({}, async (request) => {
   const vendor = { id: vendorSnap.id, ...vendorSnap.data() };
   const config = await loadPlatformConfig(db());
   const today = taipeiToday();
-  if (lock.pickup_date !== today) throw new HttpsError("failed-precondition", t("取餐當天才能捐為愛心餐；截單前可以直接取消退款", "You can donate on the pickup day; before cutoff you can cancel instead"));
+  if (lock.pickup_date !== today) throw new HttpsError("failed-precondition", t("取餐當天才能捐為愛心餐；取餐 48 小時前可以取消換折價券", "You can donate on the pickup day; up to 48 hours before pickup you can cancel for a coupon instead"));
   const { end } = helpers.todayRange(vendor, today, lock.pickup_window, config);
   if (Date.now() > end.getTime()) throw new HttpsError("failed-precondition", t("取餐時段已結束", "The pickup window has ended"));
   const mealRef = db().collection("charityMeals").doc();

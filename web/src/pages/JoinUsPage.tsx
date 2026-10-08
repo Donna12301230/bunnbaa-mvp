@@ -4,6 +4,10 @@ import { ClipboardCheck, PiggyBank, TrendingUp, Users2 } from "lucide-react";
 import CustomerLayout from "@/components/CustomerLayout";
 import PageHero from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
+
+// 合作方案：不收月費，每份餐點抽成（跟平台參數的預設值同一份）
+const commissionPct = Math.round(DEFAULT_PLATFORM_CONFIG.commissionRate * 1000) / 10;
 
 const BENEFITS = [
   {
@@ -64,19 +68,18 @@ export default function JoinUsPage() {
             </h2>
             <p className="text-muted-foreground leading-relaxed">
               {tr(
-                "首月免費試用，之後每月 NT$1,999，沒有其他上架或抽成費用。到期前平台會主動聯絡您確認續約。",
-                "The first month is free. After that it's NT$1,999 / month, with no other listing fees or commission. We'll reach out to confirm renewal before your trial ends."
+                `沒有月費、沒有上架費。平台只從每份賣出的餐點抽 ${commissionPct}%（以消費者實付金額計），撥款時直接扣除；定價時把這 ${commissionPct}% 加進去就好，後台會幫您換算。`,
+                `No monthly fee and no listing fee. The platform only takes ${commissionPct}% of each meal sold (of what the customer pays), deducted at payout. Just add that ${commissionPct}% when you price — the portal does the math for you.`
               )}
             </p>
           </div>
           <div className="rounded-[1.75rem] border border-ink bg-card p-8 md:p-10">
-            <span className="inline-block text-xs font-bold px-3 py-1 rounded-full bg-[#f29e0c] text-[#2b180d]">{tr("首月免費", "First month free")}</span>
+            <span className="inline-block text-xs font-bold px-3 py-1 rounded-full bg-[#f29e0c] text-[#2b180d]">{tr("有賣才收", "Pay only when you sell")}</span>
             <p className="mt-5 font-heading font-semibold leading-none">
-              <span className="text-2xl align-top mr-1">NT$</span>
-              <span className="text-[clamp(64px,9vw,112px)] tracking-[-0.04em]">1,999</span>
-              <span className="text-lg text-muted-foreground font-normal ml-2">{tr("／月", "/ mo")}</span>
+              <span className="text-[clamp(64px,9vw,112px)] tracking-[-0.04em]">{commissionPct}%</span>
+              <span className="text-lg text-muted-foreground font-normal ml-2">{tr("／每份餐點", "/ meal")}</span>
             </p>
-            <p className="mt-4 text-sm text-muted-foreground">{tr("0 抽成・0 上架費", "0% commission · no listing fees")}</p>
+            <p className="mt-4 text-sm text-muted-foreground">{tr("0 月費・0 上架費", "No monthly fee · no listing fees")}</p>
           </div>
         </section>
 

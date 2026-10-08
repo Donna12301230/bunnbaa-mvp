@@ -55,3 +55,26 @@ export function tierRangeText(tier: EarlyBirdTier): string {
   if (tier.minDays === 0) return tr("明天", "Tomorrow");
   return tr(`提前 ${tier.minDays}–${tier.maxDays} 天`, `${tier.minDays}–${tier.maxDays} days ahead`);
 }
+
+/** 消費者可取消的期限：取餐時段開始前 hoursBefore 小時（functions/src/pricing.js cancelDeadlineAt 同一套） */
+export function cancelDeadlineAt(pickupDate: string, pickupWindow: string, hoursBefore = 48): Date {
+  const start = pickupWindow.split("-")[0]?.trim() || "00:00";
+  return new Date(new Date(`${pickupDate}T${start}:00+08:00`).getTime() - hoursBefore * 3600000);
+}
+
+/** 取消後退的折價券面額：原價（品項原價＋加減項）× rate，不超過實付；以伺服器算的為準 */
+export function cancelCouponAmount(lock: { list_price?: number; adjust_amount?: number; paid_amount?: number; locked_price?: number }, rate = 0.3): number {
+  const original = Math.max(0, (lock.list_price ?? 0) + (lock.adjust_amount ?? 0));
+  const paid = Number.isFinite(lock.paid_amount) ? lock.paid_amount! : lock.locked_price ?? 0;
+  return Math.max(0, Math.min(Math.round(original * rate), paid));
+}
+
+/** 平台抽成後店家實收（四捨五入到元） */
+export function netOfCommission(price: number, rate = 0.05): number {
+  return Math.round(price * (1 - rate));
+}
+
+/** 想實收 net 元時的建議售價：加上抽成比例（店家定價時加 5%），無條件進位到元 */
+export function withCommission(net: number, rate = 0.05): number {
+  return Math.ceil(net * (1 + rate));
+}

@@ -11,6 +11,8 @@ const { onCall, HttpsError, assertAdminOrEmulator, assertAdminOrVendorOwner } = 
 const { generateVendorCalibrationReport } = require("./vendorCalibration");
 const { generateDiscountExplanation } = require("./consumerExplanation");
 const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./translate");
+const { loadPlatformConfig } = require("./config");
+const { commissionOf } = require("./pricing");
 
 // 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格1002.md）的功能拆在各模組：
 //   orders.js     下單計價、LINE Pay、截單判定許願、每日備料、QR 取餐、取消退款
@@ -151,15 +153,20 @@ exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request)
 // 轉讓市集接手改成付費接手（規格 §4.1）：createResaleLinePayReservation＋confirmLinePayPayment（orders.js）
 
 /* ------------------------------------------------------------------ *
- * 1b. Vendor payouts — platform collects, forwards in full, on a
- * schedule (spec ref: 改造指南 §5.1/§5.4 — "路線 A：平台代收、定期撥款
- * 商家". No platform cut: the doc is explicit that the full amount gets
- * forwarded, the platform isn't fronting or holding funds for anything
- * else. This scaffolds the aggregation + a payout record with mock
+ * 1b. Vendor payouts — platform collects, then forwards on a schedule
+ * (spec ref: 改造指南 §5.1/§5.4 — "路線 A：平台代收、定期撥款商家").
+ * 合作方案 2026-10-05 改版：不收月費，每份餐點實付金額抽成 commissionRate
+ * （預設 5%，逐份四捨五入），撥款金額＝實付加總 − 抽成。
+ * This scaffolds the aggregation + a payout record with mock
  * data; the actual LINE Pay/綠界 payout API call (or, per the doc's own
  * fallback, a manual reconciliation export) isn't wired up yet since
  * there's no merchant account to call it against.
  * ------------------------------------------------------------------ */
+
+/** 這筆訂單要撥給店家的金額（抽成前）：取消換券的單是留在店家的款項，其餘是實付金額 */
+function payableOf(lock) {
+  return lock.status === "cancelled" ? Number(lock.kept_amount) || 0 : Number(lock.locked_price) || 0;
+}
 
 async function settleVendorPayout(vendorId) {
   // Reuses the same vendor_id index as buildVendorHistory/VendorRedeemPage
@@ -174,8 +181,11 @@ async function settleVendorPayout(vendorId) {
 
   const unsettled = snap.docs.filter((d) => {
     const data = d.data();
+    if (data.payout_settled) return false;
     // 愛心餐（未取餐轉入或主動捐出）照常計入店家營業額（§7.1）
-    return ["fulfilled", "resold_and_fulfilled", "charity"].includes(data.status) && !data.payout_settled;
+    if (["fulfilled", "resold_and_fulfilled", "charity"].includes(data.status)) return true;
+    // 消費者取消只換折價券、不退現金（orders.js cancelForCoupon）：留下的款項也撥給店家，之後由店家兌現那張券
+    return data.status === "cancelled" && payableOf(data) > 0;
   });
 
   if (unsettled.length === 0) {
@@ -183,12 +193,19 @@ async function settleVendorPayout(vendorId) {
     return null;
   }
 
-  const amount = unsettled.reduce((sum, d) => sum + (d.data().locked_price || 0), 0);
+  const { commissionRate } = await loadPlatformConfig(db);
+  const rate = Number(commissionRate) || 0;
+  const gross = unsettled.reduce((sum, d) => sum + payableOf(d.data()), 0);
+  const commission = commissionOf(unsettled.map((d) => ({ locked_price: payableOf(d.data()) })), rate);
+  const amount = gross - commission;
   const lockIds = unsettled.map((d) => d.id);
 
   const payoutRef = await db.collection("payouts").add({
     vendor_id: vendorId,
-    amount, // full amount, no platform fee — see comment above
+    amount, // 撥給店家的金額＝實付加總 − 平台抽成
+    gross_amount: gross,
+    commission_amount: commission,
+    commission_rate: rate,
     lock_ids: lockIds,
     lock_count: lockIds.length,
     // No LINE Pay/綠界 merchant payout API to call yet, so this is the

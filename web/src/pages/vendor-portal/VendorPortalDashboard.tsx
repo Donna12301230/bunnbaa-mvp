@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
-import { AlertTriangle, ChefHat, ChevronRight, ClipboardList, ScanLine, ShoppingBasket, UtensilsCrossed } from "lucide-react";
+import { ChefHat, ChevronRight, ClipboardList, ScanLine, ShoppingBasket, UtensilsCrossed } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
@@ -132,20 +132,6 @@ export default function VendorPortalDashboard() {
         <h1 className="font-heading text-3xl md:text-4xl font-semibold">{myVendor?.name ?? tr("總覽", "Overview")}</h1>
         <p className="text-sm text-muted-foreground">{format(new Date(), tr("M 月 d 日 EEEE", "EEEE, MMM d"), { locale: dateLocale() })}</p>
       </div>
-
-      {/* 平台維護費（§1）：寬限期每天提醒；逾期暫停接新訂單，已成立訂單照常出餐 */}
-      {myVendor?.billing?.status === "grace" && (
-        <div className="mb-4 flex gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-          {tr("本期平台維護費 NT$ 1,999（含稅）已到期，寬限 7 天內繳清即可；逾期將暫停接新訂單。繳費請聯絡平台（信用卡定期扣款或銀行轉帳）。", "Your NT$ 1,999 platform fee is due. Pay within the 7-day grace period or new orders will be paused.")}
-        </div>
-      )}
-      {myVendor?.billing?.status === "suspended" && (
-        <div className="mb-4 flex gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-          {tr("維護費逾期，已暫停接新訂單；已成立的訂單請照常出餐。繳清後立即恢復。", "New orders are paused because the platform fee is overdue. Keep serving existing orders; paying restores ordering right away.")}
-        </div>
-      )}
 
       {loadingLocks ? (
         <SkeletonBlocks count={2} height={180} className="grid md:grid-cols-3 gap-4 mb-6" />

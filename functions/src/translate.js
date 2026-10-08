@@ -53,7 +53,7 @@ async function translationPatch(data, fields) {
 // 各 collection 要翻的欄位（地址不翻：比對地區篩選、實際找店都要用中文地址）
 const TRANSLATED_FIELDS = {
   vendors: ["name", "description"],
-  menu_items: ["name", "description", "category"],
+  menu_items: ["name", "description", "category", "catalog"],
   meal_plans: ["label", "name", "description", "fastest_booking"],
   // 評價（使用者寫的心得、系所署名）與抽獎紀錄的品名
   reviews: ["comment", "item_name", "reviewer_label"],

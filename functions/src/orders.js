@@ -23,13 +23,12 @@ const { loadPlatformConfig } = require("./config");
 const { requestPayment, confirmPayment, refundPayment } = require("./linePay");
 const {
   validatePickup, planPickupDates, applyEarlyBirdPrice, vendorSlotCapacity, cutoffAt, isPastCutoff,
-  mealPeriodOf, mealPeriodLabel, vendorPeriodRanges, MEAL_PERIODS,
+  cancelDeadlineAt, cancelCouponAmount, mealPeriodOf, mealPeriodLabel, vendorPeriodRanges, MEAL_PERIODS,
 } = require("./pricing");
 const { isBento, resolveChoices, resolveMain, resolveExtraSide, resolveCustomPicks, adjustAmount, RICE_OPTIONS } = require("./bento");
 const { ACTIVE_LOCK_STATUSES, componentPortions, rawNeeds, buildTimeline, buildLabels } = require("./prep");
 const { taipeiToday, taipeiTime, addDays, mondayOf, at, splitWindow } = require("./calendar");
 const { recordMatchedClaim } = require("./resaleMatch").helpers;
-const { billingStateOf } = require("./finance").helpers;
 
 const APP_BASE_URL = () => process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
 const MAX_CART_UNITS = 50;
@@ -53,10 +52,6 @@ async function loadVendor(vendorId, cache) {
   const vendor = { id: snap.id, ...snap.data() };
   if (vendor.status === "disabled") {
     throw new HttpsError("failed-precondition", t(`「${vendor.name}」目前暫停營業`, `${vendor.name} is temporarily closed`));
-  }
-  // 維護費逾期超過寬限期（§1）：暫停接新訂單，已成立訂單照常出餐；即時算，不等每日排程
-  if (billingStateOf(vendor).status === "suspended") {
-    throw new HttpsError("failed-precondition", t(`「${vendor.name}」暫停接單中`, `${vendor.name} isn't taking new orders right now`));
   }
   cache?.set(vendorId, vendor);
   return vendor;
@@ -588,7 +583,7 @@ async function refundLockMoney(lock) {
 }
 
 /**
- * 取消並退款（截單前的消費者取消、停班停課自動退款共用）。
+ * 取消並全額退款（停班停課自動退款用；消費者自己取消改走 cancelForCoupon 發折價券）。
  * 折價券退回並保留原到期日，已過期則不退；份數與許願計數扣回。
  */
 async function cancelAndRefund(lockRef, reason) {
@@ -638,36 +633,85 @@ exports.cancelLock = onCall({}, async (request) => {
   if ((lock.payer_uid || lock.buyer_uid) !== request.auth.uid) {
     throw new HttpsError("failed-precondition", t("轉讓取得的餐點不能退款，可以再轉讓或捐為愛心餐", "Transferred meals can't be refunded"));
   }
-  const vendor = (await db().collection("vendors").doc(lock.vendor_id).get()).data();
   const config = await loadPlatformConfig(db());
-  if (isPastCutoff(lock.pickup_date, vendor, config)) {
-    throw new HttpsError("failed-precondition", t("已經截單，店家已依訂單備料，不能免費取消；可以轉讓或捐為愛心餐", "Past cutoff — the vendor has already prepared. You can transfer or donate it instead."));
+  if (Date.now() > cancelDeadlineAt(lock.pickup_date, lock.pickup_window, config).getTime()) {
+    throw new HttpsError("failed-precondition", t(
+      `取餐前 ${config.cancelHoursBefore} 小時內不能取消；可以轉讓或捐為愛心餐`,
+      `Orders can't be cancelled within ${config.cancelHoursBefore} hours of pickup. You can transfer or donate it instead.`
+    ));
   }
-  try {
-    await cancelAndRefund(ref, "customer");
-  } catch (err) {
-    logger.error("refund failed", err);
-    throw new HttpsError("internal", t("退款失敗，請稍後再試或聯絡客服", "Refund failed. Please try again later."));
-  }
-  return { ok: true };
+  const coupon = await cancelForCoupon(ref, config);
+  return { ok: true, coupon };
 });
+
+/**
+ * 消費者取消（2026-10-05 改版）：不退現金，改發一張本店折價券（原價 30%、效期 couponValidDays 天）。
+ * 款項留在店家（kept_amount）；下單時用掉的折價券照舊退回（已過期不退），份數與許願計數扣回。
+ * 整段在交易內，連按兩次只會發一張。停班停課等非消費者因素的取消仍走 cancelAndRefund 全額退款。
+ * 這張券能不能跟其他折扣疊加還沒定案（doc/TODO.md）：目前跟一般折價券一樣，每份餐點限用一張、早鳥照算。
+ */
+async function cancelForCoupon(lockRef, config) {
+  const couponRef = db().collection("coupons").doc();
+  return db().runTransaction(async (tx) => {
+    const lock = (await tx.get(lockRef)).data();
+    if (lock.status !== "locked") throw new HttpsError("failed-precondition", t("這筆訂單目前不能取消", "This order can't be cancelled right now"));
+    const vendor = (await tx.get(db().collection("vendors").doc(lock.vendor_id))).data() || {};
+    const usedRef = lock.coupon_id ? db().collection("coupons").doc(lock.coupon_id) : null;
+    const used = usedRef ? (await tx.get(usedRef)).data() : null;
+    const amount = cancelCouponAmount(lock, config);
+    const expiresAt = Timestamp.fromMillis(Date.now() + config.couponValidDays * 86400000);
+    if (amount > 0) {
+      tx.set(couponRef, {
+        vendor_id: lock.vendor_id, vendor_name: vendor.name || "", tier: "refund", label: "取消退款券", discount: amount,
+        status: "owned", user_id: lock.buyer_uid, owned_at: FieldValue.serverTimestamp(), expires_at: expiresAt,
+        source_lock_id: lockRef.id, issued_at: FieldValue.serverTimestamp(),
+      });
+    }
+    tx.update(lockRef, {
+      status: "cancelled", cancel_reason: "customer", refunded_amount: 0, kept_amount: paidAmountOf(lock),
+      refund_coupon_id: amount > 0 ? couponRef.id : null, refund_coupon_amount: amount, cancelled_at: FieldValue.serverTimestamp(),
+    });
+    if (used) {
+      const expired = used.expires_at?.toMillis?.() <= Date.now();
+      tx.update(usedRef, expired
+        ? { status: "expired", lock_id: FieldValue.delete() }
+        : { status: "owned", lock_id: FieldValue.delete(), redeemed_at: FieldValue.delete() });
+    }
+    tx.set(slotCounterRef(lock.vendor_id, lock.pickup_date, lock.pickup_window), { count: FieldValue.increment(-1) }, { merge: true });
+    bumpWishes(tx, lock, -1);
+    return amount > 0 ? { id: couponRef.id, discount: amount, expires_at: expiresAt.toMillis(), vendor_name: vendor.name || "" } : null;
+  });
+}
 
 /* ------------------------------------------------------------------ *
  * 轉讓市集付費接手（規格 §4.1：接手者付款後成為新持有人）
- * 接手者付「早鳥價（折價券前）」給 LINE Pay，成功後原付款人自動退回他實付的金額：
- * 同一份餐店家還是收一次錢，只是付錢的人換了。原付款人用掉的折價券不退回。
+ * 接手者付「轉讓價」給 LINE Pay：轉讓人上架時自訂（locks.resale_price，0 ～ 原價），沒填就是早鳥價（折價券前）。
+ * 成功後原付款人自動退款，金額＝他實付與轉讓價取小的（LINE Pay 退款不能超過原付款額）：
+ *   - 賣得比實付低：差額由轉讓人吸收；賣得比實付高：多的留在店家，轉讓人不會因此獲利。
+ * 同一份餐店家至少收到原本那筆錢，只是付錢的人換了。原付款人用掉的折價券不退回。
  * 抽獎券跟著真正付錢的人走：接手後 payer_uid 換成接手者。
  * 逾時沒人接手仍照 firestore.rules 開放 $0 免費領取（原付款人不退款）。
  * ------------------------------------------------------------------ */
 
 const RESALE_HOLD_MS = 15 * 60 * 1000;
 
-/** 接手價＝早鳥價＋加減（折價券前）；舊資料沒有拆欄位就用實付＋券折抵 */
-function resalePriceOf(lock) {
+/** 預設接手價＝早鳥價＋加減（折價券前）；舊資料沒有拆欄位就用實付＋券折抵 */
+function defaultResalePriceOf(lock) {
   if (Number.isFinite(lock.list_price) && Number.isFinite(lock.early_bird_amount)) {
     return Math.max(0, lock.list_price - lock.early_bird_amount + (lock.adjust_amount || 0));
   }
   return Math.max(0, (lock.locked_price || 0) + (lock.coupon_discount || 0));
+}
+
+/** 轉讓價上限＝原價（品項原價＋加減項，不含早鳥折扣）；舊資料沒有原價就用預設接手價 */
+function resaleCapOf(lock) {
+  return Number.isFinite(lock.list_price) ? Math.max(0, lock.list_price + (lock.adjust_amount || 0)) : defaultResalePriceOf(lock);
+}
+
+/** 接手價：轉讓人自訂的 resale_price（夾在 0 ～ 原價），沒填用預設接手價。web/src/lib/transfers.ts 同一套 */
+function resalePriceOf(lock) {
+  if (Number.isInteger(lock.resale_price) && lock.resale_price >= 0) return Math.min(lock.resale_price, resaleCapOf(lock));
+  return defaultResalePriceOf(lock);
 }
 
 const millisOf = (ts) => (ts && typeof ts.toMillis === "function" ? ts.toMillis() : 0);
@@ -763,6 +807,7 @@ async function confirmResale(request, intentRef, intent) {
       transaction_id: lock.transaction_id || null,
       paid_amount: paidAmountOf(lock),
       resale_deadline: lock.resale_deadline || null,
+      resale_price: Number.isInteger(lock.resale_price) ? lock.resale_price : null,
       transferred_from_uids: lock.transferred_from_uids || [],
     };
     tx.update(lockRef, {
@@ -770,6 +815,7 @@ async function confirmResale(request, intentRef, intent) {
       buyer_uid: uid,
       transferred_from_uids: FieldValue.arrayUnion(lock.buyer_uid),
       resale_deadline: FieldValue.delete(),
+      resale_price: FieldValue.delete(),
       resale_hold: FieldValue.delete(),
       resale_payment_pending: orderId,
     });
@@ -790,6 +836,7 @@ async function confirmResale(request, intentRef, intent) {
         buyer_uid: prev.buyer_uid,
         transferred_from_uids: prev.transferred_from_uids,
         ...(prev.resale_deadline ? { resale_deadline: prev.resale_deadline } : {}),
+        ...(prev.resale_price != null ? { resale_price: prev.resale_price } : {}),
         resale_payment_pending: FieldValue.delete(),
       });
       rollback.update(intentRef, { status: "pending" });
@@ -800,6 +847,8 @@ async function confirmResale(request, intentRef, intent) {
 
   // 3) 接手者成為付款人；換掉代領連結與 QR，原持有人手上的截圖立即失效
   const lock = (await lockRef.get()).data();
+  // 退給原付款人的金額：實付與轉讓價取小的（自訂轉讓價可能低於或高於他實付）
+  const refundAmount = prev.transaction_id ? Math.min(prev.paid_amount, intent.amount) : 0;
   const batch = db().batch();
   batch.update(lockRef, {
     payer_uid: uid,
@@ -814,18 +863,18 @@ async function confirmResale(request, intentRef, intent) {
     resale_payment_pending: FieldValue.delete(),
     transfers: FieldValue.arrayUnion({
       intent_id: orderId, from_uid: prev.buyer_uid, to_uid: uid, price: intent.amount,
-      refund_uid: prev.payer_uid, refund_amount: prev.transaction_id ? prev.paid_amount : 0, at: Timestamp.now(),
+      refund_uid: prev.payer_uid, refund_amount: refundAmount, at: Timestamp.now(),
     }),
   });
   batch.delete(db().collection("lock_tokens").doc(intent.lock_id)); // 原持有人的取餐提醒
   batch.update(intentRef, { status: "confirmed", lock_ids: [intent.lock_id] });
   await batch.commit();
 
-  // 4) 退款給原付款人（他實付的金額）。扣款已成功、餐點已換人，退款失敗不回滾，記下來讓管理員補退
+  // 4) 退款給原付款人。扣款已成功、餐點已換人，退款失敗不回滾，記下來讓管理員補退
   let refundStatus = "none";
-  if (prev.transaction_id && prev.paid_amount > 0) {
+  if (refundAmount > 0) {
     try {
-      await refundPayment({ transactionId: prev.transaction_id, refundAmount: prev.paid_amount });
+      await refundPayment({ transactionId: prev.transaction_id, refundAmount });
       refundStatus = "done";
     } catch (err) {
       logger.error(`resale refund failed for lock ${intent.lock_id}`, err);
@@ -833,13 +882,13 @@ async function confirmResale(request, intentRef, intent) {
     }
   }
   await lockRef.update({
-    transfer_refund: { intent_id: orderId, uid: prev.payer_uid, amount: prev.paid_amount, transaction_id: prev.transaction_id, status: refundStatus, at: Timestamp.now() },
+    transfer_refund: { intent_id: orderId, uid: prev.payer_uid, amount: refundAmount, transaction_id: prev.transaction_id, status: refundStatus, at: Timestamp.now() },
   });
   await notifyUser(prev.buyer_uid, {
     kind: "transfer",
     title: t("你轉讓的餐點已被接手", "Your listed meal was taken over"),
     body: refundStatus === "done" && prev.payer_uid === prev.buyer_uid
-      ? t(`「${lock.item_name}」已由別人付款接手，NT$ ${prev.paid_amount} 已退回原付款方式。`, `${lock.item_name} was taken over; NT$ ${prev.paid_amount} is on its way back to you.`)
+      ? t(`「${lock.item_name}」已由別人付款接手，NT$ ${refundAmount} 已退回原付款方式。`, `${lock.item_name} was taken over; NT$ ${refundAmount} is on its way back to you.`)
       : t(`「${lock.item_name}」已由別人付款接手。`, `${lock.item_name} was taken over.`),
     link: "/my-bookings",
   }).catch((err) => logger.warn("notify seller failed", err));
@@ -848,7 +897,7 @@ async function confirmResale(request, intentRef, intent) {
     await notifyUser(prev.payer_uid, {
       kind: "transfer",
       title: t("餐點款項已退回", "Your payment was refunded"),
-      body: t(`你付款的「${lock.item_name}」已由別人付款接手，NT$ ${prev.paid_amount} 已退回原付款方式。`, `Someone paid for ${lock.item_name}; NT$ ${prev.paid_amount} is on its way back to you.`),
+      body: t(`你付款的「${lock.item_name}」已由別人付款接手，NT$ ${refundAmount} 已退回原付款方式。`, `Someone paid for ${lock.item_name}; NT$ ${refundAmount} is on its way back to you.`),
       link: "/my-bookings",
     }).catch((err) => logger.warn("notify payer failed", err));
   }
@@ -1391,4 +1440,5 @@ exports.pickupReminder = onSchedule({ schedule: "every 5 minutes", timeZone: "As
 
 module.exports.helpers = {
   cancelAndRefund, activeLocksOn, todayRange, periodRangesOn, runLockOrders, sideWishId, taipeiTime,
+  resalePriceOf, resaleCapOf,
 };

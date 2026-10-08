@@ -27,22 +27,22 @@ const DEFAULT_PLATFORM_CONFIG = {
   candidateMinQty: 10, // 店家可調
   openWishThreshold: 20, // 近 30 天 20 人
   openWishWindowDays: 30,
-  rewardRate: 0.1,
+  // 成長獎勵（2026-10-05 改版）：累積淨營業額滿 1 萬元開池，回饋 5% 變成折價券給持抽獎券的人抽
+  rewardRate: 0.05,
   ticketUnit: 100, // 每 100 元一張抽獎券
-  minTicketsToOpen: 100,
+  minRevenueToOpen: 10000,
   drawWindowDays: 7,
   couponValidDays: 30,
+  // 取消（2026-10-05 改版）：取餐 48 小時前可取消，不退現金，改發原價 30% 的折價券（效期同 couponValidDays）
+  cancelHoursBefore: 48,
+  cancelCouponRate: 0.3,
   charityConvertAfterMinutes: 30,
   charityCloseAfterMinutes: 120,
   charityReserveMinutes: 10, // 預約後 10 分鐘內到場；逾時釋出給下一位、不停權
   insightRadiusMeters: 1000,
   insightMinUsers: 20,
-  // 平台維護費（§1）：每月 1,999 含稅（實收 1,904＋營業稅 95），首月（30 天）免費，不抽成
-  maintenanceFee: 1999,
-  maintenanceFeeNet: 1904,
-  maintenanceFeeTax: 95,
-  billingCycleDays: 30,
-  billingGraceDays: 7,
+  // 合作方案（2026-10-05 改版）：不收月費，每份餐點抽成 5%（以實付金額計）；店家定價時自行加 5%
+  commissionRate: 0.05,
 };
 
 // 基本工資（§9.3）：platformConfig/minimumWage 存 { monthly, hourly, effectiveFrom, source, history[] }；

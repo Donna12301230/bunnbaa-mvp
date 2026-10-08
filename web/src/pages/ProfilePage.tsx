@@ -127,7 +127,7 @@ const orderStatusLabel = (): Record<LockStatus, string> => ({
   no_show: tr("未取餐（舊制）", "No-show (legacy)"),
   charity: tr("已轉愛心餐", "Charity meal"),
   cancelling: tr("退款中", "Refunding"),
-  cancelled: tr("已取消退款", "Cancelled"),
+  cancelled: tr("已取消", "Cancelled"),
 });
 
 const orderStatusTone: Record<LockStatus, string> = {

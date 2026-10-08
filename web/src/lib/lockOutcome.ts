@@ -12,7 +12,7 @@ const STATUS_STYLE: Record<string, { zh: string; en: string; className: string }
   no_show: { zh: "已登記未取餐（舊制）", en: "No-show (legacy)", className: "bg-red-100 text-red-700" },
   charity: { zh: "已轉愛心餐", en: "Charity meal", className: "bg-pink-100 text-pink-700" },
   cancelling: { zh: "退款中", en: "Refunding", className: "bg-gray-100 text-gray-700" },
-  cancelled: { zh: "已取消退款", en: "Cancelled", className: "bg-gray-100 text-gray-500" },
+  cancelled: { zh: "已取消", en: "Cancelled", className: "bg-gray-100 text-gray-500" },
 };
 
 /** 狀態標籤（依目前語言）＋顏色；每次讀都重新依語言組字串 */

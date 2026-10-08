@@ -31,7 +31,9 @@ interface Forecast {
   hourly_wage: number;
   payment_fee: number;
   payment_fee_rate: number;
-  maintenance_fee: number;
+  // 平台抽成（每份實付 × 抽成比例）；2026-10-05 以前產生的看板沒有這兩欄，按「重新計算」就會補上
+  commission_fee?: number;
+  commission_rate?: number;
   staff_salary: number;
   other_fixed_costs: number;
   net_profit: number;
@@ -127,7 +129,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
           const parts = [
             { key: "mat", label: tr("材料", "Materials"), v: data.material_cost, cls: "bg-rose-400" },
             { key: "labor", label: tr("備料人工", "Prep labor"), v: data.labor_cost, cls: "bg-amber-400" },
-            { key: "fee", label: tr("手續費", "Fees"), v: data.payment_fee + data.maintenance_fee, cls: "bg-violet-400" },
+            { key: "fee", label: tr("手續費與抽成", "Fees & commission"), v: data.payment_fee + (data.commission_fee ?? 0), cls: "bg-violet-400" },
             { key: "fixed", label: tr("薪資與固定", "Salaries & fixed"), v: data.staff_salary + data.other_fixed_costs, cls: "bg-stone-400" },
             { key: "net", label: tr("淨利", "Profit"), v: Math.max(0, data.net_profit), cls: "bg-green-500" },
           ].filter((x) => x.v > 0);
@@ -187,7 +189,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                     <Row label={tr("預計材料成本", "Materials")} value={data.material_cost} minus />
                     <Row label={tr(`備料人工（${data.labor_hours} 小時 × ${data.hourly_wage}）`, `Prep labor (${data.labor_hours} h × ${data.hourly_wage})`)} value={data.labor_cost} minus />
                     <Row label={tr(`LINE Pay 手續費（${(data.payment_fee_rate * 100).toFixed(2)}%）`, `LINE Pay fee (${(data.payment_fee_rate * 100).toFixed(2)}%)`)} value={data.payment_fee} minus />
-                    <Row label={data.maintenance_fee === 0 ? tr("平台維護費（首月免費）", "Platform fee (first month free)") : tr("平台維護費（含稅）", "Platform fee (incl. tax)")} value={data.maintenance_fee} minus />
+                    <Row label={tr(`平台抽成（${Math.round((data.commission_rate ?? 0.05) * 1000) / 10}%）`, `Platform commission (${Math.round((data.commission_rate ?? 0.05) * 1000) / 10}%)`)} value={data.commission_fee ?? 0} minus />
                     {data.staff_salary > 0 && <Row label={tr("員工固定薪資", "Staff salaries")} value={data.staff_salary} minus />}
                     {data.other_fixed_costs > 0 && <Row label={tr("其他固定成本", "Other fixed costs")} value={data.other_fixed_costs} minus />}
                     <Row label={tr("預估淨利", "Est. net profit")} value={data.net_profit} strong />

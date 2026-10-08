@@ -41,7 +41,7 @@ const STATUS: Record<string, { zh: string; en: string; cls: string }> = {
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString()}`;
 
 /**
- * 回饋券（規格 §8、§9.3、§9.4）：每週以淨營業額 10% 生成回饋池，拆成折價券抽獎，人人有獎；券發出後規則不可變更。
+ * 回饋券（規格 §8、§9.3、§9.4）：累積淨營業額滿 1 萬元時以其中 5% 生成回饋池，拆成折價券抽獎，人人有獎；券發出後規則不可變更。
  * 一眼看：流通中負債（大字）、距離開池進度、券的去向色條、本期各券種剩餘、每週回饋池長條；查詢、匯出、暫停收在「工具」。
  */
 export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number) => void }) {
@@ -124,7 +124,10 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
     }
   }
 
-  const preview = allocatePool(10000, 1000);
+  const rewardPct = Math.round((config?.rewardRate ?? 0.05) * 100);
+  const minRevenue = status?.min_revenue ?? config?.minRevenueToOpen ?? 10000;
+  const revenueSoFar = status?.revenue_so_far ?? Math.max(0, minRevenue - (status?.amount_to_open ?? minRevenue));
+  const preview = allocatePool(Math.floor(100000 * (config?.rewardRate ?? 0.05)), 800);
   const flow = [
     { key: "redeemed", label: tr("已兌現", "Redeemed"), v: m.redeemedAll, cls: "bg-green-500" },
     { key: "owned", label: tr("還在客人手上", "Outstanding"), v: m.liability, cls: "bg-orange-400" },
@@ -132,15 +135,14 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
   ];
   const flowTotal = Math.max(1, flow.reduce((s, x) => s + x.v, 0));
   const tickets = status?.tickets_so_far ?? 0;
-  const minTickets = status?.min_tickets ?? config?.minTicketsToOpen ?? 100;
   const chart = [...periods].reverse().slice(-12);
   const chartMax = Math.max(1, ...chart.map((p) => p.pool || 0));
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground flex items-center gap-1">
-        {tr(`每週一把上週淨營業額的 ${Math.round((config?.rewardRate ?? 0.1) * 100)}% 變成折價券抽給客人`, `Every Monday, ${Math.round((config?.rewardRate ?? 0.1) * 100)}% of last week's net revenue becomes coupons`)}
-        <InfoTip>{tr(`抽獎券滿 ${config?.minTicketsToOpen ?? 100} 張才開池，未達標就結轉。折價券於線上結帳時自動套用，店家不用收券；券發出後規則不可變更。範例：淨營業額 100,000、1,000 張抽獎券 → ${ALL_TIERS.map((t) => `${tierLabel(t.code)} ${preview.counts[t.code]}`).join("、")}，餘 ${preview.leftover} 元回歸店家。`, `The pool opens once ${config?.minTicketsToOpen ?? 100} tickets are in; otherwise it carries over. Coupons apply automatically at checkout.`)}</InfoTip>
+        {tr(`累積淨營業額滿 ${nt(minRevenue)} 就開池，把其中 ${rewardPct}% 變成折價券抽給客人`, `Once net revenue reaches ${nt(minRevenue)}, ${rewardPct}% of it becomes coupons for your customers`)}
+        <InfoTip>{tr(`每週一結算：累積淨營業額（含前期結轉）滿 ${nt(minRevenue)} 才開池，未達標就連同抽獎券結轉下一期。客人每實付 ${config?.ticketUnit ?? 100} 元得一張抽獎券，開池後人人有獎。折價券於線上結帳時自動套用，店家不用收券；券發出後規則不可變更。範例：淨營業額 100,000、800 張抽獎券 → ${ALL_TIERS.map((t) => `${tierLabel(t.code)} ${preview.counts[t.code]}`).join("、")}，餘 ${preview.leftover} 元回歸店家。`, `Settled every Monday: the pool opens once net revenue (incl. carry-over) reaches ${nt(minRevenue)}; otherwise it carries over with the tickets. Coupons apply automatically at checkout.`)}</InfoTip>
       </p>
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -163,9 +165,9 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
             <p className="text-xs text-muted-foreground">{tr("下一池", "Next pool")}</p>
             {status?.pool_open ? <p className="text-3xl font-bold text-orange-600">🎉 {tr("開獎中", "Open")}</p> : (
               <>
-                <p className="text-3xl font-bold tabular-nums">{tickets}<span className="text-base font-normal text-muted-foreground"> / {minTickets} {tr("張", "")}</span></p>
-                <div className="h-3 rounded-full bg-stone-200 overflow-hidden"><div className="h-full rounded-full bg-orange-400" style={{ width: `${Math.min(100, (tickets / Math.max(1, minTickets)) * 100)}%` }} /></div>
-                <p className="text-xs text-muted-foreground">{tr(`再賣 ${status?.amount_to_open ?? "—"} 元開池`, `NT$${status?.amount_to_open ?? "—"} to open`)}</p>
+                <p className="text-3xl font-bold tabular-nums">{nt(revenueSoFar)}<span className="text-base font-normal text-muted-foreground"> / {nt(minRevenue)}</span></p>
+                <div className="h-3 rounded-full bg-stone-200 overflow-hidden"><div className="h-full rounded-full bg-orange-400" style={{ width: `${Math.min(100, (revenueSoFar / Math.max(1, minRevenue)) * 100)}%` }} /></div>
+                <p className="text-xs text-muted-foreground">{status && status.amount_to_open <= 0 ? tr(`已達標，下週一結算時開池・已發 ${tickets} 張抽獎券`, `Target reached — opens at Monday's settlement · ${tickets} tickets out`) : tr(`再賣 ${status?.amount_to_open ?? "—"} 元開池・已發 ${tickets} 張抽獎券`, `NT$${status?.amount_to_open ?? "—"} to open · ${tickets} tickets out`)}</p>
               </>
             )}
           </CardContent>

@@ -23,8 +23,9 @@ export function MemberNotice() {
       </ul>
       <p className="font-semibold">4. Cancellations and refunds</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li><span className="font-semibold">Before cutoff</span>: cancel or change for free with a full refund to your original payment method; coupons are returned with their original expiry.</li>
-        <li><span className="font-semibold">After cutoff</span>: the vendor has already bought and prepared ingredients, so there are no free cancellations. You can still transfer, gift or donate the meal.</li>
+        <li><span className="font-semibold">Up to 48 hours before pickup</span>: you may cancel. Cancellations are not refunded in cash — you receive a coupon for the same vendor worth 30% of the list price, valid for 30 days. A coupon used on the order is returned with its original expiry.</li>
+        <li><span className="font-semibold">Before cutoff</span>: you can change the pickup time, main, sides or rice for free; if the new choice is cheaper the difference is refunded.</li>
+        <li><span className="font-semibold">After cutoff</span>: the vendor has already bought and prepared ingredients, so the order can't be cancelled or changed. You can still transfer, gift or donate the meal.</li>
         <li>If a work suspension is announced for the pickup location's county, that day's orders are cancelled and refunded automatically. During disasters the vendor may substitute an equivalent side dish.</li>
         <li>If the vendor fails to serve, you get a full refund.</li>
         <li>Support: herzbaa@gmail.com</li>
@@ -54,8 +55,9 @@ export function MemberNotice() {
       </ul>
       <p className="font-semibold">四、取消與退款政策</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li><span className="font-semibold">截單前</span>：可免費取消或修改，全額退回原付款方式；用券訂單的折價券退回並保留原到期日。</li>
-        <li><span className="font-semibold">截單後</span>：店家已依訂單採購備料，不可免費取消（現做餐點屬易腐敗商品，通訊交易解除權之例外）；可轉讓、贈送或捐為愛心餐。</li>
+        <li><span className="font-semibold">取餐 48 小時前</span>：可申請取消。取消不退現金，改發一張同店家的折價券，面額為原價的 30%，30 天內有效；下單時使用的折價券退回並保留原到期日。</li>
+        <li><span className="font-semibold">截單前</span>：可免費修改取餐時段、主菜、配菜、飯量；改得比較便宜會退差額。</li>
+        <li><span className="font-semibold">截單後</span>：店家已依訂單採購備料，不可取消或修改（現做餐點屬易腐敗商品，通訊交易解除權之例外）；可轉讓、贈送或捐為愛心餐。</li>
         <li>取餐地點所在縣市宣布停班時，當日訂單自動取消並全額退款；天災期間店家可等值替換配菜。</li>
         <li>店家未如期出餐，全額退款。</li>
         <li>客服聯絡方式：herzbaa@gmail.com</li>
@@ -74,20 +76,20 @@ export function VendorNotice() {
       <p className="font-bold text-amber-800 text-base">Vendor Application Terms</p>
       <p className="font-semibold">1. Eligibility</p>
       <p>Any business legally permitted to sell food may apply to become a BunnBaa vendor. Applicants must provide valid contact details and store information for review.</p>
-      <p className="font-semibold">2. Subscription and fees</p>
+      <p className="font-semibold">2. Partner plan and fees</p>
       <div className="bg-amber-100 rounded-lg p-3 space-y-1">
-        <p className="font-semibold text-amber-900">First month free</p>
-        <p>Once approved, use every feature free for the first month — no credit card needed.</p>
-        <p className="font-semibold text-amber-900 mt-1">From the second month: NT$1,999 / month</p>
-        <p>Renews monthly; the fee is charged on each renewal date.</p>
+        <p className="font-semibold text-amber-900">No monthly fee, no listing fee</p>
+        <p>The platform takes a 5% commission on each meal sold, calculated on the amount the customer actually pays and deducted when your sales are paid out.</p>
+        <p className="font-semibold text-amber-900 mt-1">Add the 5% when you price</p>
+        <p>Set your menu prices with the commission included (to net NT$100, list at NT$105). The rate is announced in advance if it changes.</p>
       </div>
-      <p className="font-semibold">3. Cancelling and account handling</p>
+      <p className="font-semibold">3. Ending the partnership and account handling</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>Vendors may request cancellation within the month before the current period ends.</li>
-        <li>After cancellation the account is <span className="font-semibold">suspended</span> and can't sign in or use the platform.</li>
+        <li>Vendors may ask to stop listing at any time by contacting the platform; orders already placed must still be served.</li>
+        <li>After leaving, the account is <span className="font-semibold">suspended</span> and can't take new orders.</li>
         <li>While suspended, all store data, menus and order history are <span className="font-semibold">kept, not deleted</span>, for up to 2 years.</li>
-        <li>To come back, simply resubscribe and everything picks up where it left off.</li>
-        <li>Once cancelled, no further charges are made after the period ends. Billing is currently reconciled manually — for billing questions contact herzbaa@gmail.com.</li>
+        <li>To come back, contact the platform and everything picks up where it left off.</li>
+        <li>Payouts are currently reconciled manually — for payout or commission questions contact herzbaa@gmail.com.</li>
       </ul>
       <p className="font-semibold">4. Service standards</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
@@ -108,20 +110,20 @@ export function VendorNotice() {
       <p className="font-bold text-amber-800 text-base">廠商申請須知</p>
       <p className="font-semibold">一、申請資格</p>
       <p>凡具有合法食品販售資格之業者，均可申請成為飯飽 BunnBaa 平台廠商。申請時須提供有效之聯絡方式及店家資訊，以供平台審核。</p>
-      <p className="font-semibold">二、訂閱方案與收費</p>
+      <p className="font-semibold">二、合作方案與收費</p>
       <div className="bg-amber-100 rounded-lg p-3 space-y-1">
-        <p className="font-semibold text-amber-900">首月免費試用</p>
-        <p>通過審核後第一個月免費使用全部功能，無需信用卡。</p>
-        <p className="font-semibold text-amber-900 mt-1">第二個月起：每月 NT$1,999</p>
-        <p>每月自動續約，費用於每月起算日扣款。</p>
+        <p className="font-semibold text-amber-900">沒有月費、沒有上架費</p>
+        <p>平台從每份賣出的餐點抽成 5%，以消費者實付金額計算，於撥款時直接扣除。</p>
+        <p className="font-semibold text-amber-900 mt-1">定價時請加上 5%</p>
+        <p>菜單售價請把抽成算進去（想實收 100 元，售價訂 105 元）。抽成比例如有調整，平台會提前公告。</p>
       </div>
-      <p className="font-semibold">三、取消訂閱與帳號處理</p>
+      <p className="font-semibold">三、終止合作與帳號處理</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>廠商可於當期到期日的前一個月內提出取消申請。</li>
-        <li>取消後帳號將進入<span className="font-semibold">暫停狀態</span>，無法登入及使用平台功能。</li>
+        <li>廠商可隨時聯絡平台申請停止上架；已成立的訂單仍須照常出餐。</li>
+        <li>終止後帳號將進入<span className="font-semibold">暫停狀態</span>，無法接新訂單。</li>
         <li>帳號暫停期間，所有店家資料、菜單、訂單紀錄<span className="font-semibold">均予保留，不會刪除</span>，保留期限為 2 年。</li>
-        <li>如日後希望恢復使用，重新訂閱即可啟用帳號，原有資料完整延續。</li>
-        <li>如廠商未確認已取消訂閱，訂閱費用於到期後不再自動扣款；本平台目前採人工對帳方式，如有帳款疑義請聯繫 herzbaa@gmail.com。</li>
+        <li>如日後希望恢復使用，聯絡平台即可啟用帳號，原有資料完整延續。</li>
+        <li>本平台目前採人工對帳方式撥款，如有撥款或抽成疑義請聯繫 herzbaa@gmail.com。</li>
       </ul>
       <p className="font-semibold">四、服務規範</p>
       <ul className="list-disc list-inside space-y-1 pl-1">

@@ -115,6 +115,27 @@ function isPastCutoff(pickupDate, vendor, config = DEFAULT_PLATFORM_CONFIG, now 
   return now.getTime() >= cutoffAt(pickupDate, vendor, config).getTime();
 }
 
+/** 消費者可取消的期限：取餐時段開始前 cancelHoursBefore 小時（預設 48） */
+function cancelDeadlineAt(pickupDate, pickupWindow, config = DEFAULT_PLATFORM_CONFIG) {
+  const start = splitWindow(pickupWindow).start || "00:00";
+  return new Date(at(pickupDate, start).getTime() - (config.cancelHoursBefore ?? 48) * 3600000);
+}
+
+/**
+ * 取消後退的折價券面額：原價（品項原價＋加減項）× cancelCouponRate（預設 30%），四捨五入到元；
+ * 不超過付款人實付金額（用免費餐券換的 0 元單不發券）。
+ */
+function cancelCouponAmount(lock, config = DEFAULT_PLATFORM_CONFIG) {
+  const original = Math.max(0, (Number(lock.list_price) || 0) + (Number(lock.adjust_amount) || 0));
+  const paid = Number.isFinite(lock.paid_amount) ? lock.paid_amount : Number(lock.locked_price) || 0;
+  return Math.max(0, Math.min(Math.round(original * (config.cancelCouponRate ?? 0.3)), paid));
+}
+
+/** 平台抽成（元）：每份餐點實付金額 × 抽成比例，逐份四捨五入後加總（收益看板與撥款用同一套） */
+function commissionOf(locks, rate = DEFAULT_PLATFORM_CONFIG.commissionRate) {
+  return locks.reduce((sum, l) => sum + Math.round((Number(l.locked_price) || 0) * rate), 0);
+}
+
 /** 0 / missing / invalid = unlimited (returns null). */
 function vendorSlotCapacity(vendor) {
   const cap = vendor?.slot_capacity;
@@ -216,6 +237,6 @@ function windowMinutes(window) {
 module.exports = {
   EARLY_BIRD_TIERS, DEFAULT_PICKUP_WINDOWS, MEAL_PERIODS, mealPeriodOf, mealPeriodLabel, itemMealPeriods, itemWindows,
   vendorPeriodRanges, isValidWindow, vendorWindows, vendorPickupRange, vendorCutoffTime,
-  cutoffAt, isPastCutoff, closedReason, validatePickup, planPickupDates, applyEarlyBirdPrice, earlyBirdPercent,
+  cutoffAt, isPastCutoff, cancelDeadlineAt, cancelCouponAmount, commissionOf, closedReason, validatePickup, planPickupDates, applyEarlyBirdPrice, earlyBirdPercent,
   vendorSlotCapacity, windowMinutes,
 };

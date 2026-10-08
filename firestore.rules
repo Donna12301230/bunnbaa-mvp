@@ -44,29 +44,8 @@ service cloud.firestore {
     match /vendors/{vendorId} {
       allow read: if true;
       allow create, delete: if isAdmin();
-      // Owner self-service on their own subscription (web/src/lib/subscription.ts),
-      // limited to exactly two transitions; everything else (incl. renewing an
-      // expired subscription — there's no subscription payment flow) is admin-only.
+      // 合作方案改成每份餐點抽成（2026-10-05），沒有月費訂閱，店主不再有訂閱欄位可以自助改。
       allow update: if isAdmin()
-                    // Request cancellation: trial/active → cancelled, remembering the
-                    // previous status; access continues until subscription_end_date.
-                    || (isVendorOwner(vendorId)
-                        && request.resource.data.diff(resource.data).affectedKeys()
-                             .hasOnly(['subscription_status', 'cancelled_from', 'cancel_requested_at'])
-                        && resource.data.get('subscription_status', null) in ['trial', 'active']
-                        && resource.data.get('subscription_end_date', null) != null
-                        && resource.data.subscription_end_date > request.time
-                        && request.resource.data.subscription_status == 'cancelled'
-                        && request.resource.data.cancelled_from == resource.data.subscription_status
-                        && request.resource.data.cancel_requested_at == request.time)
-                    // Undo a cancellation before it takes effect: back to the saved status.
-                    || (isVendorOwner(vendorId)
-                        && request.resource.data.diff(resource.data).affectedKeys()
-                             .hasOnly(['subscription_status', 'cancelled_from', 'cancel_requested_at'])
-                        && resource.data.get('subscription_status', null) == 'cancelled'
-                        && resource.data.subscription_end_date > request.time
-                        && request.resource.data.subscription_status == resource.data.get('cancelled_from', 'active')
-                        && !request.resource.data.keys().hasAny(['cancelled_from', 'cancel_requested_at']))
                     // Store profile + pickup schedule from the vendor portal's settings
                     // page. Name stays admin-only (it's what buyers trust/recognise).
                     // Element formats are checked again server-side at checkout
@@ -79,7 +58,11 @@ service cloud.firestore {
                                        // 第一階段規格 §2「店家可調」：截單只能提前、安全庫存、候選菜成立最低量；
                                        // 取餐點座標（區域洞察、附近愛心餐）、新店家自填預估、異常週
                                        'cutoff_time', 'safety_stock_rate', 'candidate_min_qty', 'lat', 'lng',
-                                       'forecast_daily', 'anomaly_weeks'])
+                                       'forecast_daily', 'anomaly_weeks',
+                                       // 菜單目錄（目錄 > 分類 兩層）的名稱與順序
+                                       'menu_catalogs'])
+                        && request.resource.data.get('menu_catalogs', []) is list
+                        && request.resource.data.get('menu_catalogs', []).size() <= 30
                         && (!request.resource.data.keys().hasAny(['cutoff_time'])
                             || (request.resource.data.cutoff_time is string
                                 && request.resource.data.cutoff_time.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
@@ -164,7 +147,14 @@ service cloud.firestore {
                     || (isSignedInUser() && resource.data.buyer_uid == request.auth.uid
                         && resource.data.status == 'locked'
                         && request.resource.data.status == 'for_resale'
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resale_deadline'])
+                        // 轉讓人自訂轉讓價（2026-10-05）：0 ～ 原價（品項原價＋加減項，不含早鳥折扣），
+                        // 不能加價賣；伺服器 resalePriceOf 會再夾一次。沒填就用早鳥價。
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resale_deadline', 'resale_price'])
+                        && (!request.resource.data.keys().hasAny(['resale_price'])
+                            || (request.resource.data.resale_price is int
+                                && request.resource.data.resale_price >= 0
+                                && request.resource.data.resale_price
+                                     <= resource.data.get('list_price', resource.data.locked_price) + resource.data.get('adjust_amount', 0)))
                         && (!request.resource.data.keys().hasAny(['resale_deadline'])
                             || (request.resource.data.resale_deadline is timestamp
                                 && request.resource.data.resale_deadline > request.time
@@ -194,7 +184,7 @@ service cloud.firestore {
                         && resource.data.status in ['for_resale', 'for_gift']
                         && !(resource.data.get('resale_hold', null) != null && resource.data.resale_hold.expires_at > request.time)
                         && request.resource.data.status == 'locked'
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resale_deadline']))
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resale_deadline', 'resale_price']))
                     // Anyone claims an expired resale listing for free — replaces a
                     // scheduled "release" Cloud Function with a lazy, rule-enforced
                     // expiry checked at claim time.
