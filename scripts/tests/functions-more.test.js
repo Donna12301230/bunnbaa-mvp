@@ -902,6 +902,7 @@ function geohash(lat, lng, precision = 7) {
     const U = await freshUser("ai");
     const a = expectCode(await U.call("askShoppingAssistant", { messages: [{ role: "user", text: `明天中午便當 ${RUN}` }] }), "unavailable");
     assert(/忙不過來/.test(a.message), a.message);
+    eq((await get(`users/${U.uid}`))?.assistant_usage?.count ?? 0, 0, "失敗不扣助理次數");
     const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     const m = expectCode(await OWNER.call("extractMenuFromImage", { vendor_id: VO, image_base64: png, mime_type: "image/png" }), "unavailable");
     assert(/AI 暫時無法辨識/.test(m.message), m.message);

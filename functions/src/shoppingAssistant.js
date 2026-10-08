@@ -358,6 +358,16 @@ async function takeUsage(uid, today) {
   }
 }
 
+/** Gemini 失敗（429／503 等）不算會員的次數：退回 takeUsage 扣的那一次 */
+async function refundUsage(uid, today) {
+  const ref = db().collection("users").doc(uid);
+  await db().runTransaction(async (tx) => {
+    const usage = (await tx.get(ref)).data()?.assistant_usage;
+    if (usage?.date !== today || !(usage.count > 0)) return;
+    tx.set(ref, { assistant_usage: { date: today, count: usage.count - 1 } }, { merge: true });
+  }).catch((err) => logger.warn("refundUsage failed", err));
+}
+
 /**
  * data: { messages: [{ role: "user"|"assistant", text }], area?: { county, town } }
  * 回傳 { reply, cards[], disclaimer }。
@@ -408,6 +418,7 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
     });
   } catch (err) {
     logger.warn("askShoppingAssistant failed", err);
+    await refundUsage(uid, today);
     throw new HttpsError("unavailable", t("助理暫時忙不過來，請稍後再試", "The assistant is busy right now. Please try again shortly."));
   }
 
