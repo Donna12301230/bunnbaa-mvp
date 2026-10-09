@@ -73,7 +73,7 @@ function AppealsList() {
 
   return (
     <>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("解封申訴管理", "Ban appeals")}</h1>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("解封申訴", "Appeals")}</h1>
       {isLoading ? (
         <SkeletonBlocks count={2} height={96} className="space-y-3" />
       ) : appeals.length === 0 ? (

@@ -14,6 +14,14 @@ interface Dish { id: string; name: string; aliases?: string[]; category?: string
 interface Template { id: string; name: string; structure: string; items?: unknown[]; components?: unknown[] }
 
 const TAGS = ["雞", "豬", "牛", "海鮮", "素", "炸", "滷", "烤", "炒", "蒸", "辣", "清淡", "甜", "葉菜", "根莖", "瓜類"];
+const CATEGORIES = ["青菜類", "肉類配菜", "蛋豆類", "根莖類", "主菜", "其他"];
+// 標籤、類別存中文（開放許願歸類會比對），英文介面只換顯示文字
+const EN_LABEL: Record<string, string> = {
+  雞: "Chicken", 豬: "Pork", 牛: "Beef", 海鮮: "Seafood", 素: "Vegetarian", 炸: "Fried", 滷: "Braised", 烤: "Roasted", 炒: "Stir-fried", 蒸: "Steamed",
+  辣: "Spicy", 清淡: "Mild", 甜: "Sweet", 葉菜: "Leafy greens", 根莖: "Root vegetables", 瓜類: "Gourds",
+  青菜類: "Greens", 肉類配菜: "Meat sides", 蛋豆類: "Egg & tofu", 根莖類: "Root vegetables", 主菜: "Main", 其他: "Other",
+};
+const label = (v: string) => tr(v, EN_LABEL[v] ?? v);
 
 /**
  * 平台菜色庫與定式模板（規格 §3.1、§4.4）：開放許願先從菜色庫選、自由輸入再由 Gemini 歸類到
@@ -46,13 +54,13 @@ function DishesContent() {
             <Input className="w-40" placeholder={tr("標準菜名", "Name")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Input className="w-56" placeholder={tr("別名（逗號分隔）", "Aliases")} value={form.aliases} onChange={(e) => setForm({ ...form, aliases: e.target.value })} />
             <select className="h-10 rounded-md border px-2 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-              {["青菜類", "肉類配菜", "蛋豆類", "根莖類", "主菜", "其他"].map((c) => <option key={c}>{c}</option>)}
+              {CATEGORIES.map((c) => <option key={c} value={c}>{label(c)}</option>)}
             </select>
             <Button onClick={add} disabled={!form.name.trim()}>{tr("新增", "Add")}</Button>
           </div>
           <div className="flex flex-wrap gap-2 text-sm">
             {TAGS.map((t) => (
-              <label key={t} className="flex items-center gap-1"><input type="checkbox" checked={form.tags.includes(t)} onChange={(e) => setForm({ ...form, tags: e.target.checked ? [...form.tags, t] : form.tags.filter((x) => x !== t) })} />{t}</label>
+              <label key={t} className="flex items-center gap-1"><input type="checkbox" checked={form.tags.includes(t)} onChange={(e) => setForm({ ...form, tags: e.target.checked ? [...form.tags, t] : form.tags.filter((x) => x !== t) })} />{label(t)}</label>
             ))}
           </div>
         </CardContent>
@@ -64,14 +72,14 @@ function DishesContent() {
           {dishes.map((d) => (
             <div key={d.id} className="flex items-center gap-2 text-sm border-b py-1">
               <span className="w-28 font-medium">{d.name}</span>
-              <span className="w-20 text-xs text-muted-foreground">{d.category}</span>
+              <span className="w-20 text-xs text-muted-foreground">{d.category ? label(d.category) : ""}</span>
               <Input
                 className="h-8 flex-1"
                 defaultValue={(d.aliases ?? []).join("、")}
                 onBlur={(e) => updateDoc(doc(db, "dishLibrary", d.id), { aliases: e.target.value.split(/[,，、]/).map((x) => x.trim()).filter(Boolean) })}
                 aria-label={tr("別名", "Aliases")}
               />
-              <span className="text-xs text-muted-foreground w-32 truncate">{(d.tags ?? []).join(" ")}</span>
+              <span className="text-xs text-muted-foreground w-32 truncate">{(d.tags ?? []).map(label).join(" ")}</span>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => deleteDoc(doc(db, "dishLibrary", d.id))}><Trash2 className="w-3.5 h-3.5" /></Button>
             </div>
           ))}

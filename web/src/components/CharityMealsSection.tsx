@@ -163,7 +163,7 @@ export default function CharityMealsSection() {
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span className="font-semibold text-foreground">{tr(`剩 ${g.available.length} 份`, `${g.available.length} left`)}</span>
                   <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {tr(`${minutesLeft} 分後截止`, `closes in ${minutesLeft} min`)}</span>
-                  {walk !== null && <span className="flex items-center gap-1"><Footprints className="w-3.5 h-3.5" /> {formatDistance(g.distance)}・{tr(`步行 ${walk} 分`, `${walk} min walk`)}</span>}
+                  {walk !== null && <span className="flex items-center gap-1"><Footprints className="w-3.5 h-3.5" /> {formatDistance(g.distance)}{tr("・", " · ")}{tr(`步行 ${walk} 分`, `${walk} min walk`)}</span>}
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2">{g.available.slice(0, 3).map((m) => m.item_name).join("、")}</p>
                 {tooFar && <span className="text-xs font-semibold text-red-700">{tr("來不及（步行時間超過剩餘時間）", "Too far to make it in time")}</span>}

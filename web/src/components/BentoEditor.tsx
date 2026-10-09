@@ -46,10 +46,14 @@ export const portionsText = (n: number) => (n && n !== 1 ? ` ×${n}` : "");
 const LOW_MARGIN = 0.4;
 
 const CATEGORIES = ["青菜類", "肉類配菜", "蛋豆類", "根莖類", "其他"];
+// 配菜類別存中文（別處會比對），英文介面只換顯示文字
+const CATEGORY_EN: Record<string, string> = { 青菜類: "Greens", 肉類配菜: "Meat sides", 蛋豆類: "Egg & tofu", 根莖類: "Root vegetables", 其他: "Other" };
+const categoryLabel = (c: string) => tr(c, CATEGORY_EN[c] ?? c);
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WD = ["日", "一", "二", "三", "四", "五", "六"];
 
 const PORTION_SKIP_CATEGORIES = ["調味", "包材"];
+// 份量文字會存進 menu_items（portion_text），要跟 functions/src/bento.js 一致，所以固定用中文、不跟介面語言
 const UNIT_TEXT: Record<string, string> = { g: "克", ml: "毫升" };
 
 /**
@@ -474,7 +478,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
               <div className="flex gap-2 items-center">
                 <span className="text-xs font-semibold shrink-0">{tr(`配菜 ${i + 1}`, `Side ${i + 1}`)}</span>
                 <select className="h-9 rounded-md border border-input px-2 text-sm" value={slot.category} onChange={(e) => setSlot(i, { ...slot, category: e.target.value })}>
-                  {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
                 </select>
                 <Button variant="ghost" size="icon" className="ml-auto h-8 w-8" aria-label={tr("刪除配菜", "Remove side")} onClick={() => onChange({ ...value, slots: value.slots.filter((_, j) => j !== i) })}><Trash2 className="w-3.5 h-3.5" /></Button>
               </div>

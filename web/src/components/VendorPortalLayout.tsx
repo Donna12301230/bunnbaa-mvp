@@ -41,7 +41,7 @@ const navGroups = () => [
     title: tr("店家", "Store"),
     items: [
       // 食材、單價、供應商：開店或漲價時才改，菜色的組成在菜單管理裡直接改
-      { href: "/vendor-portal/recipes", label: tr("食材與供應商", "Ingredients"), icon: BookOpen },
+      { href: "/vendor-portal/recipes", label: tr("食材與供應商", "Ingredients & suppliers"), icon: BookOpen },
       { href: "/vendor-portal/settings", label: tr("店家設定", "Store settings"), icon: Settings },
     ],
   },

@@ -20,7 +20,10 @@ import type { Component, Ingredient } from "@/types";
 // 存完回傳新文件 id，原本的視窗內容不受影響。
 
 export const EMPTY_ING: Omit<Ingredient, "id"> = {
-  name: "", category: "其他", unit: "g", purchase_unit_label: "公斤", purchase_unit_size: 1000,
+  name: "", category: "其他", unit: "g",
+  // 採購單位名稱是店家自填的文字，預設值跟著介面語言（getter：每次展開 {...EMPTY_ING} 時才挑語言）
+  get purchase_unit_label() { return tr("公斤", "kg"); },
+  purchase_unit_size: 1000,
   yield_rate: 1, loss_rate: 0, shelf_days: 7, frequency: "weekly", supplier_id: null, unit_price: 0,
 };
 export const EMPTY_COMP: Omit<Component, "id"> = {
@@ -31,7 +34,23 @@ const EQUIPMENT = ["炒鍋", "電鍋", "炸鍋", "烤箱", "滷鍋", "蒸籠", "
 const METHODS = ["炸", "滷", "烤", "炒", "蒸", "煮", "涼拌"];
 const FLAVORS = ["辣", "清淡", "甜"];
 // 1002 規格 §5：採購只分每週進料與每日備料；米、油、調味料、乾貨、包材等久放品項（monthly）併入每週，低於安全庫存才叫
-export const FREQ_LABEL: Record<string, string> = { monthly: "久放品項（低於安全庫存才叫）", weekly: "每週進料", daily: "每日補貨" };
+export const FREQ_LABEL: Record<string, { zh: string; en: string }> = {
+  monthly: { zh: "久放品項（低於安全庫存才叫）", en: "Long-life (reorder below safety stock)" },
+  weekly: { zh: "每週進料", en: "Weekly delivery" },
+  daily: { zh: "每日補貨", en: "Daily restock" },
+};
+export const freqLabel = (k: string) => (FREQ_LABEL[k] ? tr(FREQ_LABEL[k].zh, FREQ_LABEL[k].en) : k);
+
+// 以上類別、設備、做法、口味的值都是中文存進資料庫（別處會比對），只在顯示時換英文
+const EN_LABEL: Record<string, string> = {
+  雞: "Chicken", 豬: "Pork", 牛: "Beef", 海鮮: "Seafood", 素: "Vegetarian", 蛋: "Egg", 豆: "Beans & tofu", 葉菜: "Leafy greens",
+  根莖: "Root vegetables", 瓜類: "Gourds", 米: "Rice", 麵: "Noodles", 調味: "Seasoning", 乾貨: "Dry goods", 包材: "Packaging", 其他: "Other",
+  炒鍋: "Wok", 電鍋: "Rice cooker", 炸鍋: "Fryer", 烤箱: "Oven", 滷鍋: "Braising pot", 蒸籠: "Steamer", 湯鍋: "Stock pot", 工作台: "Prep table",
+  炸: "Fried", 滷: "Braised", 烤: "Roasted", 炒: "Stir-fried", 蒸: "Steamed", 煮: "Boiled", 涼拌: "Cold-tossed",
+  辣: "Spicy", 清淡: "Mild", 甜: "Sweet",
+};
+/** 類別／設備／做法／口味的顯示文字；不認得的值照原文 */
+export const catalogLabel = (v: string) => tr(v, EN_LABEL[v] ?? v);
 // 計量單位由店家自訂（§3.2），這些只是建議
 const UNIT_SUGGESTIONS = ["克", "片", "顆", "塊", "毫升", "支", "張", "g", "ml", "個"];
 const NEW_ING = "__new__";
@@ -126,7 +145,7 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
             <div className="col-span-2"><Label>{tr("名稱", "Name")}</Label><Input value={ing.name} onChange={(e) => setIng({ ...ing, name: e.target.value })} /></div>
             <div><Label>{tr("類別", "Category")}</Label>
               <select className={SELECT} value={ing.category} onChange={(e) => setIng({ ...ing, category: e.target.value })}>
-                {ING_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                {ING_CATEGORIES.map((c) => <option key={c} value={c}>{catalogLabel(c)}</option>)}
               </select></div>
             <div><Label>{tr("用量單位", "Unit")}</Label>
               <Input list="ing-unit-suggestions" value={ing.unit} maxLength={6} onChange={(e) => setIng({ ...ing, unit: e.target.value.trim() })} placeholder={tr("克、片、顆…", "g, slice, piece…")} />
@@ -140,7 +159,7 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
             <div><Label>{tr("保存天數", "Shelf life (days)")}</Label><Input type="number" value={ing.shelf_days} onChange={(e) => setIng({ ...ing, shelf_days: Number(e.target.value) })} /></div>
             <div><Label>{tr("採購頻率", "Purchase frequency")}</Label>
               <select className={SELECT} value={ing.frequency} onChange={(e) => setIng({ ...ing, frequency: e.target.value as Ingredient["frequency"] })}>
-                {Object.entries(FREQ_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {Object.keys(FREQ_LABEL).map((k) => <option key={k} value={k}>{freqLabel(k)}</option>)}
               </select></div>
             <div><Label>{tr("供應商", "Supplier")}</Label>
               <select className={SELECT} value={ing.supplier_id ?? ""} onChange={(e) => setIng({ ...ing, supplier_id: e.target.value || null })}>
@@ -309,10 +328,10 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
                       type="button"
                       onClick={() => setComp({ ...comp, method: m, ...METHOD_PRESET[m] })}
                       className={cn("rounded-full border px-3 py-1.5 text-sm", comp.method === m ? "border-foreground bg-foreground text-background font-semibold" : "border-border hover:bg-accent")}
-                    >{m}</button>
+                    >{catalogLabel(m)}</button>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">{tr(`${comp.equipment}・每批 ${comp.batch_capacity} 份・${comp.prep_minutes} 分鐘`, `${comp.equipment} · ${comp.batch_capacity}/batch · ${comp.prep_minutes} min`)}</p>
+                <p className="text-xs text-muted-foreground">{tr(`${comp.equipment}・每批 ${comp.batch_capacity} 份・${comp.prep_minutes} 分鐘`, `${catalogLabel(comp.equipment)} · ${comp.batch_capacity}/batch · ${comp.prep_minutes} min`)}</p>
               </div>
 
               <div className="rounded-md border border-border">
@@ -324,7 +343,7 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
                   <div className="grid grid-cols-2 gap-3 px-3 pb-3">
                     <div><Label>{tr("設備", "Equipment")}</Label>
                       <select className={SELECT} value={comp.equipment} onChange={(e) => setComp({ ...comp, equipment: e.target.value, ...EQUIPMENT_PRESET[e.target.value] })}>
-                        {EQUIPMENT.map((m) => <option key={m}>{m}</option>)}
+                        {EQUIPMENT.map((m) => <option key={m} value={m}>{catalogLabel(m)}</option>)}
                       </select></div>
                     <div><Label>{tr("每份熟重 (g)", "Cooked portion (g)")}</Label><Input type="number" value={comp.portion_grams} onChange={(e) => setComp({ ...comp, portion_grams: Number(e.target.value) })} /></div>
                     <div><Label>{tr("每批份數", "Batch size")}</Label><Input type="number" value={comp.batch_capacity} onChange={(e) => setComp({ ...comp, batch_capacity: Number(e.target.value) })} /></div>
@@ -333,7 +352,7 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
                     <div className="flex items-end gap-3 text-sm pb-2">
                       {FLAVORS.map((f) => (
                         <label key={f} className="flex items-center gap-1">
-                          <input type="checkbox" checked={comp.flavors?.includes(f) ?? false} onChange={(e) => setComp({ ...comp, flavors: e.target.checked ? [...(comp.flavors ?? []), f] : (comp.flavors ?? []).filter((x) => x !== f) })} /> {f}
+                          <input type="checkbox" checked={comp.flavors?.includes(f) ?? false} onChange={(e) => setComp({ ...comp, flavors: e.target.checked ? [...(comp.flavors ?? []), f] : (comp.flavors ?? []).filter((x) => x !== f) })} /> {catalogLabel(f)}
                         </label>
                       ))}
                     </div>

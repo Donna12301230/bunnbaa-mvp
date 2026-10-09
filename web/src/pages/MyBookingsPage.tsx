@@ -29,7 +29,7 @@ import { defaultResalePrice, refundOnTakeover, resaleCap, resalePrice } from "@/
 import { cancelCouponAmount, cancelDeadlineAt } from "@/lib/pricing";
 import { usePlatformConfig } from "@/lib/platformConfig";
 import type { Lock, MealPeriod } from "@/types";
-import { EmptyState, Tag } from "@/components/ds";
+import { EmptyState, Tabs, Tag } from "@/components/ds";
 import TransferMarketPage from "@/pages/TransferMarketPage";
 import CharityMealsSection from "@/components/CharityMealsSection";
 import FreeTransfersSection from "@/components/FreeTransfersSection";
@@ -402,7 +402,7 @@ export default function MyBookingsPage() {
   async function handleDonate(lock: Lock) {
     const ok = await confirm({
       title: tr("捐為愛心餐？", "Donate as a charity meal?"),
-      description: tr("這份便當會立即開放給需要的人領取，不退款，照常發放抽獎券，並計入你的愛心紀錄。", "It'll be open for someone in need right away. No refund; draw tickets are still issued."),
+      description: tr("這份便當會立即開放給需要的人領取，不退款，照常發放抽獎券，並計入你的愛心紀錄。", "It'll be open for someone in need right away. No refund; draw tickets are still issued, and it counts toward your giving record."),
       confirmLabel: tr("捐出", "Donate"),
     });
     if (ok) await callLock(lock, "donateLock", tr("謝謝你的愛心", "Thank you for your kindness"));
@@ -467,7 +467,7 @@ export default function MyBookingsPage() {
                         <p className="text-caption text-pink-700">
                           {lock.charity_source === "donated"
                             ? tr("謝謝你的愛心，這份已開放給需要的人領取。", "Thank you — it's open for someone in need.")
-                            : tr("這份沒有領到，已轉為愛心餐。抽獎券照常發放；下次來不了可以先按「捐為愛心餐」。", "Not picked up, so it became a charity meal. Tickets were still issued.")}
+                            : tr("這份沒有領到，已轉為愛心餐。抽獎券照常發放；下次來不了可以先按「捐為愛心餐」。", "Not picked up, so it became a charity meal. Draw tickets were still issued — next time, tap Donate before the window ends.")}
                         </p>
                       )}
 
@@ -497,7 +497,7 @@ export default function MyBookingsPage() {
                                 </Button>
                                 {isPayer && canCancel && (
                                   <Button variant="outline" size="sm" className="flex-1 border-red-300 text-red-600 hover:bg-red-50" disabled={isBusy} onClick={() => handleCancel(lock)}>
-                                    <XCircle /> {tr("取消換券", "Cancel")}
+                                    <XCircle /> {tr("取消換券", "Cancel for a coupon")}
                                   </Button>
                                 )}
                               </div>
@@ -660,11 +660,18 @@ export default function MyBookingsPage() {
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         {/* 頁上方分頁：我的餐點｜轉讓市集｜附近愛心餐（§4.5：「轉讓・愛心餐」併入我的餐點） */}
-        <div className="flex gap-2 flex-wrap" role="tablist" aria-label={tr("我的餐點分頁", "My meals tabs")}>
-          <Tag selected={pageTab === "meals"} onClick={() => switchTab("meals")}>{tr("我的餐點", "My meals")}</Tag>
-          <Tag selected={pageTab === "market"} onClick={() => switchTab("market")}>{tr("轉讓市集", "Transfer market")}</Tag>
-          <Tag selected={pageTab === "charity"} onClick={() => switchTab("charity")}>{tr("附近愛心餐", "Charity meals nearby")}</Tag>
-          <Tag selected={pageTab === "proxy"} onClick={() => switchTab("proxy")}>{tr("代領取餐", "Pick up for a friend")}</Tag>
+        <div className="overflow-x-auto bb-thin-scroll">
+          <Tabs
+            aria-label={tr("我的餐點分頁", "My meals tabs")}
+            value={pageTab}
+            onValueChange={(v) => switchTab(v as PageTab)}
+            items={[
+              { value: "meals", label: tr("我的餐點", "My meals") },
+              { value: "market", label: tr("轉讓市集", "Transfer market") },
+              { value: "charity", label: tr("附近愛心餐", "Charity meals nearby") },
+              { value: "proxy", label: tr("代領取餐", "Pick up for a friend") },
+            ]}
+          />
         </div>
 
         {pageTab === "market" ? (

@@ -5,7 +5,7 @@ import { AlertTriangle, BookOpen, Carrot, Clock, Flame, MessageCircle, Pencil, P
 import { useLocation } from "wouter";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import InfoTip from "@/components/InfoTip";
-import { ComponentDialog, EMPTY_COMP, EMPTY_ING, FREQ_LABEL, IngredientDialog, saveCatalogDoc, type ComponentDraft, type IngredientDraft } from "@/components/CatalogEditors";
+import { ComponentDialog, EMPTY_COMP, EMPTY_ING, IngredientDialog, catalogLabel, saveCatalogDoc, type ComponentDraft, type IngredientDraft } from "@/components/CatalogEditors";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -321,7 +321,7 @@ export default function VendorPortalRecipes() {
                             <div className="flex items-start gap-2">
                               <button type="button" className="flex-1 min-w-0 text-left" onClick={() => setIng(i)}>
                                 <p className="text-lg font-semibold leading-tight hover:underline">{i.name}</p>
-                                <p className="text-xs text-muted-foreground">{i.category}{i.frequency === "monthly" ? tr("・久放", " · long-life") : ""}</p>
+                                <p className="text-xs text-muted-foreground">{catalogLabel(i.category)}{i.frequency === "monthly" ? tr("・久放", " · long-life") : ""}</p>
                               </button>
                               <Button variant="ghost" size="icon" className="w-8 h-8 -mr-1 text-muted-foreground" aria-label={tr(`刪除 ${i.name}`, `Delete ${i.name}`)} onClick={() => remove("ingredients", i.id, i.name)}><Trash2 className="w-3.5 h-3.5" /></Button>
                             </div>
@@ -458,7 +458,7 @@ export default function VendorPortalRecipes() {
                           <span className="flex-1 text-lg font-semibold leading-tight">{c.name}</span>
                           {c.ai_draft && <span className="inline-flex items-center gap-0.5 rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-orange-700"><Sparkles className="w-3 h-3" />{tr("AI 草稿", "AI draft")}</span>}
                         </span>
-                        <span className="block text-sm opacity-80">{c.portion_grams}g・{c.method}</span>
+                        <span className="block text-sm opacity-80">{c.portion_grams}g・{c.method && catalogLabel(c.method)}</span>
                       </button>
                       <CardContent className="p-3 space-y-2">
                         <div className="flex items-baseline gap-2">

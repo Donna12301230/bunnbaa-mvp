@@ -136,7 +136,7 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
       ) : (
         <>
           <div className="grid grid-cols-3 gap-3">
-            {[[tr("附近的人", "People"), insight.users], [tr("份訂單", "Orders"), insight.orders], [tr("家店", "Shops"), insight.nearby_vendors]].map(([label, n]) => (
+            {[[tr("附近的人", "People"), insight.users], [tr("份訂單", "Orders"), insight.orders], [tr("家店", "Vendors"), insight.nearby_vendors]].map(([label, n]) => (
               <Card key={String(label)} className="border-2"><CardContent className="p-3 text-center"><p className="text-2xl font-bold">{n ?? 0}</p><p className="text-xs text-muted-foreground">{label}</p></CardContent></Card>
             ))}
           </div>
@@ -146,7 +146,7 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
               {insight.gaps.map((g) => (
                 <Card key={g.tag} className="border-2 border-green-300 bg-green-50/60">
                   <CardContent className="p-4 space-y-2">
-                    <p className="text-xs font-semibold text-green-800">💡 {tr("機會：想吃的人多、賣的店少", "Opportunity: high demand, few shops")}</p>
+                    <p className="text-xs font-semibold text-green-800">💡 {tr("機會：想吃的人多、賣的店少", "Opportunity: high demand, few vendors")}</p>
                     <p className="text-xl font-bold">{g.tag}</p>
                     <div className="flex gap-4 text-sm">
                       <span>{tr("需求", "Demand")} <b className="text-lg">{g.share}%</b></span>

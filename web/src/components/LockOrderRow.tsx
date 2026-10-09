@@ -39,7 +39,7 @@ export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; sh
         {/* 第一欄：核銷碼，店家掃一眼就能對 */}
         <div className="shrink-0 min-w-[4.5rem] rounded-md bg-stone-100 px-1.5 py-1 text-center" title={tr("取餐碼：取餐號＋手機末三碼", "Pickup code + last 3 phone digits")}>
           <p className="font-mono text-lg font-bold leading-tight tracking-wider">{pickupCode(lock)}</p>
-          <p className="font-mono text-[11px] leading-tight text-muted-foreground">{lock.phone_last3 ? `${tr("末三碼", "tel")} ${lock.phone_last3}` : tr("取餐號", "code")}</p>
+          <p className="font-mono text-[11px] leading-tight text-muted-foreground">{lock.phone_last3 ? `${tr("手機末三碼", "Phone last 3")} ${lock.phone_last3}` : tr("取餐號", "Pickup no.")}</p>
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-medium text-sm truncate">{loc(lock, "item_name")}</p>

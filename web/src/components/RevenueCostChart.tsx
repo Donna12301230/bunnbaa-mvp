@@ -4,6 +4,7 @@ import { TrendingUp } from "lucide-react";
 import { httpsCallable } from "@/lib/callable";
 import { functions } from "@/lib/firebase";
 import { tr } from "@/lib/i18n";
+import { formatNT, formatPickupDate } from "@/lib/format";
 import { EmptyState } from "@/components/ds";
 import { useAiDraftsInUse } from "@/components/AiDraftWarning";
 
@@ -26,14 +27,14 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
   const margin = d.revenue - d.material_cost;
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-sm space-y-0.5">
-      <p className="font-semibold text-foreground">{d.date}・{tr(`${d.qty} 份`, `${d.qty} meals`)}</p>
-      <p className="flex items-center gap-1.5 text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-revenue)]" aria-hidden="true" />{tr("收入", "Revenue")} NT${d.revenue.toLocaleString()}</p>
-      <p className="flex items-center gap-1.5 text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-cost)]" aria-hidden="true" />{tr("材料成本", "Material cost")} NT${d.material_cost.toLocaleString()}</p>
-      <p className="text-muted-foreground">{tr("毛利", "Gross margin")} NT${margin.toLocaleString()}</p>
+      <p className="font-semibold text-foreground">{formatPickupDate(d.date)}{tr("・", " · ")}{tr(`${d.qty} 份`, `${d.qty} meals`)}</p>
+      <p className="flex items-center gap-1.5 text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-revenue)]" aria-hidden="true" />{tr("收入", "Revenue")} {formatNT(d.revenue)}</p>
+      <p className="flex items-center gap-1.5 text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-cost)]" aria-hidden="true" />{tr("材料成本", "Material cost")} {formatNT(d.material_cost)}</p>
+      <p className="text-muted-foreground">{tr("毛利", "Gross margin")} {formatNT(margin)}</p>
       {d.net_profit != null && (
         <>
-          <p className="text-muted-foreground">{tr("人工、手續費、抽成、固定成本", "Labor, fees, commission, fixed")} NT${(d.other_cost ?? 0).toLocaleString()}</p>
-          <p className="flex items-center gap-1.5 font-semibold text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-profit)]" aria-hidden="true" />{tr("淨利", "Net profit")} NT${d.net_profit.toLocaleString()}</p>
+          <p className="text-muted-foreground">{tr("人工、手續費、抽成、固定成本", "Labor, fees, commission, fixed")} {formatNT(d.other_cost ?? 0)}</p>
+          <p className="flex items-center gap-1.5 font-semibold text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-profit)]" aria-hidden="true" />{tr("淨利", "Net profit")} {formatNT(d.net_profit)}</p>
         </>
       )}
     </div>

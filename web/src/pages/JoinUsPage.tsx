@@ -9,7 +9,7 @@ import { liveConfig } from "@/lib/platformConfig";
 // 合作方案：不收月費，每份餐點抽成（跟平台參數的預設值同一份）
 const commissionPct = () => Math.round(liveConfig().commissionRate * 1000) / 10;
 
-const BENEFITS = [
+const benefits = () => [
   {
     icon: TrendingUp,
     title: tr("先接單再備料", "Prep against real orders"),
@@ -46,7 +46,7 @@ export default function JoinUsPage() {
     >
       <div className="space-y-20 md:space-y-28 py-4 md:py-8">
         <section className="grid gap-10 md:grid-cols-3 md:gap-8">
-          {BENEFITS.map(({ icon: Icon, title, body }, i) => (
+          {benefits().map(({ icon: Icon, title, body }, i) => (
             <div key={title} className="space-y-4">
               <div className="flex items-center gap-4">
                 <span className="w-16 h-16 rounded-full border border-ink flex items-center justify-center bg-card">

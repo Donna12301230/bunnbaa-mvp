@@ -38,7 +38,7 @@ function PlatformContent() {
         const raw = draft[f.key];
         const def = DEFAULT_PLATFORM_CONFIG[f.key];
         (out as Record<string, unknown>)[f.key] = typeof def === "number" ? Number(raw) : raw;
-        if (typeof def === "number" && !Number.isFinite(Number(raw))) throw new Error(`${f.label} 不是數字`);
+        if (typeof def === "number" && !Number.isFinite(Number(raw))) throw new Error(tr(`${f.label} 不是數字`, `${f.labelEn} is not a number`));
       }
       await setDoc(doc(db, "platformConfig", "global"), { ...out, updated_at: new Date() }, { merge: true });
       queryClient.invalidateQueries({ queryKey: ["platformConfig"] });
@@ -58,9 +58,9 @@ function PlatformContent() {
           <tbody>
             {PLATFORM_CONFIG_FIELDS.map((f) => (
               <tr key={f.key} className="border-t">
-                <td className="py-1.5 pr-2">{f.label}{f.unit && <span className="text-xs text-muted-foreground">（{f.unit}）</span>}</td>
+                <td className="py-1.5 pr-2">{tr(f.label, f.labelEn)}{f.unit && <span className="text-xs text-muted-foreground">{tr(`（${f.unit}）`, ` (${f.unitEn ?? f.unit})`)}</span>}</td>
                 <td className="pr-2"><Input className="h-8 w-32" value={draft[f.key] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))} /></td>
-                <td className="text-xs text-muted-foreground">{f.vendorAdjustable ?? tr("否", "No")}</td>
+                <td className="text-xs text-muted-foreground">{f.vendorAdjustable ? tr(f.vendorAdjustable, f.vendorAdjustableEn ?? f.vendorAdjustable) : tr("否", "No")}</td>
               </tr>
             ))}
           </tbody>

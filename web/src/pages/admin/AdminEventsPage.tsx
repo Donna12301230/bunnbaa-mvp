@@ -16,8 +16,19 @@ import { tr } from "@/lib/i18n";
 interface DisasterEvent { id: string; type: string; counties?: string[]; towns?: string[]; dates?: string[]; source: string; summary?: string; processed?: boolean; result?: { vendors: number; cancelled: number; failed: number; notified: number } }
 interface Anomaly { id: string; type: string; user_id: string; vendor_id: string | null; detail: string; date: string; status: string }
 
-const TYPE_LABEL: Record<string, string> = { work_suspension: "停班停課", typhoon_warning: "颱風警報", price_spike: "菜價暴漲" };
-const ANOMALY_LABEL: Record<string, string> = { refunds: "7 天內取消 ≥ 3 筆", ticket_share: "單一使用者抽獎券占比 > 20%", device: "同一裝置 > 2 帳號領券" };
+// 顯示用標籤：render 當下才呼叫 tr()，切換語言才會跟著變
+const TYPE_LABEL: Record<string, { zh: string; en: string }> = {
+  work_suspension: { zh: "停班停課", en: "Work/school suspension" },
+  typhoon_warning: { zh: "颱風警報", en: "Typhoon warning" },
+  price_spike: { zh: "菜價暴漲", en: "Produce price spike" },
+};
+const ANOMALY_LABEL: Record<string, { zh: string; en: string }> = {
+  refunds: { zh: "7 天內取消 ≥ 3 筆", en: "≥ 3 cancellations within 7 days" },
+  ticket_share: { zh: "單一使用者抽獎券占比 > 20%", en: "One user holds > 20% of raffle tickets" },
+  device: { zh: "同一裝置 > 2 帳號領券", en: "> 2 accounts claiming coupons on one device" },
+};
+const typeLabel = (t: string) => (TYPE_LABEL[t] ? tr(TYPE_LABEL[t].zh, TYPE_LABEL[t].en) : t);
+const anomalyLabel = (t: string) => (ANOMALY_LABEL[t] ? tr(ANOMALY_LABEL[t].zh, ANOMALY_LABEL[t].en) : t);
 
 /** 天災事件（§11）：自動抓 NCDR（彙整氣象署、人事總處）；資料來源失效時管理者手動建立。 */
 function DisasterContent() {
@@ -33,8 +44,17 @@ function DisasterContent() {
     const counties = form.counties.split(/[,，、\s]+/).map((x) => x.trim().replace(/台/g, "臺")).filter(Boolean);
     const dates = form.dates.split(/[,，、\s]+/).map((x) => x.trim()).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x));
     if (dates.length === 0) return toast({ variant: "destructive", title: tr("請輸入日期 YYYY-MM-DD", "Enter dates as YYYY-MM-DD") });
-    const label = TYPE_LABEL[form.type];
-    if (form.type === "work_suspension" && !(await confirm({ title: `建立停班停課事件？`, description: `${counties.join("、") || "全部縣市"} ${dates.join("、")} 的訂單會自動取消並全額退款，無法復原。`, confirmLabel: "建立並退款", destructive: true }))) return;
+    // summary 存進資料庫，固定用中文
+    const label = TYPE_LABEL[form.type]?.zh ?? form.type;
+    if (form.type === "work_suspension" && !(await confirm({
+      title: tr("建立停班停課事件？", "Create a work/school suspension event?"),
+      description: tr(
+        `${counties.join("、") || "全部縣市"} ${dates.join("、")} 的訂單會自動取消並全額退款，無法復原。`,
+        `Orders in ${counties.join(", ") || "all counties"} on ${dates.join(", ")} will be cancelled and fully refunded. This can't be undone.`
+      ),
+      confirmLabel: tr("建立並退款", "Create and refund"),
+      destructive: true,
+    }))) return;
     const id = `manual_${Date.now()}`;
     await setDoc(doc(db, "disasterEvents", id), {
       type: form.type, counties, whole_counties: counties, towns: [], dates, source: "manual", summary: `${label}（管理員手動建立）`, processed: false, created_at: new Date(),
@@ -60,7 +80,7 @@ function DisasterContent() {
         <CardHeader className="pb-2"><CardTitle className="text-base">{tr("手動建立天災事件（資料來源失效時的備援）", "Create an event manually")}</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-2 items-end">
           <select className="h-10 rounded-md border px-2 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-            {Object.entries(TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.keys(TYPE_LABEL).map((k) => <option key={k} value={k}>{typeLabel(k)}</option>)}
           </select>
           <Input className="w-48" placeholder={tr("縣市（空白＝全部）", "Counties (blank = all)")} value={form.counties} onChange={(e) => setForm({ ...form, counties: e.target.value })} />
           <Input className="w-56" placeholder="2026-10-01, 2026-10-02" value={form.dates} onChange={(e) => setForm({ ...form, dates: e.target.value })} />
@@ -75,15 +95,15 @@ function DisasterContent() {
           {events.map((e) => (
             <div key={e.id} className="border-b pb-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="muted">{TYPE_LABEL[e.type] ?? e.type}</Badge>
-                <span>{(e.counties ?? []).join("、") || tr("全部縣市", "All")}{e.towns?.length ? `（${e.towns.join("、")}）` : ""}</span>
+                <Badge variant="muted">{typeLabel(e.type)}</Badge>
+                <span>{(e.counties ?? []).join("、") || tr("全部縣市", "All counties")}{e.towns?.length ? `（${e.towns.join("、")}）` : ""}</span>
                 <span className="text-muted-foreground">{(e.dates ?? []).join("、")}</span>
                 <span className="text-xs text-muted-foreground">{e.source}</span>
                 {e.processed ? <Badge variant="muted" className="bg-green-100 text-green-700">{tr("已處理", "Processed")}</Badge> : <Badge variant="muted" className="bg-amber-100 text-amber-800">{tr("待處理／有失敗", "Pending")}</Badge>}
                 {!e.processed && <Button size="sm" variant="outline" disabled={busy} onClick={() => call("reprocessDisasterEvent", { event_id: e.id })}>{tr("重新處理", "Reprocess")}</Button>}
               </div>
               {e.summary && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{e.summary}</p>}
-              {e.result && <p className="text-xs mt-1">{tr(`影響 ${e.result.vendors} 家店、取消退款 ${e.result.cancelled} 筆、失敗 ${e.result.failed}、通知 ${e.result.notified}`, JSON.stringify(e.result))}</p>}
+              {e.result && <p className="text-xs mt-1">{tr(`影響 ${e.result.vendors} 家店、取消退款 ${e.result.cancelled} 筆、失敗 ${e.result.failed}、通知 ${e.result.notified}`, `${e.result.vendors} vendors affected, ${e.result.cancelled} cancelled & refunded, ${e.result.failed} failed, ${e.result.notified} notified`)}</p>}
             </div>
           ))}
         </CardContent>
@@ -102,7 +122,7 @@ function AnomalyContent() {
         {items.length === 0 && <p className="text-muted-foreground">{tr("目前沒有異常標記。", "No anomalies.")}</p>}
         {items.map((a) => (
           <div key={a.id} className="flex items-center gap-2 border-b pb-2 flex-wrap">
-            <Badge variant="muted">{ANOMALY_LABEL[a.type] ?? a.type}</Badge>
+            <Badge variant="muted">{anomalyLabel(a.type)}</Badge>
             <span className="flex-1">{a.detail}</span>
             <span className="text-xs text-muted-foreground">{a.date}・{a.vendor_id ?? "—"}・{a.user_id.slice(0, 10)}</span>
             {a.status === "open" ? (

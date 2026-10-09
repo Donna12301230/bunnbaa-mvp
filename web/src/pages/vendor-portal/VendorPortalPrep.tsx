@@ -511,7 +511,7 @@ export default function VendorPortalPrep() {
                   <CardContent className="p-4 space-y-2 text-sm">
                     {detailComp ? (
                       <>
-                        <p className="font-semibold">{detailComp.name}・{tr(`${Math.round(detailPortions * 10) / 10} 份`, `× ${detailPortions}`)}</p>
+                        <p className="font-semibold">{detailComp.name}{tr("・", " · ")}{tr(`${Math.round(detailPortions * 10) / 10} 份`, `× ${detailPortions}`)}</p>
                         <p className="text-xs text-muted-foreground">{tr(`${detailComp.equipment}・每批 ${detailComp.batch_capacity} 份 → 做 ${Math.ceil(detailPortions / Math.max(1, detailComp.batch_capacity))} 批・每批 ${detailComp.prep_minutes} 分鐘`, `${detailComp.equipment} · ${Math.ceil(detailPortions / Math.max(1, detailComp.batch_capacity))} batch(es) × ${detailComp.prep_minutes} min`)}</p>
                         <RecipeCraft
                           items={detailComp.ingredients.flatMap((l) => {
@@ -590,7 +590,7 @@ export default function VendorPortalPrep() {
                 <div className="text-sm space-y-4">
                   {periodTimelines.map((t) => (
                     <div key={t.key}>
-                      {t.label && <p className="font-semibold mb-1">{t.label}・{tr(`取餐 ${t.range}`, `pickup ${t.range}`)}</p>}
+                      {t.label && <p className="font-semibold mb-1">{t.label}{tr("・", " · ")}{tr(`取餐 ${t.range}`, `pickup ${t.range}`)}</p>}
                       <TimelineTable timeline={t.timeline} />
                     </div>
                   ))}

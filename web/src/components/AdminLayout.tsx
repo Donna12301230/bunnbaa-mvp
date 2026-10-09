@@ -12,10 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 // 用函式包起來，每次 render 依目前語言組標籤
 const navItems = () => [
   { href: "/admin/vendors", label: tr("店家管理", "Vendors"), icon: Store },
-  { href: "/admin/platform", label: tr("平台參數", "Parameters"), icon: SlidersHorizontal },
-  { href: "/admin/dishes", label: tr("菜色庫與模板", "Dishes"), icon: BookMarked },
+  { href: "/admin/platform", label: tr("平台參數", "Platform parameters"), icon: SlidersHorizontal },
+  { href: "/admin/dishes", label: tr("菜色庫與模板", "Dishes & templates"), icon: BookMarked },
   { href: "/admin/anomalies", label: tr("異常審核", "Anomalies"), icon: AlertOctagon },
-  { href: "/admin/disasters", label: tr("天災事件", "Disasters"), icon: CloudLightning },
+  { href: "/admin/disasters", label: tr("天災事件", "Disaster events"), icon: CloudLightning },
   { href: "/admin/appeals", label: tr("解封申訴", "Appeals"), icon: ShieldAlert },
   { href: "/admin/locks", label: tr("訂單總覽", "Orders"), icon: ClipboardList },
   { href: "/admin/payouts", label: tr("撥款總覽", "Payouts"), icon: Wallet },

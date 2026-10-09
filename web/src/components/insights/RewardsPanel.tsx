@@ -104,7 +104,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
 
   async function togglePause() {
     const paused = !vendor?.rewards_paused_from;
-    if (paused && !(await confirm({ title: tr("暫停參加下一期？", "Pause the next period?"), description: tr("需提前 7 天：從 7 天後的那一週起不再發抽獎券、不開池。已發出的券照常兌現。", "Takes effect from the week at least 7 days out. Issued coupons stay valid."), confirmLabel: tr("暫停", "Pause") }))) return;
+    if (paused && !(await confirm({ title: tr("暫停參加下一期？", "Pause the next period?"), description: tr("需提前 7 天：從 7 天後的那一週起不再發抽獎券、不開池。已發出的券照常兌現。", "Takes effect from the week at least 7 days out: no more draw tickets and no new pool from then on. Issued coupons stay valid."), confirmLabel: tr("暫停", "Pause") }))) return;
     setBusy(true);
     try {
       const res = await httpsCallable(functions, "setRewardPause")({ paused });

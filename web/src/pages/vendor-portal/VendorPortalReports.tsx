@@ -29,7 +29,7 @@ export function InsightsHub({ initial = "revenue" }: { initial?: InsightsTab }) 
 
   return (
     <VendorPortalLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-4">{tr("看數據", "Insights")}</h1>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-4">{tr("報表與洞察", "Reports & insights")}</h1>
       <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5" role="tablist">
         {tabs.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}

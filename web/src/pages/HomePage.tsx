@@ -416,7 +416,7 @@ export default function HomePage() {
                   <VendorCardHeader
                     vendor={vendor}
                     reward={rewardStatuses.get(vendor.id)}
-                    subtitle={searching ? t(`${items.length} 項可預購`, `${items.length} items`) : `${t(`${items.length} 項可預購`, `${items.length} items`)}・${t("取餐", "Pickup")} ${dateText}`}
+                    subtitle={searching ? t(`${items.length} 項可預購`, `${items.length} items`) : `${t(`${items.length} 項可預購`, `${items.length} items`)}${t("・", " · ")}${t("取餐", "Pickup")} ${dateText}`}
                   />
                   <ul className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 bb-thin-scroll bb-fade-x">
                     {items.map((item) => {
@@ -542,7 +542,7 @@ export default function HomePage() {
                   </DialogHeader>
                   <div className="space-y-3 py-1">
                     <p className="text-sm text-muted-foreground">
-                      {loc(vendor, "name")}・{t(`原價 NT$${plan.price_per_meal} × ${plan.days} 天，每天依提前天數各自打早鳥折扣`, `NT$${plan.price_per_meal} × ${plan.days} days, early-bird applied per day`)}
+                      {loc(vendor, "name")}{tr("・", " · ")}{t(`原價 NT$${plan.price_per_meal} × ${plan.days} 天，每天依提前天數各自打早鳥折扣`, `NT$${plan.price_per_meal} × ${plan.days} days, early-bird applied per day`)}
                     </p>
                     <PickupPicker
                       date={planStartDate}
