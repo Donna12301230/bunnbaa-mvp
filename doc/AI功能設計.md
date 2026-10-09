@@ -21,7 +21,7 @@ BunnBaa 本身已經回應了題目中的需求預測與庫存：消費者先付
 
 ## AI 功能總覽
 
-共六項功能，其中前三項在 10/18 Demo 前實作，第 4 項做一部分，後兩項寫進 Roadmap。
+共六項新功能，其中前三項在 10/18 Demo 前實作，第 4 項做一部分，後兩項寫進 Roadmap。（前四項已於 09-30 完成；加上既有功能，目前上線的 AI 共 9 項，見「2026-10-09 全面審視與修正」。）
 
 | # | 功能 | 對應題目 | 建在哪裡 | Demo 前 |
 | --- | --- | --- | --- | --- |
@@ -82,7 +82,7 @@ BunnBaa 本身已經回應了題目中的需求預測與庫存：消費者先付
 
 ## 架構、可行性與可擴展性
 
-新功能都只是在 `functions/src/` 多加模組，共用現有的 `gemini.js`（已有 503／429 重試），不需要改資料架構。
+新功能都只是在 `functions/src/` 多加模組，共用現有的 `gemini.js`（已有 503／429 重試），不需要改資料架構。`gemini.js` 目前仍用 `@google/generative-ai`＋`GEMINI_API_KEY`（AI Studio），預計改走 Vertex AI，並把 Firestore 同步到 BigQuery，細節見 [GoogleCloud改動建議.md](GoogleCloud改動建議.md)。
 
 ```mermaid
 flowchart LR
@@ -104,25 +104,25 @@ flowchart LR
     end
   end
   FE --> CF
-  CF --> G["Gemini API<br/>文字・視覺・工具・向量"]
+  CF --> G["Gemini API（預計改 Vertex AI）<br/>文字・視覺・工具・向量"]
   CF --> P[FCM 推播]
   CF --> D["Firestore<br/>含 Vector Search"]
-  D -.-> B["擴展（Roadmap）<br/>BigQuery・Vertex AI"]
+  D -.-> B["分析層（規劃中）<br/>BigQuery・BigQuery AI・Looker Studio"]
 ```
 
-- **可行性**：正式站已上線，包含 21 支 Functions、LINE Pay 端到端付款、中英雙語、QR 核銷
+- **可行性**：正式站已上線，包含 74 支 Cloud Functions（2026-10-09 統計，與 `Submission_EN.md` 一致）、LINE Pay 端到端付款、中英雙語、QR 核銷
 - **可擴展性**：
-    - 資料層：Firestore → BigQuery（官方 Extension），之後把預測換成 Vertex AI 或 BigQuery ML
+    - 資料層：Firestore → BigQuery（官方 Extension），用 BigQuery AI（`AI.FORECAST`）做需求預測，結果寫回 Firestore 給商家後台
     - 多語言已自動化，擴展到其他城市、國家的成本很低
     - 地區篩選已有縣市＋鄉鎮市區
     - 拍照上架讓接一家新店的成本趨近於零
-- **Google 技術棧**：Gemini（文字、視覺、function calling、embeddings）、Firebase、Firestore Vector Search、FCM、Cloud Scheduler，全部是 Google 服務，與比賽方向一致
+- **Google 技術棧**：Gemini（文字、視覺、function calling、embeddings）、Firebase、Firestore Vector Search、FCM、Cloud Scheduler，全部是 Google 服務，與比賽方向一致；規劃補上 Vertex AI、BigQuery、Looker Studio
 
 ## 風險與時程
 
-建議先做功能 1 和 3（各約 1–2 天），功能 2 最後做；時間不夠時，功能 2 只做單輪問答。
+（以下為 09-29 規劃時的風險評估；功能 1–4 已於 09-30 實作完成，目前狀態見文末。）
 
-- **免費層限流**：Gemini 目前用免費層 key，功能 2 的多輪對話加 function calling 容易碰到 429。Demo 前要為常見查詢加快取（參考 `discount_explanations`），或 Demo 當天換有額度的 key
+- **限流**：Gemini 目前用 API key（AI Studio），多輪對話加 function calling 容易碰到 429。已加上每人每天 30 次上限與 10 分鐘快取（見「實作紀錄」），根本解法是改走 Vertex AI（服務帳號認證、按量計費）
 - **時程**：10/18 前還有不少正式站驗證項目（見 `TODO.md`），AI 功能不能排擠整合測試與錄 Demo
 - **統計數字**：Proposal 中台灣餐飲浪費量等數字要找有出處的資料，不要自行估計
 
@@ -167,4 +167,15 @@ flowchart LR
 其他：拍照上架的過敏原是依品名推測，風險在漏標，表單已要求店主逐項確認（Proposal 的 Responsible AI 段落要寫明）。
 
 部署注意：`firebase deploy --only functions` 會要求刪除已移除的 `onLockCreated`，確認刪除即可（非互動環境加 `--force`）。
+
+## 目前狀態（2026-10-09）
+
+程式碼：功能 1–4 與 10/09 的四項修正都已在 master（修正為 commit `8248f02`）。
+
+還沒做：
+
+- [ ] **部署**：正式站停在 10/05 的 `abdb4c4`，10/09 的 AI 修正未上線；`firestore.indexes.json`（含 `menu_embeddings` 向量索引）與 rules 也要一起部署，再由管理員呼叫一次 `backfillMenuEmbeddings`
+- [ ] **正式站實測**：預購助理、拍照上架的測試案例（C-AST-01／02、V-MNU-08／09）在 emulator 因沒有 `GEMINI_API_KEY` 卡住，要到正式站測；轉讓媒合、預估取餐區間也要實際點過一次
+- [ ] **英文 Proposal**：投影片初稿與 `Submission_EN.md` 已有，方括號處待補，尚未匯出 PDF
+- [ ] **Google Cloud 補強**（選做，見 [GoogleCloud改動建議.md](GoogleCloud改動建議.md)）：Vertex AI 遷移、BigQuery 同步與預測、Looker Studio；做了之後本文件的架構圖與技術棧要再更新
 

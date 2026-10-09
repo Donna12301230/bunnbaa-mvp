@@ -1,138 +1,312 @@
-# BunnBaa — 餐飲預購鎖定平台 MVP
+# BunnBaa 飯飽 — AI Pre-order Platform for Small Eateries
 
-權威文件：`doc/BunnBaa_0到1架構文件.docx`（唯一權威）、`doc/BunnBaa_技術規格文件_v6_消費者端補強版.docx`。
+**English** | [中文](README.zh-TW.md)
 
-- 正式站：https://bunnbaa-mvp-5474.web.app（Firebase 專案 `bunnbaa-mvp-5474`，Blaze 方案）
-- **進度、卡點、分工一律看 [`TODO.md`](TODO.md)**；本文件只記相對穩定的架構與開發設定。
-- 開工前先看 `TODO.md` 的「📌 環境備忘」（登入帳號、中文路徑下 emulator／Vite 的雷、Java）。
+> **Cook what's ordered. Eat what's cooked.**
+> Diners pay ahead to lock a meal (the earlier they book, the cheaper it is), so small eateries know exactly what to cook. Gemini on Vertex AI then helps make sure every cooked meal finds someone to eat it, and BigQuery shows how much food was saved.
 
-## 目錄結構
+![Google Cloud](https://img.shields.io/badge/Google_Cloud-4285F4?logo=googlecloud&logoColor=white)
+![Vertex AI](https://img.shields.io/badge/Vertex_AI-Gemini_3.6_Flash-8E75B2?logo=googlegemini&logoColor=white)
+![BigQuery](https://img.shields.io/badge/BigQuery_AI-AI.FORECAST_·_ML.KMEANS-669DF6?logo=googlebigquery&logoColor=white)
+![Looker Studio](https://img.shields.io/badge/Looker_Studio-dashboard-4285F4?logo=looker&logoColor=white)
+![Cloud Functions](https://img.shields.io/badge/Cloud_Functions-2nd_gen_on_Cloud_Run-4285F4?logo=googlecloud&logoColor=white)
+![Firestore](https://img.shields.io/badge/Firestore-Vector_Search-FFCA28?logo=firebase&logoColor=black)
+![React](https://img.shields.io/badge/React_18-TypeScript-61DAFB?logo=react&logoColor=black)
+![Node](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
+
+**Google AI Builder Cup 2026** · Theme: *Retail & Commerce: Intelligent Customer and Business Experiences* · Domain: Sustainability (food waste) and Social Good (free charity meals)
+
+| | |
+|---|---|
+| 🌐 **Live prototype** | https://bunnbaa-mvp-5474.web.app |
+| 🎬 **Demo video (3 min)** | [YouTube link] |
+| 📑 **Proposal deck** | [PDF link] |
+
+---
+
+## The problem
+
+Small eateries near campuses and offices buy ingredients before anyone orders. If they guess high, food gets thrown away. If they guess low, customers get turned away. Diners queue every day with no guaranteed meal and no reward for deciding early. Even a prepaid meal goes to waste when its owner's plans change, because nobody else knows it is available.
+
+## How BunnBaa works
+
+1. **Lock.** Diners book breakfast, lunch or dinner up to 30 days ahead and pay with LINE Pay. Booking two or more days early gets 20% off; booking for tomorrow gets 5% off.
+2. **Cut-off.** At 20:00 the day before, the vendor gets an exact count, plus purchase and prep lists generated for them. A 7-day demand forecast from BigQuery helps them plan the days after that.
+3. **Pass it on.** A diner who can't come can resell the meal, gift it, or donate it as a free charity meal. Meals nobody claims become charity meals automatically.
+4. **Pick up.** The vendor scans a signed QR code at the counter.
+
+Vendors pay no monthly fee. The platform keeps 5% of each meal sold, deducted at payout.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TB
+  subgraph L1["① Presentation layer · Firebase Hosting (global CDN)"]
+    direction LR
+    D["🍱 Diner app"]
+    V["🧑‍🍳 Vendor portal"]
+    A["🛡️ Admin console<br/>+ Looker Studio embed"]
+    AUTH["Firebase Auth<br/>email · phone OTP"]
+  end
+
+  subgraph L2["② Compute layer · Cloud Functions 2nd gen on Cloud Run · asia-east1"]
+    direction LR
+    CALL["Callable functions<br/>orders · payments · assistant · photo-to-menu"]
+    TRIG["Firestore triggers (Eventarc)<br/>translation · embeddings · charity"]
+    SCH["Cloud Scheduler jobs<br/>cut-off · payouts · reminders · forecast write-back"]
+    FCM["Firebase Cloud Messaging"]
+  end
+
+  LP["LINE Pay API"]
+
+  subgraph L3["③ AI core · Vertex AI"]
+    direction LR
+    GEM["✨ gemini-3.6-flash<br/>vision · function calling · JSON mode"]
+    EMB["✨ gemini-embedding-001<br/>768-dim vectors"]
+  end
+
+  subgraph L4["④ Data layer"]
+    direction LR
+    FS[("Firestore<br/>operational data")]
+    VEC[("Firestore Vector Search<br/>KNN on menu_embeddings")]
+    GCS[("Cloud Storage<br/>menu photos")]
+  end
+
+  subgraph L5["⑤ Analytics layer"]
+    direction LR
+    BQ[("BigQuery<br/>bunnbaa_analytics")]
+    BQAI["✨ BigQuery AI<br/>AI.FORECAST · ML.KMEANS · AI.GENERATE"]
+    LS["Looker Studio<br/>impact dashboard"]
+  end
+
+  D ~~~ V ~~~ A ~~~ AUTH
+  CALL ~~~ TRIG ~~~ SCH ~~~ FCM
+  GEM ~~~ EMB
+  FS ~~~ VEC ~~~ GCS
+  BQ ~~~ BQAI ~~~ LS
+
+  L1 ==>|"HTTPS · JSON · Firebase ID token"| L2
+  L2 <-->|"REST · JSON · HMAC-SHA256"| LP
+  L2 <==>|"gRPC · service account (IAM)"| L3
+  L2 ==>|"Admin SDK · gRPC"| L4
+  L1 -.->|"realtime listeners · Security Rules"| L4
+  L4 ==>|"Stream Firestore to BigQuery extension"| L5
+
+  classDef ai fill:#f3e8ff,stroke:#8E75B2,stroke-width:2px,color:#1f1f1f
+  class GEM,EMB,BQAI ai
+```
+
+✨ marks the points where AI is called. The five layers:
+
+1. **Presentation.** Three web apps (diner, vendor, admin) share one React codebase on Firebase Hosting. They read Firestore directly through realtime listeners, and Security Rules decide what each user can see. Anything that changes money or stock goes through a callable function.
+2. **Compute.** 74 Cloud Functions (2nd gen, running on Cloud Run) handle three kinds of work: callables that users trigger, triggers that react to Firestore writes, and jobs that Cloud Scheduler starts on a timer.
+3. **AI core.** Every Gemini call goes through one wrapper (`functions/src/gemini.js`) to Vertex AI, authenticated with the functions' service account. The assistant runs a function-calling loop: Gemini asks for a tool, the function runs it against Firestore, and the result goes back to Gemini.
+4. **Data.** Firestore holds all operational data. The menu vectors used for resale matching live in the same documents, with a Firestore vector index, so there is no separate vector database. Menu photos are in Cloud Storage.
+5. **Analytics.** The official extension copies every Firestore write into BigQuery. BigQuery AI forecasts demand and groups diners into segments. A scheduled job writes the forecasts back to Firestore for the vendor portal, and Looker Studio reports the waste-reduction numbers.
+
+### Security at each layer
+
+| Layer | Protection |
+|---|---|
+| Presentation | Firebase Auth (email and password, or phone OTP with reCAPTCHA); Hosting sends `X-Frame-Options: DENY`, `nosniff`, a strict referrer policy and a CSP (currently report-only) |
+| Compute | Callables check the Firebase ID token and the caller's role (admin or vendor owner); prices and discounts are recalculated on the server, never trusted from the client |
+| AI core | Vertex AI is called with the service account's IAM role (`roles/aiplatform.user`), so there are no API keys. Allergens are filtered on the server, and the assistant can only show items its own tools returned |
+| Data | Firestore and Storage Security Rules, covered by automated rule tests. Collections such as `payment_intents` and `lock_tokens` can only be written by Cloud Functions |
+| Payments & pickup | LINE Pay requests are signed with HMAC-SHA256. Pickup QR codes are HMAC-signed and include an expiry time and a nonce, so a screenshot can't be reused |
+| Analytics | BigQuery only gets the fields the analysis needs (no phone digits, notes or payment identifiers), and only admins can access the dataset |
+
+### One meal, end to end
+
+```mermaid
+sequenceDiagram
+  participant Diner
+  participant CF as Cloud Functions
+  participant G as Gemini (Vertex AI)
+  participant FS as Firestore
+  participant BQ as BigQuery
+  participant Vendor
+
+  Diner->>CF: "Lunch next Mon–Fri, under NT$120, no beef"
+  CF->>G: function calling (searchMenuItems, checkAvailability…)
+  G-->>CF: candidate meals (server re-checks allergens and prices)
+  CF-->>Diner: bookable meal cards
+  Diner->>CF: lock + pay (LINE Pay)
+  CF->>FS: locks/{id}
+  FS-->>BQ: streamed by the extension
+  Note over CF,FS: 20:00 cut-off (Cloud Scheduler)
+  CF->>Vendor: exact count, prep list, purchase list, pickup forecast
+  BQ-->>Vendor: 7-day demand forecast (AI.FORECAST, via vendors/{v}/forecast)
+  Diner->>CF: plans changed → list for resale
+  CF->>G: embed dish → Firestore KNN → nearby diners who like it
+  CF-->>Diner: push notification to matched diners
+  Vendor->>CF: scan signed QR → fulfilled
+```
+
+---
+
+## AI features
+
+### Gemini on Vertex AI: four points in a meal's life
+
+| Stage | Feature | Gemini capability | Cloud Function |
+|---|---|---|---|
+| **List** | **Photo-to-menu.** A photo of a paper menu becomes structured, bilingual menu drafts (price, category, dietary tags, allergens). The owner confirms them before they go live. | Multimodal vision → JSON | `extractMenuFromImage` |
+| **Find** | **Pre-order assistant.** A request like "Lunch next Mon–Fri, Da'an district, under NT$120, no beef" returns meal cards the diner can book. | Multi-turn function calling | `askShoppingAssistant` |
+| **Rescue** | **Resale matching.** When a meal is listed for resale, BunnBaa finds nearby diners who have eaten similar dishes and sends them a push notification. | `gemini-embedding-001` + Firestore Vector Search KNN | `matchResaleLock` |
+| **Calibrate** | **Pickup forecast.** The vendor sees a range like "42 locked → 38–41 expected", plus a nightly report in plain language and answers to what-if questions. | Structured JSON generation | `getPickupForecast`, `dailyCalibration`, `askCalibrationScenario` |
+
+Gemini also explains the early-bird discount on the item page (`getDiscountExplanation`, cached per discount tier), drafts recipes, normalises dish names, and translates content between Chinese and English.
+
+### BigQuery AI: what the data says
+
+| Analysis | How | What it gives |
+|---|---|---|
+| **Demand forecast** | `AI.FORECAST` (TimesFM, no training needed) on the daily lock count for each vendor, 7 days ahead | "About N meals expected tomorrow (for reference)" in the vendor portal, written back to `vendors/{v}/forecast` |
+| **Frequently bought together** | SQL self-join on items the same diner locked from the same vendor on the same day | Item pairs the vendor can bundle or recommend |
+| **Diner segments** | `ML.KMEANS` on recency, frequency and spend, plus resale rate and no-show rate | 4–5 segments; `AI.GENERATE` asks Gemini for a one-line description of each, e.g. "weekday lunch regulars, price-sensitive" |
+| **Impact dashboard** | Looker Studio on `bunnbaa_analytics`, embedded in the admin console | Daily locks, forecast vs. actual, meals rescued, charity meals served, segment mix |
+
+## Technical decisions
+
+| Decision | Why |
+|---|---|
+| **Gemini on Vertex AI, authenticated with the service account** | There are no API keys to leak or rotate. Usage is billed per request on the Blaze plan, so the free-tier rate limits (429) that slow down a multi-step assistant don't apply. All calls go through one wrapper (`functions/src/gemini.js`, built on `@google/genai`), so switching providers meant changing one file. |
+| **Gemini Flash for every text, vision and tool call** | Diners use the assistant while deciding what to eat, so it has to answer quickly. Flash is fast enough for that and can still handle multi-step function calling and reading menu photos. The same wrapper handles JSON mode and retries for every feature. |
+| **Embeddings + Firestore Vector Search instead of a separate vector DB** | Menu vectors are stored in the same Firestore documents as the menu items, so there is no second database to keep in sync. The nearest-neighbour search runs in the same query as the distance and opt-out filters. |
+| **Firestore for operations, BigQuery for analytics** | Firestore handles real-time bookings well but isn't built for analysing history. The official extension copies data into BigQuery without any code of our own, and forecasts go back to Firestore so the vendor portal stays a simple real-time app. |
+| **TimesFM through `AI.FORECAST`** | A new vendor has little history, so there isn't enough data to train a per-vendor model. A pretrained time-series model gives usable forecasts on day one, with just one SQL query. |
+| **Code calculates the numbers; Gemini only explains them** | Portions, prices, discounts, payouts, prize draws and vendor accuracy are all calculated by deterministic, tested functions. The model writes explanations of numbers it is given, so a hallucination can't change an amount of money. |
+| **AI drafts, people decide** | Every AI output includes a `disclaimer` field. Owners confirm menus. Recipes drafted by AI stay flagged until the owner saves them. The demand forecast is labelled "for reference", not as an instruction. The assistant suggests meals but never places an order. |
+| **Server-side guardrails** | The assistant can only show items that its own search tools returned in that turn. Allergens are filtered on the server twice: during search and again on the final cards. Prices are recalculated at checkout. |
+| **Calm by design** | No urgency marketing. Each diner gets at most 30 assistant questions a day (answers are cached for 10 minutes) and at most 2 resale alerts a day. Alerts only go to diners within 10 km, and diners can turn them off with one tap. |
+| **Privacy in the analytics layer** | BigQuery only gets the fields the analysis needs. Phone digits, free-text notes and payment identifiers stay out, and only admins can access the dataset. |
+| **Fully serverless** | Cloud Functions (2nd gen, running on Cloud Run), Cloud Scheduler, Firestore and BigQuery all scale with demand and cost close to nothing when idle. That suits a platform whose traffic peaks around mealtimes. |
+
+## Impact we measure
+
+Each outcome is written to Firestore as it happens and streamed to BigQuery, so the numbers on the Looker Studio dashboard come from records rather than estimates:
+
+- Meals rescued through AI matching (`claimed_by_match`)
+- Meals resold and picked up (`resold_and_fulfilled`)
+- Charity meals claimed (`charityReservations`)
+- Forecast vs. actual demand per vendor, and vendor forecast accuracy for the "reliable" badge (`accuracy_reports`)
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 22 and `npm install -g firebase-tools`
+- A Google Cloud / Firebase project on the **Blaze** plan
+- These APIs enabled: **Vertex AI, BigQuery, Cloud Functions, Cloud Run, Cloud Build, Artifact Registry, Cloud Scheduler, Eventarc, Firestore, Cloud Storage, Firebase Auth, Firebase Cloud Messaging**
+- The `roles/aiplatform.user` role granted to the Cloud Functions service account. Gemini authenticates with this role, so no API key is needed.
+- A LINE Pay **Sandbox** channel ([pay.line.me/tw/developers](https://pay.line.me/tw/developers)), which you can create yourself without a merchant review
+
+```bash
+gcloud services enable aiplatform.googleapis.com bigquery.googleapis.com
+gcloud projects add-iam-policy-binding <your-project-id> \
+  --member="serviceAccount:<project-number>-compute@developer.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+```
+
+### 1. Configure
+
+```bash
+git clone [repo URL] && cd BunnBaa
+firebase login
+firebase use <your-project-id>
+
+cd functions
+cp .env.example .env   # fill in LINE_PAY_*, PICKUP_QR_SECRET, APP_BASE_URL
+npm install
+
+cd ../web && npm install
+cd ../scripts && npm install
+```
+
+### 2. Set up the analytics layer
+
+```bash
+# One extension instance for each collection: locks, menu_items, vendors, payment_intents
+# Dataset: bunnbaa_analytics, location asia-east1
+firebase ext:install firebase/firestore-bigquery-export
+
+# Copy the existing documents into BigQuery once, then generate the typed views (e.g. locks_schema_latest)
+npx @firebaseextensions/fs-bq-import-collection
+npx @firebaseextensions/fs-bq-schema-views
+```
+
+Then create the `daily_demand` view and the forecast, basket and segment queries. The SQL is in [`doc/GoogleCloud改動建議.md`](doc/GoogleCloud改動建議.md).
+
+### 3. Run locally with the emulators
+
+```bash
+# web/.env.local → VITE_USE_EMULATORS=true
+npm run dev:emulator          # starts the emulators, loads seed data, then starts Vite
+npm run dev:emulator:reset    # wipe local data and reload the seed data
+```
+
+To call Vertex AI from the emulator, run `gcloud auth application-default login` first.
+Demo accounts (password `demo1234`): `customer@bunnbaa.test` (diner) and `vendor@bunnbaa.test` (vendor).
+
+### 4. Deploy
+
+```bash
+cd web && npm run build && cd ..
+firebase deploy --only firestore:rules,firestore:indexes,functions,hosting
+```
+
+When changes are merged to `master`, GitHub Actions deploys them automatically: `.github/workflows/firebase-functions-merge.yml` deploys the Cloud Functions and `firebase-hosting-merge.yml` deploys the website.
+
+### 5. Test
+
+```bash
+cd scripts/tests
+npm test                                          # business logic + Firestore security rules
+npm run emulator                                  # separate emulator for Functions tests
+npm run test:functions && npm run test:functions:more
+```
+
+Results as of 9 Oct 2026: all 61 business-logic tests and all 141 Cloud Functions tests pass (2 tests that depend on the date are skipped when the next day is not a business day). The Firestore security-rule tests also pass.
+
+---
+
+## Project structure
 
 ```
 BunnBaa/
-├── firebase.json / firestore.rules / firestore.indexes.json   # 專案設定
-├── functions/                # Cloud Functions（Node.js，region asia-east1）
-│   ├── .env.example                # 環境變數範本（Gemini、LINE Pay）
-│   └── src/
-│       ├── index.js                # 排程、callable、Firestore trigger 全部接線在這
-│       ├── gemini.js               # Gemini API 呼叫的共用 wrapper
-│       ├── vendorCalibration.js    # 商家校準：準確率／誤差由程式算，Gemini 只寫說明與 what-if（spec §4.1 / §6.1）
-│       ├── consumerExplanation.js  # 品項頁折扣說明 getDiscountExplanation（spec §4.2 / §6.2）
-│       └── linePay.js              # LINE Pay v3 簽章 + Request/Confirm API
-├── scripts/
-│   └── seed.js                # 種子資料（有自己的 package.json，需先 npm install）
-└── web/                       # 前端（React + TypeScript + Vite + Tailwind，wouter hash 路由）
-    ├── public/firebase-messaging-sw.js   # FCM 推播 service worker
-    └── src/
-        ├── App.tsx                    # 所有路由定義
-        ├── pages/                     # 消費者端頁面（首頁、店家、品項、購物車、轉讓市集、我的鎖定…）
-        │   ├── admin/                 # 平台管理後台（商家、申訴、鎖定、撥款、設定）
-        │   └── vendor-portal/         # 商家後台（儀表板、菜單、訂單、備餐、掃碼核銷、報表、成長獎勵…）
-        ├── components/
-        │   ├── ds/                    # 自家設計系統元件（預覽頁：/#/design-system）
-        │   └── ui/                    # 基礎 UI 元件（shadcn 風格）
-        └── lib/
-            ├── firebase.ts            # Firebase 初始化（含 emulator 切換）
-            ├── messaging.ts           # FCM token 註冊（VAPID_KEY 在這裡）
-            └── …                      # pricing、adminAuth、statusMap 等
+├── functions/src/          # Cloud Functions (Node 22, 2nd gen, asia-east1)
+│   ├── gemini.js           # shared Gemini wrapper: Vertex AI, JSON mode, retry
+│   ├── menuVision.js       # photo-to-menu
+│   ├── shoppingAssistant.js# pre-order assistant (function calling)
+│   ├── resaleMatch.js      # embeddings + vector KNN matching
+│   ├── pickupForecast.js / vendorCalibration.js
+│   ├── orders.js / linePay.js / wallet.js / charity.js / purchasing.js …
+│   └── index.js            # wires up all callables, triggers and schedules
+├── web/src/                # React + TypeScript + Vite + Tailwind
+│   ├── pages/              # diner app
+│   ├── pages/vendor-portal/
+│   └── pages/admin/        # includes the embedded Looker Studio dashboard
+├── scripts/                # seed data + automated tests
+├── firestore.rules / firestore.indexes.json / storage.rules
+└── doc/                    # specs, test plan, developer guide (Chinese)
 ```
 
-## 資料模型（Firestore collections）
+Detailed developer notes (in Chinese), covering the data model, the full list of functions and environment details: [`doc/開發指南.md`](doc/開發指南.md). The Google Cloud design is in [`doc/GoogleCloud改動建議.md`](doc/GoogleCloud改動建議.md).
 
-| Collection | 用途 |
-|---|---|
-| `vendors` | 商家 |
-| `menu_items` | 商家品項 |
-| `meal_plans` | 計畫型（訂閱制多日）方案 |
-| `locks` | 每一筆鎖定紀錄，狀態機：`locked → for_resale / for_gift / fulfilled / no_show / resold_and_fulfilled` |
-| `lock_tokens` | 鎖定對應的 FCM token（私有，只給 Functions 讀） |
-| `payment_intents` | LINE Pay 付款意圖，只有 Functions 能寫 |
-| `payouts` | 商家撥款結算紀錄 |
-| `growth_rewards` / `draws` | 成長獎勵與抽獎紀錄 |
-| `accuracy_reports` | Gemini 產出的商家校準報告 |
-| `discount_explanations` | 消費者端折扣說明快取（同條件不重複呼叫 API） |
-| `ban_appeals` | 帳號停權申訴 |
-| `admin_audit_logs` | 管理員操作稽核紀錄 |
+## Roadmap
 
-詳細權限見 `firestore.rules`。
+- **Assistant reads the forecast:** add one more tool to the pre-order assistant so it can recommend vendors with spare capacity and items that are often bought together
+- **Answer-quality evaluation:** score 20–30 test questions (allergens, budget, meal time) with the **Vertex AI Gen AI Evaluation Service**
+- **Vertex AI Search** for semantic menu search ("light, with soup, no beef")
+- Gemini-written summaries of reviews and no-shows for vendors
+- Fraud signals (early-bird scalping, multiple accounts, gift loops), with Gemini case summaries for admins
 
-### 第一階段規格（2026-09-30 改版）
+## Team & license
 
-依 `doc/BunnBaa 飯飽｜第一階段技術規格1002.md` 改版，但**保留「鎖定早鳥折扣＋轉讓」**（使用者決定）：訂單仍是 `locks`，付款仍是 LINE Pay，轉讓市集與愛心餐都併入「我的餐點」頁的分頁（我的餐點｜轉讓市集｜附近愛心餐；舊的 `/marketplace` 連結會轉過去）。和規格不同的地方：
+Built by 鍾雅婷, 蘇雅雯 and 陳信喜 for the Google AI Builder Cup 2026.
 
-| 規格 | 實作 |
-|---|---|
-| `orders` 集合 | 沿用 `locks`，加 `slots`／`rice`／`pickup_code`／`payer_uid` 等欄位（`functions/src/orders.js` 開頭註解） |
-| 固定售價＋加減 | 早鳥折扣（打在品項原價）＋加減＋折價券；預訂到下週五，所以最高 8 折 |
-| 截單後不可取消 | 不可退款，但仍可轉讓、贈送、捐為愛心餐 |
-| `vendors/{v}/items` | 沿用 `menu_items`，加 `main`／`slots`／`fixed`／`rice_component_id`／`weekdays` |
-| `userSpend/{v}_{u}_{period}` | `userSpend/{v}_{u}`，未滿 100 元的餘額直接結轉 |
-| `areaInsights/{geohash5}_{week}` | `areaInsights/{vendorId}_{week}`（以店家取餐點為圓心 1 公里） |
-
-新增集合：`platformConfig`、`dishLibrary`、`templates`、`vendors/{v}/ingredients|components|suppliers|inventory|purchaseLists|prepPlans|rewardPeriods|wishTally`、`sideWishes`、`openWishes`、`userSpend`、`rewardTickets`、`coupons`、`rewardStatus`、`tasteProfiles`、`areaInsights`、`charityMeals`、`charityReservations`、`charityBans`、`disasterEvents`、`anomalies`、`notifications`、`userTokens`。
-
-Functions 依功能拆檔（`functions/src/`）：`orders.js`（下單、LINE Pay、截單、QR 取餐、取消退款）、`charity.js`、`rewardsFns.js`、`purchasing.js`、`insights.js`、`disaster.js`；純計算在 `bento.js`、`prep.js`、`rewards.js`、`calendar.js`、`config.js`（前端 `web/src/lib/` 有對應的顯示用副本）。
-
-第一階段 demo 資料：`node scripts/seed-phase1.js`（跑在 `seed.js` 之後，固定 id 可重跑；`--catalog-only` 只寫參數、菜色庫、模板與兩家 demo 店的配方）。
-
-## Cloud Functions 一覽
-
-| 分類 | Function | 類型 |
-|---|---|---|
-| AI Agent | `dailyCalibration` | 排程（每日 23:30） |
-| | `triggerCalibrationNow`、`askCalibrationScenario` | callable（手動校準、what-if 追問） |
-| | `getDiscountExplanation` | callable（品項頁金額明細的折扣說明，依折扣級距快取；10/09 取代 `onLockCreated`） |
-| 金流 | `createLinePayReservation`、`createCartLinePayReservation` | callable（單品／購物車發起付款） |
-| | `confirmLinePayPayment` | callable（付款確認後建立 `locks`） |
-| 交易 | `createResaleLinePayReservation` | callable（付費接手轉讓，確認走 `confirmLinePayPayment`） |
-| | `markLockOutcome` | callable（商家 QR 核銷／標記 no-show） |
-| 結算 | `settleVendorPayouts` | 排程（每日 20:00） |
-| | `triggerSettlementNow` | callable |
-| 推播 | `pickupReminders` | 排程（每 15 分鐘，取餐前 30 分鐘提醒） |
-| | `triggerPickupRemindersNow` | callable |
-| 成長獎勵 | `drawGrowthReward` | callable（抽獎） |
-
-### 兩個 Gemini Agent 的設計原則
-
-兩者都**不輸出決策指令**，輸出裡固定帶 `disclaimer` 欄位。這是刻意的設計，直接回答「AI 建議錯了誰負責」：AI 不下指令，責任不在 AI。
-
-## 開發設定
-
-1. 安裝 CLI：`npm install -g firebase-tools`，用專案擁有者帳號執行 `firebase login`（見 `TODO.md` 環境備忘），再執行 `firebase use bunnbaa-mvp-5474`
-2. **Functions 環境變數**：
-   ```bash
-   cd functions
-   cp .env.example .env
-   # 填入 GEMINI_API_KEY（aistudio.google.com/apikey）
-   # 填入 LINE_PAY_CHANNEL_ID / LINE_PAY_CHANNEL_SECRET（Sandbox channel 可自助申請）
-   # LINE_PAY_ENV=sandbox，APP_BASE_URL 設成正式站或本機網址
-   npm install
-   ```
-3. **前端**：
-   ```bash
-   cd web
-   npm install
-   ```
-   推播需要在 `web/src/lib/messaging.ts` 填入 `VAPID_KEY`（Firebase Console → Cloud Messaging → Web Push 憑證）；沒填的話只會跳過註冊，不影響其他功能。
-4. **種子資料腳本**：`cd scripts && npm install`
-5. **本機開發**：`web/.env.local` 設 `VITE_USE_EMULATORS=false`（目前設定），本機直接讀寫雲端 Firestore，與正式站同一份資料：
-   ```powershell
-   npm run dev          # 只開 Vite：http://localhost:5300
-   ```
-   ⚠️ 本機的操作（鎖定、核銷、撥款）會直接寫進正式資料。
-
-   **要隔離測試時改用 Emulator**：`.env.local` 改成 `VITE_USE_EMULATORS=true`，再執行
-   ```powershell
-   npm run dev:emulator         # 啟動 emulator、首次自動灌種子、再開 Vite；資料存在 .emulator-data/
-   npm run dev:emulator:reset   # 清掉本機資料重灌（種子裡「今天／明天」的訂單過期時用）
-   ```
-   前提：ASCII junction 已建立（見 TODO.md「📌 環境備忘」）。
-   emulator 會開在另一個視窗；**要在那個視窗按 Ctrl+C 關閉**，資料才會存檔。
-   腳本內容見 `scripts/dev-local.ps1`（手動步驟：從 junction 執行 `firebase emulators:start --only functions,firestore,auth --import=.emulator-data --export-on-exit=.emulator-data`，
-   再以 `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=bunnbaa-mvp-5474 node scripts/seed.js` 灌資料）。
-6. **正式部署**：
-   ```bash
-   cd web && npm run build && cd ..
-   firebase deploy --only firestore:rules,firestore:indexes,functions,hosting
-   ```
-   部署前確認 `web/.env.local` 沒有把 `VITE_USE_EMULATORS=true` 帶進正式建置。
+Released under the [MIT License](LICENSE).

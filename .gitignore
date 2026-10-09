@@ -2,7 +2,12 @@ node_modules/
 dist/
 *.tsbuildinfo
 .env
-.env.local
+.env.*
+!.env.example
+# 服務帳號金鑰、憑證
+*-service-account*.json
+serviceAccount*.json
+*.pem
 *.log
 .DS_Store
 .firebase/
