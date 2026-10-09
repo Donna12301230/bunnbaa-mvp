@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { rememberReturnPath } from "@/lib/returnPath";
 import { Link } from "wouter";
 import { collection, onSnapshot } from "firebase/firestore";
 import { Gift, PartyPopper, Ticket, Trophy } from "lucide-react";
@@ -68,7 +69,7 @@ export default function RewardsPage() {
       <PageHero eyebrow={tr("人人有獎", "Everyone wins")} title={tr("成長獎勵", "Rewards")} description={tr("每累計實付 100 元一張抽獎券；店家累積營業額滿 1 萬元就開獎，拿出其中 5% 當回饋池，人人有獎。", "Every NT$100 you pay earns a ticket. Once a vendor's sales reach NT$10,000 the draw opens, with 5% of those sales as the reward pool — everyone wins.")} />
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-12 space-y-14">
         {!user ? (
-          <EmptyState icon={<Trophy size={32} />} title={tr("請先登入", "Please sign in")} description={tr("登入後就能看到你的抽獎券、抽獎進度與折價券。", "Sign in to see your tickets, draw progress and coupons.")} action={<Button asChild><Link href="/login">{tr("前往登入", "Sign in")}</Link></Button>} />
+          <EmptyState icon={<Trophy size={32} />} title={tr("請先登入", "Please sign in")} description={tr("登入後就能看到你的抽獎券、抽獎進度與折價券。", "Sign in to see your tickets, draw progress and coupons.")} action={<Button asChild><Link href="/login" onClick={() => rememberReturnPath()}>{tr("前往登入", "Sign in")}</Link></Button>} />
         ) : (
           <>
             <section className="space-y-3">

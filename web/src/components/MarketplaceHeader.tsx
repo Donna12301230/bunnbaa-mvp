@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
   Search, Globe, User, ChevronDown, ClipboardList, Repeat,
-  CalendarDays, LogOut, Store, ShieldCheck, QrCode, Menu, ShoppingCart, Trophy, Heart,
+  CalendarDays, LogOut, Store, ShieldCheck, Menu, ShoppingCart, Trophy, Heart,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,6 +23,7 @@ import { setLang, useI18n } from "@/lib/i18n";
 import { avatarUrl } from "@/lib/avatar";
 import { setSearchQuery, useSearchQuery } from "@/lib/searchQuery";
 import { isClean } from "@/lib/searchFilter";
+import { rememberReturnPath } from "@/lib/returnPath";
 
 // 抽自 HomePage 的共用頂部列——依 UI草圖(Main/Marketplace/MyBookings 三頁共用同一組
 // 導覽)統一給三頁用:預購餐點(計畫方案首頁)／轉讓市集／我的餐點。也給
@@ -45,7 +46,7 @@ import { isClean } from "@/lib/searchFilter";
 // 2026-09-28:最前面加「首頁」分頁,連到品牌形象頁(/landing,LandingPage.tsx)。
 // 2026-10-02(1002 規格 §4.5):導覽列只留 4 個——預購餐點、我的餐點、我的最愛、成長獎勵。
 // 「商家」拿掉(跟預購餐點重複);「轉讓・愛心餐」併入我的餐點的分頁。搜尋框接上預購餐點頁的搜尋。
-export type MarketplaceTab = "landing" | "plans" | "transfer" | "bookings" | "vendors" | "rewards" | "favorites";
+export type MarketplaceTab = "landing" | "plans" | "transfer" | "bookings" | "vendors" | "rewards" | "favorites" | "portal";
 
 interface NavItem {
   tab: MarketplaceTab;
@@ -71,14 +72,19 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
     },
   });
 
-  const navItems: NavItem[] = [
-    { tab: "plans", href: "/home", label: t("預購餐點", "Pre-order"), icon: ClipboardList },
-    isVendor
-      ? { tab: "bookings", href: "/lock/vendor/redeem", label: t("核對取餐", "Redeem"), icon: QrCode }
-      : { tab: "bookings", href: "/my-bookings", label: t("我的餐點", "My meals"), icon: CalendarDays },
-    { tab: "favorites", href: "/favorites", label: t("我的最愛", "Favorites"), icon: Heart },
-    { tab: "rewards", href: "/rewards", label: t("成長獎勵", "Rewards"), icon: Trophy },
-  ];
+  // 2026-10-09：廠商帳號不需要會員功能（我的餐點、我的最愛、成長獎勵、購物車、會員中心），只留
+  // 「上架顯示」（看自己的品項在前台長什麼樣子）與「廠商後台」；核對取餐在廠商後台裡
+  const navItems: NavItem[] = isVendor
+    ? [
+        { tab: "plans", href: "/home", label: t("上架顯示", "Storefront"), icon: ClipboardList },
+        { tab: "portal", href: "/vendor-portal/dashboard", label: t("廠商後台", "Vendor portal"), icon: Store },
+      ]
+    : [
+        { tab: "plans", href: "/home", label: t("預購餐點", "Pre-order"), icon: ClipboardList },
+        { tab: "bookings", href: "/my-bookings", label: t("我的餐點", "My meals"), icon: CalendarDays },
+        { tab: "favorites", href: "/favorites", label: t("我的最愛", "Favorites"), icon: Heart },
+        { tab: "rewards", href: "/rewards", label: t("成長獎勵", "Rewards"), icon: Trophy },
+      ];
 
   // 搜尋店家名稱、菜名、料理類型；結果顯示在預購餐點頁（分單點／方案兩組）
   function submitSearch(value: string) {
@@ -181,7 +187,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           </DropdownMenu>
 
           <NotificationBell />
-          <Button
+          {!isVendor && <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate("/cart")}
@@ -194,10 +200,10 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}
-          </Button>
+          </Button>}
 
           {!user ? (
-            <Button size="sm" className="shrink-0 whitespace-nowrap" onClick={() => navigate("/login")}>
+            <Button size="sm" className="shrink-0 whitespace-nowrap" onClick={() => { rememberReturnPath(); navigate("/login"); }}>
               {/* 窄螢幕英文「Sign in / Sign up」會被切掉，只留「Sign in」 */}
               <span className="sm:hidden">{t("登入", "Sign in")}</span>
               <span className="hidden sm:inline">{t("登入 / 註冊", "Sign in / Sign up")}</span>
@@ -212,9 +218,11 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem onClick={() => navigate("/profile")}>
-                  <User className="w-4 h-4 mr-2" /> {t("會員中心", "My account")}
-                </DropdownMenuItem>
+                {!isVendor && (
+                  <DropdownMenuItem onClick={() => navigate("/profile")}>
+                    <User className="w-4 h-4 mr-2" /> {t("會員中心", "My account")}
+                  </DropdownMenuItem>
+                )}
                 {isVendor && (
                   <DropdownMenuItem onClick={() => navigate("/vendor-portal/dashboard")}>
                     <Store className="w-4 h-4 mr-2" /> {t("廠商後台", "Vendor portal")}
@@ -282,7 +290,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                 </button>
               </SheetClose>
             ))}
-            <SheetClose asChild>
+            {!isVendor && <SheetClose asChild>
               <button
                 onClick={() => go("/cart")}
                 className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-foreground hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -294,7 +302,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                   </span>
                 )}
               </button>
-            </SheetClose>
+            </SheetClose>}
             <div className="px-3 py-3 text-sm flex items-center justify-between gap-2">
               <AreaPicker />
               <div className="flex gap-1" role="group" aria-label={t("切換語言", "Change language")}>
@@ -305,7 +313,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           </nav>
           {!user && (
             <div className="p-3 border-t border-border">
-              <Button className="w-full" onClick={() => go("/login")}>
+              <Button className="w-full" onClick={() => { rememberReturnPath(); go("/login"); }}>
                 {t("登入 / 註冊", "Sign in / Sign up")}
               </Button>
             </div>

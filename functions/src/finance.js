@@ -307,20 +307,38 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
   return result;
 }
 
-/** 最近 15 天每日收入與材料成本（訂單統計報表折線圖） */
+/**
+ * 最近 15 天每日收入、材料成本與淨利（訂單統計報表折線圖）。
+ * 淨利＝收入 − 材料 − 備料人工 − LINE Pay 手續費 − 平台抽成 − 固定成本日攤（正職月薪＋其他固定成本 ÷ 當月天數），
+ * 跟本月收益看板（buildForecast）同一套成本項目，只是逐日算、不含預估份數。
+ */
 async function dailySeries(vendor, today) {
   const config = await loadPlatformConfig(db());
+  const wageDoc = await loadMinimumWage(db());
   const catalog = await loadVendorCatalog(vendor.id);
   const from = addDays(today, -14);
   const snap = await db().collection("locks").where("vendor_id", "==", vendor.id)
     .where("pickup_date", ">=", from).where("pickup_date", "<=", today).get();
   const locks = snap.docs.map((d) => d.data()).filter((l) => PAID_STATUSES.includes(l.status));
+  const ownHourly = Number(vendor.hourly_wage) || 0;
+  const feeRate = Number(vendor.linepay_fee_rate) >= 0 && vendor.linepay_fee_rate != null ? Number(vendor.linepay_fee_rate) : DEFAULT_LINEPAY_FEE_RATE;
+  const commissionRate = Number(config.commissionRate) || 0;
+  const monthlyFixed = (Array.isArray(vendor.staff_salaries) ? vendor.staff_salaries : []).reduce((s, n) => s + (Number(n) || 0), 0) + (Number(vendor.fixed_costs) || 0);
   const out = [];
   for (let i = 0; i < 15; i++) {
     const date = addDays(from, i);
     const mine = locks.filter((l) => l.pickup_date === date);
     const needs = rawNeeds(componentPortions(mine, catalog.itemsById, catalog.componentsById, config), catalog.componentsById, catalog.ingredientsById);
-    out.push({ date, revenue: mine.reduce((s, l) => s + (l.locked_price || 0), 0), material_cost: Math.round(needsCost(needs, catalog.ingredientsById)), qty: mine.length });
+    const revenue = mine.reduce((s, l) => s + (l.locked_price || 0), 0);
+    const material = needsCost(needs, catalog.ingredientsById);
+    const labor = mine.length > 0 ? (dayLaborMinutes(mine, catalog, vendor, config) / 60) * Math.max(ownHourly, wageOn(wageDoc, date).hourly) : 0;
+    const fees = revenue * feeRate + commissionOf(mine, commissionRate);
+    const fixed = monthlyFixed / monthDays(date.slice(0, 7)).length;
+    out.push({
+      date, revenue, material_cost: Math.round(material), qty: mine.length,
+      other_cost: Math.round(labor + fees + fixed),
+      net_profit: Math.round(revenue - material - labor - fees - fixed),
+    });
   }
   return out;
 }
@@ -346,7 +364,7 @@ exports.refreshRevenueForecast = onCall({ timeoutSeconds: 120 }, async (request)
   return writeForecast(vendor, month);
 });
 
-/** 訂單統計報表：最近 15 天每日收入＋材料成本 */
+/** 訂單統計報表：最近 15 天每日收入、材料成本、淨利 */
 exports.getDailyRevenueSeries = onCall({ timeoutSeconds: 60 }, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const vendor = { id: vendorId, ...(await db().collection("vendors").doc(vendorId).get()).data() };

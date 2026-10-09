@@ -55,7 +55,7 @@ function computeStats(locks: Lock[]): ReportStats | null {
   };
 }
 
-/** 營收：15 天四個大數字、每日收入與材料成本圖、熱銷排行（獎牌＋長條）、預測準確率量表＋問 AI */
+/** 營收：15 天四個大數字、每日收入／材料成本／淨利圖、熱銷排行（獎牌＋長條）、預測準確率量表＋問 AI */
 export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number) => void }) {
   const [report, setReport] = useState<AccuracyReport | null>(null);
   const [askOpen, setAskOpen] = useState(false);
@@ -134,7 +134,7 @@ export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: strin
 
           <Card className="border-2">
             <CardContent className="p-4 space-y-2">
-              <p className="font-semibold flex items-center gap-1">{tr("每天收入 vs 材料成本", "Daily revenue vs materials")}<InfoTip>{tr(`最近 ${REPORT_DAYS} 天，依取餐日。預付制未取餐也算收入，取消退款的不算。`, `Last ${REPORT_DAYS} days by pickup date.`)}</InfoTip></p>
+              <p className="font-semibold flex items-center gap-1">{tr("每天收入、材料成本與淨利", "Daily revenue, materials & net profit")}<InfoTip>{tr(`最近 ${REPORT_DAYS} 天，依取餐日。預付制未取餐也算收入，取消退款的不算。`, `Last ${REPORT_DAYS} days by pickup date.`)}</InfoTip></p>
               <RevenueCostChart vendorId={vendorId} />
             </CardContent>
           </Card>

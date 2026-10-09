@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { rememberReturnPath } from "@/lib/returnPath";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
@@ -94,7 +95,7 @@ export default function FavoritesPage() {
             icon={<Heart size={32} />}
             title={tr("請先登入", "Please sign in")}
             description={tr("登入後就能收藏喜歡的店家。", "Sign in to save your favorite vendors.")}
-            action={<Button asChild><Link href="/login">{tr("前往登入", "Sign in")}</Link></Button>}
+            action={<Button asChild><Link href="/login" onClick={() => rememberReturnPath()}>{tr("前往登入", "Sign in")}</Link></Button>}
           />
         ) : loading ? (
           <SkeletonBlocks count={2} height={200} className="space-y-4" />

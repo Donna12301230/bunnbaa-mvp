@@ -137,6 +137,13 @@ function useSyncUserLang(lang: "zh" | "en") {
   }, [user?.id, user?.lang, lang]);
 }
 
+// 會員專用頁（2026-10-09）：廠商帳號只用「上架顯示」與廠商後台，打開這些頁直接導去廠商後台
+function MemberOnly({ children }: { children: React.ReactNode }) {
+  const { isVendor } = useAuth();
+  if (isVendor) return <Redirect to="/vendor-portal/dashboard" replace />;
+  return <>{children}</>;
+}
+
 // 根路徑：不管有沒有登入都先看品牌形象頁 LandingPage（不是訂購用的
 // HomePage——LandingPage 自己的頁尾／MarketplaceHeader 都把 /landing 標成
 // 「首頁」、/home 標成「今日菜單」）。瀏覽本來就不用登入，登入從
@@ -177,13 +184,13 @@ export default function App() {
             <BackOfficePage><RequireVendorSignIn><VendorRedeemPage /></RequireVendorSignIn></BackOfficePage>
           </Route>
           <Route path="/gift/:lockId">
-            <MarketplacePage><GiftClaimPage /></MarketplacePage>
+            <MarketplacePage><MemberOnly><GiftClaimPage /></MemberOnly></MarketplacePage>
           </Route>
           <Route path="/pickup/:lockId/:token">
             <MarketplacePage><PickupProxyPage /></MarketplacePage>
           </Route>
           <Route path="/rewards">
-            <MarketplacePage><RewardsPage /></MarketplacePage>
+            <MarketplacePage><MemberOnly><RewardsPage /></MemberOnly></MarketplacePage>
           </Route>
           {/* :orderId, not a query string — LINE Pay appends ?transactionId=...
               by string concatenation with no regard for the "#" boundary, which
@@ -208,23 +215,23 @@ export default function App() {
             <MarketplacePage><HomePage /></MarketplacePage>
           </Route>
           <Route path="/favorites">
-            <MarketplacePage><FavoritesPage /></MarketplacePage>
+            <MarketplacePage><MemberOnly><FavoritesPage /></MemberOnly></MarketplacePage>
           </Route>
           <Route path="/profile">
-            <MarketplacePage><ProfilePage /></MarketplacePage>
+            <MarketplacePage><MemberOnly><ProfilePage /></MemberOnly></MarketplacePage>
           </Route>
           {/* 轉讓市集併入「我的餐點」分頁（1002 規格 §4.5）；舊連結轉過去 */}
           <Route path="/marketplace">
             <Redirect to={/tab=charity/.test(window.location.search + window.location.hash) ? "/my-bookings?tab=charity" : "/my-bookings?tab=market"} replace />
           </Route>
           <Route path="/my-bookings">
-            <MarketplacePage><MyBookingsPage /></MarketplacePage>
+            <MarketplacePage><MemberOnly><MyBookingsPage /></MemberOnly></MarketplacePage>
           </Route>
           <Route path="/my-locks">
             <Redirect to="/my-bookings" replace />
           </Route>
           <Route path="/cart">
-            <MarketplacePage><CartPage /></MarketplacePage>
+            <MarketplacePage><MemberOnly><CartPage /></MemberOnly></MarketplacePage>
           </Route>
           <Route path="/vendors">
             <MarketplacePage><VendorListPage /></MarketplacePage>

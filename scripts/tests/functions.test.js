@@ -425,6 +425,41 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     expectCode(await ANON.call("issuePickupQr", { lock_id: id, share_token: "tok-123" }), "permission-denied", "轉讓後");
   });
 
+  await test("C-MY-24", "代領碼：本人產生 8 碼、免登入輸入碼可取得 QR；別人不能產生；轉讓中不能代領；轉讓後碼失效", async () => {
+    const { id, ref } = await lock(uids.A, { share_token: "tok-code" });
+    expectCode(await B.call("getProxyPickupCode", { lock_id: id }), "permission-denied");
+    const { code } = expectOk(await A.call("getProxyPickupCode", { lock_id: id }));
+    assert(/^[A-HJ-KM-NP-Z2-9]{8}$/.test(code), code);
+    eq(expectOk(await A.call("getProxyPickupCode", { lock_id: id })).code, code, "再按一次拿回同一組");
+    const q = expectOk(await ANON.call("issuePickupQr", { proxy_code: `${code.slice(0, 4)}-${code.slice(4).toLowerCase()}` }));
+    assert(/^BB1\.L\./.test(q.token), q.token);
+    expectCode(await ANON.call("issuePickupQr", { proxy_code: "AAAA-AAAA" }), "not-found");
+    // 轉讓中（lock 公開可讀、share_token 看得到）不能代領
+    await ref.update({ status: "for_resale" });
+    expectCode(await ANON.call("issuePickupQr", { proxy_code: code }), "not-found", "轉讓中");
+    expectCode(await ANON.call("issuePickupQr", { lock_id: id, share_token: "tok-code" }), "permission-denied", "轉讓中（連結）");
+    expectOk(await takeOver(B, id));
+    expectCode(await ANON.call("issuePickupQr", { proxy_code: code }), "not-found", "轉讓後");
+  });
+
+  await test("C-MY-25", "取消轉讓／取消贈送：觸發器換新 share_token，上架期間被看過的舊代領連結失效", async () => {
+    const { id, ref } = await lock(uids.A, { share_token: "tok-listed" });
+    await ref.update({ status: "for_gift" });
+    await ref.update({ status: "locked" });
+    await waitFor(async () => (await get(`locks/${id}`)).share_token !== "tok-listed");
+    expectCode(await ANON.call("issuePickupQr", { lock_id: id, share_token: "tok-listed" }), "permission-denied");
+    expectOk(await A.call("issuePickupQr", { lock_id: id }), "本人照常取餐");
+  });
+
+  await test("V-RPT-02", "每日收入圖：最近 15 天每天都有淨利欄，等於收入 − 材料 − 其他成本", async () => {
+    const days = expectOk(await OWNER.call("getDailyRevenueSeries", { vendor_id: V1 })).days;
+    eq(days.length, 15);
+    for (const d of days) {
+      assert(Number.isFinite(d.net_profit) && Number.isFinite(d.other_cost), JSON.stringify(d));
+      assert(Math.abs(d.revenue - d.material_cost - d.other_cost - d.net_profit) <= 1, JSON.stringify(d));
+    }
+  });
+
   await test("C-MY-19", "取餐日時段內捐為愛心餐", async () => {
     if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
     const { id } = await lock(uids.A, { pickup_date: TODAY });

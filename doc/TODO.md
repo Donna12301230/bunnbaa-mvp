@@ -8,6 +8,21 @@
 
 ---
 
+## 🆕 2026-10-09 回饋修正（`claude/serene-knuth-vjyzk9`）
+
+1. 報表與洞察「每天收入、材料成本與淨利」加淨利線（getDailyRevenueSeries 多回 net_profit／other_cost：扣人工、手續費、抽成、固定成本日攤）
+2. $0 轉讓（自訂 0 元＋逾時免費領取）從轉讓市集移到「附近愛心餐」分頁上方（FreeTransfersSection）
+3. 轉讓價對話框加「原價／早鳥價／半價／免費」快選；自訂金額本來就有（10/05 版），**要部署 `firestore.rules` 才能在正式站寫入 resale_price**
+4. 代領改用 8 碼代領碼（`getProxyPickupCode`，存 `proxyCodes/{code}`，規則預設全擋）；我的餐點新增「代領取餐」分頁，免登入輸入碼或貼連結；登入後回到原頁（lib/returnPath.ts）。順手修：轉讓中／贈送中的 lock 公開可讀含 share_token，代領改限 status=locked，取消轉讓／贈送時觸發器換新 share_token
+5. 廠商帳號只留「上架顯示」「廠商後台」：導覽、購物車、會員中心、收藏隱藏；會員頁導去後台；下單／轉讓／收藏擋下
+6. 我的餐點月曆依早／午／晚分開，標「午（12:00）」
+7. 菜單品項表單分 ①基本資料 ②內容與價格 ③過敏原，說明／飲食標記／英文／目錄收進「更多設定」；候選菜細項預設收起
+
+部署：Functions（新 callable `getProxyPickupCode`、`issuePickupQr`／`getDailyRevenueSeries`／`matchResaleLock` 有改）＋ hosting。rules 沒改，但上面第 3 點的待部署規則仍要部署。
+測試：functions.test.js 63/63（新增 C-MY-24 代領碼、C-MY-25 取消轉讓換 token、V-RPT-02 淨利）、functions-more 71/73（2 筆是「明天不是營業日」SKIP）、logic 57/57。
+
+---
+
 ## 🆕 第一階段規格改版（`spec-phase1` 分支，2026-09-30，部署中）
 
 依 `doc/BunnBaa 飯飽｜第一階段技術規格1002.md` 改版，保留鎖定折扣＋轉讓＋LINE Pay（對照表見 README「第一階段規格」）。

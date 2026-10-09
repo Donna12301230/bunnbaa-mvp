@@ -108,7 +108,7 @@ export default function VendorPage() {
       });
       return;
     }
-    add({ menuItem: item, vendorId: item.vendor_id, pickupDate: next.date, pickupWindow: next.window, choices: [], rice: "normal", quantity: 1, note: "", couponId: null });
+    if (!add({ menuItem: item, vendorId: item.vendor_id, pickupDate: next.date, pickupWindow: next.window, choices: [], rice: "normal", quantity: 1, note: "", couponId: null })) return;
     notifyCartAdded();
   }
 

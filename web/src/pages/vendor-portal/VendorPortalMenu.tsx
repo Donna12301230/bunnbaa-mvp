@@ -95,6 +95,8 @@ export default function VendorPortalMenu() {
   const [draftNote, setDraftNote] = useState("");
   const [activeDraft, setActiveDraft] = useState<number | null>(null);
   const [catalogsOpen, setCatalogsOpen] = useState(false);
+  // 品項表單的「更多設定」：AI 草稿（帶飲食標記）或已填過說明／英文／目錄／飲食標記時預設展開
+  const [moreOpen, setMoreOpen] = useState(false);
   const { data: platformConfig } = usePlatformConfig();
   const commissionRate = platformConfig?.commissionRate ?? 0.05;
   const commissionPct = Math.round(commissionRate * 1000) / 10;
@@ -282,6 +284,7 @@ export default function VendorPortalMenu() {
       nameEn: d.name_en,
     });
     setBento(EMPTY_BENTO);
+    setMoreOpen(true); // AI 草稿要請店家確認飲食標記
     setDialogOpen(true);
   }
 
@@ -290,11 +293,13 @@ export default function VendorPortalMenu() {
     setEditId(null);
     setForm(EMPTY_FORM);
     setBento(EMPTY_BENTO);
+    setMoreOpen(false);
     setDialogOpen(true);
   }
 
   function openEdit(item: MenuItem) {
     setActiveDraft(null);
+    setMoreOpen(false);
     setEditId(item.id);
     setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, catalog: item.catalog ?? "", isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [], nameEn: item.name_en ?? "", descriptionEn: item.description_en ?? "" });
     const isBentoItem = item.item_type ? item.item_type === "bento" : (item.slots?.length ?? 0) > 0;
@@ -513,82 +518,62 @@ export default function VendorPortalMenu() {
           {activeDraft !== null && (
             <p className="text-xs text-amber-800 bg-amber-50 rounded p-2">{tr("這是 AI 從照片讀出的草稿，請確認價格、飲食標記與過敏原（食安法規定）正確再儲存。", "This is an AI draft from your photo. Check price, dietary tags and allergens (required by law) before saving.")}</p>
           )}
-          <div className="space-y-3 py-2">
-            <div>
-              <Label>{tr("名稱 *", "Name *")}</Label>
-              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-            </div>
-            <div>
-              <Label>{tr("說明", "Description")}</Label>
-              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
-            </div>
-            {/* 英文版（給英文介面的顧客看） */}
-            <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
-              <p className="text-xs font-semibold text-muted-foreground">
-                {tr("英文版（自動翻譯，可修改）", "English (auto-translated, editable)")}
-              </p>
-              <Input
-                value={form.nameEn}
-                onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
-                placeholder={tr("英文名稱，留空＝自動翻譯", "English name — leave blank to auto-translate")}
-                aria-label={tr("英文名稱", "English name")}
-              />
-              <Textarea
-                value={form.descriptionEn}
-                onChange={e => setForm(f => ({ ...f, descriptionEn: e.target.value }))}
-                placeholder={tr("英文說明，留空＝自動翻譯", "English description — leave blank to auto-translate")}
-                aria-label={tr("英文說明", "English description")}
-                rows={2}
-              />
-              <p className="text-xs text-muted-foreground">
-                {tr("儲存後約幾秒會自動翻好。只改中文、沒改英文時，英文會重新自動翻譯。", "Translations appear a few seconds after saving. If you change the Chinese but not the English, the English is re-translated automatically.")}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>{bento.itemType === "bento" ? tr("價格（便當依主菜定價，下方設定）", "Price (set per main below)") : tr("價格 (NT$) *", "Price (NT$) *")}</Label>
-                <Input type="number" value={form.price} disabled={bento.itemType === "bento"} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
-                {/* 合作方案：每份抽成，定價時加上去 */}
-                {bento.itemType !== "bento" && Number(form.price) > 0 && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {tr(`平台抽成 ${commissionPct}%，原價賣出實收約 NT$${netOfCommission(Number(form.price), commissionRate)}。`, `After the ${commissionPct}% commission you net about NT$${netOfCommission(Number(form.price), commissionRate)} at full price.`)}{" "}
-                    <button type="button" className="font-semibold text-primary underline underline-offset-2" onClick={() => setForm(f => ({ ...f, price: String(withCommission(Number(f.price), commissionRate)) }))}>
-                      {tr(`加 ${commissionPct}% → NT$${withCommission(Number(form.price), commissionRate)}`, `Add ${commissionPct}% → NT$${withCommission(Number(form.price), commissionRate)}`)}
-                    </button>
-                  </p>
-                )}
+          {/* 2026-10-09 簡化：①必填的基本資料 ②便當內容與價格 ③過敏原（法規），說明、英文、目錄、飲食標記收進「更多設定」 */}
+          <div className="space-y-4 py-2">
+            <section className="space-y-3" aria-labelledby="menu-step-basic">
+              <h3 id="menu-step-basic" className="text-sm font-semibold">{tr("① 基本資料", "① Basics")}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-start">
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="menu-item-name">{tr("名稱 *", "Name *")}</Label>
+                    <Input id="menu-item-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={tr("例：招牌雞腿便當", "e.g. Signature chicken bento")} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="menu-item-category">{tr("分類", "Category")}</Label>
+                      <Input id="menu-item-category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder={tr("例：便當、湯品", "e.g. Bento, Soup")} />
+                    </div>
+                    {bento.itemType !== "bento" && (
+                      <div>
+                        <Label htmlFor="menu-item-price">{tr("價格 (NT$) *", "Price (NT$) *")}</Label>
+                        <Input id="menu-item-price" type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+                      </div>
+                    )}
+                  </div>
+                  {/* 合作方案：每份抽成，定價時加上去 */}
+                  {bento.itemType !== "bento" && Number(form.price) > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {tr(`平台抽成 ${commissionPct}%，原價賣出實收約 NT$${netOfCommission(Number(form.price), commissionRate)}。`, `After the ${commissionPct}% commission you net about NT$${netOfCommission(Number(form.price), commissionRate)} at full price.`)}{" "}
+                      <button type="button" className="font-semibold text-primary underline underline-offset-2" onClick={() => setForm(f => ({ ...f, price: String(withCommission(Number(f.price), commissionRate)) }))}>
+                        {tr(`加 ${commissionPct}% → NT$${withCommission(Number(form.price), commissionRate)}`, `Add ${commissionPct}% → NT$${withCommission(Number(form.price), commissionRate)}`)}
+                      </button>
+                    </p>
+                  )}
+                  {/* 上架與否是即時生效的開關設定 → 設計系統用 Switch */}
+                  <Switch
+                    checked={form.isAvailable}
+                    onCheckedChange={(checked) => setForm(f => ({ ...f, isAvailable: checked }))}
+                    label={tr("上架販售", "Available")}
+                    description={tr("關閉後顧客暫時看不到這個品項", "When off, customers won't see this item")}
+                  />
+                </div>
+                <ImageUploadField label={tr("品項圖片", "Item photo")} vendorId={VENDOR_ID} value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
               </div>
-              <div>
-                <Label>{tr("分類", "Category")}</Label>
-                <Input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder={tr("例：便當、湯品", "e.g. Bento, Soup")} />
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="menu-item-catalog">{tr("目錄（分類的上一層，選填）", "Catalog (above category, optional)")}</Label>
-                <Input id="menu-item-catalog" list="menu-catalog-options" maxLength={30} value={form.catalog} onChange={e => setForm(f => ({ ...f, catalog: e.target.value }))} placeholder={tr("例：午餐便當；可選現有的或直接打新的", "e.g. Lunch bentos — pick one or type a new one")} />
-                <datalist id="menu-catalog-options">{catalogNames.map((n) => <option key={n} value={n} />)}</datalist>
-              </div>
-            </div>
-            {/* 上架與否是即時生效的開關設定 → 設計系統用 Switch */}
-            <Switch
-              checked={form.isAvailable}
-              onCheckedChange={(checked) => setForm(f => ({ ...f, isAvailable: checked }))}
-              label={tr("上架販售", "Available")}
-              description={tr("關閉後顧客暫時看不到這個品項", "When off, customers won't see this item")}
-            />
-            {/* 飲食標記 */}
-            <div>
-              <Label className="block mb-1.5">{tr("飲食標記", "Dietary tags")}</Label>
-              <div className="flex flex-wrap gap-2">
-                {DIETARY_TAGS.map(tag => (
-                  <Tag key={tag} selected={form.dietaryTags.includes(tag)} onClick={() => toggleTag("dietaryTags", tag)}>
-                    {tr(tag, tagEn(tag))}
-                  </Tag>
-                ))}
-              </div>
-            </div>
-            {/* 過敏原標示（食安法要求） */}
-            <div>
-              <Label className="block mb-1.5">{tr("過敏原標示", "Allergens")} <span className="text-xs text-red-500 font-normal">{tr("（食安法規定）", "(required by food safety law)")}</span></Label>
+            </section>
+
+            <section className="space-y-2" aria-labelledby="menu-step-content">
+              <h3 id="menu-step-content" className="text-sm font-semibold">
+                {bento.itemType === "bento" ? tr("② 便當內容與價格（價格依主菜設定）", "② Contents & price (priced per main)") : tr("② 內容", "② Contents")}
+              </h3>
+              {nextWeekLocked && bento.itemType === "bento" && (
+                <p className="text-xs text-amber-700 bg-amber-50 rounded p-2">{tr("下週叫貨單已產生，下週主菜已鎖定；請只做等值的配菜替換。", "Next week's purchase list is out, so mains are locked — only swap sides for equivalents.")}</p>
+              )}
+              <BentoEditor itemName={form.name} itemPrice={Number(form.price) || 0} value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} orderCount={editId && nextDay && nextDayCounts?.[editId] ? { label: tr(`${nextDay.slice(5)} 已訂`, `${nextDay.slice(5)} booked`), n: nextDayCounts[editId] } : undefined} />
+            </section>
+
+            {/* 過敏原標示（食安法要求）：唯一必看的標示，留在外面 */}
+            <section aria-labelledby="menu-step-allergens">
+              <h3 id="menu-step-allergens" className="text-sm font-semibold mb-1.5">{tr("③ 過敏原標示", "③ Allergens")} <span className="text-xs text-red-500 font-normal">{tr("（食安法規定）", "(required by food safety law)")}</span></h3>
               <div className="flex flex-wrap gap-2">
                 {ALLERGEN_LIST.map(tag => (
                   <Tag key={tag} selected={form.allergens.includes(tag)} onClick={() => toggleTag("allergens", tag)}>
@@ -597,12 +582,56 @@ export default function VendorPortalMenu() {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{tr("點選含有的過敏原成分，將顯示於消費者菜單頁面。", "Select the allergens this item contains; they're shown on the customer menu.")}</p>
-            </div>
-            {nextWeekLocked && bento.itemType === "bento" && (
-              <p className="text-xs text-amber-700 bg-amber-50 rounded p-2">{tr("下週叫貨單已產生，下週主菜已鎖定；請只做等值的配菜替換。", "Next week's purchase list is out, so mains are locked — only swap sides for equivalents.")}</p>
-            )}
-            <BentoEditor itemName={form.name} itemPrice={Number(form.price) || 0} value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} orderCount={editId && nextDay && nextDayCounts?.[editId] ? { label: tr(`${nextDay.slice(5)} 已訂`, `${nextDay.slice(5)} booked`), n: nextDayCounts[editId] } : undefined} />
-            <ImageUploadField label={tr("品項圖片", "Item photo")} vendorId={VENDOR_ID} value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
+            </section>
+
+            <details className="rounded-lg border border-border" open={moreOpen} onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}>
+              <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">
+                {tr("更多設定（說明、飲食標記、英文版、目錄）", "More (description, dietary tags, English, catalog)")}
+              </summary>
+              <div className="space-y-3 px-3 pb-3">
+                <div>
+                  <Label htmlFor="menu-item-desc">{tr("說明", "Description")}</Label>
+                  <Textarea id="menu-item-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
+                </div>
+                <div>
+                  <Label className="block mb-1.5">{tr("飲食標記", "Dietary tags")}</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DIETARY_TAGS.map(tag => (
+                      <Tag key={tag} selected={form.dietaryTags.includes(tag)} onClick={() => toggleTag("dietaryTags", tag)}>
+                        {tr(tag, tagEn(tag))}
+                      </Tag>
+                    ))}
+                  </div>
+                </div>
+                {/* 英文版（給英文介面的顧客看） */}
+                <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {tr("英文版（自動翻譯，可修改）", "English (auto-translated, editable)")}
+                  </p>
+                  <Input
+                    value={form.nameEn}
+                    onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
+                    placeholder={tr("英文名稱，留空＝自動翻譯", "English name — leave blank to auto-translate")}
+                    aria-label={tr("英文名稱", "English name")}
+                  />
+                  <Textarea
+                    value={form.descriptionEn}
+                    onChange={e => setForm(f => ({ ...f, descriptionEn: e.target.value }))}
+                    placeholder={tr("英文說明，留空＝自動翻譯", "English description — leave blank to auto-translate")}
+                    aria-label={tr("英文說明", "English description")}
+                    rows={2}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {tr("儲存後約幾秒會自動翻好。只改中文、沒改英文時，英文會重新自動翻譯。", "Translations appear a few seconds after saving. If you change the Chinese but not the English, the English is re-translated automatically.")}
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="menu-item-catalog">{tr("目錄（分類的上一層，選填）", "Catalog (above category, optional)")}</Label>
+                  <Input id="menu-item-catalog" list="menu-catalog-options" maxLength={30} value={form.catalog} onChange={e => setForm(f => ({ ...f, catalog: e.target.value }))} placeholder={tr("例：午餐便當；可選現有的或直接打新的", "e.g. Lunch bentos — pick one or type a new one")} />
+                  <datalist id="menu-catalog-options">{catalogNames.map((n) => <option key={n} value={n} />)}</datalist>
+                </div>
+              </div>
+            </details>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>{tr("取消", "Cancel")}</Button>

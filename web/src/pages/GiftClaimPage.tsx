@@ -6,7 +6,7 @@ import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ds";
 import { db } from "@/lib/firebase";
-import { takeOverLock } from "@/lib/transfers";
+import { newShareToken, takeOverLock } from "@/lib/transfers";
 import { useAuth } from "@/hooks/useAuth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { useToast } from "@/hooks/use-toast";
@@ -38,8 +38,7 @@ export default function GiftClaimPage() {
     setBusy(true);
     try {
       // 換掉代領連結，原持有人手上的連結失效
-      const token = Array.from(crypto.getRandomValues(new Uint8Array(12))).map((b) => b.toString(16).padStart(2, "0")).join("");
-      await takeOverLock(lockId, user.id, { share_token: token });
+      await takeOverLock(lockId, user.id, { share_token: newShareToken() });
       setDone(true);
     } catch (err) {
       toast({ variant: "destructive", title: tr("接受贈送失敗", "Couldn't accept the gift"), description: (err as Error).message });

@@ -34,6 +34,7 @@
   /* 訂單統計報表「每日收入 vs 材料成本」兩線（dataviz validator 驗過：亮色白底、暗色 #2a231d）*/
   --chart-revenue: #b35a00;
   --chart-cost: #2f6f9f;
+  --chart-profit: #2e7d4f;         /* 淨利線（第三條） */
   --chart-3: #b87a5a;
   --chart-4: #5a9e6f;
   --chart-5: #6b8fb3;
@@ -81,6 +82,7 @@
   --chart-2: #d9a07f;
   --chart-revenue: #d97706;
   --chart-cost: #4f97d6;
+  --chart-profit: #5fbf86;
   --chart-3: #b87a5a;
   --chart-4: #8cc79c;
   --chart-5: #a5c0dc;

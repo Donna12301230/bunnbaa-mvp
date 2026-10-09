@@ -27,6 +27,26 @@ export function resalePrice(lock: PriceFields & Pick<Lock, "resale_price">): num
   return defaultResalePrice(lock);
 }
 
+/** 轉讓截止時間（取餐時段結束）；過了任何人都能免費領取 */
+export function resaleDeadlineOf(lock: Pick<Lock, "resale_deadline">): Date | null {
+  const ts = lock.resale_deadline as { toDate?: () => Date } | undefined;
+  return ts?.toDate ? ts.toDate() : null;
+}
+
+/**
+ * 免費（$0）的轉讓：轉讓人自訂 0 元，或逾時沒人接手開放免費領取。
+ * 這些不放在轉讓市集，改列在「附近愛心餐」分頁（FreeTransfersSection）。
+ */
+export function isFreeTransfer(lock: PriceFields & Pick<Lock, "resale_price" | "resale_deadline">, now: number = Date.now()): boolean {
+  const deadline = resaleDeadlineOf(lock);
+  return resalePrice(lock) === 0 || (!!deadline && deadline.getTime() <= now);
+}
+
+/** 接手後換一組新的代領 token，原持有人手上的代領連結／代領碼一起失效 */
+export function newShareToken(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(12))).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /**
  * 原付款人被接手後會拿回的金額：他實付與轉讓價取小的（舊資料實付用 locked_price）。
  * 賣得比實付低，差額自己吸收；賣得比實付高，多的留在店家（LINE Pay 退款不能超過原付款額）。

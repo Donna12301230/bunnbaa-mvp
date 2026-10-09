@@ -250,7 +250,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
 
   function confirmAdd() {
     if (!canAdd || !vendor) return;
-    add({
+    const added = add({
       menuItem: item!, vendorId: item!.vendor_id, pickupDate: date, pickupWindow: window,
       choices: bento ? choices : [], rice: bento && item!.rice_component_id ? rice : "normal",
       mainIndex: (item!.mains || []).length > 0 ? mainIndex ?? 0 : null, extraSide: bento ? extra : null,
@@ -258,6 +258,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
       quantity: qty, note: note.trim(), couponId: null,
     });
     setConfirmOpen(false);
+    if (!added) return;
     notifyCartAdded();
     onAdded?.();
   }

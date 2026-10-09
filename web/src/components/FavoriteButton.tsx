@@ -1,6 +1,7 @@
 import { Heart } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,8 @@ export default function FavoriteButton({ vendorId, vendorName, className }: { ve
   const { toast } = useToast();
   const { t } = useI18n();
   const on = ids.has(vendorId);
+  // 廠商帳號沒有會員功能（2026-10-09），不顯示收藏
+  const { isVendor } = useAuth();
 
   async function onClick(e: React.MouseEvent) {
     e.preventDefault();
@@ -25,6 +28,7 @@ export default function FavoriteButton({ vendorId, vendorName, className }: { ve
     }
   }
 
+  if (isVendor) return null;
   return (
     <button
       type="button"

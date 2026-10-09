@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { tr } from "@/lib/i18n";
 import { MemberNotice, VendorNotice } from "@/components/TermsNotices";
 import { Link, useLocation } from "wouter";
@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { login, register, applyAsVendor, requestPasswordReset, sendOtp, confirmOtp } from "@/lib/auth";
+import { useAuth } from "@/hooks/useAuth";
+import { takeReturnPath } from "@/lib/returnPath";
 import type { ConfirmationResult } from "firebase/auth";
 import TAIWAN_UNIV_DEPTS from "@/constants/taiwanUnivDepts.json";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -70,10 +72,20 @@ export default function LoginPage() {
 
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  // 登入成功後等個人資料（角色）讀好再導頁：回到登入前的頁面（lib/returnPath），沒有的話
+  // 廠商帳號進廠商後台、其他人到今日菜單
+  const { user, isLoading: authLoading } = useAuth();
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    if (!signedIn || authLoading || !user) return;
+    const back = takeReturnPath();
+    if (user.role === "vendor") navigate(back?.startsWith("/vendor-portal") || back?.startsWith("/lock/vendor") ? back : "/vendor-portal/dashboard");
+    else navigate(back ?? "/home");
+  }, [signedIn, authLoading, user?.id, user?.role]);
 
   const loginMutation = useMutation({
     mutationFn: () => login(username, password),
-    onSuccess: () => navigate("/home"),
+    onSuccess: () => setSignedIn(true),
     onError: (err: Error) => toast({ variant: "destructive", title: tr("登入失敗", "Sign-in failed"), description: err.message }),
   });
 
@@ -93,7 +105,7 @@ export default function LoginPage() {
       if (!otpConfirmation) throw new Error(tr("請先取得驗證碼", "Request a verification code first"));
       return confirmOtp(otpConfirmation, otpCode);
     },
-    onSuccess: () => navigate("/home"),
+    onSuccess: () => setSignedIn(true),
     onError: (err: Error) => toast({ variant: "destructive", title: tr("驗證失敗", "Verification failed"), description: err.message }),
   });
 
@@ -111,7 +123,7 @@ export default function LoginPage() {
     },
     onSuccess: () => {
       toast({ title: tr("註冊成功", "You're signed up"), description: tr("歡迎加入 飯飽BunnBaa！", "Welcome to BunnBaa!") });
-      navigate("/home");
+      setSignedIn(true);
     },
     onError: (err: Error) => toast({ variant: "destructive", title: tr("註冊失敗", "Sign-up failed"), description: err.message }),
   });

@@ -1056,8 +1056,55 @@ function parseQrToken(token) {
  * 產生取餐 QR。持有人本人，或拿到代領連結（share_token）的人都可以。
  * 每次產生都換 nonce，舊截圖立即失效。愛心餐預約（kind=R）也走這裡。
  */
+// 代領碼（2026-10-09）：代領連結點開常被要求登入、登入後又跳走，改成可以輸入的 8 碼代領碼。
+// 存在 proxyCodes/{code}（規則全擋，只有 Admin SDK 讀寫；不能放在 locks 上——轉讓中／贈送中的 locks 是公開可讀的），
+// 記下產生當時的 share_token：轉讓／贈送接手會換 share_token，舊代領碼跟舊連結一起失效。
+// 字母表去掉容易看錯的 0/O、1/I/L。
+const PROXY_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const PROXY_CODE_LENGTH = 8;
+
+function normalizeProxyCode(raw) {
+  return String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function randomProxyCode() {
+  const bytes = crypto.randomBytes(PROXY_CODE_LENGTH);
+  return Array.from(bytes, (b) => PROXY_CODE_ALPHABET[b % PROXY_CODE_ALPHABET.length]).join("");
+}
+
+/** 持有人取得（或第一次產生）這份餐點的代領碼 */
+exports.getProxyPickupCode = onCall({}, async (request) => {
+  assertSignedInUser(request, "產生代領碼");
+  const lockId = request.data?.lock_id;
+  if (typeof lockId !== "string" || !lockId) throw new HttpsError("invalid-argument", "lock_id is required");
+  const ref = db().collection("locks").doc(lockId);
+  const snap = await ref.get();
+  if (!snap.exists || snap.data().buyer_uid !== request.auth.uid) throw new HttpsError("permission-denied", t("這不是你的訂單", "This isn't your order"));
+  const lock = snap.data();
+  if (lock.status !== "locked") throw new HttpsError("failed-precondition", t("轉讓中、贈送中的餐點不能代領", "Meals listed for transfer or gift can't be picked up by someone else"));
+  let shareToken = lock.share_token;
+  if (!shareToken) {
+    shareToken = crypto.randomBytes(12).toString("hex");
+    await ref.update({ share_token: shareToken });
+  }
+  const existing = await db().collection("proxyCodes").where("lock_id", "==", lockId).limit(20).get();
+  const current = existing.docs.find((d) => d.data().share_token === shareToken);
+  if (current) return { code: current.id, share_token: shareToken };
+  for (let i = 0; i < 5; i++) {
+    const code = randomProxyCode();
+    try {
+      await db().collection("proxyCodes").doc(code).create({ lock_id: lockId, share_token: shareToken, created_at: FieldValue.serverTimestamp() });
+      return { code, share_token: shareToken };
+    } catch (err) {
+      if (err.code !== 6) throw err; // 6 = ALREADY_EXISTS：撞碼就換一組
+    }
+  }
+  throw new HttpsError("internal", t("代領碼產生失敗，請再試一次", "Couldn't create a proxy code. Please try again."));
+});
+
 exports.issuePickupQr = onCall({}, async (request) => {
-  const { lock_id: lockId, share_token: shareToken, reservation_id: reservationId } = request.data || {};
+  const { share_token: shareToken, reservation_id: reservationId, proxy_code: proxyCode } = request.data || {};
+  let { lock_id: lockId } = request.data || {};
   const nonce = crypto.randomBytes(6).toString("hex");
   if (reservationId) {
     assertSignedInUser(request, "領取愛心餐");
@@ -1068,14 +1115,28 @@ exports.issuePickupQr = onCall({}, async (request) => {
     await ref.update({ qr_nonce: nonce });
     return { token: makeQrToken("R", reservationId, nonce), expires_in: QR_TTL_MS / 1000 };
   }
+  let codeToken = null;
+  if (proxyCode != null) {
+    // 代領碼不用登入；碼錯、已轉手一律同一句話，不透露訂單存不存在
+    const normalized = normalizeProxyCode(proxyCode);
+    const codeSnap = normalized.length === PROXY_CODE_LENGTH ? await db().collection("proxyCodes").doc(normalized).get() : null;
+    if (!codeSnap?.exists) throw new HttpsError("not-found", t("代領碼不正確或已失效，請跟朋友確認", "That proxy code is wrong or no longer valid. Check with your friend."));
+    lockId = codeSnap.data().lock_id;
+    codeToken = codeSnap.data().share_token;
+  }
   if (typeof lockId !== "string" || !lockId) throw new HttpsError("invalid-argument", "lock_id is required");
   const ref = db().collection("locks").doc(lockId);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError("not-found", t("找不到這筆訂單", "Order not found"));
   const lock = snap.data();
   const owner = request.auth && lock.buyer_uid === request.auth.uid;
-  const proxy = shareToken && lock.share_token && shareToken === lock.share_token;
-  if (!owner && !proxy) throw new HttpsError("permission-denied", t("沒有這筆訂單的取餐權限", "You can't pick up this order"));
+  const presented = codeToken || shareToken;
+  // 代領只限沒在轉讓／贈送的餐點：for_resale／for_gift 的 locks 公開可讀（含 share_token），不能拿來代領
+  const proxy = !!presented && !!lock.share_token && presented === lock.share_token && lock.status === "locked";
+  if (!owner && !proxy) {
+    if (codeToken) throw new HttpsError("not-found", t("代領碼不正確或已失效，請跟朋友確認", "That proxy code is wrong or no longer valid. Check with your friend."));
+    throw new HttpsError("permission-denied", t("沒有這筆訂單的取餐權限", "You can't pick up this order"));
+  }
   if (!["locked", "for_resale", "for_gift"].includes(lock.status)) {
     throw new HttpsError("failed-precondition", t("這筆訂單已經不能取餐", "This order can no longer be picked up"));
   }
@@ -1087,6 +1148,8 @@ exports.issuePickupQr = onCall({}, async (request) => {
     item_name: lock.item_name,
     pickup_date: lock.pickup_date,
     pickup_window: lock.pickup_window,
+    // 代領畫面要顯示是哪一份、哪家店（不含任何持有人個資）
+    ...(proxy && !owner ? { item_name_en: lock.item_name_en || null, vendor_id: lock.vendor_id } : {}),
   };
 });
 

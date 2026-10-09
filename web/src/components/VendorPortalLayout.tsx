@@ -85,7 +85,7 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground border border-ink">{tr("商家後台", "Vendor portal")}</span>
         </div>
         <Link href="/home" className="flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("回首頁", "Home")}
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("看上架顯示", "View storefront")}
         </Link>
       </div>
 
