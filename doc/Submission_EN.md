@@ -64,11 +64,11 @@ Gemini also explains the early-bird discount and pre-order rules on the item pag
 ### Technical implementation (Google Cloud)
 
 - Frontend: React + TypeScript + Vite on **Firebase Hosting**; diner app, vendor portal and admin console; Firebase Auth.
-- Backend: **71 Cloud Functions** (asia-east1) — callables, Firestore triggers and Cloud Scheduler jobs (cut-off, payouts, pickup reminders, charity conversion).
+- Backend: **74 Cloud Functions** (asia-east1) — callables, Firestore triggers and Cloud Scheduler jobs (cut-off, payouts, pickup reminders, charity conversion).
 - Data: **Firestore** with native **Vector Search**; **Firebase Cloud Messaging** for push.
 - AI: **Gemini API** (Flash for text/vision/tools, `gemini-embedding-001` for vectors) through one shared wrapper with JSON mode and retry on 429/503.
 - Payments: LINE Pay request / confirm / refund (sandbox).
-- Quality: 64/64 Firestore security-rule tests and 127/128 Cloud Functions tests passing (as of 5 Oct 2026; the remaining one must run after the 20:00 cut-off).
+- Quality: 61/61 business-logic tests and 141 Cloud Functions tests passing with none failing (as of 9 Oct 2026; 2 date-dependent tests are skipped when the next day is not a business day), plus Firestore security-rule tests.
 
 ### Impact
 
@@ -93,10 +93,10 @@ Record on the live site. Prepare beforehand: a diner account and a vendor accoun
 | 0:00–0:15 | Cover slide, then the home page | "Small eateries buy ingredients before anyone orders. Too much and food is wasted; too little and customers leave. BunnBaa fixes that: diners pay ahead to lock a meal, and the earlier they lock, the cheaper it is." |
 | 0:15–0:45 | **Vendor portal → Menu → Photo listing.** Photograph the paper menu; drafts appear; edit one allergen; confirm | "Onboarding takes one photo. Gemini's vision model reads the menu and drafts every item — name, English name, price, dietary tags and allergens. Nothing goes live until the owner confirms it." |
 | 0:45–1:20 | **Diner home → assistant.** Type "Lunch next Monday to Friday, Da'an, under 120, no beef"; cards appear; open one; show the date/price row with the early-bird price; check out with LINE Pay sandbox | "Diners don't have to browse ten shops. They just ask. Gemini calls our server-side tools to check menus, availability and meal plans, and returns meals they can actually book. It suggests; it never buys. Booking two days ahead saves 20 percent." |
-| 1:20–1:55 | **My meals → Transfer → list for resale.** Switch to the second diner's phone: push notification arrives; tap; pay; first diner sees the refund | "Plans change. Instead of wasting the meal, the diner lists it for resale. Gemini embeddings and Firestore vector search find people nearby who like similar food, and we notify them. The new buyer pays, and the original buyer is refunded automatically. That's a meal rescued — and we count every one." |
+| 1:20–1:55 | **My meals → Transfer → list for resale.** Switch to the second diner's phone: push notification arrives; tap; pay; first diner sees the refund as platform points | "Plans change. Instead of wasting the meal, the diner lists it for resale. Gemini embeddings and Firestore vector search find people nearby who like similar food, and we notify them. The new buyer pays, and the original buyer is refunded automatically as platform points. That's a meal rescued — and we count every one." |
 | 1:55–2:25 | **Vendor portal → Daily prep.** Show locked count, the "expected pickups" range, the prep list; ask a what-if question | "After the 20:00 cut-off, the vendor has an exact count and a ready-made prep and purchase list. The pickup range comes from statistics on past pickups, and Gemini explains it in plain words and answers what-if questions. AI advises; the vendor decides." |
 | 2:25–2:40 | **Pickup.** Diner shows QR; vendor scans with camera; "picked up". Briefly show the charity-meal tab | "At the counter, a signed QR code is scanned. Any meal still unclaimed becomes a free charity meal, so it still feeds someone." |
-| 2:40–3:00 | Architecture slide, then closing slide | "BunnBaa runs entirely on Google Cloud: Firebase Hosting, 71 Cloud Functions, Firestore with vector search, and Gemini for vision, function calling and embeddings. Cook what's ordered. Eat what's cooked." |
+| 2:40–3:00 | Architecture slide, then closing slide | "BunnBaa runs entirely on Google Cloud: Firebase Hosting, 74 Cloud Functions, Firestore with vector search, and Gemini for vision, function calling and embeddings. Cook what's ordered. Eat what's cooked." |
 
 Tips: record at 1080p, keep the browser zoomed so text is readable, cut waiting time (LINE Pay redirects, push delivery), and add English captions.
 
