@@ -12,8 +12,8 @@
 | A 問題陳述 | 0:00–0:20 | 小餐館先備料後接單、剩食與撲空 | 問題對齊（25%） |
 | B 解決方案與賽題 | 0:20–0:35 | 預付鎖定、越早越便宜；點名 Retail & Commerce 賽題 | 問題對齊、創新 |
 | C 實機操作：四個 Gemini 功能 | 0:35–2:15 | 拍照上架 → 預購助理 → 轉讓媒合 → 備料預測 | **技術（40%）**、使用者體驗（10%） |
-| D 架構與負責任 AI | 2:15–2:35 | 全 Google Cloud 架構圖；AI 只建議、金額由程式算 | 技術（40%）、創新（25%） |
-| E 擴展性與影響 | 2:35–3:00 | 上架成本趨近零、BigQuery／Vertex AI 路線、救回份數可量化 | 技術：可擴展性；影響 |
+| D 架構與負責任 AI | 2:15–2:30 | 全 Google Cloud 架構圖（Vertex AI、Cloud Run、BigQuery）；AI 只建議、金額由程式算 | 技術（40%）、創新（25%） |
+| E 數據、擴展性與影響 | 2:30–3:00 | Looker Studio 儀表板（預測 vs. 實際、救回份數）、BigQuery AI 預測與分群、上架成本趨近零 | 技術：可擴展性；影響 |
 
 **原則**
 - C 段佔一半以上時間，而且全部是**正式站實機操作**，不是投影片——評審要看「能跑的原型」。
@@ -72,23 +72,33 @@
 
 字卡：`Statistics compute the numbers · Gemini explains · Cloud Scheduler cut-off`
 
-### D　架構與負責任 AI（2:15–2:35）
+### D　架構與負責任 AI（2:15–2:30）
 
 畫面：投影片「Architecture」→「Responsible AI」。
 
-> Everything runs on Google Cloud: Firebase Hosting, seventy-four Cloud Functions on Cloud Run, Firestore with vector search, and Gemini for vision, tools and embeddings. Our rule: AI advises, code calculates, people decide. Gemini never touches prices or quantities.
+> Everything runs on Google Cloud: Firebase Hosting, seventy-four Cloud Functions on Cloud Run, Firestore vector search, and Gemini on Vertex AI. Our rule: AI advises, code calculates, people decide.
 
-### E　擴展性與影響（2:35–3:00）
+字卡：`Gemini on Vertex AI · Cloud Functions (2nd gen) on Cloud Run · Firestore · BigQuery`
 
-畫面：投影片「Impact」→「Scalability」→ 結尾頁（網址）。
+### E　數據、擴展性與影響（2:30–3:00）
 
-> A new vendor is one photo away, translation is automatic, and the stack is serverless, so BunnBaa can grow from one campus to every lunch district. Next, we stream Firestore to BigQuery for forecasting at scale. Cook what's ordered. Eat what's cooked.
+畫面：管理後台嵌入的 Looker Studio 儀表板（預測 vs. 實際、轉讓救回份數、愛心餐）→ 店家報表頁「預估明天 N 份（參考）」→ 結尾頁（網址）。
 
-> 如果 Vertex AI 遷移（`doc/GoogleCloud改動建議.md` 的 P0）在錄影前完成，D 段改成 “…and Gemini on Vertex AI for vision, tools and embeddings.”；E 段的 BigQuery 若已上線，改成 “Our data already streams to BigQuery…” 並秀一張 BigQuery 畫面。**沒做完就不要講成已完成。**
+> Every order streams into BigQuery. BigQuery AI forecasts each shop's next week and groups its customers, and Gemini describes each group in plain words. Looker Studio tracks forecast versus actual and every meal rescued. A new vendor is one photo away, so BunnBaa can grow to every lunch district. Cook what's ordered. Eat what's cooked.
+
+字卡：`BigQuery AI.FORECAST · ML.KMEANS · AI.GENERATE · Looker Studio`
 
 ---
 
 ## 3. 錄影前準備
+
+**本腳本、`Submission_EN.md` 與投影片都已寫成 `doc/GoogleCloud改動建議.md` 的 P0、P1 已完成。錄影前必須全部做完，否則 D、E 段與投影片第 9、11、14 頁要改回去：**
+- [ ] P0：`functions/src/gemini.js` 改走 Vertex AI（`@google/genai`，服務帳號、移除 `GEMINI_API_KEY`），embedding 仍是 768 維
+- [ ] P0：Stream Firestore to BigQuery extension（`locks`、`menu_items`、`vendors`、`payment_intents`）＋回填＋schema view
+- [ ] P1：補 60～90 天模擬資料、`AI.FORECAST` 預測寫回 Firestore、店家報表頁顯示「預估明天 N 份（參考）」
+- [ ] P1：`ML.KMEANS` 客群＋`AI.GENERATE` 每群一句描述
+- [ ] P1：Looker Studio 儀表板嵌入管理後台
+- [ ] README 環境變數段、`doc/ISMS_管理制度文件.md` 資料流同步更新
 
 - [ ] 正式站已部署最新 Functions、rules、indexes，並跑過一次 `backfillMenuEmbeddings`（C3 推播才會出現）
 - [ ] 帳號：店家 1、消費者 A（下單、轉讓）、消費者 B（接手；過去訂過類似菜色、常用地點在 10 公里內、今天還沒收過 2 則媒合通知）
