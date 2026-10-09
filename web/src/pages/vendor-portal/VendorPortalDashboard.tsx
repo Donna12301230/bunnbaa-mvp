@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
-import { ChefHat, ChevronRight, ClipboardList, ScanLine, ShoppingBasket, UtensilsCrossed } from "lucide-react";
+import { ChefHat, ChevronRight, ClipboardList, LayoutDashboard, ScanLine, ShoppingBasket, UtensilsCrossed } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
@@ -9,6 +9,7 @@ import { useRecipeGaps } from "@/components/RecipeGapCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import PortalPageHeader from "@/components/PortalPageHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyVendor } from "@/hooks/useMyVendor";
 import { dateLocale, tr } from "@/lib/i18n";
@@ -32,8 +33,8 @@ function Ring({ done, total }: { done: number; total: number }) {
   const pct = total > 0 ? done / total : 0;
   return (
     <svg viewBox="0 0 128 128" className="w-36 h-36 shrink-0" role="img" aria-label={tr(`已取 ${done} / ${total} 份`, `${done} of ${total} picked up`)}>
-      <circle cx="64" cy="64" r={r} fill="none" strokeWidth="14" className="stroke-stone-200" />
-      <circle cx="64" cy="64" r={r} fill="none" strokeWidth="14" strokeLinecap="round" className="stroke-green-500 transition-all" strokeDasharray={`${c * pct} ${c}`} transform="rotate(-90 64 64)" />
+      <circle cx="64" cy="64" r={r} fill="none" strokeWidth="14" className="stroke-border" />
+      <circle cx="64" cy="64" r={r} fill="none" strokeWidth="14" strokeLinecap="round" className="stroke-success transition-all" strokeDasharray={`${c * pct} ${c}`} transform="rotate(-90 64 64)" />
       <text x="64" y="62" textAnchor="middle" className="fill-foreground" style={{ fontSize: 30, fontWeight: 700 }}>{done}</text>
       <text x="64" y="84" textAnchor="middle" className="fill-muted-foreground" style={{ fontSize: 13 }}>/ {total} {tr("份", "")}</text>
     </svg>
@@ -44,10 +45,10 @@ function Ring({ done, total }: { done: number; total: number }) {
 function Shortcut({ href, icon, title, children, tone }: { href: string; icon: ReactNode; title: string; children: ReactNode; tone?: "warn" | "ok" }) {
   return (
     <Link href={href} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <Card className={cn("h-full border-2 transition-colors hover:bg-accent", tone === "warn" && "border-amber-300", tone === "ok" && "border-green-300")}>
+      <Card className={cn("h-full border-2 transition-colors hover:bg-accent", tone === "warn" && "border-warning/50", tone === "ok" && "border-success/40")}>
         <CardContent className="p-4 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="w-11 h-11 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center">{icon}</span>
+            <span className="w-11 h-11 rounded-xl bg-secondary text-accent-foreground flex items-center justify-center">{icon}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </div>
           <p className="text-sm font-semibold">{title}</p>
@@ -128,10 +129,11 @@ export default function VendorPortalDashboard() {
 
   return (
     <VendorPortalLayout>
-      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
-        <h1 className="font-heading text-3xl md:text-4xl font-semibold">{myVendor?.name ?? tr("總覽", "Overview")}</h1>
-        <p className="text-sm text-muted-foreground">{format(new Date(), tr("M 月 d 日 EEEE", "EEEE, MMM d"), { locale: dateLocale() })}</p>
-      </div>
+      <PortalPageHeader
+        icon={LayoutDashboard}
+        title={myVendor?.name ?? tr("總覽", "Overview")}
+        description={format(new Date(), tr("M 月 d 日 EEEE", "EEEE, MMM d"), { locale: dateLocale() })}
+      />
 
       {loadingLocks ? (
         <SkeletonBlocks count={2} height={180} className="grid md:grid-cols-3 gap-4 mb-6" />
@@ -154,8 +156,8 @@ export default function VendorPortalDashboard() {
                   <Ring done={todayDone} total={todayTotal} />
                   <div className="flex-1 min-w-[14rem] space-y-3">
                     <div className="flex gap-4 text-sm">
-                      <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-green-500" />{tr("已取", "Picked up")} <b className="text-lg">{todayDone}</b></span>
-                      <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-400" />{tr("待取", "Waiting")} <b className="text-lg">{todayPending}</b></span>
+                      <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-success-strong" />{tr("已取", "Picked up")} <b className="text-lg">{todayDone}</b></span>
+                      <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-warning" />{tr("待取", "Waiting")} <b className="text-lg">{todayPending}</b></span>
                     </div>
                     {todayWindows.map(([w, row]) => (
                       <div key={w} className="space-y-1">
@@ -163,8 +165,8 @@ export default function VendorPortalDashboard() {
                           <span className="font-mono font-semibold">{w}</span>
                           <span className="text-muted-foreground">{row.done} / {row.total}</span>
                         </div>
-                        <div className="flex h-3 overflow-hidden rounded-full bg-amber-400" role="img" aria-label={tr(`${w} 已取 ${row.done} / ${row.total}`, `${w}: ${row.done} of ${row.total}`)}>
-                          <div className="h-full bg-green-500 transition-all" style={{ width: `${(row.done / row.total) * 100}%` }} />
+                        <div className="flex h-3 overflow-hidden rounded-full bg-warning" role="img" aria-label={tr(`${w} 已取 ${row.done} / ${row.total}`, `${w}: ${row.done} of ${row.total}`)}>
+                          <div className="h-full bg-success-strong transition-all" style={{ width: `${(row.done / row.total) * 100}%` }} />
                         </div>
                       </div>
                     ))}
@@ -185,8 +187,8 @@ export default function VendorPortalDashboard() {
                   return (
                     <div key={d.date} className="flex-1 flex flex-col items-center gap-1 min-w-0">
                       <span className="text-[11px] font-semibold">{d.n || ""}</span>
-                      <div className="w-full flex flex-col justify-end h-20 rounded-sm bg-stone-100 overflow-hidden">
-                        <div className={cn("w-full", i === 0 ? "bg-orange-500" : "bg-orange-300")} style={{ height: `${(d.n / weekMax) * 100}%` }} />
+                      <div className="w-full flex flex-col justify-end h-20 rounded-sm bg-muted overflow-hidden">
+                        <div className={cn("w-full", i === 0 ? "bg-primary" : "bg-brand/50")} style={{ height: `${(d.n / weekMax) * 100}%` }} />
                       </div>
                       <span className={cn("text-[11px] leading-none", i === 0 ? "font-bold" : "text-muted-foreground")}>{i === 0 ? tr("今", "Today") : tr(WD[wd], ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][wd])}</span>
                     </div>
@@ -204,7 +206,7 @@ export default function VendorPortalDashboard() {
           {plan ? (
             <>
               <p className="text-2xl font-bold leading-none">{prepDone}<span className="text-sm font-normal text-muted-foreground"> / {prepTotal}</span></p>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-stone-200"><div className="h-full bg-green-500" style={{ width: `${prepTotal ? (prepDone / prepTotal) * 100 : 0}%` }} /></div>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-border"><div className="h-full bg-success-strong" style={{ width: `${prepTotal ? (prepDone / prepTotal) * 100 : 0}%` }} /></div>
             </>
           ) : <p className="text-sm text-muted-foreground">{todayTotal > 0 ? tr(`${todayTotal} 份，截單後開始`, `${todayTotal} meals`) : tr("今天沒有要做的", "Nothing today")}</p>}
         </Shortcut>
@@ -216,7 +218,7 @@ export default function VendorPortalDashboard() {
           {gaps.stats ? (
             <>
               <p className="text-2xl font-bold leading-none">{gaps.stats.ready.length}<span className="text-sm font-normal text-muted-foreground"> / {gaps.listed.length} {tr("道算得出成本", "with cost")}</span></p>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-stone-200"><div className="h-full bg-green-500" style={{ width: `${gaps.listed.length ? (gaps.stats.ready.length / gaps.listed.length) * 100 : 0}%` }} /></div>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-border"><div className="h-full bg-success-strong" style={{ width: `${gaps.listed.length ? (gaps.stats.ready.length / gaps.listed.length) * 100 : 0}%` }} /></div>
             </>
           ) : <p className="text-sm text-muted-foreground">—</p>}
         </Shortcut>

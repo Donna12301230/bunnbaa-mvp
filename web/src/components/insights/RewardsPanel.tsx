@@ -33,10 +33,10 @@ interface Period {
 }
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 const STATUS: Record<string, { zh: string; en: string; cls: string }> = {
-  pooled: { zh: "開獎中", en: "Draw open", cls: "bg-orange-500" },
-  carried: { zh: "未達門檻，結轉", en: "Carried over", cls: "bg-stone-300" },
-  closed: { zh: "已結束", en: "Closed", cls: "bg-green-500" },
-  paused: { zh: "暫停", en: "Paused", cls: "bg-stone-200" },
+  pooled: { zh: "開獎中", en: "Draw open", cls: "bg-primary" },
+  carried: { zh: "未達門檻，結轉", en: "Carried over", cls: "bg-input" },
+  closed: { zh: "已結束", en: "Closed", cls: "bg-success-strong" },
+  paused: { zh: "暫停", en: "Paused", cls: "bg-border" },
 };
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString()}`;
 
@@ -44,13 +44,14 @@ const nt = (n: number) => `NT$${Math.round(n).toLocaleString()}`;
  * 回饋券（規格 §8、§9.3、§9.4）：累積淨營業額滿 1 萬元時以其中 5% 生成回饋池，拆成折價券抽獎，人人有獎；券發出後規則不可變更。
  * 一眼看：流通中負債（大字）、距離開池進度、券的去向色條、本期各券種剩餘、每週回饋池長條；查詢、匯出、暫停收在「工具」。
  */
-export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number) => void }) {
+export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {
   const { data: vendor } = useMyVendor();
   const { data: config } = usePlatformConfig();
   const { toast } = useToast();
   const confirm = useConfirm();
   const [periods, setPeriods] = useState<Period[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [couponsLoaded, setCouponsLoaded] = useState(false);
   const [status, setStatus] = useState<RewardStatus | null>(null);
   const [lookup, setLookup] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,7 +62,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
   useEffect(() => {
     if (!vendorId) return;
     const u1 = onSnapshot(collection(db, "vendors", vendorId, "rewardPeriods"), (s) => setPeriods(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Period).sort((a, b) => b.id.localeCompare(a.id))), () => setPeriods([]));
-    const u2 = onSnapshot(query(collection(db, "coupons"), where("vendor_id", "==", vendorId)), (s) => setCoupons(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Coupon)), () => setCoupons([]));
+    const u2 = onSnapshot(query(collection(db, "coupons"), where("vendor_id", "==", vendorId)), (s) => { setCoupons(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Coupon)); setCouponsLoaded(true); }, () => { setCoupons([]); setCouponsLoaded(true); });
     const u3 = onSnapshot(doc(db, "rewardStatus", vendorId), (s) => setStatus(s.exists() ? ({ id: s.id, ...s.data() } as RewardStatus) : null), () => setStatus(null));
     return () => { u1(); u2(); u3(); };
   }, [vendorId]);
@@ -69,25 +70,30 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
   const current = periods.find((p) => p.status === "pooled") ?? periods.find((p) => p.status === "closed");
   const m = useMemo(() => {
     const sum = (list: Coupon[]) => list.reduce((s, c) => s + (c.discount || 0), 0);
+    // 取消換券的券（tier refund）不屬於回饋池：沒有 pool_period，不算「退回回饋池」，另外列出
     const owned = coupons.filter((c) => c.status === "owned");
+    const pool = coupons.filter((c) => c.tier !== "refund");
     const redeemed = coupons.filter((c) => c.status === "redeemed");
     const soon = owned.filter((c) => millis(c.expires_at) < Date.now() + 7 * 86400000);
     return {
       liability: sum(owned), ownedCount: owned.length,
+      refundLiability: sum(owned.filter((c) => c.tier === "refund")),
       redeemedAll: sum(redeemed), redeemedCount: redeemed.length,
       redeemedPeriod: sum(redeemed.filter((c) => c.pool_period === current?.id)),
-      returned: sum(coupons.filter((c) => c.status === "expired" || c.status === "unclaimed")) + periods.reduce((s, p) => s + (p.leftover || 0), 0),
+      returned: sum(pool.filter((c) => c.status === "expired" || c.status === "unclaimed")) + periods.reduce((s, p) => s + (p.leftover || 0), 0),
       expiringSoon: sum(soon), expiringCount: soon.length,
     };
   }, [coupons, periods, current?.id]);
-  useEffect(() => { onHeadline?.(m.liability); }, [m.liability]);
+  useEffect(() => { onHeadline?.(couponsLoaded ? m.liability : null); }, [m.liability, couponsLoaded]);
 
   const found = lookup.trim() ? coupons.filter((c) => c.id === lookup.trim() || c.lock_id === lookup.trim()) : [];
 
   function exportCsv() {
-    const rows = coupons.filter((c) => (!from || c.pool_period >= from) && (!to || c.pool_period <= to));
+    // 回饋池的券依期別篩；取消換券的券沒有期別，用發券日篩
+    const periodOf = (c: Coupon) => c.pool_period || (millis((c as { created_at?: unknown }).created_at) ? new Date(millis((c as { created_at?: unknown }).created_at)).toISOString().slice(0, 10) : "");
+    const rows = coupons.filter((c) => (!from || periodOf(c) >= from) && (!to || periodOf(c) <= to));
     const header = ["coupon_id", "pool_period", "tier", "discount", "status", "expires_at", "lock_id"];
-    const csv = [header, ...rows.map((c) => [c.id, c.pool_period, c.tier, c.discount, c.status, c.expires_at ? new Date(millis(c.expires_at)).toISOString() : "", c.lock_id ?? ""])]
+    const csv = [header, ...rows.map((c) => [c.id, c.pool_period ?? "", c.tier, c.discount, c.status, c.expires_at ? new Date(millis(c.expires_at)).toISOString() : "", c.lock_id ?? ""])]
       .map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -99,7 +105,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
 
   async function togglePause() {
     const paused = !vendor?.rewards_paused_from;
-    if (paused && !(await confirm({ title: tr("暫停參加下一期？", "Pause the next period?"), description: tr("需提前 7 天：從 7 天後的那一週起不再發抽獎券、不開池。已發出的券照常兌現。", "Takes effect from the week at least 7 days out. Issued coupons stay valid."), confirmLabel: tr("暫停", "Pause") }))) return;
+    if (paused && !(await confirm({ title: tr("暫停參加下一期？", "Pause the next period?"), description: tr("需提前 7 天：從 7 天後的那一週起不再發抽獎券、不開池。已發出的券照常兌現。", "Takes effect from the week at least 7 days out: no more draw tickets and no new pool from then on. Issued coupons stay valid."), confirmLabel: tr("暫停", "Pause") }))) return;
     setBusy(true);
     try {
       const res = await httpsCallable(functions, "setRewardPause")({ paused });
@@ -129,9 +135,9 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
   const revenueSoFar = status?.revenue_so_far ?? Math.max(0, minRevenue - (status?.amount_to_open ?? minRevenue));
   const preview = allocatePool(Math.floor(100000 * (config?.rewardRate ?? 0.05)), 800);
   const flow = [
-    { key: "redeemed", label: tr("已兌現", "Redeemed"), v: m.redeemedAll, cls: "bg-green-500" },
-    { key: "owned", label: tr("還在客人手上", "Outstanding"), v: m.liability, cls: "bg-orange-400" },
-    { key: "returned", label: tr("回到店家", "Returned"), v: m.returned, cls: "bg-stone-300" },
+    { key: "redeemed", label: tr("已兌現", "Redeemed"), v: m.redeemedAll, cls: "bg-success-strong" },
+    { key: "owned", label: tr("還在客人手上", "Outstanding"), v: m.liability, cls: "bg-brand" },
+    { key: "returned", label: tr("回到店家", "Returned"), v: m.returned, cls: "bg-input" },
   ];
   const flowTotal = Math.max(1, flow.reduce((s, x) => s + x.v, 0));
   const tickets = status?.tickets_so_far ?? 0;
@@ -146,11 +152,12 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
       </p>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <Card className="border-2 border-orange-300 bg-orange-50/60">
+        <Card className="border-2 border-brand/40 bg-accent/60">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">{tr("還在客人手上的券（潛在成本）", "Outstanding coupons (liability)")}</p>
-            <p className="text-3xl font-bold text-orange-700 tabular-nums">{nt(m.liability)}</p>
+            <p className="text-3xl font-bold text-accent-foreground tabular-nums">{nt(m.liability)}</p>
             <p className="text-xs text-muted-foreground">{tr(`${m.ownedCount} 張`, `${m.ownedCount} coupons`)}{m.expiringCount > 0 ? tr(`・7 天內到期 ${nt(m.expiringSoon)}`, ` · ${nt(m.expiringSoon)} expiring in 7 d`) : ""}</p>
+            {m.refundLiability > 0 && <p className="text-xs text-muted-foreground">{tr(`其中取消換券 ${nt(m.refundLiability)}（不屬於回饋池）`, `incl. ${nt(m.refundLiability)} from cancellations (not from the reward pool)`)}</p>}
           </CardContent>
         </Card>
         <Card className="border-2">
@@ -163,10 +170,10 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
         <Card className="border-2">
           <CardContent className="p-4 space-y-2">
             <p className="text-xs text-muted-foreground">{tr("下一池", "Next pool")}</p>
-            {status?.pool_open ? <p className="text-3xl font-bold text-orange-600">🎉 {tr("開獎中", "Open")}</p> : (
+            {status?.pool_open ? <p className="text-3xl font-bold text-accent-foreground">🎉 {tr("開獎中", "Open")}</p> : (
               <>
                 <p className="text-3xl font-bold tabular-nums">{nt(revenueSoFar)}<span className="text-base font-normal text-muted-foreground"> / {nt(minRevenue)}</span></p>
-                <div className="h-3 rounded-full bg-stone-200 overflow-hidden"><div className="h-full rounded-full bg-orange-400" style={{ width: `${Math.min(100, (revenueSoFar / Math.max(1, minRevenue)) * 100)}%` }} /></div>
+                <div className="h-3 rounded-full bg-border overflow-hidden"><div className="h-full rounded-full bg-brand" style={{ width: `${Math.min(100, (revenueSoFar / Math.max(1, minRevenue)) * 100)}%` }} /></div>
                 <p className="text-xs text-muted-foreground">{status && status.amount_to_open <= 0 ? tr(`已達標，下週一結算時開池・已發 ${tickets} 張抽獎券`, `Target reached — opens at Monday's settlement · ${tickets} tickets out`) : tr(`再賣 ${status?.amount_to_open ?? "—"} 元開池・已發 ${tickets} 張抽獎券`, `NT$${status?.amount_to_open ?? "—"} to open · ${tickets} tickets out`)}</p>
               </>
             )}
@@ -178,7 +185,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
       <Card className="border-2">
         <CardContent className="p-4 space-y-2">
           <p className="font-semibold">{tr("發出去的券後來怎麼了", "Where issued coupons went")}</p>
-          <div className="flex h-6 overflow-hidden rounded-lg bg-stone-100" role="img" aria-label={flow.map((x) => `${x.label} ${nt(x.v)}`).join("，")}>
+          <div className="flex h-6 overflow-hidden rounded-lg bg-muted" role="img" aria-label={flow.map((x) => `${x.label} ${nt(x.v)}`).join("，")}>
             {flow.filter((x) => x.v > 0).map((x) => <div key={x.key} className={cn("h-full", x.cls)} style={{ width: `${(x.v / flowTotal) * 100}%` }} title={`${x.label} ${nt(x.v)}`} />)}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -197,8 +204,8 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
                 const left = current.remaining?.[t.code] ?? 0;
                 return (
                   <div key={t.code} className="grid grid-cols-[5.5rem_1fr_auto] items-center gap-2 text-sm">
-                    <span className="truncate"><Ticket className="inline w-3.5 h-3.5 mr-1 text-orange-500" />{tierLabel(t.code)}</span>
-                    <div className="h-3 rounded-full bg-stone-100 overflow-hidden"><div className="h-full rounded-full bg-orange-400" style={{ width: `${(left / Math.max(1, total)) * 100}%` }} /></div>
+                    <span className="truncate"><Ticket className="inline w-3.5 h-3.5 mr-1 text-accent-foreground" />{tierLabel(t.code)}</span>
+                    <div className="h-3 rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full bg-brand" style={{ width: `${(left / Math.max(1, total)) * 100}%` }} /></div>
                     <span className="w-16 text-right tabular-nums text-muted-foreground">{left}/{total}</span>
                   </div>
                 );
@@ -214,8 +221,8 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
                 <div className="flex items-end gap-1.5 h-32" role="img" aria-label={chart.map((p) => `${p.id} ${nt(p.pool || 0)}`).join("，")}>
                   {chart.map((p) => (
                     <div key={p.id} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${p.id}：${nt(p.pool || 0)}・${p.status ? tr(STATUS[p.status]?.zh ?? p.status, STATUS[p.status]?.en ?? p.status) : tr("累積中", "Accumulating")}`}>
-                      <div className="w-full flex flex-col justify-end h-24 rounded-sm bg-stone-100 overflow-hidden">
-                        <div className={cn("w-full", STATUS[p.status ?? ""]?.cls ?? "bg-orange-200")} style={{ height: `${((p.pool || 0) / chartMax) * 100}%` }} />
+                      <div className="w-full flex flex-col justify-end h-24 rounded-sm bg-muted overflow-hidden">
+                        <div className={cn("w-full", STATUS[p.status ?? ""]?.cls ?? "bg-brand/30")} style={{ height: `${((p.pool || 0) / chartMax) * 100}%` }} />
                       </div>
                       <span className="text-[10px] text-muted-foreground leading-none">{p.id.slice(5).replace("-", "/")}</span>
                     </div>
@@ -235,7 +242,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
         <CardContent className="p-0">
           <button type="button" className="w-full flex items-center gap-1.5 px-4 py-3 text-left text-sm font-semibold" onClick={() => setTools((v) => !v)} aria-expanded={tools}>
             {tools ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}{tr("查詢單張券・匯出 CSV・暫停參加", "Look up · Export CSV · Pause")}
-            {vendor?.rewards_paused_from && <span className="ml-2 rounded-full bg-stone-200 px-2 py-0.5 text-xs">{tr(`${vendor.rewards_paused_from} 起暫停`, `Paused from ${vendor.rewards_paused_from}`)}</span>}
+            {vendor?.rewards_paused_from && <span className="ml-2 rounded-full bg-border px-2 py-0.5 text-xs">{tr(`${vendor.rewards_paused_from} 起暫停`, `Paused from ${vendor.rewards_paused_from}`)}</span>}
           </button>
           {tools && (
             <div className="grid gap-4 px-4 pb-4 md:grid-cols-2">

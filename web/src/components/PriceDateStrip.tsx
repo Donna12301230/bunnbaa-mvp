@@ -11,7 +11,7 @@ const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // 折扣顏色：95 折淡、8 折主色（之後加 7 折再加一色）
 function tierClasses(discountPercent: number, selected: boolean) {
   if (selected) return "bg-ink text-[var(--text-on-inverse)] border-ink";
-  if (discountPercent >= 20) return "bg-[#f29e0c]/15 text-foreground border-[#f29e0c]/60 hover:bg-[#f29e0c]/25";
+  if (discountPercent >= 20) return "bg-brand/15 text-foreground border-brand/60 hover:bg-brand/25";
   if (discountPercent > 0) return "bg-secondary text-foreground border-border hover:bg-secondary/70";
   return "bg-card text-foreground border-border";
 }

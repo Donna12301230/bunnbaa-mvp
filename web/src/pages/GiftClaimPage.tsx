@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatNT, formatPickupDate } from "@/lib/format";
 import { Link, useParams } from "wouter";
 import { doc, getDoc } from "firebase/firestore";
 import { Gift } from "lucide-react";
@@ -6,7 +7,7 @@ import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ds";
 import { db } from "@/lib/firebase";
-import { takeOverLock } from "@/lib/transfers";
+import { newShareToken, takeOverLock } from "@/lib/transfers";
 import { useAuth } from "@/hooks/useAuth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { useToast } from "@/hooks/use-toast";
@@ -38,8 +39,7 @@ export default function GiftClaimPage() {
     setBusy(true);
     try {
       // 換掉代領連結，原持有人手上的連結失效
-      const token = Array.from(crypto.getRandomValues(new Uint8Array(12))).map((b) => b.toString(16).padStart(2, "0")).join("");
-      await takeOverLock(lockId, user.id, { share_token: token });
+      await takeOverLock(lockId, user.id, { share_token: newShareToken() });
       setDone(true);
     } catch (err) {
       toast({ variant: "destructive", title: tr("接受贈送失敗", "Couldn't accept the gift"), description: (err as Error).message });
@@ -61,11 +61,11 @@ export default function GiftClaimPage() {
             <span className="bb-receipt__check" aria-hidden="true"><Gift className="w-9 h-9" /></span>
             <h1 className="font-heading font-semibold text-[clamp(30px,5vw,44px)] leading-tight">{tr("有同學送你一份便當", "A classmate gifted you a meal")}</h1>
             <p className="font-heading text-2xl font-semibold">{loc(lock, "item_name")}</p>
-            <p className="text-sm text-muted-foreground">{lock.pickup_date}・{lock.pickup_window}</p>
+            <p className="text-sm text-muted-foreground">{formatPickupDate(lock.pickup_date)} {lock.pickup_window}</p>
             {(lock.slots?.length ?? 0) > 0 && (
               <ul className="text-xs text-muted-foreground">{lock.slots!.map((s, i) => <li key={i}>• {slotText(s)}</li>)}</ul>
             )}
-            <Button className="w-full h-12 rounded-full text-base" disabled={busy || lock.buyer_uid === user?.id} onClick={accept}>
+            <Button className="w-full h-12 text-base" disabled={busy || lock.buyer_uid === user?.id} onClick={accept}>
               {busy ? tr("處理中…", "Working…") : lock.buyer_uid === user?.id ? tr("這是你送出的", "You sent this") : tr("接受贈送", "Accept gift")}
             </Button>
           </div>

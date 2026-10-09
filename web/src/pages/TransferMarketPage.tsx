@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatNT, formatPickupDate } from "@/lib/format";
 import { collection, doc, limit, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "@/lib/callable";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
-import { Clock, MapPin, UtensilsCrossed, Repeat } from "lucide-react";
+import { Clock, HeartHandshake, MapPin, UtensilsCrossed, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useWallet } from "@/hooks/useWallet";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db, functions } from "@/lib/firebase";
 import { isClean } from "@/lib/searchFilter";
-import { refundOnTakeover, resalePrice, takeOverLock } from "@/lib/transfers";
+import { isFreeTransfer, refundOnTakeover, resaleDeadlineOf, resalePrice } from "@/lib/transfers";
 import type { Lock } from "@/types";
 import { useVendors } from "@/hooks/useVendors";
 import { useItemImages } from "@/hooks/useItemImages";
@@ -22,8 +25,8 @@ import { Link, useLocation } from "wouter";
 // ConsumerLockPage.tsx 已驗證過的模式:
 //   - 「我要接手」＝付費接手（規格 §4.1）：createResaleLinePayReservation 保留 15 分鐘並導去
 //     LINE Pay，付款確認（confirmLinePayPayment）後換人，原付款人自動退款（functions/src/orders.js）
-//   - 「免費領取」是純 client-side 規則（firestore.rules：for_resale 且
-//     resale_deadline 已過，任何登入用戶可直接 updateDoc），不用排程
+//   - $0 的轉讓（自訂 0 元，或逾時開放免費領取）2026-10-09 起不放在這裡，
+//     改列在「附近愛心餐」分頁（components/FreeTransfersSection.tsx）
 //   - 列出所有商家的轉讓，只用 status 單一等值查詢（自動索引），排序交給前端，
 //     避免另外要求新的複合索引
 // 「取消轉讓」2026-09-22 補上 firestore.rules 規則（owner 可以把還沒被接手的
@@ -45,7 +48,7 @@ function formatCountdown(deadline: Date, now: number): string {
 
 // 1002 規格：導覽列的「轉讓・愛心餐」併入「我的餐點」，頁上方「轉讓市集」「附近愛心餐」分頁。
 // 放在我的餐點頁的「轉讓市集」分頁裡（1002 規格 §4.5）；愛心餐由我的餐點自己的分頁顯示。
-export default function TransferMarketPage() {
+export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => void }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [browseTab, setBrowseTab] = useState<"browse" | "mine">("browse");
@@ -57,6 +60,8 @@ export default function TransferMarketPage() {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [usePoints, setUsePoints] = useState(true);
+  const { balance: pointBalance } = useWallet();
   const { data: vendors = [] } = useVendors();
   const imageOf = useItemImages();
   const vendorName = (id: string) => loc(vendors.find((v) => v.id === id), "name");
@@ -116,10 +121,7 @@ export default function TransferMarketPage() {
     return () => clearInterval(interval);
   }, []);
 
-  function deadlineOf(lock: Lock): Date | null {
-    const ts = lock.resale_deadline as { toDate?: () => Date } | undefined;
-    return ts?.toDate ? ts.toDate() : null;
-  }
+  const deadlineOf = resaleDeadlineOf;
 
   // 不雅字詞當作沒輸入搜尋字串處理，不特別跳錯誤訊息。
   const searchLower = isClean(search) ? search.trim().toLowerCase() : "";
@@ -135,14 +137,9 @@ export default function TransferMarketPage() {
       ),
     [locks, uid, searchLower, area, vendors]
   );
-  const activeListings = forResale.filter((l) => {
-    const d = deadlineOf(l);
-    return !d || d.getTime() > now;
-  });
-  const expiredListings = forResale.filter((l) => {
-    const d = deadlineOf(l);
-    return d && d.getTime() <= now;
-  });
+  // $0（自訂 0 元或逾時開放免費）的不放市集，改列在「附近愛心餐」分頁（FreeTransfersSection）
+  const activeListings = forResale.filter((l) => !isFreeTransfer(l, now));
+  const freeCount = forResale.length - activeListings.length;
   const myListings = useMemo(
     () => locks.filter((l) => l.status === "for_resale" && l.buyer_uid === uid),
     [locks, uid]
@@ -153,26 +150,13 @@ export default function TransferMarketPage() {
     setClaimingId(lockId);
     try {
       const fn = httpsCallable(functions, "createResaleLinePayReservation");
-      const result = await fn({ lock_id: lockId });
+      const result = await fn({ lock_id: lockId, use_points: usePoints && pointBalance > 0 });
       const { order_id: orderId, payment_url: paymentUrl, free } = result.data as { order_id: string; payment_url: string; free?: boolean };
       // 付款完成後由確認頁（/payment/confirm）換人、退款給原付款人
       if (free) navigate(`/payment/confirm/${orderId}`);
       else window.location.href = paymentUrl;
     } catch (err) {
       toast({ title: tr("接手失敗", "Couldn't take it over"), description: (err as Error).message, variant: "destructive" });
-      setClaimingId(null);
-    }
-  }
-
-  async function handleClaimFree(lockId: string) {
-    if (!requireLogin() || !uid) return;
-    setClaimingId(lockId);
-    try {
-      await takeOverLock(lockId, uid, { locked_price: 0 });
-      toast({ title: tr("已免費領取", "Claimed for free"), description: tr("取餐編號可在「我的餐點」查看。", "Find the pickup code under My meals.") });
-    } catch (err) {
-      toast({ title: tr("領取失敗", "Couldn't claim it"), description: (err as Error).message, variant: "destructive" });
-    } finally {
       setClaimingId(null);
     }
   }
@@ -192,7 +176,7 @@ export default function TransferMarketPage() {
   return (
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground max-w-2xl">{tr("安全轉讓已鎖定的餐點，截單後也能轉；逾時沒人接手，系統會自動開放 $0 元供人領取。", "Pass locked meals between classmates, even after cutoff. If nobody takes one in time, anyone can claim it for $0.")}</p>
+          <p className="text-sm text-muted-foreground max-w-2xl">{tr("安全轉讓已鎖定的餐點，截單後也能轉；$0 與逾時沒人接手的餐點會移到「附近愛心餐」免費領取。", "Pass locked meals between classmates, even after cutoff. $0 meals and ones nobody took in time move to Charity meals nearby, free to claim.")}</p>
           <input
             type="search"
             value={search}
@@ -218,6 +202,12 @@ export default function TransferMarketPage() {
           <>
             <div className="flex items-center justify-between flex-wrap gap-3.5">
               <span className="text-sm text-muted-foreground font-semibold">{tr(`目前 ${activeListings.length} 筆轉讓中`, `${activeListings.length} available`)}</span>
+              {pointBalance > 0 && (
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={usePoints} onCheckedChange={(v) => setUsePoints(v === true)} />
+                  {tr(`接手時用平台點數折抵（可用 ${pointBalance} 點）`, `Use BunnBaa points when taking over (${pointBalance} available)`)}
+                </label>
+              )}
             </div>
 
             {activeListings.length === 0 ? (
@@ -227,7 +217,7 @@ export default function TransferMarketPage() {
                 {activeListings.map(item => {
                   const deadline = deadlineOf(item);
                   return (
-                    <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
+                    <article key={item.id} className="group rounded-card bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
                       <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
                         {imageOf(item) ? (
                         <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />
@@ -243,12 +233,12 @@ export default function TransferMarketPage() {
                       <div className="flex flex-col gap-2.5 p-5 flex-1">
                         <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
+                          <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{formatPickupDate(item.pickup_date)} · {item.pickup_window}
                         </div>
                         <div className="flex items-center justify-between mt-auto pt-1.5">
                           <span className="flex flex-col leading-tight">
                             <span className="text-micro text-muted-foreground">{tr("接手價", "Price")}</span>
-                            <span className="font-heading text-2xl font-semibold">${resalePrice(item)}</span>
+                            <span className="font-heading text-2xl font-semibold">NT${resalePrice(item)}</span>
                           </span>
                           <Button
                             size="sm"
@@ -265,51 +255,13 @@ export default function TransferMarketPage() {
               </div>
             )}
 
-            <div className="flex items-center gap-2.5 pt-2 flex-wrap">
-              <Clock className="w-5 h-5" />
-              <h2 className="font-heading text-2xl md:text-3xl font-semibold">{tr("已逾期・開放 $0 元領取", "Expired · free to claim")}</h2>
-              <span className="text-xs text-muted-foreground">{tr("取餐時段結束仍未被接手，系統自動開放給任何人免費領取，先到先得", "Not taken by the end of the pickup window, so anyone can claim it for free — first come, first served")}</span>
-            </div>
-
-            {expiredListings.length === 0 ? (
-              <EmptyState size="compact" icon={<Clock size={32} />} title={tr("目前沒有逾期的項目", "No expired items")} />
-            ) : (
-              /* 逾期清單常有幾十筆：用較密的格線，頁面不會拉得太長 */
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {expiredListings.map(item => (
-                  <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
-                    <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
-                      {imageOf(item) ? (
-                        <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />
-                      ) : (
-                        <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
-                      )}
-                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-[var(--surface-inverse)] text-[var(--text-on-inverse)]">
-                        {tr("已逾期・開放中", "Expired · open")}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-2.5 p-5 flex-1">
-                      <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
-                      </div>
-                      <div className="flex items-center justify-between mt-auto pt-1.5">
-                        <div>
-                          <span className="text-xs text-muted-foreground line-through mr-1.5">${resalePrice(item)}</span>
-                          <span className="font-heading text-2xl font-semibold">$0</span>
-                        </div>
-                        <Button
-                          size="sm"
-                          disabled={claimingId === item.id}
-                          onClick={() => handleClaimFree(item.id)}
-                        >
-                          {claimingId === item.id ? tr("處理中…", "Working…") : tr("免費領取", "Claim free")}
-                        </Button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
+            {freeCount > 0 && (
+              <p className="text-sm text-muted-foreground">
+                <HeartHandshake className="inline w-4 h-4 mr-1 -mt-0.5 text-charity" aria-hidden="true" />
+                {tr(`另有 ${freeCount} 份 $0 免費領取的餐點，放在`, `${freeCount} more meal(s) are free ($0) — see `)}
+                <button type="button" className="font-semibold text-primary underline underline-offset-2" onClick={onShowFree}>{tr("「附近愛心餐」", "Charity meals nearby")}</button>
+                {tr("分頁。", ".")}
+              </p>
             )}
           </>
         )}
@@ -328,31 +280,31 @@ export default function TransferMarketPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {myListings.map(item => (
-                  <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
+                  <article key={item.id} className="group rounded-card bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
                     <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
                       {imageOf(item) ? (
                         <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />
                       ) : (
                         <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
                       )}
-                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-[#f29e0c] text-[#2b180d]">
+                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-brand text-brand-foreground">
                         {tr("轉讓中", "Listed")}
                       </span>
                     </div>
                     <div className="flex flex-col gap-2.5 p-5 flex-1">
                       <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
+                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{formatPickupDate(item.pickup_date)} · {item.pickup_window}
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-1.5">
                         <span className="flex flex-col leading-tight">
-                          <span className="font-heading text-2xl font-semibold">${resalePrice(item)}</span>
-                          <span className="text-micro text-muted-foreground">{tr(`有人接手後退你 NT$${refundOnTakeover(item)}`, `NT$${refundOnTakeover(item)} back to you once taken`)}</span>
+                          <span className="font-heading text-2xl font-semibold">NT${resalePrice(item)}</span>
+                          <span className="text-micro text-muted-foreground">{tr(`有人接手後退你 ${refundOnTakeover(item)} 點`, `${refundOnTakeover(item)} points back to you once taken`)}</span>
                         </span>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-red-300 text-red-600 hover:bg-red-50"
+                          className="border-danger/40 text-danger-text hover:bg-danger-soft"
                           disabled={claimingId === item.id}
                           onClick={() => handleCancelListing(item.id)}
                         >
@@ -375,7 +327,7 @@ export default function TransferMarketPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {handedOver.map(item => (
-                  <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
+                  <article key={item.id} className="group rounded-card bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
                     <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
                       {imageOf(item) ? (
                         <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />
@@ -389,7 +341,7 @@ export default function TransferMarketPage() {
                     <div className="flex flex-col gap-2.5 p-5 flex-1">
                       <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
+                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{formatPickupDate(item.pickup_date)} · {item.pickup_window}
                       </div>
                     </div>
                   </article>

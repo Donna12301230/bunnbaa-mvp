@@ -56,7 +56,7 @@ async function resolveProfile(u: User): Promise<UserProfile> {
         vendorId = snap.docs[0].id;
       }
     } catch (err) {
-      console.error("查詢商家綁定失敗", err);
+      console.error("查詢店家綁定失敗", err);
     }
   }
 

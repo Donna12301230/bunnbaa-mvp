@@ -303,10 +303,17 @@ try { fin = req("finance.js").helpers; } catch (e) { fin = null; }
 test("V-FEE-01", "合作方案：不收月費，每份實付抽成 5%（逐份四捨五入）", () => {
   assert.equal(CFG.commissionRate, 0.05);
   assert.equal(CFG.maintenanceFee, undefined, "月費參數應已移除");
-  assert.equal(pricing.commissionOf([{ locked_price: 80 }, { locked_price: 90 }, { locked_price: 0 }], 0.05), 4 + 5);
-  assert.equal(pricing.commissionOf([{ locked_price: 110 }], 0.05), 6, "5.5 進位");
+  assert.equal(pricing.commissionOf([{ status: "fulfilled", locked_price: 80 }, { status: "charity", locked_price: 90 }, { status: "fulfilled", locked_price: 0 }], 0.05), 4 + 5);
+  assert.equal(pricing.commissionOf([{ status: "fulfilled", locked_price: 110 }], 0.05), 6, "5.5 進位");
   assert.equal(pricing.commissionOf([], 0.05), 0);
 });
+test("V-REV-07", "營收口徑＝撥款口徑：預付照實付（含未取餐）、取消換券算留下的款項、退成點數的不算", () => {
+  eq3(pricing.revenueOf({ status: "no_show", locked_price: 80 }), 80);
+  eq3(pricing.revenueOf({ status: "cancelled", cancel_reason: "customer", locked_price: 60, kept_amount: 60 }), 60);
+  eq3(pricing.revenueOf({ status: "cancelled", cancel_reason: "disaster", locked_price: 90, refunded_amount: 90 }), 0);
+  eq3(pricing.commissionOf([{ status: "cancelled", kept_amount: 60 }, { status: "cancelled", refunded_amount: 90, locked_price: 90 }], 0.05), 3);
+});
+function eq3(a, b) { assert.equal(a, b); }
 test("C-CXL-01", "取消期限：取餐時段開始前 48 小時；折價券＝原價（含加減項）30%，不超過實付", () => {
   const deadline = pricing.cancelDeadlineAt("2026-10-05", "11:00-11:30", CFG);
   assert.equal(deadline.toISOString(), new Date("2026-10-03T11:00:00+08:00").toISOString());
@@ -435,6 +442,30 @@ testAsync("C-AST-02", "卡片帶入可訂的日期與時段（品項頁預填要
 testAsync("F-16", "模型回不存在的品項／方案 id 被丟掉；設定壞掉的方案也不出卡", async () => {
   const cards = await assistant.buildCards({ menuItemIds: ["nope", "beef"], mealPlanIds: ["ghost", "bad", "p1"] }, astCatalog(), new Map(), "zh", CFG, NOW);
   assert.deepEqual(cards.map((c) => `${c.type}:${c.id}`), ["item:beef", "plan:p1"]);
+});
+
+testAsync("C-AST-18", "指定餐期：午餐查不到只供晚餐的品項；店家沒開晚餐時段，晚餐查不到任何品項", async () => {
+  const lunch = await astTools().searchMenuItems({ mealPeriod: "lunch" });
+  assert.ok(!lunch.items.some((i) => i.id === "dinner"), lunch.items.map((i) => i.id).join());
+  assert.ok(lunch.items.every((i) => i.meal_periods.includes("lunch")));
+  const dinner = await astTools().searchMenuItems({ mealPeriod: "dinner" });
+  assert.equal(dinner.count, 0);
+  const [d] = await assistant.checkDates(AST_ITEMS[0], AST_VENDOR, ["2026-10-01"], CFG, NOW, "dinner");
+  assert.equal(d.available, false);
+  assert.match(d.reason, /晚餐/);
+});
+testAsync("C-AST-19", "卡片最後把關：沒被搜尋工具回傳過的品項、含會員過敏原的品項都不出卡", async () => {
+  const seen = new Set(["beef", "soy"]);
+  const cards = await assistant.buildCards({ menuItemIds: ["burdock", "beef", "soy"] }, astCatalog(), new Map(), "zh", CFG, NOW, { seen, taste: { prefs: [], allergies: ["大豆"] } });
+  assert.deepEqual(cards.map((c) => c.id), ["beef"]);
+});
+test("V-CAL-05", "校準準確率與誤差由程式算（不經 LLM）：Σ取餐÷Σ鎖定、平均落差", () => {
+  const cal = req("vendorCalibration.js");
+  const st = cal.calibrationStats([{ locked_qty: 10, fulfilled_qty: 8 }, { locked_qty: 5, fulfilled_qty: 5 }, { locked_qty: 0, fulfilled_qty: 0 }]);
+  assert.equal(st.accuracy_rate, 0.867);
+  assert.equal(st.error_range, "±1 份");
+  assert.equal(st.max_gap, 2);
+  assert.equal(st.rounds, 2);
 });
 
 (async () => {

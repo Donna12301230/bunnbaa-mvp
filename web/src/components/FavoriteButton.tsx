@@ -1,6 +1,7 @@
 import { Heart } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,8 @@ export default function FavoriteButton({ vendorId, vendorName, className }: { ve
   const { toast } = useToast();
   const { t } = useI18n();
   const on = ids.has(vendorId);
+  // 廠商帳號沒有會員功能（2026-10-09），不顯示收藏
+  const { isVendor } = useAuth();
 
   async function onClick(e: React.MouseEvent) {
     e.preventDefault();
@@ -25,6 +28,7 @@ export default function FavoriteButton({ vendorId, vendorName, className }: { ve
     }
   }
 
+  if (isVendor) return null;
   return (
     <button
       type="button"
@@ -33,7 +37,7 @@ export default function FavoriteButton({ vendorId, vendorName, className }: { ve
       aria-label={on ? t(`從我的最愛移除 ${vendorName}`, `Remove ${vendorName} from favorites`) : t(`把 ${vendorName} 加入我的最愛`, `Save ${vendorName} to favorites`)}
       className={cn(
         "inline-flex items-center justify-center w-7 h-7 rounded-full border border-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        on ? "bg-red-50 text-red-500" : "bg-card text-muted-foreground hover:text-red-500",
+        on ? "bg-danger-soft text-danger-text" : "bg-card text-muted-foreground hover:text-danger-text",
         className
       )}
     >

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { policy } from "@/lib/policy";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, doc, getDocs, getDoc, query, where } from "firebase/firestore";
@@ -24,6 +25,7 @@ import { useSideWishes } from "@/hooks/useSideWishes";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
 import { getPreferredPickup, mealPeriodLabel, mealPeriodOf, priceDays, slotLabel, vendorCutoffTime, weekdayOf } from "@/lib/pickupSlots";
 import { notifyCartAdded } from "@/components/CartPreview";
+import DiscountExplanation from "@/components/DiscountExplanation";
 
 /** 下拉式選單一列（§4.2）：左邊是目前選的那道菜的小圖，右邊是原生下拉（手機上是系統選單） */
 function DishSelectRow({
@@ -239,8 +241,8 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     if (!canAdd || !vendor) return;
     if (cartVendorId && cartVendorId !== item!.vendor_id) {
       toast({
-        title: tr("購物車裡有別家商家的品項", "Your cart has items from another vendor"),
-        description: tr("一次只能跟一家商家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
+        title: tr("購物車裡有別家店家的品項", "Your cart has items from another vendor"),
+        description: tr("一次只能跟一家店家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
         variant: "destructive",
       });
       return;
@@ -250,7 +252,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
 
   function confirmAdd() {
     if (!canAdd || !vendor) return;
-    add({
+    const added = add({
       menuItem: item!, vendorId: item!.vendor_id, pickupDate: date, pickupWindow: window,
       choices: bento ? choices : [], rice: bento && item!.rice_component_id ? rice : "normal",
       mainIndex: (item!.mains || []).length > 0 ? mainIndex ?? 0 : null, extraSide: bento ? extra : null,
@@ -258,6 +260,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
       quantity: qty, note: note.trim(), couponId: null,
     });
     setConfirmOpen(false);
+    if (!added) return;
     notifyCartAdded();
     onAdded?.();
   }
@@ -285,18 +288,18 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               type="button"
               onClick={() => setImageOpen(true)}
               aria-label={tr("放大圖片", "Enlarge photo")}
-              className="block w-full rounded-[2rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-zoom-in"
+              className="block w-full rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-zoom-in"
             >
-              <img src={item.image} alt={loc(item, "name")} className="w-full aspect-[4/3] rounded-[2rem] border border-ink object-cover" />
+              <img src={item.image} alt={loc(item, "name")} className="w-full aspect-[4/3] rounded-card border border-ink object-cover" />
             </button>
           ) : (
-            <div className="w-full aspect-[4/3] rounded-[2rem] border border-ink bg-secondary flex items-center justify-center">
+            <div className="w-full aspect-[4/3] rounded-card border border-ink bg-secondary flex items-center justify-center">
               <UtensilsCrossed className="h-14 w-14 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
             </div>
           )}
           <div>
             <p className="text-sm font-semibold text-muted-foreground">
-              <Link href={`/vendor/${item.vendor_id}`} className="text-blue-600 underline underline-offset-4">{loc(vendor, "name")}</Link>
+              <Link href={`/vendor/${item.vendor_id}`} className="text-info-text underline underline-offset-4">{loc(vendor, "name")}</Link>
             </p>
             <h1 className="font-heading font-semibold text-[clamp(28px,3.6vw,46px)] leading-[1.08] tracking-[-0.02em] mb-2">{loc(item, "name")}</h1>
             <p className="text-muted-foreground leading-relaxed">{loc(item, "description")}</p>
@@ -305,10 +308,10 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               <div className="space-y-1.5 mt-2">
                 {item.dietary_tags?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {item.dietary_tags.map((tag) => <span key={tag} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">{tr(tag, tagEn(tag))}</span>)}
+                    {item.dietary_tags.map((tag) => <span key={tag} className="text-xs bg-success-soft text-success-text px-2 py-0.5 rounded-full">{tr(tag, tagEn(tag))}</span>)}
                   </div>
                 )}
-                {item.allergens?.length > 0 && <p className="text-xs text-red-700">{tr("含過敏原：", "Contains: ")}{item.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</p>}
+                {item.allergens?.length > 0 && <p className="text-xs text-danger-text">{tr("含過敏原：", "Contains: ")}{item.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</p>}
               </div>
             )}
           </div>
@@ -341,12 +344,12 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              {tr(`取餐前一天 ${vendorCutoffTime(vendor)} 截單，截單前可免費修改；取餐 48 小時前可取消換折價券（原價 30%）。`, `Orders close at ${vendorCutoffTime(vendor)} the day before; change for free until then, or cancel up to 48 hours before pickup for a coupon (30% of the price).`)}
+              {tr(`${policy.cutoff(vendor)}，截單前可免費修改；${policy.cancelShort()}。`, `${policy.cutoff(vendor).replace(/^o/, "O")}; change for free until then, or ${policy.cancelShort()}.`)}
             </p>
             {typhoon && (
-              <div className="flex gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
+              <div className="flex gap-2 rounded-lg bg-warning-soft border border-warning/50 p-2.5 text-xs text-warning-text">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
-                {tr("颱風警報期間：這天可能因停班停課取消，取消時會自動全額退款。", "Typhoon warning: this day may be cancelled for a work suspension — you'd get a full automatic refund.")}
+                {tr("颱風警報期間：這天可能因停班停課取消，取消時會自動全額退成平台點數。", "Typhoon warning: this day may be cancelled for a work suspension — you'd get a full automatic refund as BunnBaa points.")}
               </div>
             )}
           </section>
@@ -373,7 +376,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               {mains.length > 0 && (
                 <DishSelectRow label={tr("主菜", "Main")} image={main?.image_url}>
                   <Select aria-label={tr("主菜", "Main")} value={String(mainIndex ?? 0)} disabled={mains.length === 1} onChange={(e) => setMainIndex(Number(e.target.value))}>
-                    {mains.map((m, i) => <option key={i} value={i}>{m.name}{mains.length > 1 ? `（NT$ ${m.price}）` : ""}</option>)}
+                    {mains.map((m, i) => <option key={i} value={i}>{m.name}{mains.length > 1 ? `（NT$${m.price}）` : ""}</option>)}
                   </Select>
                 </DishSelectRow>
               )}
@@ -388,11 +391,11 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                     label={`${tr(`配菜 ${i + 1}`, `Side ${i + 1}`)}${slot.category ? `・${slot.category}` : ""}`}
                     image={picked?.image_url}
                     hint={wish ? (
-                      <p className="text-orange-700">
+                      <p className="text-accent-foreground">
                         {tr(`許願中：截單時滿 ${wish.min} 人才成立；未成立${extra?.mode === "backup" ? "換成備案" : `換回「${slot.default.name}」`}，訂單照常成立。`,
                           `Wish: needs ${wish.min} people by cutoff; otherwise ${extra?.mode === "backup" ? "your backup" : slot.default.name} is used.`)}
                       </p>
-                    ) : choice === "none" ? <p className="text-orange-700">{tr(`這道不要（−${removePrice}）`, `Skipped (−${removePrice})`)}</p> : null}
+                    ) : choice === "none" ? <p className="text-accent-foreground">{tr(`這道不要（−${removePrice}）`, `Skipped (−${removePrice})`)}</p> : null}
                   >
                     <Select aria-label={tr(`配菜 ${i + 1}`, `Side ${i + 1}`)} value={String(choice)} onChange={(e) => pickSide(i, e.target.value === "default" || e.target.value === "none" ? e.target.value : Number(e.target.value))}>
                       <option value="default">{slot.default.name}{tr("（預設）", " (default)")}</option>
@@ -466,7 +469,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                 ))}
                 <span className="font-semibold text-muted-foreground" aria-hidden="true">→</span>
                 <span className="inline-flex items-center rounded-lg border-2 border-ink bg-ink text-[var(--text-on-inverse)] px-2.5 py-1.5 font-semibold">
-                  {loc(item, "name")}{breakdown ? `・NT$ ${breakdown.total}` : ""}
+                  {loc(item, "name")}{breakdown ? `・NT$${breakdown.total}` : ""}
                 </span>
               </div>
               {extra?.mode === "backup" && extraOpt && <p className="text-xs text-muted-foreground">{tr(`備案：${extraOpt.name}（前面許願沒成立才遞補）`, `Backup: ${extraOpt.name} (only if a wish fails)`)}</p>}
@@ -485,11 +488,12 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                 <p className="font-semibold">{tr("金額拆解", "Price breakdown")}</p>
                 <dl className="space-y-1 pt-2 border-t border-border">
                   <div className="flex justify-between"><dt className="text-muted-foreground">{tr("原價", "Price")}</dt><dd>NT${breakdown.listPrice}</dd></div>
-                  {breakdown.earlyBird > 0 && <div className="flex justify-between text-green-700"><dt>{tr(`早鳥 ${discountText(breakdown.discountPercent)}`, `Early bird ${discountText(breakdown.discountPercent)}`)}</dt><dd>−NT${breakdown.earlyBird}</dd></div>}
+                  {breakdown.earlyBird > 0 && <div className="flex justify-between text-success-text"><dt>{tr(`早鳥 ${discountText(breakdown.discountPercent)}`, `Early bird ${discountText(breakdown.discountPercent)}`)}</dt><dd>−NT${breakdown.earlyBird}</dd></div>}
                   {breakdown.adjust !== 0 && <div className="flex justify-between"><dt className="text-muted-foreground">{tr("加減選項", "Adjustments")}</dt><dd>{breakdown.adjust > 0 ? "+" : "−"}NT${Math.abs(breakdown.adjust)}</dd></div>}
                   <div className="flex justify-between font-bold"><dt>{tr("應付（每份）", "Total (each)")}</dt><dd>NT${breakdown.total}</dd></div>
                 </dl>
                 <p className="text-xs text-muted-foreground">{tr("有折價券可在購物車套用（每筆限一張）。", "Apply a coupon in your cart (one per meal).")}</p>
+                {breakdown.discountPercent > 0 && <DiscountExplanation vendorId={item.vendor_id} discountPercent={breakdown.discountPercent} />}
               </div>
             )}
             <div className="flex items-center justify-between gap-3">
@@ -500,7 +504,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                 className="min-w-0 text-left rounded-xl px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="flex items-center gap-1 font-heading text-xl font-semibold">
-                  {tr("合計", "Total")} NT$ {breakdown ? breakdown.total * qty : "—"}
+                  {tr("合計", "Total")} NT${breakdown ? breakdown.total * qty : "—"}
                   <ChevronUp className={cn("w-4 h-4 transition-transform", !showMaterials && "rotate-180")} aria-hidden="true" />
                 </span>
                 <span className="block text-xs text-muted-foreground truncate">
@@ -508,15 +512,15 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                 </span>
               </button>
               <div className="flex items-center gap-2 shrink-0">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" aria-label={tr("減少數量", "Decrease quantity")} onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus /></Button>
+                <Button variant="outline" size="icon" className="h-10 w-10" aria-label={tr("減少數量", "Decrease quantity")} onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus /></Button>
                 <span className="w-5 text-center font-medium bb-num" aria-live="polite">{qty}</span>
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" aria-label={tr("增加數量", "Increase quantity")} onClick={() => setQty((q) => Math.min(20, q + 1))}><Plus /></Button>
-                <Button onClick={openConfirm} disabled={!canAdd} className="h-12 px-5 rounded-full text-base">
+                <Button variant="outline" size="icon" className="h-10 w-10" aria-label={tr("增加數量", "Increase quantity")} onClick={() => setQty((q) => Math.min(20, q + 1))}><Plus /></Button>
+                <Button onClick={openConfirm} disabled={!canAdd} className="h-12 px-5 text-base">
                   <ShoppingCart /> {tr("加入購物車", "Add to cart")}
                 </Button>
               </div>
             </div>
-            {problem && date && <p className="text-xs text-red-600 text-right">{problem}</p>}
+            {problem && date && <p className="text-xs text-danger-text text-right">{problem}</p>}
           </div>
         </div>
       </div>
@@ -586,7 +590,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={() => setConfirmOpen(false)} className="h-11 rounded-full">{tr("再改改", "Edit")}</Button>
-            <Button onClick={confirmAdd} disabled={!canAdd} className="h-11 rounded-full"><ShoppingCart /> {tr("確認加入", "Confirm")}</Button>
+            <Button onClick={confirmAdd} disabled={!canAdd} className="h-11"><ShoppingCart /> {tr("確認加入", "Confirm")}</Button>
           </div>
         </DialogContent>
       </Dialog>

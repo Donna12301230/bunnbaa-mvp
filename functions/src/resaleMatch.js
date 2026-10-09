@@ -10,6 +10,7 @@
 // 依品項相似度、同一家店、取餐時段相近、常用地點距離加權排序 → 取前幾名推播。
 // 排除：轉讓者本人、曾經持有這份的人、當天已經有訂這家店的人、關掉這類通知的人、
 // 今天已收過 2 則媒合通知的人。
+const crypto = require("crypto");
 const { onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const {
   REGION, db, onCall, logger, FieldValue, assertAdminOrEmulator, notifyUser, countyOf, distanceMeters, decodeGeohash,
@@ -231,6 +232,12 @@ async function matchResale(lockId, lock) {
 exports.matchResaleLock = onDocumentUpdated({ document: "locks/{lockId}", region: REGION }, async (event) => {
   const before = event.data.before.data();
   const after = event.data.after.data();
+  // 取消轉讓／取消贈送（同一個人收回）：上架期間 lock 公開可讀、share_token 可能被看過，換一組新的，
+  // 舊代領連結與代領碼（proxyCodes 記的是舊 token）一起失效（orders.js issuePickupQr）
+  if (["for_resale", "for_gift"].includes(before.status) && after.status === "locked" && before.buyer_uid === after.buyer_uid && after.share_token) {
+    await event.data.after.ref.update({ share_token: crypto.randomBytes(12).toString("hex") }).catch((err) => logger.error("Rotate share_token failed", err));
+    return;
+  }
   if (before.status === "for_resale" || after.status !== "for_resale") return;
   try {
     const result = await matchResale(event.params.lockId, after);

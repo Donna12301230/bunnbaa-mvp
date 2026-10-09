@@ -17,7 +17,7 @@ BunnBaa 本身已經回應了題目中的需求預測與庫存：消費者先付
 3. **救餐**：有人無法取餐時，AI 把這份餐媒合給可能想接手的人
 4. **校準**：實際取餐結果回到商家端，變成下一輪的備料參考區間
 
-**負責任 AI 原則（沿用現有設計）**：AI 不輸出決策指令，輸出固定帶 `disclaimer` 欄位，最後由人決定。AI 不幫消費者下單，也不替商家決定備貨量；價格一律由伺服器重算。這直接回答「AI 建議錯了誰負責」，要放進 Proposal 的 Responsible AI 段落。
+**負責任 AI 原則（沿用現有設計）**：AI 不輸出決策指令，輸出固定帶 `disclaimer` 欄位，最後由人決定。AI 不幫消費者下單，也不替商家決定備貨量；價格一律由伺服器重算；**任何數字（價格、份量、準確率）都由程式計算，模型只負責說明給它的數字**。這直接回答「AI 建議錯了誰負責」，要放進 Proposal 的 Responsible AI 段落。
 
 ## AI 功能總覽
 
@@ -78,7 +78,7 @@ BunnBaa 本身已經回應了題目中的需求預測與庫存：消費者先付
 
 - 辨識模式：低價搶早鳥再高價轉讓、同一手機多個帳號、贈送來回互轉
 - Gemini 為每個案件寫摘要，由管理員判斷；`ban_appeals` 先自動整理，再交管理員核准
-- 現有「未取餐 2 次自動封鎖」可當作第一版規則
+- （舊制「未取餐 2 次自動封鎖」已取消，未取餐改轉愛心餐；異常偵測目前是 `detectAnomalies` 規則版）
 
 ## 架構、可行性與可擴展性
 
@@ -94,7 +94,7 @@ flowchart LR
   subgraph CF["Cloud Functions（asia-east1）"]
     subgraph OLD["既有"]
       F1["校準報告<br/>dailyCalibration"]
-      F2["折扣說明<br/>onLockCreated"]
+      F2["折扣說明<br/>getDiscountExplanation"]
       F3["自動翻譯<br/>觸發器寫入 *_en"]
     end
     subgraph NEW["新增（Demo 前）"]
@@ -152,3 +152,19 @@ flowchart LR
 - **影響指標**：`resale_matches/{lockId}` 記下通知了誰；付費接手（`confirmLinePayPayment` 確認）時，若接手者是被通知的會員，會記 `claimed_by_match: true`，可算出「媒合救回的份數」。逾時免費領取走前端規則，不會記到
 - **預測區間**：過去 60 天、每天至少 3 份的日子算取餐率；同星期幾的資料滿 4 天就只用同星期幾。8 天以上取 10%／90% 分位數，不到 8 天用平均 ± 1.28 標準差
 - **部署**：`firebase deploy --only firestore:indexes,firestore:rules,functions`（含 `menu_embeddings` 向量索引），再由管理員呼叫一次 `backfillMenuEmbeddings`，為既有品項補算向量
+
+## 2026-10-09 全面審視與修正
+
+目前實際上線的 AI 共 9 項：拍照上架、預購助理、轉讓媒合、預估取餐區間（純統計）、校準報告與 what-if、折扣說明、配方草稿／AI 一次補完、菜名歸類、自動翻譯。審視後修正四個與負責任 AI 原則不符或浪費額度的地方：
+
+| # | 問題 | 修正 |
+| --- | --- | --- |
+| 1 | AI 一次補完的配方份量（克數）未經店家確認，就直接進今日備料、每週叫貨單（LINE 傳給供應商）、材料成本與淨利 | `AiDraftWarning`：今日備料、採購叫貨頁上方列出還是 AI 草稿的半成品；傳 LINE 叫貨前先問「照樣傳送／先去確認」；淨利圖下方提醒成本可能不準。店家在配方頁儲存就算確認 |
+| 2 | 校準報告的 `accuracy_rate`、`error_range` 由 Gemini 計算，而準確率決定消費者看到的「穩定」徽章 | `vendorCalibration.calibrationStats` 用程式算（Σ取餐÷Σ鎖定、平均落差），Gemini 只拿算好的數字寫說明與模式；Gemini 失敗時照樣寫入數字。what-if 追問改成只回答問題（`answerCalibrationScenario`），不重產整份報告 |
+| 3 | 折扣說明在每筆訂單建立後（`onLockCreated`）呼叫 Gemini＋翻譯，但沒有任何畫面顯示，內容也還是舊規則 | 移除 `onLockCreated`；改成品項頁金額明細裡的 `getDiscountExplanation`，下單前顯示，規則（截單、取消換券比例、轉讓／代領／愛心餐）由平台參數帶入，依「折扣級距 × 店家穩定度」快取，中英文一次產生 |
+| 4 | 預購助理只知道「週一至週五午餐」，卡片沒有最後的過敏原把關 | 工具加 `mealPeriod`（早／午／晚），提示詞改成依平台參數；卡片只接受這一輪搜尋工具回傳過的品項，並再濾一次會員過敏原 |
+
+其他：拍照上架的過敏原是依品名推測，風險在漏標，表單已要求店主逐項確認（Proposal 的 Responsible AI 段落要寫明）。
+
+部署注意：`firebase deploy --only functions` 會要求刪除已移除的 `onLockCreated`，確認刪除即可（非互動環境加 `--force`）。
+

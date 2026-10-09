@@ -12,7 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/ds";
-import { Store } from "lucide-react";
+import { Settings, Store } from "lucide-react";
+import PortalPageHeader from "@/components/PortalPageHeader";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 // 認證商家徽章：vendors collection 原本只有 reliability_tone（履約穩定度，系統
 // 自動算），沒有「認證商家」欄位——這是平台審核後手動認證的標記，所以放在管理員
@@ -20,7 +22,7 @@ import { Store } from "lucide-react";
 // 另外改規則），不是商家自己能勾選的。
 function VendorVerificationCard() {
   const { toast } = useToast();
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendors, setVendors] = useState<Vendor[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,17 +45,19 @@ function VendorVerificationCard() {
 
   return (
     <Card className="p-5">
-      <h3 className="font-semibold mb-2">{tr("認證商家", "Verified vendors")}</h3>
+      <h3 className="font-semibold mb-2">{tr("認證店家", "Verified vendors")}</h3>
       <p className="text-sm text-muted-foreground mb-3">{tr("平台審核後手動認證，跟系統自動算的「履約穩定度」是兩件事。", "Set manually after platform review — separate from the automatically calculated reliability.")}</p>
-      {vendors.length === 0 ? (
-        <EmptyState size="compact" icon={<Store size={32} />} title={tr("目前沒有商家資料", "No vendors yet")} />
+      {vendors === null ? (
+        <SkeletonBlocks count={3} height={36} className="space-y-2" />
+      ) : vendors.length === 0 ? (
+        <EmptyState size="compact" icon={<Store size={32} />} title={tr("目前沒有店家資料", "No vendors yet")} />
       ) : (
         <div className="space-y-2">
           {vendors.map((vendor) => (
             <div key={vendor.id} className="flex items-center justify-between gap-3 py-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">{vendor.name}</span>
-                {vendor.verified && <Badge className="bg-orange-100 text-orange-700 border-0">{tr("已認證", "Verified")}</Badge>}
+                {vendor.verified && <Badge className="bg-secondary text-accent-foreground border-0">{tr("已認證", "Verified")}</Badge>}
               </div>
               <Button
                 size="sm"
@@ -61,7 +65,7 @@ function VendorVerificationCard() {
                 disabled={busyId === vendor.id}
                 onClick={() => toggleVerified(vendor)}
               >
-                {vendor.verified ? tr("取消認證", "Remove verification") : tr("設為認證商家", "Mark as verified")}
+                {vendor.verified ? tr("取消認證", "Remove verification") : tr("設為認證店家", "Mark as verified")}
               </Button>
             </div>
           ))}
@@ -129,14 +133,14 @@ function SettingsContent() {
         <h3 className="font-semibold mb-2">{tr("權限管理方式（MVP 過渡做法）", "How admin access works (MVP interim)")}</h3>
         <p className="text-sm text-muted-foreground mb-2">
           {tr("管理員名單目前寫死在三處：", "The admin list is currently hard-coded in three places: ")}
-          <code className="bg-orange-50 text-orange-700 px-1 rounded">firestore.rules</code> <code className="bg-orange-50 text-orange-700 px-1 rounded">isAdmin()</code>,{" "}
-          <code className="bg-orange-50 text-orange-700 px-1 rounded">web/src/lib/adminAuth.ts</code>,{" "}
-          <code className="bg-orange-50 text-orange-700 px-1 rounded">functions/src/index.js</code> <code className="bg-orange-50 text-orange-700 px-1 rounded">ADMIN_EMAILS</code>.
+          <code className="bg-accent text-accent-foreground px-1 rounded">firestore.rules</code> <code className="bg-accent text-accent-foreground px-1 rounded">isAdmin()</code>,{" "}
+          <code className="bg-accent text-accent-foreground px-1 rounded">web/src/lib/adminAuth.ts</code>,{" "}
+          <code className="bg-accent text-accent-foreground px-1 rounded">functions/src/index.js</code> <code className="bg-accent text-accent-foreground px-1 rounded">ADMIN_EMAILS</code>.
           {tr("要新增／移除管理員：", " To add or remove an admin:")}
         </p>
         <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1 mb-2">
           <li>{tr("同時修改這三個檔案裡的 email 清單", "Update the email list in all three files")}</li>
-          <li>{tr("執行", "Run")} <code className="bg-orange-50 text-orange-700 px-1 rounded">firebase deploy --only firestore:rules,functions</code> {tr("讓權限變更生效", "to apply the change")}</li>
+          <li>{tr("執行", "Run")} <code className="bg-accent text-accent-foreground px-1 rounded">firebase deploy --only firestore:rules,functions</code> {tr("讓權限變更生效", "to apply the change")}</li>
           <li>{tr("重新部署前端（Hosting）讓這頁顯示的清單同步", "Redeploy the front end (Hosting) so this page shows the new list")}</li>
         </ol>
         <p className="text-xs text-muted-foreground italic">
@@ -150,7 +154,7 @@ function SettingsContent() {
 export default function AdminSettingsPage() {
   return (
     <AdminLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("系統設定", "Settings")}</h1>
+      <PortalPageHeader icon={Settings} title={tr("系統設定", "Settings")} />
       <RequireRealAdmin>
         <SettingsContent />
       </RequireRealAdmin>

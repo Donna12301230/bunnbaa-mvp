@@ -1,67 +1,72 @@
 import { tr } from "@/lib/i18n";
+import { liveConfig } from "@/lib/platformConfig";
+import { policy } from "@/lib/policy";
 import { Plus } from "lucide-react";
 import CustomerLayout from "@/components/CustomerLayout";
 import PageHero from "@/components/PageHero";
 import { Link } from "wouter";
 
-const FAQS = [
-  {
-    q: tr("要怎麼預購餐點？", "How do I pre-order a meal?"),
-    a: tr(
-      "在「預購餐點」選早餐／午餐／晚餐與單點或方案，點便當後在價格日期列選取餐日（最遠 30 天），點圖片選主菜、配菜（候選菜點了就是許願）與飯量，加入購物車後用 LINE Pay 結帳。取餐前一天 20:00 截單，截單前可修改或取消。",
-      "Go to Pre-order, pick a meal and a bento, then choose the pickup day (up to 30 days ahead), main, sides (tapping a candidate is a wish) and rice. Check out with LINE Pay. Orders close at 20:00 the day before."
-    ),
-  },
-  {
-    q: tr("早鳥折扣怎麼算？", "How does the early-bird discount work?"),
-    a: tr(
-      "越早訂，越開心：訂明天的 95 折，提前 2 天以上 8 折（最遠 30 天）。白飯一碗半 +10、半碗 −5、配菜少一道 −5、第四道加菜 +10（設為備案不加價），直接反映在金額上。",
-      "Book early, save more: 5% off for tomorrow, 20% off 2+ days ahead (up to 30 days). 1.5 bowls of rice +10, half a bowl −5, one fewer side −5, a 4th add-on side +10 (free as a backup)."
-    ),
-  },
-  {
-    q: tr("臨時去不了怎麼辦？", "What if I can't make it after ordering?"),
-    a: tr(
-      "取餐 48 小時前可以到「我的餐點」取消：不退現金，會換成一張同店家的折價券（原價的 30%，30 天內有效）。來不及取消的話，可以轉讓、贈送、分享代領連結，或在取餐當天按「捐為愛心餐」。",
-      "Up to 48 hours before pickup you can cancel from My meals: there's no cash refund, but you get a coupon for the same vendor worth 30% of the list price, valid for 30 days. After that you can transfer, gift, share a proxy pickup link, or donate it as a charity meal on the day."
-    ),
-  },
-  {
-    q: tr("沒去取餐會怎樣？", "What happens if I don't show up to pick up my order?"),
-    a: tr(
-      "取餐時段結束 30 分鐘後仍未取餐，便當會轉為愛心餐，開放給需要的人領取。不退款，但這筆訂單的抽獎券照常發放。",
-      "Meals not picked up 30 minutes after the window become charity meals for people in need. There's no refund, but your reward tickets are still issued."
-    ),
-  },
-  {
-    q: tr("店家沒有出餐怎麼辦？", "What if the vendor doesn't serve my order?"),
-    a: tr(
-      "請到「聯絡客服」回報，平台會跟店家確認並協助處理。颱風、停班停課時，當天的訂單會自動取消並全額退款。",
-      "Let us know via Contact us — we'll check with the vendor and help sort it out. On typhoon or work-suspension days, that day's orders are cancelled and fully refunded automatically."
-    ),
-  },
-  {
-    q: tr("可以用什麼方式付款？", "What payment methods are supported?"),
-    a: tr(
-      "目前透過 LINE Pay 付款，結帳時會導到 LINE Pay 完成付款再回到平台。",
-      "Payment is handled through LINE Pay — checkout redirects you to LINE Pay to complete payment, then brings you back to BunnBaa."
-    ),
-  },
-  {
-    q: tr("取餐前會有提醒嗎？", "Will I get a reminder before pickup?"),
-    a: tr(
-      "會，取餐時段結束前 30 分鐘還沒取餐會提醒你；許願未成立、停班停課退款、抽獎開池也會通知（右上角鈴鐺）。",
-      "Yes — we remind you 30 minutes before the pickup window ends, and notify you about wishes, work-suspension refunds and reward draws (see the bell icon)."
-    ),
-  },
-  {
-    q: tr("怎麼成為合作店家？", "How can my store become a partner?"),
-    a: tr(
-      "到「加入我們」頁面看合作方式，或直接在登入頁的「廠商申請」分頁送出申請，管理員審核通過後就能使用商家後台。",
-      "See the Join us page for details, or go straight to the Vendors tab on the sign-in page to apply. Once an admin approves your application, you'll get access to the vendor portal."
-    ),
-  },
-];
+// 規則數字一律從 lib/policy.ts（平台參數）來；寫成函式，切換語言時才會重新產生
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const faqs = () => {
+  const c = liveConfig();
+  return [
+    {
+      q: tr("要怎麼預購餐點？", "How do I pre-order a meal?"),
+      a: tr(
+        `在「預購餐點」選早餐／午餐／晚餐與單點或方案，點便當後在價格日期列選取餐日（${policy.bookingRange()}），點圖片選主菜、配菜（候選菜點了就是許願）與飯量，加入購物車後用 LINE Pay 結帳（有平台點數可以先折抵）。${policy.cutoff()}，截單前可以修改。`,
+        `Go to Pre-order, pick a meal and a bento, then choose the pickup day (${policy.bookingRange()}), main, sides (tapping a candidate is a wish) and rice. Check out with LINE Pay (BunnBaa points are applied first if you have any). ${cap(policy.cutoff())}; you can change your order until then.`
+      ),
+    },
+    {
+      q: tr("早鳥折扣怎麼算？", "How does the early-bird discount work?"),
+      a: tr(
+        `越早訂，越開心：${policy.earlyBird()}（${policy.bookingRange()}）。白飯一碗半 +${c.riceAddPrice}、半碗 ${c.riceLessPrice}、配菜少一道 ${c.slotRemovePrice}、第四道加菜 +${c.addonSidePrice}（設為備案不加價），直接反映在金額上。`,
+        `Book early, save more: ${policy.earlyBird()} (${policy.bookingRange()}). 1.5 bowls of rice +${c.riceAddPrice}, half a bowl ${c.riceLessPrice}, one fewer side ${c.slotRemovePrice}, a 4th add-on side +${c.addonSidePrice} (free as a backup).`
+      ),
+    },
+    {
+      q: tr("臨時去不了怎麼辦？", "What if I can't make it after ordering?"),
+      a: tr(
+        `${policy.cancel()}，到「我的餐點」按「取消換券」。來不及取消的話，可以轉讓、贈送、請朋友代領（給他代領碼），或在取餐當天按「捐為愛心餐」。`,
+        `${cap(policy.cancel())} — tap Cancel in My meals. After that you can transfer or gift it, ask a friend to pick it up (give them your proxy code), or donate it as a charity meal on the day.`
+      ),
+    },
+    {
+      q: tr("沒去取餐會怎樣？", "What happens if I don't show up to pick up my order?"),
+      a: tr(`${policy.noShow()}，開放給需要的人領取。`, `${cap(policy.noShow())}, open to people in need.`),
+    },
+    {
+      q: tr("退款會退到哪裡？", "Where do refunds go?"),
+      a: tr(`${policy.refunds()}。`, `${cap(policy.refunds())}.`),
+    },
+    {
+      q: tr("店家沒有出餐怎麼辦？", "What if the vendor doesn't serve my order?"),
+      a: tr(`${policy.vendorFailed()}。${policy.disaster()}。`, `${cap(policy.vendorFailed())}. ${cap(policy.disaster())}.`),
+    },
+    {
+      q: tr("可以用什麼方式付款？", "What payment methods are supported?"),
+      a: tr(
+        "透過 LINE Pay 付款，結帳時會導到 LINE Pay 完成付款再回到平台；有平台點數的話可以先折抵，全額折抵就不用經過 LINE Pay。",
+        "Payment is handled through LINE Pay — checkout redirects you there and back. BunnBaa points can be applied first; if they cover everything, LINE Pay is skipped."
+      ),
+    },
+    {
+      q: tr("取餐前會有提醒嗎？", "Will I get a reminder before pickup?"),
+      a: tr(
+        "會，取餐時段結束前 30 分鐘還沒取餐會提醒你；許願未成立、停班停課退款、抽獎開池也會通知（右上角鈴鐺）。",
+        "Yes — we remind you 30 minutes before the pickup window ends, and notify you about wishes, work-suspension refunds and reward draws (see the bell icon)."
+      ),
+    },
+    {
+      q: tr("怎麼成為合作店家？", "How can my store become a partner?"),
+      a: tr(
+        "到「加入我們」頁面看合作方式，或直接在登入頁的「店家申請」分頁送出申請，管理員審核通過後就能使用店家後台。",
+        "See the Join us page for details, or apply on the Vendor application tab of the sign-in page. Once an admin approves it, you'll get access to the vendor portal."
+      ),
+    },
+  ];
+};
 
 export default function FaqPage() {
   return (
@@ -71,7 +76,7 @@ export default function FaqPage() {
     >
       {/* 桌機兩欄：左邊 sticky 的「找不到答案？」，右邊問答 */}
       <div className="grid gap-10 lg:grid-cols-[320px_1fr] lg:gap-16 items-start py-4 md:py-8">
-        <aside className="lg:sticky lg:top-24 rounded-[1.75rem] border border-ink bg-accent p-7 space-y-3">
+        <aside className="lg:sticky lg:top-24 rounded-card border border-ink bg-accent p-7 space-y-3">
           <p className="font-heading text-2xl font-semibold">{tr("沒找到你想問的？", "Didn't find your answer?")}</p>
           <p className="text-sm text-muted-foreground">{tr("寫信給我們，通常 1～2 個工作天內回覆。", "Write to us — we usually reply within 1–2 business days.")}</p>
           <Link href="/contact" className="inline-flex items-center h-11 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover transition-colors">
@@ -80,7 +85,7 @@ export default function FaqPage() {
         </aside>
 
         <div className="border-t border-ink">
-          {FAQS.map(({ q, a }, i) => (
+          {faqs().map(({ q, a }, i) => (
             <details key={q} className="group border-b border-ink">
               <summary className="flex items-start gap-5 cursor-pointer list-none py-6 md:py-7 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                 <span className="font-heading italic text-primary text-base w-7 shrink-0 pt-1" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>

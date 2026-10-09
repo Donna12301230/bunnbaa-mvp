@@ -15,6 +15,8 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import PortalPageHeader from "@/components/PortalPageHeader";
+import { EmptyState } from "@/components/ds";
 
 interface VendorApplication {
   id: string; // = 申請人的 uid
@@ -114,8 +116,8 @@ export default function AdminVendorsPage() {
     onSuccess: (_, vars) => {
       invalidate();
       toast({
-        title: vars.approved ? tr("已核准並綁定商家", "Approved and linked") : tr("已拒絕申請", "Application rejected"),
-        description: vars.approved ? tr("對方重新整理或重新登入後就會看到廠商後台。", "They'll see the vendor portal after refreshing or signing in again.") : undefined,
+        title: vars.approved ? tr("已核准並綁定店家", "Approved and linked") : tr("已拒絕申請", "Application rejected"),
+        description: vars.approved ? tr("對方重新整理或重新登入後就會看到店家後台。", "They'll see the vendor portal after refreshing or signing in again.") : undefined,
       });
     },
     onError: (err: Error) => toast({ variant: "destructive", title: tr("操作失敗", "Action failed"), description: err.message }),
@@ -138,7 +140,7 @@ export default function AdminVendorsPage() {
   async function handleUnbind(vendor: Vendor) {
     const ok = await confirm({
       title: tr(`解除「${vendor.name}」的帳號綁定？`, `Unlink the account for ${vendor.name}?`),
-      description: tr("解除後原本的商家帳號就進不了廠商後台，也看不到撥款與校準報告。", "The vendor account will lose access to the vendor portal, payouts and calibration reports."),
+      description: tr("解除後原本的店家帳號就進不了店家後台，也看不到撥款與校準報告。", "The vendor account will lose access to the vendor portal, payouts and calibration reports."),
       confirmLabel: tr("解除綁定", "Unlink"),
       destructive: true,
     });
@@ -147,14 +149,11 @@ export default function AdminVendorsPage() {
 
   return (
     <AdminLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("待審核的廠商申請", "Pending vendor applications")} ({applications.length})</h1>
+      <PortalPageHeader icon={Store} title={<>{tr("待審核的店家申請", "Pending vendor applications")} ({applications.length})</>} />
       {loadingApps ? (
         <SkeletonBlocks count={2} height={96} className="space-y-3 mb-8" />
       ) : applications.length === 0 ? (
-        <div className="text-center py-10 mb-8 text-muted-foreground bg-white rounded-xl border border-border">
-          <Store className="w-10 h-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">{tr("目前沒有待審核的申請", "No pending applications")}</p>
-        </div>
+        <EmptyState size="compact" className="mb-8" icon={<Store size={32} />} title={tr("目前沒有待審核的申請", "No pending applications")} />
       ) : (
         <div className="space-y-3 mb-8">
           {applications.map((app) => (
@@ -166,7 +165,7 @@ export default function AdminVendorsPage() {
                     {app.email}{app.phone ? ` · ${app.phone}` : ""}
                   </div>
                 </div>
-                <Badge className="bg-yellow-100 text-yellow-800 border-0">{tr("待審核", "Pending")}</Badge>
+                <Badge className="bg-warning-soft text-warning-text border-0">{tr("待審核", "Pending")}</Badge>
               </CardHeader>
               <CardContent className="text-sm flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
                 <Select
@@ -177,16 +176,16 @@ export default function AdminVendorsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NEW_VENDOR}>{tr(`建立新商家「${app.store_name}」`, `Create new vendor "${app.store_name}"`)}</SelectItem>
+                    <SelectItem value={NEW_VENDOR}>{tr(`建立新店家「${app.store_name}」`, `Create new vendor "${app.store_name}"`)}</SelectItem>
                     {unboundVendors.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>{tr("綁定到既有商家：", "Link to existing vendor: ")}{v.name}</SelectItem>
+                      <SelectItem key={v.id} value={v.id}>{tr("綁定到既有店家：", "Link to existing vendor: ")}{v.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <div className="flex gap-2 flex-shrink-0">
                   <Button
                     size="sm"
-                    className="h-7 text-xs bg-green-500 hover:bg-green-600 text-white"
+                    className="h-7 text-xs bg-success-strong hover:bg-success-strong/90 text-white"
                     disabled={decideMutation.isPending}
                     onClick={() => decideMutation.mutate({ app, approved: true })}
                   >
@@ -195,7 +194,7 @@ export default function AdminVendorsPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-7 text-xs text-red-500"
+                    className="h-7 text-xs text-danger-text"
                     disabled={decideMutation.isPending}
                     onClick={() => decideMutation.mutate({ app, approved: false })}
                   >
@@ -208,9 +207,11 @@ export default function AdminVendorsPage() {
         </div>
       )}
 
-      <h2 className="text-lg font-bold mb-3">{tr("所有商家", "All vendors")} ({vendors.length})</h2>
+      <h2 className="text-lg font-bold mb-3">{tr("所有店家", "All vendors")} ({vendors.length})</h2>
       {loadingVendors ? (
         <SkeletonBlocks count={3} height={72} className="space-y-3" />
+      ) : vendors.length === 0 ? (
+        <EmptyState size="compact" icon={<Store size={32} />} title={tr("目前沒有店家", "No vendors yet")} />
       ) : (
         <div className="space-y-3">
           {vendors.map((vendor) => (
@@ -225,7 +226,7 @@ export default function AdminVendorsPage() {
                 <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                   {vendor.owner_uid ? (
                     <>
-                      <Badge className="bg-green-100 text-green-800 border-0">{tr("已綁定帳號", "Account linked")}</Badge>
+                      <Badge className="bg-success-soft text-success-text border-0">{tr("已綁定帳號", "Account linked")}</Badge>
                       <Button
                         size="sm"
                         variant="outline"
@@ -237,7 +238,7 @@ export default function AdminVendorsPage() {
                       </Button>
                     </>
                   ) : (
-                    <Badge className="bg-gray-100 text-gray-600 border-0">{tr("未綁定", "Not linked")}</Badge>
+                    <Badge className="bg-muted text-muted-foreground border-0">{tr("未綁定", "Not linked")}</Badge>
                   )}
                 </div>
               </CardContent>

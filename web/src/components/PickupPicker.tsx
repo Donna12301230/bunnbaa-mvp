@@ -41,7 +41,7 @@ export default function PickupPicker({ date, window, onDateChange, onWindowChang
       <PriceDateStrip value={date} onChange={onDateChange} vendor={vendor} basePrice={basePrice} label={dateLabel} />
 
       {closedReason ? (
-        <div className="flex items-start gap-2 rounded-lg border border-border bg-gray-50 p-3 text-sm text-muted-foreground">
+        <div className="flex items-start gap-2 rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
           <CalendarOff className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{closedReason}{tr("，請改選其他日期。", ". Please choose another date.")}</span>
         </div>
@@ -55,10 +55,10 @@ export default function PickupPicker({ date, window, onDateChange, onWindowChang
                 key={slot.window}
                 className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-colors ${
                   !slot.open
-                    ? "border-border bg-gray-50 opacity-50 cursor-not-allowed"
+                    ? "border-border bg-background opacity-50 cursor-not-allowed"
                     : selected
-                      ? "border-orange-400 bg-orange-50 cursor-pointer"
-                      : "border-border bg-gray-50 cursor-pointer"
+                      ? "border-brand bg-accent cursor-pointer"
+                      : "border-border bg-background cursor-pointer"
                 }`}
               >
                 <input
@@ -79,7 +79,7 @@ export default function PickupPicker({ date, window, onDateChange, onWindowChang
       )}
 
       {conflicts.length > 0 && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+        <div className="flex items-start gap-2 rounded-lg border border-warning/50 bg-warning-soft p-3 text-xs text-warning-text">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>
             {tr(

@@ -76,8 +76,8 @@ export default function RecipeGapCard() {
   const gaps = stats.gapItems.length;
   if (gaps > 0) {
     return (
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border-2 border-orange-300 bg-orange-50 px-4 py-3 print:hidden">
-        <Sparkles className="w-5 h-5 text-orange-500 shrink-0" />
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border-2 border-brand/40 bg-accent px-4 py-3 print:hidden">
+        <Sparkles className="w-5 h-5 text-accent-foreground shrink-0" />
         <p className="flex-1 min-w-[12rem] text-sm">
           {tr("還有 ", "")}<b className="text-lg">{gaps}</b>{tr(" 道菜沒有配方，叫貨單會不準", ` item(s) have no recipe — purchasing will be off`)}
         </p>
@@ -92,7 +92,7 @@ export default function RecipeGapCard() {
     return (
       <button
         type="button"
-        className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900 hover:bg-amber-200 print:hidden"
+        className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1 text-sm font-medium text-warning-text hover:bg-warning/30 print:hidden"
         onClick={() => { setPendingEdit("ingredient", firstId); navigate("/vendor-portal/recipes"); }}
       >
         <AlertTriangle className="w-4 h-4" />

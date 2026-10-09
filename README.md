@@ -16,8 +16,8 @@ BunnBaa/
 │   └── src/
 │       ├── index.js                # 排程、callable、Firestore trigger 全部接線在這
 │       ├── gemini.js               # Gemini API 呼叫的共用 wrapper
-│       ├── vendorCalibration.js    # 商家校準 Agent（spec §4.1 / §6.1）
-│       ├── consumerExplanation.js  # 消費者端折扣說明 Agent（spec §4.2 / §6.2）
+│       ├── vendorCalibration.js    # 商家校準：準確率／誤差由程式算，Gemini 只寫說明與 what-if（spec §4.1 / §6.1）
+│       ├── consumerExplanation.js  # 品項頁折扣說明 getDiscountExplanation（spec §4.2 / §6.2）
 │       └── linePay.js              # LINE Pay v3 簽章 + Request/Confirm API
 ├── scripts/
 │   └── seed.js                # 種子資料（有自己的 package.json，需先 npm install）
@@ -81,7 +81,7 @@ Functions 依功能拆檔（`functions/src/`）：`orders.js`（下單、LINE Pa
 |---|---|---|
 | AI Agent | `dailyCalibration` | 排程（每日 23:30） |
 | | `triggerCalibrationNow`、`askCalibrationScenario` | callable（手動校準、what-if 追問） |
-| | `onLockCreated` | Firestore trigger（產生消費者折扣說明） |
+| | `getDiscountExplanation` | callable（品項頁金額明細的折扣說明，依折扣級距快取；10/09 取代 `onLockCreated`） |
 | 金流 | `createLinePayReservation`、`createCartLinePayReservation` | callable（單品／購物車發起付款） |
 | | `confirmLinePayPayment` | callable（付款確認後建立 `locks`） |
 | 交易 | `createResaleLinePayReservation` | callable（付費接手轉讓，確認走 `confirmLinePayPayment`） |

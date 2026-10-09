@@ -50,16 +50,16 @@ export default function RecipeCraft({ items, target, onItemClick, haveNote, comp
                 title={short ? tr(`不夠，還缺 ${amountText(item.need - (item.have ?? 0), item.unit)}`, "Not enough") : undefined}
               >
                 <span className={cn(
-                  "rounded-md border-2 bg-white flex flex-col items-center justify-center px-1",
+                  "rounded-md border-2 bg-card flex flex-col items-center justify-center px-1",
                   compact ? "w-[72px] h-[52px]" : "w-[84px] h-[60px]",
-                  short ? "border-red-500 bg-red-50" : "border-foreground/70",
+                  short ? "border-danger bg-danger-soft" : "border-foreground/70",
                   item.minor && "border-dashed",
                 )}>
                   <span className="text-xs font-semibold leading-tight line-clamp-2">{item.name}</span>
                   <span className="text-[11px] text-muted-foreground leading-tight">{amountText(item.need, item.unit)}</span>
                 </span>
                 {item.have !== undefined && (
-                  <span className={cn("text-[11px] font-mono mt-0.5", short ? "text-red-600 font-semibold" : "text-muted-foreground")}>
+                  <span className={cn("text-[11px] font-mono mt-0.5", short ? "text-danger-text font-semibold" : "text-muted-foreground")}>
                     ({amountText(item.have, item.unit)}/{amountText(item.need, item.unit)})
                   </span>
                 )}
@@ -87,7 +87,7 @@ export default function RecipeCraft({ items, target, onItemClick, haveNote, comp
         {items.some((i) => i.have !== undefined) && (
           <span>
             {tr("（現有／需要）", "(have/need)")}{haveNote ? `・${haveNote}` : ""}
-            {shortCount > 0 && <span className="text-red-600 font-semibold">{tr(`・${shortCount} 項不夠`, ` · ${shortCount} short`)}</span>}
+            {shortCount > 0 && <span className="text-danger-text font-semibold">{tr(`・${shortCount} 項不夠`, ` · ${shortCount} short`)}</span>}
           </span>
         )}
       </div>

@@ -1,11 +1,14 @@
 import { getLang } from "@/lib/i18n";
+import { policy } from "@/lib/policy";
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // 會員服務須知／廠商申請須知（登入頁註冊、廠商申請分頁用）。中英兩份內容一起維護，改條款時兩邊都要改。
 
 export function MemberNotice() {
   return getLang() === "en" ? (
     <>
-      <p className="font-bold text-orange-800 text-base">Member Terms of Service</p>
+      <p className="font-bold text-accent-foreground text-base">Member Terms of Service</p>
       <p className="font-semibold">1. Membership</p>
       <p>Anyone who completes registration and agrees to these terms becomes a BunnBaa member and can browse menus and place orders online.</p>
       <p className="font-semibold">2. Account security</p>
@@ -16,18 +19,19 @@ export function MemberNotice() {
       </ul>
       <p className="font-semibold">3. Ordering rules</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>Phase 1 covers weekday (Mon–Fri) breakfast, lunch and dinner pickup. You can book up to 30 days ahead; orders close at <span className="font-semibold">20:00 the day before pickup</span> (a vendor may close earlier).</li>
+        <li>{cap(policy.serviceDays())}. You can {policy.bookingRange()}; <span className="font-semibold">{policy.cutoff()}</span> (a vendor may close earlier).</li>
         <li>Side-dish wishes are decided at cutoff. If a wish doesn't reach the minimum, you get the default side and the order still stands.</li>
         <li>If you have allergies or special dietary needs, note them on your order and confirm directly with the vendor.</li>
-        <li><span className="font-semibold">Meals not picked up 30 minutes after the pickup window become charity meals</span>: no refund, but reward tickets are still issued. Before pickup you can donate a meal yourself.</li>
+        <li><span className="font-semibold">{cap(policy.noShow())}</span>. On the pickup day you can also donate a meal yourself.</li>
       </ul>
       <p className="font-semibold">4. Cancellations and refunds</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li><span className="font-semibold">Up to 48 hours before pickup</span>: you may cancel. Cancellations are not refunded in cash — you receive a coupon for the same vendor worth 30% of the list price, valid for 30 days. A coupon used on the order is returned with its original expiry.</li>
-        <li><span className="font-semibold">Before cutoff</span>: you can change the pickup time, main, sides or rice for free; if the new choice is cheaper the difference is refunded.</li>
-        <li><span className="font-semibold">After cutoff</span>: the vendor has already bought and prepared ingredients, so the order can't be cancelled or changed. You can still transfer, gift or donate the meal.</li>
-        <li>If a work suspension is announced for the pickup location's county, that day's orders are cancelled and refunded automatically. During disasters the vendor may substitute an equivalent side dish.</li>
-        <li>If the vendor fails to serve, you get a full refund.</li>
+        <li>{cap(policy.cancel())}. A coupon used on the order is returned with its original expiry.</li>
+        <li>{cap(policy.changeBeforeCutoff())}.</li>
+        <li>{cap(policy.afterCutoff())}.</li>
+        <li>{cap(policy.refunds())}.</li>
+        <li>{cap(policy.disaster())}.</li>
+        <li>{cap(policy.vendorFailed())}.</li>
         <li>Support: herzbaa@gmail.com</li>
       </ul>
       <p className="font-semibold">5. Personal data</p>
@@ -37,7 +41,7 @@ export function MemberNotice() {
     </>
   ) : (
     <>
-      <p className="font-bold text-orange-800 text-base">會員服務須知</p>
+      <p className="font-bold text-accent-foreground text-base">會員服務須知</p>
       <p className="font-semibold">一、會員資格</p>
       <p>凡完成會員註冊程序並同意本須知者，即取得飯飽 BunnBaa 會員資格，享有線上瀏覽菜單、下單訂餐等服務。</p>
       <p className="font-semibold">二、帳號安全</p>
@@ -48,18 +52,19 @@ export function MemberNotice() {
       </ul>
       <p className="font-semibold">三、訂餐規範</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>第一階段只做週一至週五早、中、晚餐自取。最遠可預訂 30 天後，<span className="font-semibold">取餐日前一天 20:00 截單</span>（店家可提前截單）。</li>
+        <li>{policy.serviceDays()}。{policy.bookingRange()}，<span className="font-semibold">{policy.cutoff()}</span>（店家可提前截單）。</li>
         <li>配菜許願於截單時判定，未達最低量自動改為預設配菜，訂單照常成立。</li>
-        <li>如對餐點有過敏或特殊飲食需求，請於備註欄位說明，並直接與廠商確認。</li>
-        <li><span className="font-semibold">取餐時段結束 30 分鐘後仍未取餐，便當將轉為愛心餐</span>，不退款但照常發放抽獎券；取餐前也可主動「捐為愛心餐」。</li>
+        <li>如對餐點有過敏或特殊飲食需求，請於備註欄位說明，並直接與店家確認。</li>
+        <li><span className="font-semibold">{policy.noShow()}</span>；取餐當天也可以主動「捐為愛心餐」。</li>
       </ul>
       <p className="font-semibold">四、取消與退款政策</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li><span className="font-semibold">取餐 48 小時前</span>：可申請取消。取消不退現金，改發一張同店家的折價券，面額為原價的 30%，30 天內有效；下單時使用的折價券退回並保留原到期日。</li>
-        <li><span className="font-semibold">截單前</span>：可免費修改取餐時段、主菜、配菜、飯量；改得比較便宜會退差額。</li>
-        <li><span className="font-semibold">截單後</span>：店家已依訂單採購備料，不可取消或修改（現做餐點屬易腐敗商品，通訊交易解除權之例外）；可轉讓、贈送或捐為愛心餐。</li>
-        <li>取餐地點所在縣市宣布停班時，當日訂單自動取消並全額退款；天災期間店家可等值替換配菜。</li>
-        <li>店家未如期出餐，全額退款。</li>
+        <li>{policy.cancel()}；下單時使用的折價券退回並保留原到期日。</li>
+        <li>{policy.changeBeforeCutoff()}。</li>
+        <li>{policy.afterCutoff()}（現做餐點屬易腐敗商品，通訊交易解除權之例外）。</li>
+        <li>{policy.refunds()}。</li>
+        <li>{policy.disaster()}。</li>
+        <li>{policy.vendorFailed()}。</li>
         <li>客服聯絡方式：herzbaa@gmail.com</li>
       </ul>
       <p className="font-semibold">五、個人資料保護</p>
@@ -73,15 +78,15 @@ export function MemberNotice() {
 export function VendorNotice() {
   return getLang() === "en" ? (
     <>
-      <p className="font-bold text-amber-800 text-base">Vendor Application Terms</p>
+      <p className="font-bold text-warning-text text-base">Vendor Application Terms</p>
       <p className="font-semibold">1. Eligibility</p>
       <p>Any business legally permitted to sell food may apply to become a BunnBaa vendor. Applicants must provide valid contact details and store information for review.</p>
       <p className="font-semibold">2. Partner plan and fees</p>
-      <div className="bg-amber-100 rounded-lg p-3 space-y-1">
-        <p className="font-semibold text-amber-900">No monthly fee, no listing fee</p>
-        <p>The platform takes a 5% commission on each meal sold, calculated on the amount the customer actually pays and deducted when your sales are paid out.</p>
-        <p className="font-semibold text-amber-900 mt-1">Add the 5% when you price</p>
-        <p>Set your menu prices with the commission included (to net NT$100, list at NT$105). The rate is announced in advance if it changes.</p>
+      <div className="bg-warning-soft rounded-lg p-3 space-y-1">
+        <p className="font-semibold text-warning-text">No monthly fee, no listing fee</p>
+        <p>The platform takes a {policy.commission().pct}% commission on each meal sold, calculated on the amount the customer actually pays and deducted when your sales are paid out.</p>
+        <p className="font-semibold text-warning-text mt-1">Add the {policy.commission().pct}% when you price</p>
+        <p>Set your menu prices with the commission included (to net NT$100, list at NT${policy.commission().example}). The rate is announced in advance if it changes.</p>
       </div>
       <p className="font-semibold">3. Ending the partnership and account handling</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
@@ -107,19 +112,19 @@ export function VendorNotice() {
     </>
   ) : (
     <>
-      <p className="font-bold text-amber-800 text-base">廠商申請須知</p>
+      <p className="font-bold text-warning-text text-base">店家申請須知</p>
       <p className="font-semibold">一、申請資格</p>
-      <p>凡具有合法食品販售資格之業者，均可申請成為飯飽 BunnBaa 平台廠商。申請時須提供有效之聯絡方式及店家資訊，以供平台審核。</p>
+      <p>凡具有合法食品販售資格之業者，均可申請成為飯飽 BunnBaa 平台店家。申請時須提供有效之聯絡方式及店家資訊，以供平台審核。</p>
       <p className="font-semibold">二、合作方案與收費</p>
-      <div className="bg-amber-100 rounded-lg p-3 space-y-1">
-        <p className="font-semibold text-amber-900">沒有月費、沒有上架費</p>
-        <p>平台從每份賣出的餐點抽成 5%，以消費者實付金額計算，於撥款時直接扣除。</p>
-        <p className="font-semibold text-amber-900 mt-1">定價時請加上 5%</p>
-        <p>菜單售價請把抽成算進去（想實收 100 元，售價訂 105 元）。抽成比例如有調整，平台會提前公告。</p>
+      <div className="bg-warning-soft rounded-lg p-3 space-y-1">
+        <p className="font-semibold text-warning-text">沒有月費、沒有上架費</p>
+        <p>平台從每份賣出的餐點抽成 {policy.commission().pct}%，以消費者實付金額計算，於撥款時直接扣除。</p>
+        <p className="font-semibold text-warning-text mt-1">定價時請加上 {policy.commission().pct}%</p>
+        <p>菜單售價請把抽成算進去（想實收 100 元，售價訂 {policy.commission().example} 元）。抽成比例如有調整，平台會提前公告。</p>
       </div>
       <p className="font-semibold">三、終止合作與帳號處理</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>廠商可隨時聯絡平台申請停止上架；已成立的訂單仍須照常出餐。</li>
+        <li>店家可隨時聯絡平台申請停止上架；已成立的訂單仍須照常出餐。</li>
         <li>終止後帳號將進入<span className="font-semibold">暫停狀態</span>，無法接新訂單。</li>
         <li>帳號暫停期間，所有店家資料、菜單、訂單紀錄<span className="font-semibold">均予保留，不會刪除</span>，保留期限為 2 年。</li>
         <li>如日後希望恢復使用，聯絡平台即可啟用帳號，原有資料完整延續。</li>
@@ -127,15 +132,15 @@ export function VendorNotice() {
       </ul>
       <p className="font-semibold">四、服務規範</p>
       <ul className="list-disc list-inside space-y-1 pl-1">
-        <li>廠商應確保所販售之商品符合食品安全衛生相關法規。</li>
-        <li>廠商應如實填寫菜單品項、價格及供應時間，不得有虛偽不實之情形。</li>
-        <li>廠商應依據訂單於指定時間完成出餐，如遇特殊狀況應提前通知平台及消費者。</li>
-        <li>廠商不得無故取消已確認之訂單，如有違反將影響合作資格。</li>
+        <li>店家應確保所販售之商品符合食品安全衛生相關法規。</li>
+        <li>店家應如實填寫菜單品項、價格及供應時間，不得有虛偽不實之情形。</li>
+        <li>店家應依據訂單於指定時間完成出餐，如遇特殊狀況應提前通知平台及消費者。</li>
+        <li>店家不得無故取消已確認之訂單，如有違反將影響合作資格。</li>
       </ul>
       <p className="font-semibold">五、帳號管理</p>
-      <p>廠商帳號限本人使用，不得轉讓或共用。帳號密碼請妥善保管，如發現帳號遭盜用請立即通知平台。</p>
+      <p>店家帳號限本人使用，不得轉讓或共用。帳號密碼請妥善保管，如發現帳號遭盜用請立即通知平台。</p>
       <p className="font-semibold">六、資料使用</p>
-      <p>廠商所提供之店家資訊（店名、聯絡方式）將公開顯示於平台，供消費者查閱。</p>
+      <p>店家所提供之店家資訊（店名、聯絡方式）將公開顯示於平台，供消費者查閱。</p>
       <p className="font-semibold">七、其他</p>
       <p>本須知如有修訂，平台將提前公告。繼續使用平台服務即視為同意修訂後之條款。</p>
     </>

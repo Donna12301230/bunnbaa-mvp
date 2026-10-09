@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { selectClass } from "@/lib/fieldStyles";
 import { useQuery } from "@tanstack/react-query";
 import { addDoc, collection, deleteDoc, doc, getDocs, writeBatch } from "firebase/firestore";
 import { AlertTriangle, BookOpen, Carrot, Clock, Flame, MessageCircle, Pencil, Phone, Plus, Soup, Sparkles, Store, Trash2, UtensilsCrossed, Wand2 } from "lucide-react";
 import { useLocation } from "wouter";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import InfoTip from "@/components/InfoTip";
-import { ComponentDialog, EMPTY_COMP, EMPTY_ING, FREQ_LABEL, IngredientDialog, saveCatalogDoc, type ComponentDraft, type IngredientDraft } from "@/components/CatalogEditors";
+import { ComponentDialog, EMPTY_COMP, EMPTY_ING, IngredientDialog, catalogLabel, saveCatalogDoc, type ComponentDraft, type IngredientDraft } from "@/components/CatalogEditors";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState, Tag } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import PortalPageHeader from "@/components/PortalPageHeader";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useMyVendor } from "@/hooks/useMyVendor";
@@ -60,7 +62,7 @@ export default function VendorPortalRecipes() {
   const [onlyIssues, setOnlyIssues] = useState(false);
   const [priceEdit, setPriceEdit] = useState<{ id: string; value: string } | null>(null);
 
-  const { data: templates = [] } = useQuery({
+  const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ["templates"],
     queryFn: async () => (await getDocs(collection(db, "templates"))).docs.map((d) => ({ id: d.id, ...d.data() }) as TemplateDoc),
     enabled: templateOpen,
@@ -247,13 +249,14 @@ export default function VendorPortalRecipes() {
 
   return (
     <VendorPortalLayout>
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <h1 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-2">
-          <BookOpen className="w-6 h-6 text-orange-500" /> {tr("食材與供應商", "Ingredients & suppliers")}
+      <PortalPageHeader
+        icon={BookOpen}
+        title={<>
+          {tr("食材與供應商", "Ingredients & suppliers")}
           <InfoTip>{tr("這裡管單價、供應商與熟成率；每道菜用什麼，直接在菜單管理點便當格子改。點價格就能直接改，進貨時順手更新。", "Prices, suppliers and yields live here; dish contents are edited from bento cells in Menu. Tap a price to change it.")}</InfoTip>
-        </h1>
-        <Button variant="outline" onClick={() => setTemplateOpen(true)}><Wand2 /> {tr("從定式模板開店", "Start from a template")}</Button>
-      </div>
+        </>}
+        actions={<Button variant="outline" onClick={() => setTemplateOpen(true)}><Wand2 /> {tr("從定式模板開店", "Start from a template")}</Button>}
+      />
 
       {isLoading ? <SkeletonBlocks count={3} height={64} className="space-y-2" /> : (
         <div className="space-y-4">
@@ -268,10 +271,10 @@ export default function VendorPortalRecipes() {
                 onClick={() => setTab(t.key)}
                 className={cn("relative rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", tab === t.key ? "border-foreground bg-card shadow-sm" : "border-border bg-card/60 hover:bg-card")}
               >
-                <t.icon className="w-5 h-5 text-orange-500" />
+                <t.icon className="w-5 h-5 text-accent-foreground" />
                 <p className="mt-1 text-sm text-muted-foreground">{t.label}</p>
                 <p className="text-2xl font-bold leading-none">{t.n}</p>
-                {t.warn > 0 && <span className="absolute top-2 right-2 inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900"><AlertTriangle className="w-3 h-3" />{t.warn}</span>}
+                {t.warn > 0 && <span className="absolute top-2 right-2 inline-flex items-center gap-0.5 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning-text"><AlertTriangle className="w-3 h-3" />{t.warn}</span>}
               </button>
             ))}
           </div>
@@ -280,12 +283,12 @@ export default function VendorPortalRecipes() {
           {tab === "ingredients" && (noPrice.length > 0 || noSupplier.length > 0) && (
             <div className="flex flex-wrap items-center gap-2">
               {noPrice.map((i) => (
-                <button key={`p${i.id}`} type="button" className="inline-flex items-center gap-1 rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800 hover:bg-red-200" onClick={() => setPriceEdit({ id: i.id, value: "" })}>
+                <button key={`p${i.id}`} type="button" className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-3 py-1 text-sm font-medium text-danger-text hover:bg-danger/25" onClick={() => setPriceEdit({ id: i.id, value: "" })}>
                   <AlertTriangle className="w-3.5 h-3.5" />{tr(`${i.name}：缺單價`, `${i.name}: no price`)}
                 </button>
               ))}
               {noSupplier.filter((i) => i.unit_price > 0).map((i) => (
-                <button key={`s${i.id}`} type="button" className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900 hover:bg-amber-200" onClick={() => setTab("suppliers")}>
+                <button key={`s${i.id}`} type="button" className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-3 py-1 text-sm font-medium text-warning-text hover:bg-warning/30" onClick={() => setTab("suppliers")}>
                   <Store className="w-3.5 h-3.5" />{tr(`${i.name}：沒供應商`, `${i.name}: no supplier`)}
                 </button>
               ))}
@@ -315,13 +318,13 @@ export default function VendorPortalRecipes() {
                       const users = (catalog?.components ?? []).filter((c) => c.ingredients.some((l) => l.ingredient_id === i.id));
                       const weight = ["g", "ml", "克", "毫升"].includes(i.unit);
                       return (
-                        <Card key={i.id} className={cn("overflow-hidden border-2", !priced && "border-red-300")}>
+                        <Card key={i.id} className={cn("overflow-hidden border-2", !priced && "border-danger/40")}>
                           <div className={cn("h-1.5", GROUP_DOT[g])} />
                           <CardContent className="p-3 space-y-2">
                             <div className="flex items-start gap-2">
                               <button type="button" className="flex-1 min-w-0 text-left" onClick={() => setIng(i)}>
                                 <p className="text-lg font-semibold leading-tight hover:underline">{i.name}</p>
-                                <p className="text-xs text-muted-foreground">{i.category}{i.frequency === "monthly" ? tr("・久放", " · long-life") : ""}</p>
+                                <p className="text-xs text-muted-foreground">{catalogLabel(i.category)}{i.frequency === "monthly" ? tr("・久放", " · long-life") : ""}</p>
                               </button>
                               <Button variant="ghost" size="icon" className="w-8 h-8 -mr-1 text-muted-foreground" aria-label={tr(`刪除 ${i.name}`, `Delete ${i.name}`)} onClick={() => remove("ingredients", i.id, i.name)}><Trash2 className="w-3.5 h-3.5" /></Button>
                             </div>
@@ -334,7 +337,7 @@ export default function VendorPortalRecipes() {
                                 <span className="text-sm text-muted-foreground">/ {i.purchase_unit_label}</span>
                               </div>
                             ) : (
-                              <button type="button" onClick={() => setPriceEdit({ id: i.id, value: priced ? String(i.unit_price) : "" })} className={cn("w-full flex items-baseline gap-1 rounded-lg px-2 py-1 -mx-2 text-left hover:bg-accent", !priced && "text-red-700")} aria-label={tr(`改 ${i.name} 的單價`, `Edit price of ${i.name}`)}>
+                              <button type="button" onClick={() => setPriceEdit({ id: i.id, value: priced ? String(i.unit_price) : "" })} className={cn("w-full flex items-baseline gap-1 rounded-lg px-2 py-1 -mx-2 text-left hover:bg-accent", !priced && "text-danger-text")} aria-label={tr(`改 ${i.name} 的單價`, `Edit price of ${i.name}`)}>
                                 {priced ? (
                                   <>
                                     <span className="text-2xl font-bold">NT${i.unit_price}</span>
@@ -347,15 +350,15 @@ export default function VendorPortalRecipes() {
 
                             {/* 小圖示：供應商、生熟比、保存天數 */}
                             <div className="flex flex-wrap gap-1.5 text-xs">
-                              <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5", i.supplier_id ? "bg-stone-100" : "bg-amber-100 text-amber-900")}>
+                              <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5", i.supplier_id ? "bg-muted" : "bg-warning-soft text-warning-text")}>
                                 <Store className="w-3 h-3" />{supplierName(i.supplier_id) ?? tr("沒供應商", "No supplier")}
                               </span>
                               {weight && i.yield_rate !== 1 && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5" title={tr("熟重 ÷ 生重", "cooked ÷ raw")}>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5" title={tr("熟重 ÷ 生重", "cooked ÷ raw")}>
                                   <Flame className="w-3 h-3" />{tr(`生→熟 ×${i.yield_rate}`, `raw→cooked ×${i.yield_rate}`)}
                                 </span>
                               )}
-                              <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5"><Clock className="w-3 h-3" />{tr(`放 ${i.shelf_days} 天`, `${i.shelf_days} d`)}</span>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5"><Clock className="w-3 h-3" />{tr(`放 ${i.shelf_days} 天`, `${i.shelf_days} d`)}</span>
                             </div>
 
                             {users.length > 0 ? (
@@ -377,14 +380,14 @@ export default function VendorPortalRecipes() {
           {tab === "suppliers" && (
             <div className="space-y-3">
               {noSupplier.length > 0 && suppliers.length > 0 && (
-                <Card className="border-2 border-amber-300 bg-amber-50/60">
+                <Card className="border-2 border-warning/50 bg-warning-soft/60">
                   <CardContent className="p-3 space-y-2">
-                    <p className="font-semibold flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-amber-600" />{tr(`${noSupplier.length} 樣食材還沒指定跟誰買`, `${noSupplier.length} ingredient(s) have no supplier`)}</p>
+                    <p className="font-semibold flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-accent-foreground" />{tr(`${noSupplier.length} 樣食材還沒指定跟誰買`, `${noSupplier.length} ingredient(s) have no supplier`)}</p>
                     <div className="flex flex-wrap gap-2">
                       {noSupplier.map((i) => (
                         <label key={i.id} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-1 py-1 text-sm">
                           <span className={cn("w-2.5 h-2.5 rounded-sm", GROUP_DOT[ingredientGroup(i.category)])} />{i.name}
-                          <select className="h-8 rounded-full border border-input bg-background px-2 text-xs" value="" onChange={(e) => e.target.value && quickSave(i, { supplier_id: e.target.value })} aria-label={tr(`${i.name} 的供應商`, `Supplier for ${i.name}`)}>
+                          <select className={selectClass("sm", "rounded-full px-2")} value="" onChange={(e) => e.target.value && quickSave(i, { supplier_id: e.target.value })} aria-label={tr(`${i.name} 的供應商`, `Supplier for ${i.name}`)}>
                             <option value="">{tr("選供應商…", "Pick…")}</option>
                             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                           </select>
@@ -401,7 +404,7 @@ export default function VendorPortalRecipes() {
                     <Card key={s.id} className="border-2">
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-3">
-                          <span className="w-12 h-12 shrink-0 rounded-full bg-orange-100 text-orange-900 flex items-center justify-center text-xl font-bold" aria-hidden="true">{s.name.slice(0, 1)}</span>
+                          <span className="w-12 h-12 shrink-0 rounded-full bg-secondary text-accent-foreground flex items-center justify-center text-xl font-bold" aria-hidden="true">{s.name.slice(0, 1)}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-lg font-semibold leading-tight truncate">{s.name}</p>
                             <p className="text-xs text-muted-foreground">{tr(`${mine.length} 樣食材`, `${mine.length} ingredients`)}{s.note ? `・${s.note}` : ""}</p>
@@ -411,15 +414,15 @@ export default function VendorPortalRecipes() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {s.phone ? <Button size="sm" variant="outline" asChild><a href={`tel:${s.phone}`}><Phone /> {s.phone}</a></Button> : null}
-                          {s.line_id ? <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-sm text-green-900"><MessageCircle className="w-3.5 h-3.5" />LINE {s.line_id}</span> : null}
+                          {s.line_id ? <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-3 py-1 text-sm text-success-text"><MessageCircle className="w-3.5 h-3.5" />LINE {s.line_id}</span> : null}
                           {!s.phone && !s.line_id && <button type="button" className="text-xs text-primary underline" onClick={() => setSup(s)}>{tr("＋ 加電話或 LINE", "+ Add phone or LINE")}</button>}
                         </div>
                         {mine.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 pt-2 border-t">
                             {mine.map((i) => (
-                              <button key={i.id} type="button" onClick={() => { setTab("ingredients"); setIng(i); }} className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 text-sm hover:bg-stone-200">
+                              <button key={i.id} type="button" onClick={() => { setTab("ingredients"); setIng(i); }} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-sm hover:bg-border">
                                 <span className={cn("w-2.5 h-2.5 rounded-sm", GROUP_DOT[ingredientGroup(i.category)])} />{i.name}
-                                <span className={cn("text-xs", i.unit_price > 0 ? "text-muted-foreground" : "text-red-700 font-semibold")}>{i.unit_price > 0 ? `$${i.unit_price}` : tr("缺價", "no price")}</span>
+                                <span className={cn("text-xs", i.unit_price > 0 ? "text-muted-foreground" : "text-danger-text font-semibold")}>{i.unit_price > 0 ? `$${i.unit_price}` : tr("缺價", "no price")}</span>
                               </button>
                             ))}
                           </div>
@@ -428,7 +431,7 @@ export default function VendorPortalRecipes() {
                     </Card>
                   );
                 })}
-                <button type="button" onClick={() => setSup({ name: "", phone: "", line_id: "", note: "" })} className="min-h-[9rem] rounded-xl border-2 border-dashed border-stone-300 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:bg-card hover:text-foreground">
+                <button type="button" onClick={() => setSup({ name: "", phone: "", line_id: "", note: "" })} className="min-h-[9rem] rounded-xl border-2 border-dashed border-input flex flex-col items-center justify-center gap-1 text-muted-foreground hover:bg-card hover:text-foreground">
                   <Plus className="w-6 h-6" />{tr("新增供應商", "Add supplier")}
                 </button>
               </div>
@@ -440,7 +443,7 @@ export default function VendorPortalRecipes() {
             <div className="space-y-3">
               <Card>
                 <CardContent className="p-3 flex flex-wrap gap-2 items-center">
-                  <Sparkles className="w-4 h-4 text-orange-500" />
+                  <Sparkles className="w-4 h-4 text-accent-foreground" />
                   <Input className="w-48" value={draftName} onChange={(e) => setDraftName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") draftRecipe(); }} placeholder={tr("打菜名，例：地瓜葉", "Dish name, e.g. greens")} />
                   <Button size="sm" onClick={draftRecipe} disabled={drafting || !draftName.trim()}>{drafting ? tr("產生中…", "Drafting…") : tr("AI 產生配方", "AI draft")}</Button>
                 </CardContent>
@@ -453,17 +456,17 @@ export default function VendorPortalRecipes() {
                   const cost = componentCost(c, ingById);
                   return (
                     <Card key={c.id} className={cn("overflow-hidden border-2", issue && issue.kind !== "no_price" && "border-dashed")}>
-                      <button type="button" onClick={() => setComp(c)} className={cn("w-full border-b-2 px-3 py-3 text-left", issue && issue.kind !== "no_price" ? "bg-white border-dashed border-stone-300" : GROUP_CELL[componentGroup(c, ingById)])}>
+                      <button type="button" onClick={() => setComp(c)} className={cn("w-full border-b-2 px-3 py-3 text-left", issue && issue.kind !== "no_price" ? "bg-card border-dashed border-input" : GROUP_CELL[componentGroup(c, ingById)])}>
                         <span className="flex items-start gap-2">
                           <span className="flex-1 text-lg font-semibold leading-tight">{c.name}</span>
-                          {c.ai_draft && <span className="inline-flex items-center gap-0.5 rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-orange-700"><Sparkles className="w-3 h-3" />{tr("AI 草稿", "AI draft")}</span>}
+                          {c.ai_draft && <span className="inline-flex items-center gap-0.5 rounded-full bg-card/80 px-2 py-0.5 text-[11px] font-semibold text-accent-foreground"><Sparkles className="w-3 h-3" />{tr("AI 草稿", "AI draft")}</span>}
                         </span>
-                        <span className="block text-sm opacity-80">{c.portion_grams}g・{c.method}</span>
+                        <span className="block text-sm opacity-80">{c.portion_grams}g・{c.method && catalogLabel(c.method)}</span>
                       </button>
                       <CardContent className="p-3 space-y-2">
                         <div className="flex items-baseline gap-2">
                           {issue ? (
-                            <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-800"><AlertTriangle className="w-4 h-4" />{costIssueText(issue)}</span>
+                            <span className="inline-flex items-center gap-1 text-sm font-semibold text-warning-text"><AlertTriangle className="w-4 h-4" />{costIssueText(issue)}</span>
                           ) : (
                             <><span className="text-2xl font-bold">NT${cost.toFixed(1)}</span><span className="text-sm text-muted-foreground">{tr("/ 份", "/ portion")}</span></>
                           )}
@@ -474,7 +477,7 @@ export default function VendorPortalRecipes() {
                             {c.ingredients.map((l, k) => {
                               const ing = ingById[l.ingredient_id];
                               return (
-                                <span key={k} className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs">
+                                <span key={k} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
                                   <span className={cn("w-2 h-2 rounded-sm", GROUP_DOT[ingredientGroup(ing?.category)])} />{ing?.name ?? "?"} {Math.round(l.grams * 10) / 10}{ing?.unit ?? "g"}
                                 </span>
                               );
@@ -484,7 +487,7 @@ export default function VendorPortalRecipes() {
                         {users.length > 0 ? (
                           <div className="flex flex-wrap items-center gap-1 text-xs pt-1 border-t">
                             <UtensilsCrossed className="w-3.5 h-3.5 text-muted-foreground" aria-label={tr("用在", "Used in")} />
-                            {users.map((u) => <button key={u.id} type="button" className="rounded-md bg-orange-50 px-1.5 py-0.5 hover:bg-orange-100" onClick={() => openMenuItem(u.id)}>{u.name}</button>)}
+                            {users.map((u) => <button key={u.id} type="button" className="rounded-md bg-accent px-1.5 py-0.5 hover:bg-secondary" onClick={() => openMenuItem(u.id)}>{u.name}</button>)}
                           </div>
                         ) : <p className="text-xs text-muted-foreground pt-1 border-t">{tr("還沒放進菜單", "Not on the menu")}</p>}
                       </CardContent>
@@ -539,7 +542,8 @@ export default function VendorPortalRecipes() {
             <DialogDescription>{tr("每個模板內含配菜格結構、預設配方、製程資料、每格 3 道候選菜建議。套用後品項先下架，確認價格再上架。", "Each template has slot structure, default recipes, prep data and 3 candidate suggestions per slot. Items start unlisted.")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            {templates.length === 0 && <p className="text-sm text-muted-foreground">{tr("平台還沒建立模板。", "No templates yet.")}</p>}
+            {loadingTemplates && <SkeletonBlocks count={2} height={56} className="space-y-2" />}
+            {!loadingTemplates && templates.length === 0 && <p className="text-sm text-muted-foreground">{tr("平台還沒建立模板。", "No templates yet.")}</p>}
             {templates.map((t) => (
               <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
                 <div className="flex-1"><p className="font-medium">{t.name}</p><p className="text-xs text-muted-foreground">{t.structure}</p></div>

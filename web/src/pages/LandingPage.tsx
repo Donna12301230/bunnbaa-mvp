@@ -14,7 +14,7 @@ import type { MenuItem } from "@/types";
 import { EARLY_BIRD_TIERS, discountText } from "@/lib/pricing";
 import { useReviews } from "@/hooks/useReviews";
 import { slotLabel, vendorWindows } from "@/lib/pickupSlots";
-import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
+import { liveConfig } from "@/lib/platformConfig";
 import "./LandingPage.css";
 import { dateLocale, useI18n, type Lang, loc } from "@/lib/i18n";
 import { useVendors } from "@/hooks/useVendors";
@@ -33,13 +33,18 @@ import SiteFooter from "@/components/SiteFooter";
 type Bi = { zh: string; en: string };
 const pick = (text: Bi, lang: Lang) => text[lang];
 
-const TICKER: Bi[] = [
-  { zh: "訂明天 95 折，提前 2 天以上 8 折", en: "5% off for tomorrow, 20% off 2+ days ahead" },
-  { zh: "臨時去不了？轉讓或捐為愛心餐", en: "Can't make it? Transfer it or donate it as a charity meal" },
-  { zh: "取餐 48 小時前可取消，換成原價 30% 的折價券", en: "Cancel up to 48 hours ahead for a coupon worth 30% of the price" },
-  { zh: "取餐前推播提醒，不怕忘記", en: "Push reminders before pickup" },
-  { zh: "每 100 元一張抽獎券，人人有獎", en: "A reward ticket every NT$100 — everyone wins" },
-];
+// 跑馬燈：規則數字讀平台參數（lib/policy.ts），切換語言時重新產生
+const ticker = (): Bi[] => {
+  const c = liveConfig();
+  const [near, far] = EARLY_BIRD_TIERS;
+  return [
+    { zh: `訂明天 ${discountText(near.discountPercent)}，提前 ${far.minDays} 天以上 ${discountText(far.discountPercent)}`, en: `${near.discountPercent}% off for tomorrow, ${far.discountPercent}% off ${far.minDays}+ days ahead` },
+    { zh: "臨時去不了？轉讓、請朋友代領或捐為愛心餐", en: "Can't make it? Transfer it, send a friend, or donate it as a charity meal" },
+    { zh: `取餐 ${c.cancelHoursBefore} 小時前可取消，換成原價 ${Math.round(c.cancelCouponRate * 100)}% 的折價券`, en: `Cancel up to ${c.cancelHoursBefore} hours ahead for a coupon worth ${Math.round(c.cancelCouponRate * 100)}% of the price` },
+    { zh: "取餐時段快結束還沒取，推播提醒你", en: "A push reminder if your pickup window is about to end" },
+    { zh: `每 ${c.ticketUnit} 元一張抽獎券`, en: `A draw ticket for every NT$${c.ticketUnit}` },
+  ];
+};
 
 // 早鳥最高折扣（預訂 30 天內的階梯），跟 lib/pricing 同一套級距與四捨五入
 const BEST_EARLY_BIRD = Math.max(...EARLY_BIRD_TIERS.map((t) => t.discountPercent));
@@ -49,7 +54,7 @@ const MENU_TAB_LIMIT = 5;
 const MENU_ITEMS_PER_TAB = 4;
 
 // 預訂開放範圍：最遠提前 30 天（規格 §2，跟 lib/pickupSlots 同一個參數）
-const MAX_ADVANCE_DAYS = DEFAULT_PLATFORM_CONFIG.bookingRangeDays;
+const maxAdvanceDays = () => liveConfig().bookingRangeDays;
 
 // 近期活動讀 landing_events（管理員在 Firestore 維護），icon 存成字串 key
 const EVENT_ICONS: Record<string, ReactNode> = {
@@ -303,7 +308,7 @@ function EarlyBirdSimulator({ item, vendorName }: { item: MenuItem | undefined; 
   const dayLabel = days === 1
     ? t("明天", "Tomorrow")
     : format(pickupDate, isEn ? "EEE, MMM d" : "M/d（EEEEE）", { locale: dateLocale() });
-  const fill = ((days - 1) / (MAX_ADVANCE_DAYS - 1)) * 100;
+  const fill = ((days - 1) / (maxAdvanceDays() - 1)) * 100;
 
   return (
     <div className="lp-sim" data-reveal>
@@ -318,12 +323,12 @@ function EarlyBirdSimulator({ item, vendorName }: { item: MenuItem | undefined; 
       </div>
 
       <div className="lp-sim__readout" aria-live="polite">
-        <span className="lp-sim__was">NT$ {price}</span>
+        <span className="lp-sim__was">NT${price}</span>
         <span className="lp-sim__now"><span className="lp-sim__cur">NT$</span><AnimatedNumber value={now} duration={420} /></span>
         <span className={`lp-sim__badge${pct >= BEST_EARLY_BIRD ? " is-best" : ""}`}>{discountText(pct)}</span>
       </div>
       <p className="lp-sim__save">
-        {t(`${dayLabel}取餐，省下 NT$ ${price - now}`, `Pick up ${dayLabel} — save NT$ ${price - now}`)}
+        {t(`${dayLabel}取餐，省下 NT$${price - now}`, `Pick up ${dayLabel} — save NT$${price - now}`)}
       </p>
 
       <label htmlFor={sliderId} className="lp-sim__label">
@@ -335,23 +340,23 @@ function EarlyBirdSimulator({ item, vendorName }: { item: MenuItem | undefined; 
         className="lp-sim__range"
         type="range"
         min={1}
-        max={MAX_ADVANCE_DAYS}
+        max={maxAdvanceDays()}
         step={1}
         value={days}
         onChange={(e) => setDays(Number(e.target.value))}
         style={{ "--fill": `${fill}%` } as CSSProperties}
-        aria-valuetext={t(`提前 ${days} 天，${discountText(pct)}，NT$ ${now}`, `${days} day${days > 1 ? "s" : ""} ahead, ${discountText(pct)}, NT$ ${now}`)}
+        aria-valuetext={t(`提前 ${days} 天，${discountText(pct)}，NT$${now}`, `${days} day${days > 1 ? "s" : ""} ahead, ${discountText(pct)}, NT$${now}`)}
       />
       <ol className="lp-sim__days" aria-hidden="true">
-        {Array.from({ length: MAX_ADVANCE_DAYS }, (_, i) => i + 1).map((d) => (
+        {Array.from({ length: maxAdvanceDays() }, (_, i) => i + 1).map((d) => (
           <li key={d} className={`${d <= days ? "is-on" : ""}${discountFor(d) >= BEST_EARLY_BIRD ? " is-best" : ""}`}>
             <span>{format(addDays(new Date(), d), "d")}</span>
           </li>
         ))}
       </ol>
       <div className="lp-sim__legend" aria-hidden="true">
-        <span><i className="lp-sim__dot" />{t("明天 95 折", "Tomorrow −5%")}</span>
-        <span><i className="lp-sim__dot is-best" />{t(`提前 2 天以上 ${discountText(BEST_EARLY_BIRD)}`, `2+ days ahead −${BEST_EARLY_BIRD}%`)}</span>
+        <span><i className="lp-sim__dot" />{t(`明天 ${discountText(EARLY_BIRD_TIERS[0].discountPercent)}`, `Tomorrow −${EARLY_BIRD_TIERS[0].discountPercent}%`)}</span>
+        <span><i className="lp-sim__dot is-best" />{t(`提前 ${EARLY_BIRD_TIERS[1].minDays} 天以上 ${discountText(BEST_EARLY_BIRD)}`, `${EARLY_BIRD_TIERS[1].minDays}+ days ahead −${BEST_EARLY_BIRD}%`)}</span>
       </div>
     </div>
   );
@@ -471,7 +476,7 @@ function LandingContent() {
               </div>
               <dl className="lp-hero__proof" data-reveal style={{ "--d": "480ms" } as CSSProperties}>
                 <div><dt>{t("早鳥最高", "Up to")}</dt><dd>{isEn ? `${BEST_EARLY_BIRD}% off` : discountText(BEST_EARLY_BIRD)}</dd></div>
-                <div><dt>{t("最早提前", "Book up to")}</dt><dd>{t(`${MAX_ADVANCE_DAYS} 天`, `${MAX_ADVANCE_DAYS} days`)}</dd></div>
+                <div><dt>{t("最早提前", "Book up to")}</dt><dd>{t(`${maxAdvanceDays()} 天`, `${maxAdvanceDays()} days`)}</dd></div>
                 <div><dt>{t("合作店家", "Partner vendors")}</dt><dd>{vendorsLoading ? "—" : vendors.length}</dd></div>
               </dl>
             </div>
@@ -503,16 +508,16 @@ function LandingContent() {
                     </div>
                   </div>
                   <div className="lp-ticket__price">
-                    <span className="lp-strike">NT$ {heroItem.price}</span>
-                    <span className="lp-ticket__now">NT$ {earlyBird(heroItem.price)}</span>
+                    <span className="lp-strike">NT${heroItem.price}</span>
+                    <span className="lp-ticket__now">NT${earlyBird(heroItem.price)}</span>
                     <Badge tone="success" dot>{t("已鎖定", "Locked")}</Badge>
                   </div>
                   <span className="lp-ticket__stamp">{isEn ? `−${BEST_EARLY_BIRD}%` : discountText(BEST_EARLY_BIRD)}</span>
                 </div>
               )}
               <div className="lp-float lp-float--a"><Ticket /> {t("可轉讓・贈送", "Transfer or gift")}</div>
-              <div className="lp-float lp-float--b"><BellRing /> {t("取餐前提醒", "Pickup reminder")}</div>
-              <div className="lp-float lp-float--c"><ShieldCheck /> {t("48 小時前可取消換券", "Cancel 48h ahead for a coupon")}</div>
+              <div className="lp-float lp-float--b"><BellRing /> {t("取餐提醒", "Pickup reminder")}</div>
+              <div className="lp-float lp-float--c"><ShieldCheck /> {t(`${liveConfig().cancelHoursBefore} 小時前可取消換券`, `Cancel ${liveConfig().cancelHoursBefore}h ahead for a coupon`)}</div>
             </div>
           </div>
         </section>
@@ -520,8 +525,8 @@ function LandingContent() {
         {/* ── 跑馬燈 ── */}
         <div className="lp-ticker" role="region" aria-label={t("最新消息", "Latest news")}>
           <div className="lp-ticker__track">
-            {[...TICKER, ...TICKER].map((item, i) => (
-              <span key={i} className="lp-ticker__item" aria-hidden={i >= TICKER.length || undefined}>
+            {[...ticker(), ...ticker()].map((item, i) => (
+              <span key={i} className="lp-ticker__item" aria-hidden={i >= ticker().length || undefined}>
                 <Sparkle className="lp-ticker__star" aria-hidden="true" /> {pick(item, lang)}
               </span>
             ))}
@@ -618,8 +623,8 @@ function LandingContent() {
                   </div>
                   <span className="lp-dish__leader" aria-hidden="true" />
                   <div className="lp-dish__price">
-                    <span className="lp-strike"><span className="sr-only">{t("原價", "Was")} </span>${m.price}</span>
-                    <strong><span className="sr-only">{t("早鳥價", "Early-bird")} </span>${earlyBird(m.price)}</strong>
+                    <span className="lp-strike"><span className="sr-only">{t("原價", "Was")} </span>NT${m.price}</span>
+                    <strong><span className="sr-only">{t("早鳥價", "Early-bird")} </span>NT${earlyBird(m.price)}</strong>
                   </div>
                 </li>
               ))}
@@ -668,8 +673,8 @@ function LandingContent() {
         <section className="lp-container lp-stats-wrap" aria-label={t("BunnBaa 的承諾", "Our promises")}>
           <dl className="lp-stats">
             <div className="lp-stat" data-reveal><dd>{isEn ? <StatNumber value={BEST_EARLY_BIRD} suffix="%" /> : <StatNumber value={(100 - BEST_EARLY_BIRD) / 10} suffix="折" />}</dd><dt>{t("早鳥折扣最高", "Max early-bird discount")}</dt></div>
-            <div className="lp-stat" data-reveal style={{ "--d": "120ms" } as CSSProperties}><dd><StatNumber value={MAX_ADVANCE_DAYS} suffix={t("天", "d")} /></dd><dt>{t("最早可提前預約", "Book up to days ahead")}</dt></div>
-            <div className="lp-stat" data-reveal style={{ "--d": "240ms" } as CSSProperties}><dd><StatNumber value={100} suffix={t("元", "NT$")} /></dd><dt>{t("每累計實付，換一張抽獎券", "Paid per reward ticket")}</dt></div>
+            <div className="lp-stat" data-reveal style={{ "--d": "120ms" } as CSSProperties}><dd><StatNumber value={maxAdvanceDays()} suffix={t("天", "d")} /></dd><dt>{t("最早可提前預約", "Book up to days ahead")}</dt></div>
+            <div className="lp-stat" data-reveal style={{ "--d": "240ms" } as CSSProperties}><dd><StatNumber value={100} suffix={t("元", "NT$")} /></dd><dt>{t("每累計實付，換一張抽獎券", "Paid per draw ticket")}</dt></div>
           </dl>
         </section>
 
@@ -739,7 +744,7 @@ function LandingContent() {
               <Link key={v.id} href={`/vendor/${v.id}`} className="lp-store" data-reveal style={{ "--d": `${Math.min(i, 4) * 90}ms` } as CSSProperties}>
                 <div className="lp-store__visual" aria-hidden="true">
                   {v.cover_image ? <img src={v.cover_image} alt="" loading="lazy" decoding="async" /> : <Store />}
-                  {v.verified && <Badge tone="success" size="sm" className="lp-store__verified">{t("認證商家", "Verified")}</Badge>}
+                  {v.verified && <Badge tone="success" size="sm" className="lp-store__verified">{t("認證店家", "Verified")}</Badge>}
                 </div>
                 <div className="lp-store__body">
                   <h3 className="lp-h3">{loc(v, "name")}</h3>

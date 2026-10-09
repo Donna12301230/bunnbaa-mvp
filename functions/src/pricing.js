@@ -131,9 +131,18 @@ function cancelCouponAmount(lock, config = DEFAULT_PLATFORM_CONFIG) {
   return Math.max(0, Math.min(Math.round(original * (config.cancelCouponRate ?? 0.3)), paid));
 }
 
-/** 平台抽成（元）：每份餐點實付金額 × 抽成比例，逐份四捨五入後加總（收益看板與撥款用同一套） */
+// 營收／撥款口徑（2026-10-09 統一，以實際撥款為準）：全額預付的訂單算實付（未取餐、轉愛心餐也算）；
+// 顧客取消換券時留下的款項（kept_amount）也算；停班停課、店家未出餐退成點數的不算。
+// web/src/lib/lockOutcome.ts revenueOf 同一套。
+const PAID_STATUSES = ["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "charity", "no_show"];
+function revenueOf(lock) {
+  if (lock?.status === "cancelled") return Number(lock.kept_amount) || 0;
+  return PAID_STATUSES.includes(lock?.status) ? Number(lock.locked_price) || 0 : 0;
+}
+
+/** 平台抽成（元）：每份餐點的營收 × 抽成比例，逐份四捨五入後加總（收益看板與撥款用同一套） */
 function commissionOf(locks, rate = DEFAULT_PLATFORM_CONFIG.commissionRate) {
-  return locks.reduce((sum, l) => sum + Math.round((Number(l.locked_price) || 0) * rate), 0);
+  return locks.reduce((sum, l) => sum + Math.round(revenueOf(l) * rate), 0);
 }
 
 /** 0 / missing / invalid = unlimited (returns null). */
@@ -147,7 +156,11 @@ function closedReason(pickupDate, vendor, config = DEFAULT_PLATFORM_CONFIG) {
   const name = vendor?.name ?? t("這家店", "This vendor");
   const weekday = weekdayOf(pickupDate);
   if (!config.businessWeekdays.includes(weekday)) {
-    return t(`${pickupDate} 不是營業日（第一階段只做週一至週五）`, `${pickupDate} isn't a business day (weekdays only)`);
+    return t(`${pickupDate} 不是營業日`, `${pickupDate} isn't a business day`);
+  }
+  // 停班停課的日子（disaster.js 寫入）：單點下單另有檢查，這裡補上讓計畫型、預購助理也會跳過
+  if (Array.isArray(vendor?.disaster_dates) && vendor.disaster_dates.includes(pickupDate)) {
+    return t(`${pickupDate} 因停班停課暫停供餐`, `No service on ${pickupDate} (work suspension)`);
   }
   if (Array.isArray(vendor?.holidays) && vendor.holidays.includes(pickupDate)) {
     return t(`「${name}」${pickupDate} 公休`, `${name} is closed on ${pickupDate}`);
@@ -237,6 +250,6 @@ function windowMinutes(window) {
 module.exports = {
   EARLY_BIRD_TIERS, DEFAULT_PICKUP_WINDOWS, MEAL_PERIODS, mealPeriodOf, mealPeriodLabel, itemMealPeriods, itemWindows,
   vendorPeriodRanges, isValidWindow, vendorWindows, vendorPickupRange, vendorCutoffTime,
-  cutoffAt, isPastCutoff, cancelDeadlineAt, cancelCouponAmount, commissionOf, closedReason, validatePickup, planPickupDates, applyEarlyBirdPrice, earlyBirdPercent,
+  cutoffAt, isPastCutoff, cancelDeadlineAt, cancelCouponAmount, commissionOf, revenueOf, PAID_STATUSES, closedReason, validatePickup, planPickupDates, applyEarlyBirdPrice, earlyBirdPercent,
   vendorSlotCapacity, windowMinutes,
 };

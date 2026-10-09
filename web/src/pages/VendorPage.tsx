@@ -102,13 +102,13 @@ export default function VendorPage() {
     }
     if (cartVendorId && cartVendorId !== item.vendor_id) {
       toast({
-        title: tr("購物車裡有別家商家的品項", "Your cart has items from another vendor"),
-        description: tr("一次只能跟一家商家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
+        title: tr("購物車裡有別家店家的品項", "Your cart has items from another vendor"),
+        description: tr("一次只能跟一家店家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
         variant: "destructive",
       });
       return;
     }
-    add({ menuItem: item, vendorId: item.vendor_id, pickupDate: next.date, pickupWindow: next.window, choices: [], rice: "normal", quantity: 1, note: "", couponId: null });
+    if (!add({ menuItem: item, vendorId: item.vendor_id, pickupDate: next.date, pickupWindow: next.window, choices: [], rice: "normal", quantity: 1, note: "", couponId: null })) return;
     notifyCartAdded();
   }
 
@@ -120,9 +120,9 @@ export default function VendorPage() {
     return (
       <EmptyState
         icon={<Store size={32} />}
-        title={tr("找不到這個商家", "Vendor not found")}
+        title={tr("找不到這個店家", "Vendor not found")}
         description={tr("可能已停止營業，或連結有誤。", "It may have closed, or the link is wrong.")}
-        action={<Button variant="outline" asChild><Link href="/vendors">{tr("回商家清單", "Back to vendors")}</Link></Button>}
+        action={<Button variant="outline" asChild><Link href="/vendors">{tr("回店家清單", "Back to vendors")}</Link></Button>}
       />
     );
   }
@@ -130,11 +130,11 @@ export default function VendorPage() {
   return (
     <div className="space-y-10">
       <Link href="/vendors" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("回商家清單", "Back to vendors")}
+        <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("回店家清單", "Back to vendors")}
       </Link>
 
       {/* ── 店家頁首：大圖＋疊在圖上的店名（深色漸層保證白字對比） ── */}
-      <section className="relative overflow-hidden rounded-[2rem] border border-ink bg-secondary">
+      <section className="relative overflow-hidden rounded-card border border-ink bg-secondary">
         {vendor.cover_image ? (
           <img src={vendor.cover_image} alt="" className="w-full h-[260px] md:h-[420px] object-cover" />
         ) : (
@@ -145,7 +145,7 @@ export default function VendorPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#1c110a]/85 via-[#1c110a]/25 to-transparent" aria-hidden="true" />
         <div className="absolute inset-x-0 bottom-0 p-6 md:p-10 text-[#fff6e3]">
           {vendor.verified && (
-            <span className="inline-block mb-3 text-caption font-bold px-2.5 py-1 rounded-full bg-[#ffe1a1] text-[#2b180d]">{tr("認證商家", "Verified")}</span>
+            <span className="inline-block mb-3 text-caption font-bold px-2.5 py-1 rounded-full bg-highlight text-brand-foreground">{tr("認證店家", "Verified")}</span>
           )}
           <h1 className="font-heading font-semibold text-[clamp(36px,5.5vw,72px)] leading-[1.04] tracking-[-0.02em]">{loc(vendor, "name")}</h1>
           {vendor.description && <p className="mt-2 max-w-2xl text-sm md:text-base opacity-90">{loc(vendor, "description")}</p>}
@@ -156,7 +156,7 @@ export default function VendorPage() {
       <div className="flex flex-wrap gap-3 text-sm">
         {rating && (
           <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-ink bg-card">
-            <Star className="w-4 h-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+            <Star className="w-4 h-4 fill-warning text-warning" aria-hidden="true" />
             <span className="font-semibold">{rating.average}</span>
             <span className="text-muted-foreground">（{rating.count}+）</span>
           </span>
@@ -176,9 +176,9 @@ export default function VendorPage() {
       {/* ── 提醒 ── */}
       <div className="grid gap-3 md:grid-cols-2">
         {vendor.typhoon_notice?.dates?.length ? (
-          <div className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 md:col-span-2">
+          <div className="flex items-start gap-3 rounded-2xl border border-warning/50 bg-warning-soft p-4 text-sm text-warning-text md:col-span-2">
             <AlertTriangle className="w-5 h-5 shrink-0" aria-hidden="true" />
-            <span>{tr(`颱風警報：${vendor.typhoon_notice.dates.join("、")} 的訂單可能因停班停課取消（會自動全額退款）。`, `Typhoon warning: orders on ${vendor.typhoon_notice.dates.join(", ")} may be cancelled (automatic full refund).`)}</span>
+            <span>{tr(`颱風警報：${vendor.typhoon_notice.dates.join("、")} 的訂單可能因停班停課取消（會自動全額退成平台點數）。`, `Typhoon warning: orders on ${vendor.typhoon_notice.dates.join(", ")} may be cancelled (automatic full refund as points).`)}</span>
           </div>
         ) : null}
         <div className="flex items-center gap-4 rounded-2xl border border-ink bg-accent p-4 text-sm">
@@ -201,7 +201,7 @@ export default function VendorPage() {
         {itemsLoading ? (
           <SkeletonBlocks count={2} height={72} className="space-y-1" />
         ) : items.length === 0 ? (
-          <EmptyState size="compact" icon={<UtensilsCrossed size={32} />} title={tr("這家商家目前沒有上架品項", "This vendor has no items available right now")} />
+          <EmptyState size="compact" icon={<UtensilsCrossed size={32} />} title={tr("這家店家目前沒有上架品項", "This vendor has no items available right now")} />
         ) : (
           <>
             {showCatalogs && (
@@ -278,7 +278,7 @@ export default function VendorPage() {
                             {item.dietary_tags?.length > 0 && (
                               <span className="flex flex-wrap gap-1 mt-1.5">
                                 {item.dietary_tags.map((tag) => (
-                                  <span key={tag} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                  <span key={tag} className="text-xs bg-success-soft text-success-text px-2 py-0.5 rounded-full">
                                     {tr(tag, tagEn(tag))}
                                   </span>
                                 ))}

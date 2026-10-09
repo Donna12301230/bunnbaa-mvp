@@ -29,6 +29,7 @@ const { isBento, resolveChoices, resolveMain, resolveExtraSide, resolveCustomPic
 const { ACTIVE_LOCK_STATUSES, componentPortions, rawNeeds, buildTimeline, buildLabels } = require("./prep");
 const { taipeiToday, taipeiTime, addDays, mondayOf, at, splitWindow } = require("./calendar");
 const { recordMatchedClaim } = require("./resaleMatch").helpers;
+const wallet = require("./wallet").helpers;
 
 const APP_BASE_URL = () => process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
 const MAX_CART_UNITS = 50;
@@ -154,7 +155,7 @@ async function buildDrafts(line, ctx) {
   const item = await loadOrderableMenuItem(line?.menu_item_id);
   const vendor = await loadVendor(item.vendor_id, ctx.vendorCache);
   if (ctx.vendorId && ctx.vendorId !== vendor.id) {
-    throw new HttpsError("invalid-argument", t("一次只能跟一家商家預購", "One vendor per checkout"));
+    throw new HttpsError("invalid-argument", t("一次只能跟一家店家預購", "One vendor per checkout"));
   }
   ctx.vendorId = vendor.id;
   const pickupDate = line.pickup_date;
@@ -264,15 +265,20 @@ async function assertSlotsHaveRoom(drafts, vendorCache) {
   }
 }
 
-/** 建立付款意圖；金額為 0（折價券全額折抵）時不經 LINE Pay，確認頁直接建立鎖定 */
+/**
+ * 建立付款意圖；use_points＝先用平台點數折抵（wallet.js），剩下的才走 LINE Pay。
+ * 要付的現金為 0（折價券或點數全額折抵）時不經 LINE Pay，確認頁直接建立鎖定。
+ */
 async function reserve(request, drafts, productName) {
-  const amount = drafts.reduce((s, d) => s + d.locked_price, 0);
+  const total = drafts.reduce((s, d) => s + d.locked_price, 0);
   const intentRef = db().collection("payment_intents").doc();
   const orderId = intentRef.id;
+  const points = request.data?.use_points ? await wallet.holdPoints(request.auth.uid, orderId, total) : { used: 0, sources: [] };
+  const amount = total - points.used;
   let transactionId = null;
   let paymentUrl = `${APP_BASE_URL()}/#/payment/confirm/${orderId}`;
   if (amount > 0) {
-    // LINE Pay 的 products 金額加總要等於 amount；同價的合併成一行
+    // LINE Pay 的 products 金額加總要等於 amount；同價的合併成一行。有用點數折抵時合成一行「折抵後金額」
     const byPrice = new Map();
     for (const d of drafts) {
       const key = `${productName(d)}|${d.locked_price}`;
@@ -280,7 +286,9 @@ async function reserve(request, drafts, productName) {
       p.quantity += 1;
       byPrice.set(key, p);
     }
-    const products = [...byPrice.values()].filter((p) => p.price > 0);
+    const products = points.used > 0
+      ? [{ name: t(`飯飽預購（已折抵 ${points.used} 點）`, `BunnBaa pre-order (${points.used} points applied)`), quantity: 1, price: amount }]
+      : [...byPrice.values()].filter((p) => p.price > 0);
     let info;
     try {
       // orderId goes in the path, not a query string: LINE Pay appends
@@ -292,6 +300,7 @@ async function reserve(request, drafts, productName) {
       });
     } catch (err) {
       logger.error("LINE Pay request failed", err);
+      await wallet.releaseHold(request.auth.uid, orderId, "failed").catch(() => undefined);
       throw new HttpsError("internal", t("LINE Pay 付款請求失敗，請稍後再試", "The LINE Pay request failed. Please try again later."));
     }
     transactionId = String(info.transactionId);
@@ -302,11 +311,17 @@ async function reserve(request, drafts, productName) {
     buyer_uid: request.auth.uid,
     transaction_id: transactionId,
     amount,
+    total,
+    points_used: points.used,
+    points_sources: points.sources,
     lock_drafts: drafts,
     created_at: FieldValue.serverTimestamp(),
   });
-  return { order_id: orderId, payment_url: paymentUrl, free: amount === 0 };
+  return { order_id: orderId, payment_url: paymentUrl, free: amount === 0, points_used: points.used };
 }
+
+const holdExpired = () =>
+  t("付款逾時，折抵的點數已退回，這筆沒有扣款，請重新結帳", "This payment timed out. Your points were returned and you weren't charged — please check out again.");
 
 async function newContext(request) {
   return {
@@ -514,25 +529,39 @@ exports.confirmLinePayPayment = onCall({}, async (request) => {
     tx.update(intentRef, { status: "confirming" });
     return "ok";
   });
-  if (outcome === "sold_out") throw new HttpsError("resource-exhausted", soldOutDuringPayment());
-  if (outcome === "coupon_gone") throw new HttpsError("failed-precondition", couponGoneDuringPayment());
+  if (outcome === "sold_out" || outcome === "coupon_gone") {
+    await wallet.releaseHold(request.auth.uid, orderId, outcome).catch(() => undefined);
+    if (outcome === "sold_out") throw new HttpsError("resource-exhausted", soldOutDuringPayment());
+    throw new HttpsError("failed-precondition", couponGoneDuringPayment());
+  }
 
-  // 2) 扣款；失敗就把份數、折價券還回去，讓買家可以重試同一筆
+  // 2) 扣款；失敗就把份數、折價券（與點數保留）還回去，讓買家可以重試同一筆
+  const rollbackReservation = async (status) => {
+    const rollback = db().batch();
+    slots.forEach((g, i) => rollback.update(counterRefs[i], { count: FieldValue.increment(-g.count) }));
+    couponIds.forEach((id) => rollback.update(db().collection("coupons").doc(id), {
+      status: "owned", lock_id: FieldValue.delete(), redeemed_at: FieldValue.delete(),
+    }));
+    rollback.update(intentRef, { status });
+    await rollback.commit().catch((e) => logger.error("Rollback failed", e));
+  };
+  if (!(await wallet.lockHold(request.auth.uid, orderId))) {
+    await rollbackReservation("expired");
+    throw new HttpsError("deadline-exceeded", holdExpired());
+  }
   if (intent.amount > 0) {
     try {
       await confirmPayment({ transactionId: intent.transaction_id, amount: intent.amount });
     } catch (err) {
       logger.error("LINE Pay confirm failed", err);
-      const rollback = db().batch();
-      slots.forEach((g, i) => rollback.update(counterRefs[i], { count: FieldValue.increment(-g.count) }));
-      couponIds.forEach((id) => rollback.update(db().collection("coupons").doc(id), {
-        status: "owned", lock_id: FieldValue.delete(), redeemed_at: FieldValue.delete(),
-      }));
-      rollback.update(intentRef, { status: "pending" });
-      await rollback.commit().catch((e) => logger.error("Rollback failed", e));
+      await wallet.unlockHold(request.auth.uid, orderId).catch(() => undefined);
+      await rollbackReservation("pending");
       throw new HttpsError("internal", t("LINE Pay 付款確認失敗，請稍後再試或聯絡客服", "LINE Pay couldn't confirm the payment. Please try again later."));
     }
   }
+  await wallet.commitHold(request.auth.uid, orderId);
+  // 點數折抵依序分給每一份；每份記下還能退的錢來自哪裡（funding，wallet.js）
+  const shares = wallet.splitFunding(drafts.map((d) => d.locked_price), intent.transaction_id, intent.points_sources || []);
 
   // 3) 建立鎖定、候選菜許願計數
   const codes = await allocatePickupCodes(drafts);
@@ -551,6 +580,8 @@ exports.confirmLinePayPayment = onCall({}, async (request) => {
       buyer_uid: request.auth.uid,
       payer_uid: request.auth.uid,
       paid_amount: draft.locked_price,
+      points_used: shares[i].points,
+      funding: shares[i].funding,
       payment_intent_id: orderId,
       transaction_id: intent.transaction_id,
       pickup_code: codes[i],
@@ -576,44 +607,34 @@ function paidAmountOf(lock) {
   return Number.isFinite(lock.paid_amount) ? lock.paid_amount : lock.locked_price || 0;
 }
 
-async function refundLockMoney(lock) {
-  const amount = paidAmountOf(lock);
-  if (!(amount > 0) || !lock.transaction_id) return;
-  await refundPayment({ transactionId: lock.transaction_id, refundAmount: amount });
-}
-
 /**
  * 取消並全額退款（停班停課自動退款用；消費者自己取消改走 cancelForCoupon 發折價券）。
+ * 2026-10-09 起退款一律退成平台點數給付款人（wallet.js），會員可自己退回 LINE Pay。
  * 折價券退回並保留原到期日，已過期則不退；份數與許願計數扣回。
  */
 async function cancelAndRefund(lockRef, reason) {
-  const snap = await lockRef.get();
-  const lock = snap.data();
-  if (!ACTIVE_LOCK_STATUSES.includes(lock.status)) return false;
-  // 先標記避免重複退款，退款失敗再還原
-  await lockRef.update({ status: "cancelling" });
-  try {
-    await refundLockMoney(lock);
-  } catch (err) {
-    await lockRef.update({ status: lock.status });
-    throw err;
-  }
-  const batch = db().batch();
-  batch.update(lockRef, {
-    status: "cancelled", cancel_reason: reason, refunded_amount: paidAmountOf(lock), cancelled_at: FieldValue.serverTimestamp(),
+  return db().runTransaction(async (tx) => {
+    const snap = await tx.get(lockRef);
+    const lock = snap.data();
+    if (!ACTIVE_LOCK_STATUSES.includes(lock.status)) return false;
+    const couponRef = lock.coupon_id ? db().collection("coupons").doc(lock.coupon_id) : null;
+    const coupon = couponRef ? (await tx.get(couponRef)).data() : null;
+    const { sources, funding, amount } = wallet.refundSources(lock, Infinity);
+    wallet.writeCredit(tx, lock.payer_uid || lock.buyer_uid, sources, { reason, lockId: lockRef.id, text: lock.item_name || "" });
+    tx.update(lockRef, {
+      status: "cancelled", cancel_reason: reason, refunded_amount: (lock.refunded_amount || 0) + amount, refunded_as: "points", funding,
+      cancelled_at: FieldValue.serverTimestamp(),
+    });
+    if (couponRef) {
+      const expired = coupon?.expires_at?.toMillis?.() <= Date.now();
+      tx.update(couponRef, expired
+        ? { status: "expired", lock_id: FieldValue.delete() }
+        : { status: "owned", lock_id: FieldValue.delete(), redeemed_at: FieldValue.delete() });
+    }
+    tx.set(slotCounterRef(lock.vendor_id, lock.pickup_date, lock.pickup_window), { count: FieldValue.increment(-1) }, { merge: true });
+    bumpWishes(tx, lock, -1);
+    return true;
   });
-  if (lock.coupon_id) {
-    const couponRef = db().collection("coupons").doc(lock.coupon_id);
-    const coupon = (await couponRef.get()).data();
-    const expired = coupon?.expires_at?.toMillis?.() <= Date.now();
-    batch.update(couponRef, expired
-      ? { status: "expired", lock_id: FieldValue.delete() }
-      : { status: "owned", lock_id: FieldValue.delete(), redeemed_at: FieldValue.delete() });
-  }
-  batch.set(slotCounterRef(lock.vendor_id, lock.pickup_date, lock.pickup_window), { count: FieldValue.increment(-1) }, { merge: true });
-  bumpWishes(batch, lock, -1);
-  await batch.commit();
-  return true;
 }
 
 async function loadOwnLock(request, lockId) {
@@ -662,7 +683,7 @@ async function cancelForCoupon(lockRef, config) {
     const expiresAt = Timestamp.fromMillis(Date.now() + config.couponValidDays * 86400000);
     if (amount > 0) {
       tx.set(couponRef, {
-        vendor_id: lock.vendor_id, vendor_name: vendor.name || "", tier: "refund", label: "取消退款券", discount: amount,
+        vendor_id: lock.vendor_id, vendor_name: vendor.name || "", tier: "refund", label: "取消補償券", discount: amount,
         status: "owned", user_id: lock.buyer_uid, owned_at: FieldValue.serverTimestamp(), expires_at: expiresAt,
         source_lock_id: lockRef.id, issued_at: FieldValue.serverTimestamp(),
       });
@@ -750,7 +771,9 @@ exports.createResaleLinePayReservation = onCall({}, async (request) => {
     return data;
   });
 
-  const amount = resalePriceOf(lock);
+  const total = resalePriceOf(lock);
+  const points = request.data?.use_points ? await wallet.holdPoints(request.auth.uid, orderId, total) : { used: 0, sources: [] };
+  const amount = total - points.used;
   let transactionId = null;
   let paymentUrl = `${APP_BASE_URL()}/#/payment/confirm/${orderId}`;
   if (amount > 0) {
@@ -766,6 +789,7 @@ exports.createResaleLinePayReservation = onCall({}, async (request) => {
     } catch (err) {
       logger.error("LINE Pay request failed (resale)", err);
       await lockRef.update({ resale_hold: FieldValue.delete() }).catch(() => {});
+      await wallet.releaseHold(request.auth.uid, orderId, "failed").catch(() => undefined);
       throw new HttpsError("internal", t("LINE Pay 付款請求失敗，請稍後再試", "The LINE Pay request failed. Please try again later."));
     }
   }
@@ -777,9 +801,12 @@ exports.createResaleLinePayReservation = onCall({}, async (request) => {
     seller_uid: lock.buyer_uid,
     transaction_id: transactionId,
     amount,
+    total,
+    points_used: points.used,
+    points_sources: points.sources,
     created_at: FieldValue.serverTimestamp(),
   });
-  return { order_id: orderId, payment_url: paymentUrl, free: amount === 0, amount };
+  return { order_id: orderId, payment_url: paymentUrl, free: amount === 0, amount, total, points_used: points.used };
 });
 
 /** confirmLinePayPayment 的接手分支：先換人（賣家就不能再取消轉讓）→ 扣款 → 退款給原付款人 */
@@ -806,6 +833,7 @@ async function confirmResale(request, intentRef, intent) {
       payer_uid: lock.payer_uid || lock.buyer_uid,
       transaction_id: lock.transaction_id || null,
       paid_amount: paidAmountOf(lock),
+      funding: wallet.fundingOf(lock),
       resale_deadline: lock.resale_deadline || null,
       resale_price: Number.isInteger(lock.resale_price) ? lock.resale_price : null,
       transferred_from_uids: lock.transferred_from_uids || [],
@@ -822,14 +850,35 @@ async function confirmResale(request, intentRef, intent) {
     tx.update(intentRef, { status: "confirming", prev: snapshot });
     return snapshot;
   });
-  if (prev.gone) throw new HttpsError("failed-precondition", prev.gone);
+  if (prev.gone) {
+    await wallet.releaseHold(uid, orderId, "gone").catch(() => undefined);
+    throw new HttpsError("failed-precondition", prev.gone);
+  }
 
-  // 2) 扣款；失敗就把餐點還給賣家、意圖回 pending，接手者可以重試
+  // 2) 扣款；失敗就把餐點還給賣家、意圖回 pending（點數保留也放回），接手者可以重試
+  const rollbackTakeover = async (status) => {
+    const rollback = db().batch();
+    rollback.update(lockRef, {
+      status: "for_resale",
+      buyer_uid: prev.buyer_uid,
+      transferred_from_uids: prev.transferred_from_uids,
+      ...(prev.resale_deadline ? { resale_deadline: prev.resale_deadline } : {}),
+      ...(prev.resale_price != null ? { resale_price: prev.resale_price } : {}),
+      resale_payment_pending: FieldValue.delete(),
+    });
+    rollback.update(intentRef, { status });
+    await rollback.commit().catch((e) => logger.error("Resale rollback failed", e));
+  };
+  if (!(await wallet.lockHold(uid, orderId))) {
+    await rollbackTakeover("expired");
+    throw new HttpsError("deadline-exceeded", holdExpired());
+  }
   if (intent.amount > 0) {
     try {
       await confirmPayment({ transactionId: intent.transaction_id, amount: intent.amount });
     } catch (err) {
       logger.error("LINE Pay confirm failed (resale)", err);
+      await wallet.unlockHold(uid, orderId).catch(() => undefined);
       const rollback = db().batch();
       rollback.update(lockRef, {
         status: "for_resale",
@@ -845,24 +894,31 @@ async function confirmResale(request, intentRef, intent) {
     }
   }
 
+  await wallet.commitHold(uid, orderId);
+
   // 3) 接手者成為付款人；換掉代領連結與 QR，原持有人手上的截圖立即失效
   const lock = (await lockRef.get()).data();
-  // 退給原付款人的金額：實付與轉讓價取小的（自訂轉讓價可能低於或高於他實付）
-  const refundAmount = prev.transaction_id ? Math.min(prev.paid_amount, intent.amount) : 0;
+  const price = Number.isFinite(intent.total) ? intent.total : intent.amount; // 舊意圖沒有 total（沒有點數折抵）
+  // 退給原付款人的金額：實付與轉讓價取小的（自訂轉讓價可能低於或高於他實付）；2026-10-09 起退成點數
+  const refund = wallet.refundSources({ funding: prev.funding || [] }, Math.min(prev.paid_amount, price));
+  const refundAmount = refund.amount;
+  const [share] = wallet.splitFunding([price], intent.transaction_id, intent.points_sources || []);
   const batch = db().batch();
   batch.update(lockRef, {
     payer_uid: uid,
     transaction_id: intent.transaction_id,
     payment_intent_id: orderId,
-    paid_amount: intent.amount,
-    locked_price: intent.amount,
+    paid_amount: price,
+    points_used: share.points,
+    funding: share.funding,
+    locked_price: price,
     coupon_id: null,
     coupon_discount: 0,
     share_token: crypto.randomBytes(12).toString("hex"),
     qr_nonce: FieldValue.delete(),
     resale_payment_pending: FieldValue.delete(),
     transfers: FieldValue.arrayUnion({
-      intent_id: orderId, from_uid: prev.buyer_uid, to_uid: uid, price: intent.amount,
+      intent_id: orderId, from_uid: prev.buyer_uid, to_uid: uid, price,
       refund_uid: prev.payer_uid, refund_amount: refundAmount, at: Timestamp.now(),
     }),
   });
@@ -870,35 +926,36 @@ async function confirmResale(request, intentRef, intent) {
   batch.update(intentRef, { status: "confirmed", lock_ids: [intent.lock_id] });
   await batch.commit();
 
-  // 4) 退款給原付款人。扣款已成功、餐點已換人，退款失敗不回滾，記下來讓管理員補退
+  // 4) 原付款人的款項退成平台點數（可折抵或到會員中心退回 LINE Pay）
   let refundStatus = "none";
   if (refundAmount > 0) {
     try {
-      await refundPayment({ transactionId: prev.transaction_id, refundAmount });
+      await wallet.creditPoints(prev.payer_uid, refund.sources, { reason: "transfer", lockId: intent.lock_id, text: lock.item_name || "" });
       refundStatus = "done";
     } catch (err) {
-      logger.error(`resale refund failed for lock ${intent.lock_id}`, err);
+      logger.error(`resale points refund failed for lock ${intent.lock_id}`, err);
       refundStatus = "failed";
     }
   }
   await lockRef.update({
-    transfer_refund: { intent_id: orderId, uid: prev.payer_uid, amount: refundAmount, transaction_id: prev.transaction_id, status: refundStatus, at: Timestamp.now() },
+    transfer_refund: { intent_id: orderId, uid: prev.payer_uid, amount: refundAmount, as: "points", status: refundStatus, at: Timestamp.now() },
   });
+  const pointsText = (n) => t(`${n} 點已存入你的平台點數，可結帳折抵或到會員中心退回 LINE Pay。`, `${n} points were added to your BunnBaa balance — use them at checkout or send them back to LINE Pay from My account.`);
   await notifyUser(prev.buyer_uid, {
     kind: "transfer",
     title: t("你轉讓的餐點已被接手", "Your listed meal was taken over"),
     body: refundStatus === "done" && prev.payer_uid === prev.buyer_uid
-      ? t(`「${lock.item_name}」已由別人付款接手，NT$ ${refundAmount} 已退回原付款方式。`, `${lock.item_name} was taken over; NT$ ${refundAmount} is on its way back to you.`)
+      ? `${t(`「${lock.item_name}」已由別人付款接手。`, `${lock.item_name} was taken over. `)}${pointsText(refundAmount)}`
       : t(`「${lock.item_name}」已由別人付款接手。`, `${lock.item_name} was taken over.`),
-    link: "/my-bookings",
+    link: refundStatus === "done" && prev.payer_uid === prev.buyer_uid ? "/profile?tab=points" : "/my-bookings",
   }).catch((err) => logger.warn("notify seller failed", err));
   // 贈送或免費領取來的餐點再轉讓：錢退給當初真正付款的人
   if (refundStatus === "done" && prev.payer_uid !== prev.buyer_uid) {
     await notifyUser(prev.payer_uid, {
       kind: "transfer",
-      title: t("餐點款項已退回", "Your payment was refunded"),
-      body: t(`你付款的「${lock.item_name}」已由別人付款接手，NT$ ${refundAmount} 已退回原付款方式。`, `Someone paid for ${lock.item_name}; NT$ ${refundAmount} is on its way back to you.`),
-      link: "/my-bookings",
+      title: t("餐點款項已退成點數", "Your payment came back as points"),
+      body: `${t(`你付款的「${lock.item_name}」已由別人付款接手。`, `Someone paid for ${lock.item_name}. `)}${pointsText(refundAmount)}`,
+      link: "/profile?tab=points",
     }).catch((err) => logger.warn("notify payer failed", err));
   }
   // AI 轉讓媒合的影響指標：接手的人是不是被通知的會員（失敗不影響接手）
@@ -961,8 +1018,8 @@ exports.updateLockChoices = onCall({}, async (request) => {
     newLocked = subtotal - couponDiscount;
     if (newLocked > lock.locked_price) {
       throw new HttpsError("failed-precondition", t(
-        `這樣改要補 NT$ ${newLocked - lock.locked_price}，第一階段請取消後重新下單`,
-        `This change costs NT$ ${newLocked - lock.locked_price} more — please cancel and re-order`
+        `這樣改要多 NT$${newLocked - lock.locked_price}，目前還不能線上補差額，請保留原本的選項`,
+        `This change costs NT$${newLocked - lock.locked_price} more, and topping up isn't supported yet — please keep your current choices`
       ));
     }
     Object.assign(patch, {
@@ -982,16 +1039,16 @@ exports.updateLockChoices = onCall({}, async (request) => {
     next = { ...lock, ...patch };
   }
 
+  // 變便宜：差額退成平台點數給付款人（wallet.js），寫進同一個交易
   const refund = lock.locked_price - newLocked;
-  if (refund > 0 && lock.transaction_id) {
-    try {
-      await refundPayment({ transactionId: lock.transaction_id, refundAmount: refund });
-    } catch (err) {
-      logger.error("partial refund failed", err);
-      throw new HttpsError("internal", t("退差額失敗，請稍後再試", "Refunding the difference failed. Please try again later."));
+  let refundCredit = null;
+  if (refund > 0) {
+    refundCredit = wallet.refundSources(lock, refund);
+    if (refundCredit.amount > 0) {
+      patch.refunded_amount = (lock.refunded_amount || 0) + refundCredit.amount;
+      patch.paid_amount = paidAmountOf(lock) - refundCredit.amount;
+      patch.funding = refundCredit.funding;
     }
-    patch.refunded_amount = (lock.refunded_amount || 0) + refund;
-    patch.paid_amount = paidAmountOf(lock) - refund;
   }
 
   // 換時段要搬份數（有上限的店家先檢查新時段還有沒有位子）
@@ -1008,6 +1065,9 @@ exports.updateLockChoices = onCall({}, async (request) => {
       tx.set(slotCounterRef(lock.vendor_id, lock.pickup_date, lock.pickup_window), { count: FieldValue.increment(-1) }, { merge: true });
     }
     tx.update(ref, patch);
+    if (refundCredit?.amount > 0) {
+      wallet.writeCredit(tx, lock.payer_uid || lock.buyer_uid, refundCredit.sources, { reason: "price_change", lockId: ref.id, text: lock.item_name || "" });
+    }
   });
   if (changesChoices) {
     const batch = db().batch();
@@ -1056,8 +1116,55 @@ function parseQrToken(token) {
  * 產生取餐 QR。持有人本人，或拿到代領連結（share_token）的人都可以。
  * 每次產生都換 nonce，舊截圖立即失效。愛心餐預約（kind=R）也走這裡。
  */
+// 代領碼（2026-10-09）：代領連結點開常被要求登入、登入後又跳走，改成可以輸入的 8 碼代領碼。
+// 存在 proxyCodes/{code}（規則全擋，只有 Admin SDK 讀寫；不能放在 locks 上——轉讓中／贈送中的 locks 是公開可讀的），
+// 記下產生當時的 share_token：轉讓／贈送接手會換 share_token，舊代領碼跟舊連結一起失效。
+// 字母表去掉容易看錯的 0/O、1/I/L。
+const PROXY_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const PROXY_CODE_LENGTH = 8;
+
+function normalizeProxyCode(raw) {
+  return String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function randomProxyCode() {
+  const bytes = crypto.randomBytes(PROXY_CODE_LENGTH);
+  return Array.from(bytes, (b) => PROXY_CODE_ALPHABET[b % PROXY_CODE_ALPHABET.length]).join("");
+}
+
+/** 持有人取得（或第一次產生）這份餐點的代領碼 */
+exports.getProxyPickupCode = onCall({}, async (request) => {
+  assertSignedInUser(request, "產生代領碼");
+  const lockId = request.data?.lock_id;
+  if (typeof lockId !== "string" || !lockId) throw new HttpsError("invalid-argument", "lock_id is required");
+  const ref = db().collection("locks").doc(lockId);
+  const snap = await ref.get();
+  if (!snap.exists || snap.data().buyer_uid !== request.auth.uid) throw new HttpsError("permission-denied", t("這不是你的訂單", "This isn't your order"));
+  const lock = snap.data();
+  if (lock.status !== "locked") throw new HttpsError("failed-precondition", t("轉讓中、贈送中的餐點不能代領", "Meals listed for transfer or gift can't be picked up by someone else"));
+  let shareToken = lock.share_token;
+  if (!shareToken) {
+    shareToken = crypto.randomBytes(12).toString("hex");
+    await ref.update({ share_token: shareToken });
+  }
+  const existing = await db().collection("proxyCodes").where("lock_id", "==", lockId).limit(20).get();
+  const current = existing.docs.find((d) => d.data().share_token === shareToken);
+  if (current) return { code: current.id, share_token: shareToken };
+  for (let i = 0; i < 5; i++) {
+    const code = randomProxyCode();
+    try {
+      await db().collection("proxyCodes").doc(code).create({ lock_id: lockId, share_token: shareToken, created_at: FieldValue.serverTimestamp() });
+      return { code, share_token: shareToken };
+    } catch (err) {
+      if (err.code !== 6) throw err; // 6 = ALREADY_EXISTS：撞碼就換一組
+    }
+  }
+  throw new HttpsError("internal", t("代領碼產生失敗，請再試一次", "Couldn't create a proxy code. Please try again."));
+});
+
 exports.issuePickupQr = onCall({}, async (request) => {
-  const { lock_id: lockId, share_token: shareToken, reservation_id: reservationId } = request.data || {};
+  const { share_token: shareToken, reservation_id: reservationId, proxy_code: proxyCode } = request.data || {};
+  let { lock_id: lockId } = request.data || {};
   const nonce = crypto.randomBytes(6).toString("hex");
   if (reservationId) {
     assertSignedInUser(request, "領取愛心餐");
@@ -1068,14 +1175,28 @@ exports.issuePickupQr = onCall({}, async (request) => {
     await ref.update({ qr_nonce: nonce });
     return { token: makeQrToken("R", reservationId, nonce), expires_in: QR_TTL_MS / 1000 };
   }
+  let codeToken = null;
+  if (proxyCode != null) {
+    // 代領碼不用登入；碼錯、已轉手一律同一句話，不透露訂單存不存在
+    const normalized = normalizeProxyCode(proxyCode);
+    const codeSnap = normalized.length === PROXY_CODE_LENGTH ? await db().collection("proxyCodes").doc(normalized).get() : null;
+    if (!codeSnap?.exists) throw new HttpsError("not-found", t("代領碼不正確或已失效，請跟朋友確認", "That proxy code is wrong or no longer valid. Check with your friend."));
+    lockId = codeSnap.data().lock_id;
+    codeToken = codeSnap.data().share_token;
+  }
   if (typeof lockId !== "string" || !lockId) throw new HttpsError("invalid-argument", "lock_id is required");
   const ref = db().collection("locks").doc(lockId);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError("not-found", t("找不到這筆訂單", "Order not found"));
   const lock = snap.data();
   const owner = request.auth && lock.buyer_uid === request.auth.uid;
-  const proxy = shareToken && lock.share_token && shareToken === lock.share_token;
-  if (!owner && !proxy) throw new HttpsError("permission-denied", t("沒有這筆訂單的取餐權限", "You can't pick up this order"));
+  const presented = codeToken || shareToken;
+  // 代領只限沒在轉讓／贈送的餐點：for_resale／for_gift 的 locks 公開可讀（含 share_token），不能拿來代領
+  const proxy = !!presented && !!lock.share_token && presented === lock.share_token && lock.status === "locked";
+  if (!owner && !proxy) {
+    if (codeToken) throw new HttpsError("not-found", t("代領碼不正確或已失效，請跟朋友確認", "That proxy code is wrong or no longer valid. Check with your friend."));
+    throw new HttpsError("permission-denied", t("沒有這筆訂單的取餐權限", "You can't pick up this order"));
+  }
   if (!["locked", "for_resale", "for_gift"].includes(lock.status)) {
     throw new HttpsError("failed-precondition", t("這筆訂單已經不能取餐", "This order can no longer be picked up"));
   }
@@ -1087,6 +1208,8 @@ exports.issuePickupQr = onCall({}, async (request) => {
     item_name: lock.item_name,
     pickup_date: lock.pickup_date,
     pickup_window: lock.pickup_window,
+    // 代領畫面要顯示是哪一份、哪家店（不含任何持有人個資）
+    ...(proxy && !owner ? { item_name_en: lock.item_name_en || null, vendor_id: lock.vendor_id } : {}),
   };
 });
 

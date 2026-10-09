@@ -12,7 +12,7 @@ export const ALL_TIERS = [...COUPON_TIERS, BASE_TIER];
 
 export function tierLabel(code: string): string {
   // 取消訂單退的折價券（functions/src/orders.js cancelForCoupon），不經回饋池
-  if (code === "refund") return tr("取消退款券", "Cancellation coupon");
+  if (code === "refund") return tr("取消補償券", "Cancellation coupon");
   const t = ALL_TIERS.find((x) => x.code === code);
   return t ? tr(t.label, t.labelEn) : code;
 }

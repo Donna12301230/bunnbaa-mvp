@@ -48,17 +48,17 @@ Gemini runs through four stages of a meal's life:
 | Stage | Feature | Gemini capability | Cloud Function |
 |---|---|---|---|
 | List | Photo-to-menu: a photo of a paper menu becomes structured, bilingual menu drafts (price, category, dietary tags, allergens) that the owner confirms | Multimodal vision → JSON | `extractMenuFromImage` |
-| Find | Conversational pre-order assistant: "Lunch next Mon–Fri, Da'an district, under NT$120, no beef" → bookable meal cards | Multi-turn function calling (`searchMenuItems`, `checkAvailability`, `searchMealPlans`, `presentCandidates`) | `askShoppingAssistant` |
+| Find | Conversational pre-order assistant: "Lunch next Mon–Fri, Da'an district, under NT$120, no beef" or "dinner tomorrow, not spicy" → bookable meal cards (breakfast / lunch / dinner aware) | Multi-turn function calling (`searchMenuItems`, `checkAvailability`, `searchMealPlans`, `presentCandidates`) | `askShoppingAssistant` |
 | Rescue | Resale matching: when a meal is put up for resale, find diners who ate similar dishes nearby and push-notify them | `gemini-embedding-001` (768-dim) + Firestore Vector Search KNN + FCM | `matchResaleLock` |
 | Calibrate | Pickup forecast range ("42 locked → 38–41 expected") from statistics, with a nightly Gemini report and what-if questions for the vendor | Structured JSON generation | `getPickupForecast`, `dailyCalibration`, `askCalibrationScenario` |
 
-Gemini also writes plain-language discount explanations (`onLockCreated`), drafts recipes and normalises dish names (insights module), and keeps all content bilingual through Chinese → English translation triggers.
+Gemini also explains the early-bird discount and pre-order rules on the item page before checkout (`getDiscountExplanation`, cached per discount tier), drafts recipes and normalises dish names (insights module), and keeps all content bilingual through Chinese → English translation triggers.
 
 ### Responsible AI
 
-- **Numbers are code.** Portions, prices, discounts, payouts and prize draws are deterministic functions; the model never computes them.
-- **Drafts, not decisions.** Every AI output carries a `disclaimer` field. Owners confirm menus; vendors decide how much to cook. The assistant never places an order.
-- **Server-side guards.** Ids returned by the model are validated against the live catalog, the user's allergens are filtered on the server, and prices are recomputed at checkout.
+- **Numbers are code.** Portions, prices, discounts, payouts, prize draws and the vendor accuracy rate behind the "reliable" badge are deterministic functions; the model only explains numbers it is given.
+- **Drafts, not decisions.** Every AI output carries a `disclaimer` field. Owners confirm menus; vendors decide how much to cook — AI-drafted recipes stay flagged until the owner saves them, and the prep, purchasing and cost screens warn (and ask before sending a supplier order) while any are unconfirmed. The assistant never places an order.
+- **Server-side guards.** The assistant can only show items its own search tools returned in that turn, the user's allergens are filtered on the server both in search and again on the final cards, and prices are recomputed at checkout.
 - **Calm and bounded.** No urgency marketing; 30 assistant questions per user per day with a 10-minute cache; at most 2 resale alerts per person per day, nobody more than 10 km away, one-tap opt-out.
 
 ### Technical implementation (Google Cloud)

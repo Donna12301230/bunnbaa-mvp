@@ -235,7 +235,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
 
   await test("C-ORD-02", "購物車：跨店被擋（一次只能一家）；同店 2 行各 1 份 → 2 筆、vendor_id 正確", async () => {
     const cross = expectCode(await cart([line(), { menu_item_id: ITEM2, pickup_date: OPEN_DAY, pickup_window: WINDOW, quantity: 1 }]), "invalid-argument");
-    assert(/一家商家/.test(cross.message), cross.message);
+    assert(/一家店家/.test(cross.message), cross.message);
     const lines = [];
     for (let i = 0; i < 2; i++) lines.push({ menu_item_id: ITEM2, pickup_date: OPEN_DAY, pickup_window: WINDOW, quantity: 1, coupon_id: await coupon(uids.A, V2, 100) });
     const conf = expectOk(await A.call("confirmLinePayPayment", { order_id: expectOk(await cart(lines)).order_id }));
@@ -404,7 +404,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   await test("C-MY-23", "截單前改成變貴（白飯一碗半）被擋，資料不變", async () => {
     const { id } = await lock(uids.A, { discount_percent: 20, early_bird_amount: 20, adjust_amount: 0 });
     const r = expectCode(await A.call("updateLockChoices", { lock_id: id, rice: "add" }), "failed-precondition");
-    assert(/補 NT\$ 10/.test(r.message), r.message);
+    assert(/多 NT\$10/.test(r.message), r.message);
     const l = await get(`locks/${id}`);
     eq([l.locked_price, l.rice], [80, "normal"]);
   });
@@ -423,6 +423,120 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     await ref.update({ status: "for_resale" });
     expectOk(await takeOver(B, id));
     expectCode(await ANON.call("issuePickupQr", { lock_id: id, share_token: "tok-123" }), "permission-denied", "轉讓後");
+  });
+
+  await test("C-MY-27", "代領碼：本人產生 8 碼、免登入輸入碼可取得 QR；別人不能產生；轉讓中不能代領；轉讓後碼失效", async () => {
+    const { id, ref } = await lock(uids.A, { share_token: "tok-code" });
+    expectCode(await B.call("getProxyPickupCode", { lock_id: id }), "permission-denied");
+    const { code } = expectOk(await A.call("getProxyPickupCode", { lock_id: id }));
+    assert(/^[A-HJ-KM-NP-Z2-9]{8}$/.test(code), code);
+    eq(expectOk(await A.call("getProxyPickupCode", { lock_id: id })).code, code, "再按一次拿回同一組");
+    const q = expectOk(await ANON.call("issuePickupQr", { proxy_code: `${code.slice(0, 4)}-${code.slice(4).toLowerCase()}` }));
+    assert(/^BB1\.L\./.test(q.token), q.token);
+    expectCode(await ANON.call("issuePickupQr", { proxy_code: "AAAA-AAAA" }), "not-found");
+    // 轉讓中（lock 公開可讀、share_token 看得到）不能代領
+    await ref.update({ status: "for_resale" });
+    expectCode(await ANON.call("issuePickupQr", { proxy_code: code }), "not-found", "轉讓中");
+    expectCode(await ANON.call("issuePickupQr", { lock_id: id, share_token: "tok-code" }), "permission-denied", "轉讓中（連結）");
+    expectOk(await takeOver(B, id));
+    expectCode(await ANON.call("issuePickupQr", { proxy_code: code }), "not-found", "轉讓後");
+  });
+
+  await test("C-MY-28", "取消轉讓／取消贈送：觸發器換新 share_token，上架期間被看過的舊代領連結失效", async () => {
+    const { id, ref } = await lock(uids.A, { share_token: "tok-listed" });
+    await ref.update({ status: "for_gift" });
+    await ref.update({ status: "locked" });
+    await waitFor(async () => (await get(`locks/${id}`)).share_token !== "tok-listed");
+    expectCode(await ANON.call("issuePickupQr", { lock_id: id, share_token: "tok-listed" }), "permission-denied");
+    expectOk(await A.call("issuePickupQr", { lock_id: id }), "本人照常取餐");
+  });
+
+  await test("V-RPT-03", "每日收入圖：最近 15 天每天都有淨利欄，等於收入 − 材料 − 其他成本", async () => {
+    const days = expectOk(await OWNER.call("getDailyRevenueSeries", { vendor_id: V1 })).days;
+    eq(days.length, 15);
+    for (const d of days) {
+      assert(Number.isFinite(d.net_profit) && Number.isFinite(d.other_cost), JSON.stringify(d));
+      assert(Math.abs(d.revenue - d.material_cost - d.other_cost - d.net_profit) <= 1, JSON.stringify(d));
+    }
+  });
+
+  await test("V-CAL-06", "校準報告的準確率由程式算：Gemini 沒設 key 時也照樣寫入數字並更新穩定度", async () => {
+    const vid = uniq("zz-cal");
+    await db.collection("vendors").doc(vid).set({ name: "校準測試店", owner_uid: uids.owner });
+    const add = (date, status) => db.collection("locks").add({ vendor_id: vid, pickup_date: date, pickup_window: WINDOW, status, buyer_uid: uids.A, locked_price: 80, created_at: Timestamp.now() });
+    for (let i = 0; i < 8; i++) await add("2026-09-01", i < 6 ? "fulfilled" : "no_show"); // 6/8
+    for (let i = 0; i < 2; i++) await add("2026-09-02", "fulfilled"); // 2/2
+    const { report_id: id } = expectOk(await OWNER.call("triggerCalibrationNow", { vendor_id: vid }));
+    const r = await get(`accuracy_reports/${id}`);
+    eq([r.accuracy_rate, r.error_range, r.error_range_en], [0.8, "±1 份", "±1 meal"]);
+    eq((await get(`vendors/${vid}`)).reliability_tone, "stable");
+  });
+
+  await test("F-05", "折扣說明只接受早鳥級距；Gemini 失敗時回 null、不報錯", async () => {
+    expectCode(await ANON.call("getDiscountExplanation", { vendor_id: V1, discount_percent: 37 }), "invalid-argument");
+    const r = expectOk(await ANON.call("getDiscountExplanation", { vendor_id: V1, discount_percent: 20 }));
+    assert(r.explanation === null || typeof r.explanation === "string", JSON.stringify(r));
+  });
+
+  // ════ 平台點數（wallet.js）════
+  const wallet = async (uid) => (await get(`wallets/${uid}`))?.balance ?? 0;
+  await test("W-01", "截單前改便宜：差額退成點數（批次記原交易），不再退 LINE Pay", async () => {
+    const before = await wallet(uids.C);
+    const { id } = await lock(uids.C, { discount_percent: 20, early_bird_amount: 20, adjust_amount: 0, paid_amount: 80, transaction_id: "fake-w01" });
+    const r = expectOk(await C.call("updateLockChoices", { lock_id: id, slots: [{ choice: "none" }, { choice: "default" }] }));
+    eq(r.refunded, 5);
+    eq((await wallet(uids.C)) - before, 5);
+    const l = await get(`locks/${id}`);
+    eq([l.paid_amount, l.refunded_amount, l.funding], [75, 5, [{ tx: "fake-w01", amount: 75 }]]);
+  });
+
+  await test("W-02", "用點數結帳：折抵後剩下的才走 LINE Pay；確認後每份記下點數與資金來源", async () => {
+    const start = await wallet(uids.C);
+    assert(start >= 5, `C 應有點數（W-01），現在 ${start}`);
+    const c = await coupon(uids.C, V1, 30); // 讓金額小一點，點數只折一部分
+    const r = expectOk(await C.call("createCartLinePayReservation", { lines: [line({ coupon_id: c })], use_points: true }));
+    assert(r.points_used === start || r.points_used > 0, JSON.stringify(r));
+    eq(await wallet(uids.C), start - r.points_used, "結帳時先扣住");
+    const conf = expectOk(await C.call("confirmLinePayPayment", { order_id: r.order_id }));
+    const l = await get(`locks/${conf.lock_ids[0]}`);
+    eq(l.points_used, r.points_used);
+    eq(l.funding.reduce((s, f) => s + f.amount, 0), l.locked_price, "資金來源加總＝實付");
+    eq((await get(`wallets/${uids.C}/holds/${r.order_id}`)).status, "used");
+  });
+
+  await test("W-03", "付款取消：扣住的點數還回去；取消後不能再確認", async () => {
+    const before = await wallet(uids.C);
+    if (before <= 0) await db.doc(`wallets/${uids.C}`).set({ balance: 0 }, { merge: true });
+    // 先給 C 一批點數
+    await db.collection(`wallets/${uids.C}/lots`).add({ source_tx: null, amount: 20, remaining: 20, reason: "test", created_at: Timestamp.now() });
+    await db.doc(`wallets/${uids.C}`).set({ balance: FieldValue.increment(20) }, { merge: true });
+    const has = await wallet(uids.C);
+    const c = await coupon(uids.C, V1, 30);
+    const r = expectOk(await C.call("createCartLinePayReservation", { lines: [line({ coupon_id: c })], use_points: true }));
+    assert(r.points_used > 0);
+    expectOk(await C.call("cancelPaymentIntent", { order_id: r.order_id }));
+    eq(await wallet(uids.C), has, "點數還回去");
+    expectCode(await C.call("confirmLinePayPayment", { order_id: r.order_id }), "failed-precondition");
+  });
+
+  await test("W-04", "退回 LINE Pay：只退有原交易的批次，退完餘額扣掉、明細記一筆", async () => {
+    await db.collection(`wallets/${uids.E}/lots`).add({ source_tx: "fake-w04", amount: 40, remaining: 40, reason: "test", created_at: Timestamp.now() });
+    await db.collection(`wallets/${uids.E}/lots`).add({ source_tx: null, amount: 7, remaining: 7, reason: "test", created_at: Timestamp.now() });
+    await db.doc(`wallets/${uids.E}`).set({ balance: FieldValue.increment(47) }, { merge: true });
+    const before = await wallet(uids.E);
+    const r = expectOk(await E.call("withdrawPoints", {}));
+    eq([r.withdrawn, r.failed], [40, 0]);
+    eq(await wallet(uids.E), before - 40, "不能退回的 7 點留著");
+  });
+
+  await test("W-05", "店家未出餐：管理員全額退成點數給付款人，訂單取消", async () => {
+    const before = await wallet(uids.B);
+    const { id } = await lock(uids.B, { paid_amount: 80, transaction_id: "fake-w05" });
+    expectOk(await OWNER.call("refundLockAsPoints", { lock_id: id, note: "店家沒開" }));
+    const l = await get(`locks/${id}`);
+    eq([l.status, l.cancel_reason, l.refunded_amount], ["cancelled", "vendor_failed", 80]);
+    eq((await wallet(uids.B)) - before, 80);
+    expectCode(await OWNER.call("refundLockAsPoints", { lock_id: id }), "failed-precondition", "不能退兩次");
   });
 
   await test("C-MY-19", "取餐日時段內捐為愛心餐", async () => {
@@ -455,7 +569,10 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     const l = await get(`locks/${id}`);
     eq(l.buyer_uid, uids.B); eq(l.status, "locked"); eq(l.payer_uid, uids.B);
     eq([l.locked_price, l.paid_amount, l.coupon_id, l.coupon_discount], [80, 80, null, 0], "接手價＝早鳥價（折價券前）");
-    eq([l.transfer_refund.uid, l.transfer_refund.amount, l.transfer_refund.status], [uids.A, 50, "done"], "退回 A 實付的 50");
+    eq([l.transfer_refund.uid, l.transfer_refund.amount, l.transfer_refund.status, l.transfer_refund.as], [uids.A, 50, "done", "points"], "A 實付的 50 退成點數");
+    eq(l.funding, [{ tx: l.transaction_id, amount: 80 }], "新持有人的資金來源");
+    const lots = (await db.collection(`wallets/${uids.A}/lots`).where("lock_id", "==", id).get()).docs.map((d) => d.data());
+    eq(lots.map((x) => [x.source_tx, x.amount, x.reason]), [["fake-seller-tx", 50, "transfer"]], "點數批次記原交易");
     assert(!l.resale_hold && !l.resale_payment_pending, "保留與付款中標記應清掉");
     assert(l.share_token && l.share_token !== "old", "share_token 應更換");
     assert((l.transferred_from_uids || []).includes(uids.A), "transferred_from_uids 應含 A");

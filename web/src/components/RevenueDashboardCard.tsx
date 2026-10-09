@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { EARLY_BIRD_TIERS, discountText } from "@/lib/pricing";
+const BEST_EARLY_BIRD = Math.max(...EARLY_BIRD_TIERS.map((x) => x.discountPercent));
 import { doc, onSnapshot } from "firebase/firestore";
 import { AlertTriangle, Calculator, RefreshCw, Settings2, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,7 +49,7 @@ interface Forecast {
   generated_at?: { toMillis?: () => number };
 }
 
-const nt = (n: number | null | undefined) => `NT$ ${Math.round(n ?? 0).toLocaleString()}`;
+const nt = (n: number | null | undefined) => `NT$${Math.round(n ?? 0).toLocaleString()}`;
 
 function Row({ label, value, minus, strong }: { label: string; value: number; minus?: boolean; strong?: boolean }) {
   return (
@@ -127,11 +129,11 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
         ) : (() => {
           // 錢去哪裡：營收拆成各項成本＋淨利，一條色條
           const parts = [
-            { key: "mat", label: tr("材料", "Materials"), v: data.material_cost, cls: "bg-rose-400" },
-            { key: "labor", label: tr("備料人工", "Prep labor"), v: data.labor_cost, cls: "bg-amber-400" },
-            { key: "fee", label: tr("手續費與抽成", "Fees & commission"), v: data.payment_fee + (data.commission_fee ?? 0), cls: "bg-violet-400" },
-            { key: "fixed", label: tr("薪資與固定", "Salaries & fixed"), v: data.staff_salary + data.other_fixed_costs, cls: "bg-stone-400" },
-            { key: "net", label: tr("淨利", "Profit"), v: Math.max(0, data.net_profit), cls: "bg-green-500" },
+            { key: "mat", label: tr("材料", "Materials"), v: data.material_cost, cls: "bg-danger" },
+            { key: "labor", label: tr("備料人工", "Prep labor"), v: data.labor_cost, cls: "bg-warning" },
+            { key: "fee", label: tr("手續費與抽成", "Fees & commission"), v: data.payment_fee + (data.commission_fee ?? 0), cls: "bg-plum" },
+            { key: "fixed", label: tr("薪資與固定", "Salaries & fixed"), v: data.staff_salary + data.other_fixed_costs, cls: "bg-muted-foreground/50" },
+            { key: "net", label: tr("淨利", "Profit"), v: Math.max(0, data.net_profit), cls: "bg-success-strong" },
           ].filter((x) => x.v > 0);
           const base = Math.max(1, data.revenue, parts.reduce((s, x) => s + x.v, 0));
           const sold = data.confirmed_qty;
@@ -141,9 +143,9 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
             <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className={cn("rounded-2xl border-2 p-4", data.net_profit < 0 ? "border-red-300 bg-red-50" : "border-green-300 bg-green-50")}>
+                  <div className={cn("rounded-2xl border-2 p-4", data.net_profit < 0 ? "border-danger/40 bg-danger-soft" : "border-success/40 bg-success-soft")}>
                     <p className="text-xs text-muted-foreground">{tr("預估淨利", "Est. net profit")}</p>
-                    <p className={cn("font-heading text-2xl sm:text-3xl md:text-4xl font-semibold tabular-nums whitespace-nowrap", data.net_profit < 0 ? "text-red-600" : "text-green-800")}>{nt(data.net_profit)}</p>
+                    <p className={cn("font-heading text-2xl sm:text-3xl md:text-4xl font-semibold tabular-nums whitespace-nowrap", data.net_profit < 0 ? "text-danger-text" : "text-success-text")}>{nt(data.net_profit)}</p>
                   </div>
                   <div className="rounded-2xl border-2 border-border p-4">
                     <p className="text-xs text-muted-foreground">{tr("老闆實際時薪", "Your real hourly")}</p>
@@ -160,8 +162,8 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                       {data.break_even_qty == null ? tr("每份沒賺錢", "No margin per meal") : data.break_even_qty === 0 ? tr("已打平 🎉", "Covered 🎉") : tr(`還差 ${data.break_even_qty} 份`, `${data.break_even_qty} to go`)}
                     </span>
                   </div>
-                  <div className="h-4 overflow-hidden rounded-full bg-stone-200" role="img" aria-label={tr(`已賣 ${sold} 份`, `${sold} sold`)}>
-                    <div className={cn("h-full transition-all", data.break_even_qty == null ? "bg-red-400" : "bg-green-500")} style={{ width: `${data.break_even_qty == null ? 100 : beTotal > 0 ? Math.min(100, (sold / beTotal) * 100) : 100}%` }} />
+                  <div className="h-4 overflow-hidden rounded-full bg-border" role="img" aria-label={tr(`已賣 ${sold} 份`, `${sold} sold`)}>
+                    <div className={cn("h-full transition-all", data.break_even_qty == null ? "bg-danger" : "bg-success-strong")} style={{ width: `${data.break_even_qty == null ? 100 : beTotal > 0 ? Math.min(100, (sold / beTotal) * 100) : 100}%` }} />
                   </div>
                   <p className="text-xs text-muted-foreground">{tr(`已確定 ${sold} 份`, `${sold} confirmed`)}{beTotal > 0 ? tr(` / 打平要 ${beTotal} 份`, ` / ${beTotal} to break even`) : ""}</p>
                 </div>
@@ -178,7 +180,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                     {parts.map((x) => <span key={x.key} className="inline-flex items-center gap-1"><span className={cn("w-2.5 h-2.5 rounded-sm", x.cls)} />{x.label} <span className="text-muted-foreground tabular-nums">{nt(x.v)}</span></span>)}
                   </div>
-                  {data.net_profit < 0 && <p className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{tr(`成本比營收多 ${nt(-data.net_profit)}`, `Costs exceed revenue by ${nt(-data.net_profit)}`)}</p>}
+                  {data.net_profit < 0 && <p className="text-xs text-danger-text flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{tr(`成本比營收多 ${nt(-data.net_profit)}`, `Costs exceed revenue by ${nt(-data.net_profit)}`)}</p>}
                 </div>
 
                 <details className="text-sm">
@@ -209,9 +211,9 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                   </div>
                   {byPeriod && (
                     <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-xl bg-stone-100 p-2"><p className="text-xs text-muted-foreground">{tr("份數", "Meals")}</p><p className="text-xl font-bold">{byPeriod.qty}</p></div>
-                      <div className="rounded-xl bg-stone-100 p-2"><p className="text-xs text-muted-foreground">{tr("營收", "Revenue")}</p><p className="text-xl font-bold tabular-nums">{nt(byPeriod.revenue)}</p></div>
-                      <div className="rounded-xl bg-stone-100 p-2"><p className="text-xs text-muted-foreground">{tr("材料", "Materials")}</p><p className="text-xl font-bold tabular-nums">{nt(byPeriod.material_cost)}</p></div>
+                      <div className="rounded-xl bg-muted p-2"><p className="text-xs text-muted-foreground">{tr("份數", "Meals")}</p><p className="text-xl font-bold">{byPeriod.qty}</p></div>
+                      <div className="rounded-xl bg-muted p-2"><p className="text-xs text-muted-foreground">{tr("營收", "Revenue")}</p><p className="text-xl font-bold tabular-nums">{nt(byPeriod.revenue)}</p></div>
+                      <div className="rounded-xl bg-muted p-2"><p className="text-xs text-muted-foreground">{tr("材料", "Materials")}</p><p className="text-xl font-bold tabular-nums">{nt(byPeriod.material_cost)}</p></div>
                     </div>
                   )}
                 </div>
@@ -225,7 +227,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                         return (
                           <li key={n.ingredient_id} className="grid grid-cols-[5rem_1fr_auto] items-center gap-2 text-sm">
                             <span className="truncate">{n.name}</span>
-                            <div className="h-3 rounded-full bg-stone-100 overflow-hidden"><div className={cn("h-full", GROUP_DOT[g])} style={{ width: `${(n.cost / needMax) * 100}%` }} /></div>
+                            <div className="h-3 rounded-full bg-muted overflow-hidden"><div className={cn("h-full", GROUP_DOT[g])} style={{ width: `${(n.cost / needMax) * 100}%` }} /></div>
                             <span className="text-xs text-muted-foreground tabular-nums w-20 text-right">{nt(n.cost)}</span>
                           </li>
                         );
@@ -237,20 +239,20 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                 <div>
                   <p className="text-sm font-semibold mb-2 flex items-center gap-1">
                     {tr("每份賺多少", "Margin per meal")}
-                    <InfoTip>{tr("8 折後售價 − 材料成本。紅色＝毛利低於材料成本 30%。", "Price after 20% off − materials. Red = margin under 30% of material cost.")}</InfoTip>
+                    <InfoTip>{tr(`最深早鳥折扣（${discountText(BEST_EARLY_BIRD)}）後的售價 − 材料成本。紅色＝毛利低於材料成本 30%。`, `Price after the deepest early-bird discount (${BEST_EARLY_BIRD}% off) − materials. Red = margin under 30% of material cost.`)}</InfoTip>
                   </p>
                   <ul className="space-y-2 max-h-56 overflow-y-auto bb-thin-scroll pr-1">
                     {data.item_margins.map((m) => {
                       const costPct = m.discounted_price > 0 ? Math.min(100, (m.material_cost / m.discounted_price) * 100) : 100;
                       return (
                         <li key={`${m.menu_item_id}-${m.name}`} className="space-y-0.5">
-                          <div className={cn("flex justify-between gap-2 text-sm", m.warn && "text-red-600 font-semibold")}>
+                          <div className={cn("flex justify-between gap-2 text-sm", m.warn && "text-danger-text font-semibold")}>
                             <span className="truncate">{m.warn && <AlertTriangle className="inline w-3.5 h-3.5 mr-0.5" />}{m.name}</span>
                             <span className="tabular-nums shrink-0">+${m.margin}</span>
                           </div>
                           <div className="flex h-2.5 overflow-hidden rounded-full" role="img" aria-label={tr(`售價 ${m.discounted_price}，材料 ${m.material_cost}`, `price ${m.discounted_price}, materials ${m.material_cost}`)}>
-                            <div className={cn("h-full", m.warn ? "bg-red-500" : "bg-rose-400")} style={{ width: `${costPct}%` }} />
-                            <div className="h-full flex-1 bg-green-500" />
+                            <div className={cn("h-full", m.warn ? "bg-destructive" : "bg-danger")} style={{ width: `${costPct}%` }} />
+                            <div className="h-full flex-1 bg-success-strong" />
                           </div>
                         </li>
                       );
@@ -334,12 +336,12 @@ function CostSettingsDialog({ open, onClose, vendor, minimumWage, onSaved }: {
           <label className="block text-sm">
             {tr("備料人工時薪（元）", "Prep labor hourly wage")}
             <Input type="number" min={minHourly} value={hourly} onChange={(e) => setHourly(e.target.value)} />
-            {hourlyLow && <span className="text-xs text-red-600">{tr(`不得低於基本工資 ${minHourly} 元`, `Must be at least ${minHourly}`)}</span>}
+            {hourlyLow && <span className="text-xs text-danger-text">{tr(`不得低於基本工資 ${minHourly} 元`, `Must be at least ${minHourly}`)}</span>}
           </label>
           <label className="block text-sm">
             {tr("正職員工月薪（選填，多位用逗號分開）", "Staff monthly salaries (optional, comma-separated)")}
             <Input value={salaries} onChange={(e) => setSalaries(e.target.value)} placeholder="30000, 32000" />
-            {salaryLow && <span className="text-xs text-red-600">{tr(`每位都不得低於基本工資月薪 ${minMonthly} 元`, `Each must be at least ${minMonthly}`)}</span>}
+            {salaryLow && <span className="text-xs text-danger-text">{tr(`每位都不得低於基本工資月薪 ${minMonthly} 元`, `Each must be at least ${minMonthly}`)}</span>}
           </label>
           <label className="block text-sm">
             {tr("其他固定成本／月（房租、水電，選填）", "Other fixed costs / month (optional)")}

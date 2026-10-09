@@ -682,21 +682,18 @@ function geohash(lat, lng, precision = 7) {
     eq(x.cancel_reason, "disaster");
   });
 
-  await test("A-DIS-05", "退款失敗的那筆按「重新處理」只補失敗的，不重複退款與通知", async () => {
+  await test("A-DIS-05", "停班退款退成點數給付款人；按「重新處理」不重複退款與通知", async () => {
     const VD2 = await mkVendor(vid("dis2"), { address: `臺北市重處${RUN}區測試路 1 號` });
     const okBuyer = `zz2-dok-${RUN}`;
-    const good = await lock(okBuyer, VD2);
-    const bad = await lock(`zz2-dbad-${RUN}`, VD2, { transaction_id: "tx-that-fails" }); // emulator 沒有 LINE Pay 金鑰 → 退款失敗
+    const good = await lock(okBuyer, VD2, { paid_amount: 100, transaction_id: "fake-dis05" });
     const ev = await db.collection("disasterEvents").add({ type: "work_suspension", counties: ["臺北市"], towns: [`臺北市重處${RUN}區`], whole_counties: [], dates: [OPEN_DAY], source: "manual", summary: "測試", created_at: Timestamp.now() });
     const first = await waitFor(async () => (await ev.get()).data().result, 60000);
-    eq([first.cancelled, first.failed], [1, 1]);
-    eq((await ev.get()).data().processed, false, "有失敗 → processed=false");
-    eq((await get(`locks/${bad.id}`)).status, "locked", "失敗的那筆狀態要還原");
-    await bad.ref.update({ transaction_id: FieldValue.delete() });
-    const r = expectOk(await OWNER.call("reprocessDisasterEvent", { event_id: ev.id }));
-    eq([r.cancelled, r.failed], [1, 0]);
-    eq((await get(`locks/${bad.id}`)).status, "cancelled");
+    eq([first.cancelled, first.failed], [1, 0]);
     eq((await get(`locks/${good.id}`)).cancel_reason, "disaster");
+    eq((await get(`wallets/${okBuyer}`)).balance, 100, "全額退成點數");
+    const r = expectOk(await OWNER.call("reprocessDisasterEvent", { event_id: ev.id }));
+    eq([r.cancelled, r.failed], [0, 0]);
+    eq((await get(`wallets/${okBuyer}`)).balance, 100, "不重複退");
     eq((await notes(okBuyer, { kind: "disaster" })).length, 1, "已取消的不重複通知");
   });
 
@@ -787,7 +784,7 @@ function geohash(lat, lng, precision = 7) {
   });
 
   // ════ 1b. 撥款 ════
-  await test("F-01 A-PAY-01", "手動結算：已取餐＋愛心餐＋轉讓取餐＋取消換券留下的款項計入，未取餐、已退款的不算；扣 5% 抽成；重按不重複結算", async () => {
+  await test("F-01 A-PAY-01", "手動結算：已取餐＋愛心餐＋轉讓取餐＋舊制未取餐＋取消換券留下的款項計入，還沒取餐、已退款的不算；扣 5% 抽成；重按不重複結算", async () => {
     const VS3 = await mkVendor(vid("pay"));
     await lock(`zz2-pa-${RUN}`, VS3, { status: "fulfilled", locked_price: 80 });
     await lock(`zz2-pb-${RUN}`, VS3, { status: "charity", locked_price: 100 });
@@ -795,10 +792,11 @@ function geohash(lat, lng, precision = 7) {
     await lock(`zz2-pd-${RUN}`, VS3, { status: "locked", locked_price: 70 });
     await lock(`zz2-pe-${RUN}`, VS3, { status: "cancelled", cancel_reason: "customer", locked_price: 60, kept_amount: 60, refunded_amount: 0 }); // 取消換券：款項留在店家
     await lock(`zz2-pf-${RUN}`, VS3, { status: "cancelled", cancel_reason: "disaster", locked_price: 90, refunded_amount: 90 }); // 停班全額退款：不撥
+    await lock(`zz2-pg-${RUN}`, VS3, { status: "no_show", locked_price: 40 }); // 舊制未取餐：預付不退，照常撥款（2026-10-09）
     const r = expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VS3 }));
     const p = await get(`payouts/${r.payout_id}`);
-    // 抽成逐份四捨五入：80→4、100→5、50→3、60→3
-    eq([p.gross_amount, p.commission_amount, p.amount, p.lock_count], [290, 15, 275, 4]);
+    // 抽成逐份四捨五入：80→4、100→5、50→3、60→3、40→2
+    eq([p.gross_amount, p.commission_amount, p.amount, p.lock_count], [330, 17, 313, 5]);
     eq(expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VS3 })).payout_id, null, "重按");
   });
 
