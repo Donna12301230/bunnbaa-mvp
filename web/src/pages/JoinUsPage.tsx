@@ -74,7 +74,7 @@ export default function JoinUsPage() {
             </p>
           </div>
           <div className="rounded-card border border-ink bg-card p-8 md:p-10">
-            <span className="inline-block text-xs font-bold px-3 py-1 rounded-full bg-brand text-[#2b180d]">{tr("有賣才收", "Pay only when you sell")}</span>
+            <span className="inline-block text-xs font-bold px-3 py-1 rounded-full bg-brand text-brand-foreground">{tr("有賣才收", "Pay only when you sell")}</span>
             <p className="mt-5 font-heading font-semibold leading-none">
               <span className="text-[clamp(64px,9vw,112px)] tracking-[-0.04em]">{commissionPct()}%</span>
               <span className="text-lg text-muted-foreground font-normal ml-2">{tr("／每份餐點", "/ meal")}</span>

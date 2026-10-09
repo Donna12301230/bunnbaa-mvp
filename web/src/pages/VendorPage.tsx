@@ -145,7 +145,7 @@ export default function VendorPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#1c110a]/85 via-[#1c110a]/25 to-transparent" aria-hidden="true" />
         <div className="absolute inset-x-0 bottom-0 p-6 md:p-10 text-[#fff6e3]">
           {vendor.verified && (
-            <span className="inline-block mb-3 text-caption font-bold px-2.5 py-1 rounded-full bg-[#ffe1a1] text-[#2b180d]">{tr("認證店家", "Verified")}</span>
+            <span className="inline-block mb-3 text-caption font-bold px-2.5 py-1 rounded-full bg-highlight text-brand-foreground">{tr("認證店家", "Verified")}</span>
           )}
           <h1 className="font-heading font-semibold text-[clamp(36px,5.5vw,72px)] leading-[1.04] tracking-[-0.02em]">{loc(vendor, "name")}</h1>
           {vendor.description && <p className="mt-2 max-w-2xl text-sm md:text-base opacity-90">{loc(vendor, "description")}</p>}

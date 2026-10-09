@@ -287,7 +287,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
                       ) : (
                         <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
                       )}
-                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-brand text-[#2b180d]">
+                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-brand text-brand-foreground">
                         {tr("轉讓中", "Listed")}
                       </span>
                     </div>

@@ -442,7 +442,7 @@ export default function HomePage() {
                                     </span>
                                   )}
                                   {discountPercent > 0 && !searching && (
-                                    <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-brand text-[#2b180d]">
+                                    <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-brand text-brand-foreground">
                                       {discountText(discountPercent)}
                                     </span>
                                   )}
@@ -629,7 +629,7 @@ export default function HomePage() {
                 {t("前往轉讓市集", "Go to transfers")}
               </Link>
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-1 bb-thin-scroll rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe1a1]" tabIndex={0} role="region" aria-label={t("同學轉讓清單（可左右捲動）", "Classmate transfers (scrolls sideways)")}>
+            <div className="flex gap-3 overflow-x-auto pb-1 bb-thin-scroll rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-highlight" tabIndex={0} role="region" aria-label={t("同學轉讓清單（可左右捲動）", "Classmate transfers (scrolls sideways)")}>
               {visibleTransfers.length === 0 && <p className="text-sm opacity-80">{t("目前沒有同學轉讓的餐點。", "No transfers right now.")}</p>}
               {visibleTransfers.map((x) => (
                 <div key={x.id} className="shrink-0 w-64 bg-card text-foreground rounded-2xl p-3 border border-ink">

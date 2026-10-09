@@ -126,7 +126,7 @@ export default function FavoritesPage() {
                             {item.image
                               ? <img src={item.image} alt="" loading="lazy" className="w-full h-full object-cover" />
                               : <span className="w-full h-full flex items-center justify-center"><UtensilsCrossed className="w-7 h-7 text-secondary-foreground/50" aria-hidden="true" /></span>}
-                            {discountPercent > 0 && <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-brand text-[#2b180d]">{discountText(discountPercent)}</span>}
+                            {discountPercent > 0 && <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-brand text-brand-foreground">{discountText(discountPercent)}</span>}
                           </span>
                           <span className="block mt-2 text-sm font-semibold truncate">{loc(item, "name")}</span>
                           <span className="font-heading text-lg font-semibold">NT${lockedPrice}</span>

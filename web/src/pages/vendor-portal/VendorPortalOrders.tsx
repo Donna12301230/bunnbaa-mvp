@@ -14,6 +14,7 @@ import { PENDING_STATUSES } from "@/lib/lockOutcome";
 import { todayStr } from "@/lib/pickupSlots";
 import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import TabNumberLoading from "@/components/TabNumberLoading";
 import PortalPageHeader from "@/components/PortalPageHeader";
 import type { CharityMeal, Lock } from "@/types";
 
@@ -44,10 +45,11 @@ export function OrdersHub({ initial = "pickup" }: { initial?: OrdersTab }) {
 
   // 今天的愛心餐與收攤結算
   const [charity, setCharity] = useState<CharityMeal[]>([]);
+  const [charityLoaded, setCharityLoaded] = useState(false);
   const [charityResult, setCharityResult] = useState<{ total: number; given_onsite: number; wasted: number; reserved_claimed: number } | null>(null);
   useEffect(() => {
     if (!vendorId) return;
-    const u1 = onSnapshot(query(collection(db, "charityMeals"), where("vendor_id", "==", vendorId), where("date", "==", today)), (s) => setCharity(s.docs.map((d) => ({ id: d.id, ...d.data() }) as CharityMeal)), () => setCharity([]));
+    const u1 = onSnapshot(query(collection(db, "charityMeals"), where("vendor_id", "==", vendorId), where("date", "==", today)), (s) => { setCharity(s.docs.map((d) => ({ id: d.id, ...d.data() }) as CharityMeal)); setCharityLoaded(true); }, () => { setCharity([]); setCharityLoaded(true); });
     const u2 = onSnapshot(doc(db, "vendors", vendorId, "prepPlans", today), (s) => setCharityResult(s.exists() ? s.data().charity_result ?? null : null), () => setCharityResult(null));
     return () => { u1(); u2(); };
   }, [vendorId, today]);
@@ -58,10 +60,10 @@ export function OrdersHub({ initial = "pickup" }: { initial?: OrdersTab }) {
   const upcoming = useMemo(() => locks.filter((l) => l.pickup_date >= today && l.status !== "cancelled" && l.status !== "no_show").length, [locks, today]);
 
   const tabs = [
-    { key: "pickup" as const, icon: ScanLine, label: tr("取餐", "Pickup"), n: waitingToday, sub: tr("今天待取", "waiting today") },
-    { key: "charity" as const, icon: HeartHandshake, label: tr("愛心餐", "Charity"), n: charityOpen, sub: tr("份等人領", "waiting") },
-    { key: "orders" as const, icon: ClipboardList, label: tr("訂單", "Orders"), n: pendingAll, sub: tr("待取餐", "to pick up") },
-    { key: "slots" as const, icon: CalendarDays, label: tr("時段", "Slots"), n: upcoming, sub: tr("份已訂", "booked ahead") },
+    { key: "pickup" as const, icon: ScanLine, label: tr("取餐", "Pickup"), n: loadingToday ? null : waitingToday, sub: tr("今天待取", "waiting today") },
+    { key: "charity" as const, icon: HeartHandshake, label: tr("愛心餐", "Charity"), n: charityLoaded ? charityOpen : null, sub: tr("份等人領", "waiting") },
+    { key: "orders" as const, icon: ClipboardList, label: tr("訂單", "Orders"), n: loading ? null : pendingAll, sub: tr("待取餐", "to pick up") },
+    { key: "slots" as const, icon: CalendarDays, label: tr("時段", "Slots"), n: loading ? null : upcoming, sub: tr("份已訂", "booked ahead") },
   ];
 
   return (
@@ -72,7 +74,7 @@ export function OrdersHub({ initial = "pickup" }: { initial?: OrdersTab }) {
           <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
             className={cn("rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", tab === t.key ? "border-foreground bg-card shadow-sm" : "border-border bg-card/60 hover:bg-card")}>
             <span className="flex items-center gap-1.5 font-semibold"><t.icon className="w-5 h-5 text-accent-foreground" />{t.label}</span>
-            <span className="mt-1 block text-2xl font-bold leading-none">{t.n}</span>
+            <span className="mt-1 block text-2xl font-bold leading-none tabular-nums">{t.n ?? <TabNumberLoading />}</span>
             <span className="text-xs text-muted-foreground">{t.sub}</span>
           </button>
         ))}

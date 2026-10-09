@@ -44,13 +44,14 @@ const nt = (n: number) => `NT$${Math.round(n).toLocaleString()}`;
  * 回饋券（規格 §8、§9.3、§9.4）：累積淨營業額滿 1 萬元時以其中 5% 生成回饋池，拆成折價券抽獎，人人有獎；券發出後規則不可變更。
  * 一眼看：流通中負債（大字）、距離開池進度、券的去向色條、本期各券種剩餘、每週回饋池長條；查詢、匯出、暫停收在「工具」。
  */
-export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number) => void }) {
+export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {
   const { data: vendor } = useMyVendor();
   const { data: config } = usePlatformConfig();
   const { toast } = useToast();
   const confirm = useConfirm();
   const [periods, setPeriods] = useState<Period[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [couponsLoaded, setCouponsLoaded] = useState(false);
   const [status, setStatus] = useState<RewardStatus | null>(null);
   const [lookup, setLookup] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,7 +62,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
   useEffect(() => {
     if (!vendorId) return;
     const u1 = onSnapshot(collection(db, "vendors", vendorId, "rewardPeriods"), (s) => setPeriods(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Period).sort((a, b) => b.id.localeCompare(a.id))), () => setPeriods([]));
-    const u2 = onSnapshot(query(collection(db, "coupons"), where("vendor_id", "==", vendorId)), (s) => setCoupons(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Coupon)), () => setCoupons([]));
+    const u2 = onSnapshot(query(collection(db, "coupons"), where("vendor_id", "==", vendorId)), (s) => { setCoupons(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Coupon)); setCouponsLoaded(true); }, () => { setCoupons([]); setCouponsLoaded(true); });
     const u3 = onSnapshot(doc(db, "rewardStatus", vendorId), (s) => setStatus(s.exists() ? ({ id: s.id, ...s.data() } as RewardStatus) : null), () => setStatus(null));
     return () => { u1(); u2(); u3(); };
   }, [vendorId]);
@@ -83,7 +84,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
       expiringSoon: sum(soon), expiringCount: soon.length,
     };
   }, [coupons, periods, current?.id]);
-  useEffect(() => { onHeadline?.(m.liability); }, [m.liability]);
+  useEffect(() => { onHeadline?.(couponsLoaded ? m.liability : null); }, [m.liability, couponsLoaded]);
 
   const found = lookup.trim() ? coupons.filter((c) => c.id === lookup.trim() || c.lock_id === lookup.trim()) : [];
 

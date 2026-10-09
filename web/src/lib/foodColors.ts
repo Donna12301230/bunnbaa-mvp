@@ -35,7 +35,7 @@ export const GROUP_CELL: Record<FoodGroup, string> = {
   rice: "bg-warning-soft border-warning text-warning-text",
   protein: "bg-danger-soft border-danger text-danger-text",
   veg: "bg-success-soft border-success text-success-text",
-  pack: "bg-violet-100 border-violet-400 text-violet-950",
+  pack: "bg-plum-soft border-plum text-plum-text",
   other: "bg-muted border-input text-foreground",
 };
 
@@ -44,7 +44,7 @@ export const GROUP_DOT: Record<FoodGroup, string> = {
   rice: "bg-warning",
   protein: "bg-danger",
   veg: "bg-success-strong",
-  pack: "bg-violet-400",
+  pack: "bg-plum",
   other: "bg-muted-foreground/50",
 };
 

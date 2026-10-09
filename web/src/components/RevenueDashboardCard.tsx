@@ -131,7 +131,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
           const parts = [
             { key: "mat", label: tr("材料", "Materials"), v: data.material_cost, cls: "bg-danger" },
             { key: "labor", label: tr("備料人工", "Prep labor"), v: data.labor_cost, cls: "bg-warning" },
-            { key: "fee", label: tr("手續費與抽成", "Fees & commission"), v: data.payment_fee + (data.commission_fee ?? 0), cls: "bg-violet-400" },
+            { key: "fee", label: tr("手續費與抽成", "Fees & commission"), v: data.payment_fee + (data.commission_fee ?? 0), cls: "bg-plum" },
             { key: "fixed", label: tr("薪資與固定", "Salaries & fixed"), v: data.staff_salary + data.other_fixed_costs, cls: "bg-muted-foreground/50" },
             { key: "net", label: tr("淨利", "Profit"), v: Math.max(0, data.net_profit), cls: "bg-success-strong" },
           ].filter((x) => x.v > 0);

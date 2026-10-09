@@ -43,13 +43,14 @@ function Bar({ label, value, max, text, cls = "bg-brand" }: { label: string; val
  * 區域洞察（規格 §10.2）：取餐點方圓 1 公里、近 30 天，統計人數少於 20 人不顯示。
  * 只有匿名彙總：你的店的許願（進度條到「參考名單」門檻）、附近口味占比、供需缺口、許願排行、「不要」率。
  */
-export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number) => void }) {
+export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {
   const { data: vendor } = useMyVendor();
   const { data: config } = usePlatformConfig();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [insight, setInsight] = useState<Insight | null>(null);
   const [tally, setTally] = useState<Tally[]>([]);
+  const [tallyLoaded, setTallyLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const threshold = config?.openWishThreshold ?? 20;
 
@@ -59,10 +60,11 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
       const list = s.docs.map((d) => ({ id: d.id, ...d.data() }) as Insight).sort((a, b) => b.week.localeCompare(a.week));
       setInsight(list[0] ?? null);
     }, () => setInsight(null));
-    const u2 = onSnapshot(collection(db, "vendors", vendorId, "wishTally"), (s) => setTally(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Tally).filter((t) => t.count > 0).sort((a, b) => b.count - a.count)), () => setTally([]));
+    const u2 = onSnapshot(collection(db, "vendors", vendorId, "wishTally"), (s) => { setTally(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Tally).filter((t) => t.count > 0).sort((a, b) => b.count - a.count)); setTallyLoaded(true); }, () => { setTally([]); setTallyLoaded(true); });
     return () => { u1(); u2(); };
   }, [vendorId]);
-  useEffect(() => { onHeadline?.(tally.reduce((s, t) => s + t.count, 0)); }, [tally]);
+  // 還沒讀到資料前回 null，分頁卡顯示載入中而不是 0
+  useEffect(() => { onHeadline?.(tallyLoaded ? tally.reduce((s, t) => s + t.count, 0) : null); }, [tally, tallyLoaded]);
 
   async function rebuild() {
     setBusy(true);
@@ -169,7 +171,7 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
             <Card className="border-2">
               <CardContent className="p-4 space-y-2">
                 <p className="font-semibold">{tr("附近大家許願的菜", "Nearby wishes")}</p>
-                {insight.open_wishes?.length ? insight.open_wishes.map((w) => <Bar key={w.dish_key} label={w.dish} value={w.people} max={insight.open_wishes![0].people} text={tr(`${w.people} 人`, `${w.people}`)} cls="bg-violet-400" />) : <p className="text-sm text-muted-foreground">—</p>}
+                {insight.open_wishes?.length ? insight.open_wishes.map((w) => <Bar key={w.dish_key} label={w.dish} value={w.people} max={insight.open_wishes![0].people} text={tr(`${w.people} 人`, `${w.people}`)} cls="bg-plum" />) : <p className="text-sm text-muted-foreground">—</p>}
               </CardContent>
             </Card>
             <Card className="border-2 md:col-span-2">

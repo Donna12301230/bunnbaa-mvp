@@ -80,8 +80,8 @@ function PickupTimeline({ timeline, range, label, showNow }: { timeline: Timelin
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const segs = [
-    { key: "fire", a: fire, b: pack, text: tr("開火", "Cook"), cls: "bg-brand text-[#2b180d]" },
-    { key: "pack", a: pack, b: ps, text: tr("裝盒", "Pack"), cls: "bg-violet-400 text-violet-950" },
+    { key: "fire", a: fire, b: pack, text: tr("開火", "Cook"), cls: "bg-brand text-brand-foreground" },
+    { key: "pack", a: pack, b: ps, text: tr("裝盒", "Pack"), cls: "bg-plum text-plum-foreground" },
     { key: "pickup", a: ps, b: pickupEnd, text: tr("取餐", "Pickup"), cls: "bg-success-soft text-success-text" },
   ].filter((x) => x.b > x.a);
   const hours: number[] = [];

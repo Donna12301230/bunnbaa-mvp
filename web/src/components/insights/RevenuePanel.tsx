@@ -57,7 +57,7 @@ function computeStats(locks: Lock[]): ReportStats | null {
 }
 
 /** 營收：15 天四個大數字、每日收入／材料成本／淨利圖、熱銷排行（獎牌＋長條）、預測準確率量表＋問 AI */
-export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number) => void }) {
+export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {
   const [report, setReport] = useState<AccuracyReport | null>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -88,7 +88,7 @@ export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: strin
     }, () => setLoading(false));
   }, [vendorId]);
   const stats = computeStats(locks);
-  useEffect(() => { onHeadline?.(stats?.totalRevenue ?? 0); }, [stats?.totalRevenue]);
+  useEffect(() => { onHeadline?.(loading ? null : stats?.totalRevenue ?? 0); }, [stats?.totalRevenue, loading]);
 
   async function ask() {
     const q = draft.trim();
