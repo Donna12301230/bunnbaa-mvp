@@ -46,7 +46,7 @@ emulator 端對端測試已跑過：截單判定許願、備料清單／時間�
 - [x] `functions/.env` 加 `PICKUP_QR_SECRET`：2026-09-30 SU 已產生一組隨機字串（64 碼 hex），**還沒真的寫進正式站的 `functions/.env`**——本機沒有 `GEMINI_API_KEY`／`LINE_PAY_*` 這幾把既有金鑰，等雅婷把完整 `.env` 補齊再一起部署 Functions，避免用不完整的 `.env` 部署把現有能動的翻譯／LINE Pay 洗掉
 - [x] 部署 `firestore:rules,firestore:indexes`：2026-09-30 SU 已部署完成（先審查過規則，沒發現安全漏洞，只有 `charityBans` 沒開放管理員讀取，但目前沒有前端頁面用到，不影響）；索引在背景建立，可能還要幾分鐘才會顯示為 Enabled
 - [x] 部署 `functions,hosting`：2026-10-05 完成（`.env` 金鑰已補齊，從本機手動部署 Functions）
-- [ ] **GitHub Actions 自動部署 Functions 會失敗**：repo 沒設 `FUNCTIONS_ENV` secret，workflow 會在部署前停下（保護金鑰，不會動到正式站）。設好之前 master 動到 `functions/` 都要手動 `firebase deploy --only functions`；設定方式：`gh secret set FUNCTIONS_ENV < functions/.env`
+- [x] GitHub Actions 自動部署 Functions：2026-10-09 已設好 `FUNCTIONS_ENV` secret（內容 = 本機 `functions/.env`）。之後改 `functions/.env` 要同步更新：`gh secret set FUNCTIONS_ENV < functions/.env`；2026-10-09 補齊服務帳號 IAM 角色（服務帳戶使用者、Cloud Datastore 檢視者等）後首次自動部署成功
 - [ ] 正式站灌 `node scripts/seed-phase1.js`（或 `--catalog-only` 只灌模板與配方）——需要服務帳號金鑰
 - [ ] Firebase Console 確認新排程都有啟用：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`（每 5–10 分）、`closeRewardPeriod`（週一 00:10）、`buildWeeklyPurchase`（週六 12:00）、`pollDisasterFeeds`（每 15 分）（`buildMonthlyPurchase` 已依 1002 規格移除，久放品項併入週叫貨單）
 - [x] 舊的 `drawGrowthReward`、`markLockOutcome`、`createLinePayReservation`、`pickupReminders`、`triggerPickupRemindersNow` 已移除；2026-10-05 再刪掉雲端上的 `buildMonthlyPurchase`（月叫貨單已取消）、`claimResoldLock`（舊的免費接手，已改付費接手）
@@ -164,7 +164,7 @@ emulator 端對端測試已跑過：截單判定許願、備料清單／時間�
 
 ## ⚪ Demo 後／有空再做
 
-- [ ] **Functions runtime 升級（2026-10-30 前）**：Node.js 20 停用後無法再部署 Functions。`functions/package.json` engines 升 Node 22＋`firebase-functions@latest`（有 breaking changes，要重測）
+- [x] Functions runtime 升級：2026-10-09 `engines` 改 Node 22、`firebase-functions` 5.1 → 7.4（`firebase-admin` 維持 12.7）。程式只用 `firebase-functions/v2/*` 跟根目錄的 `logger`，v6／v7 的 breaking changes（預設入口改 v2、移除 `functions.config()`）都沒碰到；比對過升級前後 69 個 function 的部署設定完全相同。CI 的 setup-node 也改成 22
 - [ ] 份數上限邊界測試：兩人同時搶最後一份（只能一人成功、另一人不扣款）、LINE Pay 確認失敗時份數退回
 - [ ] CSP 長期觀察無違規後，`firebase.json` 的 `Content-Security-Policy-Report-Only` 改成強制
 - [ ] LINE Pay／綠界特約商店審核（Demo 沿用 Sandbox；審過後換 `functions/.env` 的 Channel ID/Secret＋`LINE_PAY_ENV=production`，程式碼不用改）
