@@ -178,7 +178,7 @@ export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: strin
                   <div className="relative h-4 rounded-full bg-gradient-to-r from-red-300 via-amber-300 to-green-400">
                     <span className="absolute -top-1 h-6 w-1.5 rounded-full bg-foreground" style={{ left: `calc(${acc}% - 3px)` }} aria-hidden="true" />
                   </div>
-                  <div className="flex justify-between text-[11px] text-muted-foreground"><span>0%</span><span>{tr("誤差", "error")} {report.error_range}</span><span>100%</span></div>
+                  <div className="flex justify-between text-[11px] text-muted-foreground"><span>0%</span><span>{tr("誤差", "error")} {loc(report, "error_range")}</span><span>100%</span></div>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">{loc(report, "pattern_note")}</p>

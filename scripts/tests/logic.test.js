@@ -437,6 +437,30 @@ testAsync("F-16", "模型回不存在的品項／方案 id 被丟掉；設定壞
   assert.deepEqual(cards.map((c) => `${c.type}:${c.id}`), ["item:beef", "plan:p1"]);
 });
 
+testAsync("C-AST-18", "指定餐期：午餐查不到只供晚餐的品項；店家沒開晚餐時段，晚餐查不到任何品項", async () => {
+  const lunch = await astTools().searchMenuItems({ mealPeriod: "lunch" });
+  assert.ok(!lunch.items.some((i) => i.id === "dinner"), lunch.items.map((i) => i.id).join());
+  assert.ok(lunch.items.every((i) => i.meal_periods.includes("lunch")));
+  const dinner = await astTools().searchMenuItems({ mealPeriod: "dinner" });
+  assert.equal(dinner.count, 0);
+  const [d] = await assistant.checkDates(AST_ITEMS[0], AST_VENDOR, ["2026-10-01"], CFG, NOW, "dinner");
+  assert.equal(d.available, false);
+  assert.match(d.reason, /晚餐/);
+});
+testAsync("C-AST-19", "卡片最後把關：沒被搜尋工具回傳過的品項、含會員過敏原的品項都不出卡", async () => {
+  const seen = new Set(["beef", "soy"]);
+  const cards = await assistant.buildCards({ menuItemIds: ["burdock", "beef", "soy"] }, astCatalog(), new Map(), "zh", CFG, NOW, { seen, taste: { prefs: [], allergies: ["大豆"] } });
+  assert.deepEqual(cards.map((c) => c.id), ["beef"]);
+});
+test("V-CAL-05", "校準準確率與誤差由程式算（不經 LLM）：Σ取餐÷Σ鎖定、平均落差", () => {
+  const cal = req("vendorCalibration.js");
+  const st = cal.calibrationStats([{ locked_qty: 10, fulfilled_qty: 8 }, { locked_qty: 5, fulfilled_qty: 5 }, { locked_qty: 0, fulfilled_qty: 0 }]);
+  assert.equal(st.accuracy_rate, 0.867);
+  assert.equal(st.error_range, "±1 份");
+  assert.equal(st.max_gap, 2);
+  assert.equal(st.rounds, 2);
+});
+
 (async () => {
   for (const [id, name, fn] of asyncTests) {
     try { await fn(); results.push([id, "PASS", name, ""]); }

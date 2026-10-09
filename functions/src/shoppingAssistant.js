@@ -16,7 +16,7 @@ const {
 } = require("./common");
 const { loadPlatformConfig } = require("./config");
 const { runWithTools } = require("./gemini");
-const { validatePickup, closedReason, itemWindows, vendorSlotCapacity, applyEarlyBirdPrice } = require("./pricing");
+const { validatePickup, closedReason, itemWindows, vendorSlotCapacity, applyEarlyBirdPrice, mealPeriodOf, MEAL_PERIODS } = require("./pricing");
 const { resolveMain } = require("./bento");
 const { taipeiToday, addDays, weekdayOf, lastBookableDate } = require("./calendar");
 
@@ -27,6 +27,17 @@ const MAX_RESULTS = 10;
 const MAX_CARDS = 6;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
+const PERIOD_ZH = { breakfast: "早餐", lunch: "午餐", dinner: "晚餐" };
+const PERIOD_ARG = `餐期，只能用：${MEAL_PERIODS.join("、")}（breakfast=早餐、lunch=午餐、dinner=晚餐）`;
+
+/** 模型給的餐期字串；不認得就當沒指定 */
+const periodArg = (v) => (MEAL_PERIODS.includes(v) ? v : null);
+
+/** 品項在這家店、這個餐期有沒有可取餐的時段（品項供應餐期 × 店家時段） */
+function itemPeriodWindows(vendor, item, config, period) {
+  const windows = itemWindows(vendor, item, config);
+  return period ? windows.filter((w) => mealPeriodOf(w, config) === period) : windows;
+}
 
 const normalize = (s) => String(s || "").replace(/台/g, "臺").replace(/\s+/g, "");
 
@@ -58,6 +69,7 @@ const FUNCTION_DECLARATIONS = [
         dietaryTags: LIST("必須符合的飲食標記，只能用：葷食、素食、全素、辣"),
         excludeKeywords: LIST("不要出現的食材，用具體的詞，例如「牛肉」「牛腩」「豬」「香菜」；不要只寫「牛」以免排除牛蒡"),
         weekday: N("只看這個星期幾有供應的品項，1=週一 … 5=週五"),
+        mealPeriod: S(PERIOD_ARG),
       },
     },
   },
@@ -69,6 +81,7 @@ const FUNCTION_DECLARATIONS = [
       properties: {
         menuItemId: S("searchMenuItems 回傳的品項 id"),
         dates: LIST("要查的日期 YYYY-MM-DD，最多 10 天"),
+        mealPeriod: S(`${PERIOD_ARG}；有指定就只查這個餐期的取餐時段`),
       },
       required: ["menuItemId", "dates"],
     },
@@ -97,14 +110,17 @@ const FUNCTION_DECLARATIONS = [
         mealPlanIds: LIST("推薦的計畫方案 id（最多 3 個）"),
         suggestedDates: LIST("建議的取餐日期 YYYY-MM-DD（依使用者需求，可空）"),
         suggestedWindow: S("建議的取餐時段，例如「12:00-12:30」（可空）"),
+        mealPeriod: S(`${PERIOD_ARG}（使用者有指定餐期時填）`),
       },
       required: ["reply"],
     },
   },
 ];
 
-function systemInstruction({ lang, today, dates, area, taste }) {
-  return `你是 BunnBaa 飯飽（台灣校園周邊午餐預購平台）的預購助理。消費者會用一句話描述需求，你用工具查詢後，挑出符合條件、還有名額的候選。
+function systemInstruction({ lang, today, dates, area, taste, config }) {
+  const businessDays = (config.businessWeekdays || [1, 2, 3, 4, 5]).map((d) => WEEKDAY_ZH[d]).join("、");
+  const periods = MEAL_PERIODS.map((p) => `${PERIOD_ZH[p]}（${config.mealPeriods?.[p] || ""}）`).join("、");
+  return `你是 BunnBaa 飯飽（台灣校園周邊便當預購平台）的預購助理。消費者會用一句話描述需求，你用工具查詢後，挑出符合條件、還有名額的候選。
 規則：
 - 只推薦工具查到的品項與方案，不要編造店名、價格、id；查不到就老實說，並建議放寬哪個條件。
 - 你不能幫使用者下單或付款，只提供候選；價格以結帳時伺服器計算為準。
@@ -112,9 +128,11 @@ function systemInstruction({ lang, today, dates, area, taste }) {
 - 有指定日期時，用 checkAvailability 確認推薦的品項那幾天能訂（最多查 3 個品項）；額滿、公休或已截單的要避開或說明。
 - 「不吃牛」之類的需求用 excludeKeywords 帶具體詞（牛肉、牛腩、牛排）；素食用 dietaryTags。
 - 「一週／連續幾天」的需求，也查 searchMealPlans。
+- 使用者說早餐、午餐、晚餐（或「明天晚上」「早上」）時，searchMenuItems、checkAvailability、presentCandidates 都要帶 mealPeriod；沒說就不要帶。
+- 使用者在對話裡提到的過敏或不吃的東西，要用 excludeKeywords 帶具體食材詞；查到的 allergens 欄位跟他說的過敏原相符就不要推薦。
 - 最後一定要呼叫 presentCandidates，reply 用${lang === "en" ? "英文" : "繁體中文"}回答。
 背景：
-- 今天 ${today}（台北時間）。平台只做週一至週五午餐自取，取餐日前一天晚上截單，最遠可以訂到 ${dates[dates.length - 1]?.date ?? today}。
+- 今天 ${today}（台北時間）。平台是預購自取，營業日是週${businessDays}，分 ${periods} 三個餐期（各店家供應的餐期不同），取餐日前一天晚上截單，最遠可以訂到 ${dates[dates.length - 1]?.date ?? today}。
 - 可預訂的日期：${dates.map((d) => `${d.date}(週${WEEKDAY_ZH[d.weekday]})`).join("、") || "無"}
 - 使用者目前選的地區：${area ? `${area.county}${area.town ? ` ${area.town}` : ""}` : "未選"}（使用者沒另外指定時就用這個）
 - 使用者自己設定的口味：${taste.prefs.length ? taste.prefs.join("、") : "無"}；過敏原（已自動排除）：${taste.allergies.length ? taste.allergies.join("、") : "無"}`;
@@ -172,7 +190,7 @@ function hasDietaryTag(item, tag) {
   return tags.includes(tag);
 }
 
-function summarizeItem(item, vendor) {
+function summarizeItem(item, vendor, config) {
   return {
     id: item.id,
     vendor_id: item.vendor_id,
@@ -186,6 +204,7 @@ function summarizeItem(item, vendor) {
     main: item.mains?.length ? item.mains.map((m) => m?.name).filter(Boolean).join("／") : item.main?.name || null,
     sides: (item.slots || []).map((s) => s.default?.name).filter(Boolean),
     weekdays: item.weekdays?.length ? item.weekdays : [1, 2, 3, 4, 5],
+    meal_periods: MEAL_PERIODS.filter((p) => itemPeriodWindows(vendor, item, config, p).length > 0),
     description: String(item.description || "").slice(0, 80),
   };
 }
@@ -194,7 +213,7 @@ function summarizeItem(item, vendor) {
  * 品項在這幾天能不能訂，判斷跟下單（orders.buildDrafts）一致：營業日／公休、品項供應的星期與餐期、
  * 停班停課、截單、時段名額。
  */
-async function checkDates(item, vendor, dates, config, now = new Date()) {
+async function checkDates(item, vendor, dates, config, now = new Date(), period = null) {
   const capacity = vendorSlotCapacity(vendor);
   const price = basePrice(item);
   const out = [];
@@ -214,7 +233,7 @@ async function checkDates(item, vendor, dates, config, now = new Date()) {
     }
     const windows = [];
     let problem = null;
-    for (const window of itemWindows(vendor, item, config)) {
+    for (const window of itemPeriodWindows(vendor, item, config, period)) {
       problem = validatePickup(date, window, vendor, config, now, item);
       if (problem) continue;
       let left = null;
@@ -229,15 +248,18 @@ async function checkDates(item, vendor, dates, config, now = new Date()) {
       const { discountPercent, lockedPrice } = applyEarlyBirdPrice(price, date, now);
       out.push({ date, available: true, windows, early_bird_percent: discountPercent, estimated_price: lockedPrice });
     } else {
-      out.push({ date, available: false, reason: problem || t("各時段已額滿", "All slots are full") });
+      out.push({ date, available: false, reason: problem || (period && itemPeriodWindows(vendor, item, config, period).length === 0
+        ? t(`這個品項沒有供應${PERIOD_ZH[period]}`, `Not served at ${period}`)
+        : t("各時段已額滿", "All slots are full")) });
     }
   }
   return out;
 }
 
-function toolHandlers({ loadCatalog, taste, config, availability }) {
+function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set() }) {
   return {
     async searchMenuItems(args) {
+      const period = periodArg(args.mealPeriod);
       const { vendors, items } = await loadCatalog();
       const keyword = normalize(args.keyword);
       const category = normalize(args.category);
@@ -256,6 +278,7 @@ function toolHandlers({ loadCatalog, taste, config, availability }) {
         if ((item.allergens || []).some((a) => taste.allergies.includes(a))) continue;
         if (!needTags.every((tag) => hasDietaryTag(item, tag))) continue;
         if (weekday >= 1 && weekday <= 5 && item.weekdays?.length && !item.weekdays.includes(weekday)) continue;
+        if (period && itemPeriodWindows(vendor, item, config, period).length === 0) continue;
         const text = normalize(itemText(item));
         if (exclude.some((word) => text.includes(word))) continue;
         if (category && !normalize(item.category).includes(category) && !text.includes(category)) continue;
@@ -267,7 +290,10 @@ function toolHandlers({ loadCatalog, taste, config, availability }) {
       return {
         count: results.length,
         allergies_excluded: taste.allergies,
-        items: results.slice(0, MAX_RESULTS).map((r) => summarizeItem(r.item, r.vendor)),
+        items: results.slice(0, MAX_RESULTS).map((r) => {
+          seen.add(r.item.id);
+          return summarizeItem(r.item, r.vendor, config);
+        }),
       };
     },
 
@@ -277,7 +303,7 @@ function toolHandlers({ loadCatalog, taste, config, availability }) {
       if (!item) return { error: "unknown menuItemId" };
       const vendor = vendors.get(item.vendor_id);
       const dates = (Array.isArray(args.dates) ? args.dates : []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 10);
-      const out = await checkDates(item, vendor, dates, config);
+      const out = await checkDates(item, vendor, dates, config, new Date(), periodArg(args.mealPeriod));
       availability.set(item.id, out);
       return { menuItemId: item.id, list_price: basePrice(item), results: out };
     },
@@ -310,16 +336,23 @@ function toolHandlers({ loadCatalog, taste, config, availability }) {
   };
 }
 
-/** 模型給的 id 比對目錄，查無、下架的丟掉；價格一律用伺服器的 */
-async function buildCards(finish, loadCatalog, availability, lang, config, now = new Date()) {
+/**
+ * 模型給的 id 比對目錄，查無、下架的丟掉；價格一律用伺服器的。
+ * 2026-10-09 加兩道把關：只接受這一輪 searchMenuItems 真的回傳過的品項（seen），
+ * 以及會員設定的過敏原再濾一次——不靠模型記得。
+ */
+async function buildCards(finish, loadCatalog, availability, lang, config, now = new Date(), { seen = null, taste = null } = {}) {
   const { vendors, items, plans } = await loadCatalog();
   const en = lang === "en";
   const pick = (v, key) => (en && v?.[`${key}_en`]) || v?.[key] || "";
   const suggestedDates = (Array.isArray(finish.suggestedDates) ? finish.suggestedDates : []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+  const period = periodArg(finish.mealPeriod);
   const cards = [];
   for (const id of [...new Set(Array.isArray(finish.menuItemIds) ? finish.menuItemIds : [])]) {
     const item = items.get(String(id));
     if (!item || cards.length >= MAX_CARDS) continue;
+    if (seen && !seen.has(item.id)) continue;
+    if (taste && (item.allergens || []).some((a) => taste.allergies.includes(a))) continue;
     const vendor = vendors.get(item.vendor_id);
     const price = basePrice(item);
     if (!price) continue;
@@ -327,7 +360,7 @@ async function buildCards(finish, loadCatalog, availability, lang, config, now =
     const checked = [...(availability.get(item.id) || [])];
     const unchecked = suggestedDates.filter((d) => !checked.some((c) => c.date === d)).slice(0, 5);
     if (unchecked.length) {
-      checked.push(...(await checkDates(item, vendor, unchecked, config, now)));
+      checked.push(...(await checkDates(item, vendor, unchecked, config, now, period)));
       checked.sort((a, b) => a.date.localeCompare(b.date));
     }
     const open = checked.filter((c) => c.available);
@@ -444,14 +477,15 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
   }
   const loadCatalog = catalogLoader();
   const availability = new Map();
+  const seen = new Set(); // 這一輪搜尋工具回傳過的品項 id
 
   let result;
   try {
     result = await runWithTools({
-      systemInstruction: systemInstruction({ lang, today, dates, area, taste }),
+      systemInstruction: systemInstruction({ lang, today, dates, area, taste, config }),
       contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] })),
       functionDeclarations: FUNCTION_DECLARATIONS,
-      handlers: toolHandlers({ loadCatalog, taste, config, availability }),
+      handlers: toolHandlers({ loadCatalog, taste, config, availability, seen }),
       finishTool: "presentCandidates",
     });
   } catch (err) {
@@ -461,7 +495,7 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
   }
 
   const finish = result.finish || { reply: result.text, menuItemIds: [], mealPlanIds: [] };
-  const cards = await buildCards(finish, loadCatalog, availability, lang, config);
+  const cards = await buildCards(finish, loadCatalog, availability, lang, config, new Date(), { seen, taste });
   const reply = String(finish.reply || "").trim().slice(0, 1200)
     || t("抱歉，這次沒找到合適的選項，可以換個條件再問一次。", "Sorry, I couldn't find a good match. Try different conditions.");
 

@@ -63,7 +63,7 @@ interface AssistantReply {
 const EXAMPLES = [
   { zh: "下週一到五中午，預算 120，不吃牛", en: "Weekday lunches next week, under NT$120, no beef" },
   { zh: "明天想吃素食便當", en: "A vegetarian bento for tomorrow" },
-  { zh: "有沒有雞腿便當？", en: "Any chicken leg bentos?" },
+  { zh: "明天晚餐有什麼不辣的？", en: "Something not spicy for dinner tomorrow?" },
 ];
 
 export default function ShoppingAssistant({ open, onClose }: { open: boolean; onClose: () => void }) {

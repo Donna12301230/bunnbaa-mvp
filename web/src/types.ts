@@ -202,8 +202,6 @@ export interface Lock {
   no_show_note?: string | null;
   note?: string; // 消費者下單時的備註（例如「不要香菜」），購物車結帳才會有
   consumer_feedback?: string | null;
-  discount_explanation?: string | null; // filled in by onLockCreated
-  discount_explanation_en?: string | null;
   buyer_uid: string;
   // 曾經持有過、後來被別人接手（轉賣／免費領取／贈送）的 uid，接手時追加。
   // 「我的轉讓」靠這個查回已被接手的項目，原持有人也因此保有讀取權限。
@@ -268,7 +266,8 @@ export interface AccuracyReport {
   vendor_id: string;
   horizon: string;
   accuracy_rate: number;
-  error_range: string;
+  error_range: string; // 程式算的（vendorCalibration.calibrationStats），不是 LLM
+  error_range_en?: string;
   explanation: string;
   pattern_note: string;
   explanation_en?: string;

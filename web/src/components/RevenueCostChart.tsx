@@ -5,6 +5,7 @@ import { httpsCallable } from "@/lib/callable";
 import { functions } from "@/lib/firebase";
 import { tr } from "@/lib/i18n";
 import { EmptyState } from "@/components/ds";
+import { useAiDraftsInUse } from "@/components/AiDraftWarning";
 
 interface DayRow {
   date: string;
@@ -45,6 +46,7 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
  * 淨利再扣人工、手續費、平台抽成、固定成本日攤，都由 Functions getDailyRevenueSeries 算（配方是營業機密，只在後端算）。
  */
 export default function RevenueCostChart({ vendorId }: { vendorId: string | null | undefined }) {
+  const aiDrafts = useAiDraftsInUse(vendorId ?? undefined);
   const { data, isLoading, error } = useQuery({
     queryKey: ["dailyRevenueSeries", vendorId],
     queryFn: async () => {
@@ -94,6 +96,12 @@ export default function RevenueCostChart({ vendorId }: { vendorId: string | null
         {tr("（材料成本依最新單價估算；淨利再扣備料人工、LINE Pay 手續費、平台抽成，以及正職薪資與固定成本按天平均分攤，成本參數在「店家設定」）",
           " (materials at latest unit prices; net profit also deducts prep labor, LINE Pay fees, platform commission, and salaries/fixed costs spread evenly per day — set them in Settings)")}
       </p>
+      {aiDrafts.length > 0 && (
+        <p className="text-xs text-orange-800">
+          {tr(`注意：${aiDrafts.length} 道半成品的份量還是 AI 估計（${aiDrafts.slice(0, 3).map((d) => d.component.name).join("、")}${aiDrafts.length > 3 ? "…" : ""}），材料成本與淨利會跟著不準，確認配方後就會更新。`,
+            `Note: ${aiDrafts.length} recipe(s) still use AI-estimated portions, so material cost and net profit may be off until you confirm them.`)}
+        </p>
+      )}
       <details className="text-xs">
         <summary className="cursor-pointer text-muted-foreground">{tr("以表格檢視", "View as table")}</summary>
         <table className="mt-2 w-full text-left">

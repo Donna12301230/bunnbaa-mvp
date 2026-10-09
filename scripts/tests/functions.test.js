@@ -425,7 +425,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     expectCode(await ANON.call("issuePickupQr", { lock_id: id, share_token: "tok-123" }), "permission-denied", "轉讓後");
   });
 
-  await test("C-MY-24", "代領碼：本人產生 8 碼、免登入輸入碼可取得 QR；別人不能產生；轉讓中不能代領；轉讓後碼失效", async () => {
+  await test("C-MY-27", "代領碼：本人產生 8 碼、免登入輸入碼可取得 QR；別人不能產生；轉讓中不能代領；轉讓後碼失效", async () => {
     const { id, ref } = await lock(uids.A, { share_token: "tok-code" });
     expectCode(await B.call("getProxyPickupCode", { lock_id: id }), "permission-denied");
     const { code } = expectOk(await A.call("getProxyPickupCode", { lock_id: id }));
@@ -442,7 +442,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     expectCode(await ANON.call("issuePickupQr", { proxy_code: code }), "not-found", "轉讓後");
   });
 
-  await test("C-MY-25", "取消轉讓／取消贈送：觸發器換新 share_token，上架期間被看過的舊代領連結失效", async () => {
+  await test("C-MY-28", "取消轉讓／取消贈送：觸發器換新 share_token，上架期間被看過的舊代領連結失效", async () => {
     const { id, ref } = await lock(uids.A, { share_token: "tok-listed" });
     await ref.update({ status: "for_gift" });
     await ref.update({ status: "locked" });
@@ -451,13 +451,31 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     expectOk(await A.call("issuePickupQr", { lock_id: id }), "本人照常取餐");
   });
 
-  await test("V-RPT-02", "每日收入圖：最近 15 天每天都有淨利欄，等於收入 − 材料 − 其他成本", async () => {
+  await test("V-RPT-03", "每日收入圖：最近 15 天每天都有淨利欄，等於收入 − 材料 − 其他成本", async () => {
     const days = expectOk(await OWNER.call("getDailyRevenueSeries", { vendor_id: V1 })).days;
     eq(days.length, 15);
     for (const d of days) {
       assert(Number.isFinite(d.net_profit) && Number.isFinite(d.other_cost), JSON.stringify(d));
       assert(Math.abs(d.revenue - d.material_cost - d.other_cost - d.net_profit) <= 1, JSON.stringify(d));
     }
+  });
+
+  await test("V-CAL-06", "校準報告的準確率由程式算：Gemini 沒設 key 時也照樣寫入數字並更新穩定度", async () => {
+    const vid = uniq("zz-cal");
+    await db.collection("vendors").doc(vid).set({ name: "校準測試店", owner_uid: uids.owner });
+    const add = (date, status) => db.collection("locks").add({ vendor_id: vid, pickup_date: date, pickup_window: WINDOW, status, buyer_uid: uids.A, locked_price: 80, created_at: Timestamp.now() });
+    for (let i = 0; i < 8; i++) await add("2026-09-01", i < 6 ? "fulfilled" : "no_show"); // 6/8
+    for (let i = 0; i < 2; i++) await add("2026-09-02", "fulfilled"); // 2/2
+    const { report_id: id } = expectOk(await OWNER.call("triggerCalibrationNow", { vendor_id: vid }));
+    const r = await get(`accuracy_reports/${id}`);
+    eq([r.accuracy_rate, r.error_range, r.error_range_en], [0.8, "±1 份", "±1 meal"]);
+    eq((await get(`vendors/${vid}`)).reliability_tone, "stable");
+  });
+
+  await test("F-05", "折扣說明只接受早鳥級距；Gemini 失敗時回 null、不報錯", async () => {
+    expectCode(await ANON.call("getDiscountExplanation", { vendor_id: V1, discount_percent: 37 }), "invalid-argument");
+    const r = expectOk(await ANON.call("getDiscountExplanation", { vendor_id: V1, discount_percent: 20 }));
+    assert(r.explanation === null || typeof r.explanation === "string", JSON.stringify(r));
   });
 
   await test("C-MY-19", "取餐日時段內捐為愛心餐", async () => {

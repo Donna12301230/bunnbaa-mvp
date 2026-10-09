@@ -177,3 +177,14 @@ export function craftItems(needs: Map<string, number>, ingredientsById: Record<s
     return [{ id, name: ing.name, need, unit: ing.unit || "g", have: stock ? stock[id] ?? 0 : undefined, minor: MINOR_CATEGORIES.includes(ing.category) }];
   }).sort((a, b) => Number(a.minor) - Number(b.minor) || b.need - a.need);
 }
+
+/**
+ * 上架中品項用到、但還是 AI 草稿（ai_draft，店家還沒按儲存確認）的半成品。
+ * 草稿的份量是 AI 估的，備料、叫貨、成本照它算會不準——這些頁面要提醒店家先確認（2026-10-09）。
+ */
+export function aiDraftComponentsInUse(items: MenuItem[], componentsById: Record<string, Component>): { component: Component; items: MenuItem[] }[] {
+  const usage = componentUsage(items.filter((i) => i.is_available !== false));
+  return [...usage.entries()]
+    .map(([id, used]) => ({ component: componentsById[id], items: used }))
+    .filter((x): x is { component: Component; items: MenuItem[] } => !!x.component?.ai_draft);
+}

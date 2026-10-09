@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, Tag } from "@/components/ds";
 import { useMyVendor } from "@/hooks/useMyVendor";
 import { useVendorCatalog } from "@/hooks/useVendorCatalog";
+import AiDraftWarning, { useConfirmAiDrafts } from "@/components/AiDraftWarning";
 import { useToast } from "@/hooks/use-toast";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
@@ -108,6 +109,7 @@ export default function VendorPortalPurchasing() {
   const { data: vendor } = useMyVendor();
   const vendorId = vendor?.id;
   const { data: catalog } = useVendorCatalog(vendorId);
+  const confirmAiDrafts = useConfirmAiDrafts(vendorId);
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const thisMonday = mondayOf(todayStr());
@@ -189,12 +191,14 @@ export default function VendorPortalPurchasing() {
     }
   }
 
-  function shareSupplier(lines: Line[]) {
+  async function shareSupplier(lines: Line[]) {
+    if (!(await confirmAiDrafts())) return;
     const title = tr(`${vendor?.name ?? ""} 叫貨（${weekly?.week_start?.slice(5) ?? ""} 那週）`, `${vendor?.name ?? ""} order (week of ${weekly?.week_start ?? ""})`);
     shareToLine(purchaseText(title, lines.map((l) => ({ name: l.name, supplier_id: l.supplier_id, units: unitsOf(l), unit_label: l.purchase_unit_label, deliveries: counts[l.ingredient_id] === undefined ? l.deliveries : undefined })), suppliers));
   }
 
-  function shareRestock(date: string, shortages: Shortage[]) {
+  async function shareRestock(date: string, shortages: Shortage[]) {
+    if (!(await confirmAiDrafts())) return;
     shareToLine(purchaseText(tr(`${vendor?.name ?? ""} 臨時補貨（${date} 用）`, `${vendor?.name ?? ""} restock for ${date}`), shortages.map((s) => {
       const ing = ingById[s.ingredient_id];
       return { name: s.name, supplier_id: ing?.supplier_id ?? null, units: toPurchaseUnits(s.short, ing?.purchase_unit_size ?? 1), unit_label: ing?.purchase_unit_label || s.unit };
@@ -320,6 +324,7 @@ export default function VendorPortalPurchasing() {
       <div className="space-y-4">
         <div className="print:hidden space-y-3">
           <RecipeGapCard />
+          <AiDraftWarning vendorId={vendorId} what={tr("叫貨量", "order quantities")} />
           <h1 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-2">
             <ShoppingBasket className="w-6 h-6 text-orange-500" /> {tr("採購叫貨", "Purchasing")}
             <InfoTip>{tr("叫貨單每週六 12:00 依下週訂單＋預測自動鎖定。週六前用 − ＋ 改「冰箱還剩多少」就是盤點，沒改的照理論庫存算；存起來會自動重算。米、油、調味料等久放品項不夠才會列出來。", "Lists lock every Saturday 12:00 from next week's orders + forecast. Before then, use − + to set what's left — that's your stock count; untouched items use theoretical stock. Long-life items only appear when running low.")}</InfoTip>

@@ -18,7 +18,9 @@
 6. 我的餐點月曆依早／午／晚分開，標「午（12:00）」
 7. 菜單品項表單分 ①基本資料 ②內容與價格 ③過敏原，說明／飲食標記／英文／目錄收進「更多設定」；候選菜細項預設收起
 
-部署：Functions（新 callable `getProxyPickupCode`、`issuePickupQr`／`getDailyRevenueSeries`／`matchResaleLock` 有改）＋ hosting。rules 沒改，但上面第 3 點的待部署規則仍要部署。
+8. AI 全面審視修正（細節見 [AI功能設計.md](AI功能設計.md)「2026-10-09 全面審視與修正」）：AI 配方草稿在備料／叫貨／淨利頁提醒、傳 LINE 前確認；校準準確率改程式算；折扣說明改成品項頁按需產生（移除 `onLockCreated`）；預購助理支援早中晚＋卡片最後把關
+
+部署：Functions（新 callable `getProxyPickupCode`、`getDiscountExplanation`；`issuePickupQr`／`getDailyRevenueSeries`／`matchResaleLock`／`askCalibrationScenario`／`dailyCalibration`／`askShoppingAssistant` 有改；**`onLockCreated` 已移除，部署時 CLI 會問要不要刪除雲端上的，選是或加 `--force`**）＋ hosting。rules 沒改，但上面第 3 點的待部署規則仍要部署。
 測試：functions.test.js 63/63（新增 C-MY-24 代領碼、C-MY-25 取消轉讓換 token、V-RPT-02 淨利）、functions-more 71/73（2 筆是「明天不是營業日」SKIP）、logic 57/57。
 
 ---

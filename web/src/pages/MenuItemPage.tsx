@@ -24,6 +24,7 @@ import { useSideWishes } from "@/hooks/useSideWishes";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
 import { getPreferredPickup, mealPeriodLabel, mealPeriodOf, priceDays, slotLabel, vendorCutoffTime, weekdayOf } from "@/lib/pickupSlots";
 import { notifyCartAdded } from "@/components/CartPreview";
+import DiscountExplanation from "@/components/DiscountExplanation";
 
 /** 下拉式選單一列（§4.2）：左邊是目前選的那道菜的小圖，右邊是原生下拉（手機上是系統選單） */
 function DishSelectRow({
@@ -491,6 +492,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                   <div className="flex justify-between font-bold"><dt>{tr("應付（每份）", "Total (each)")}</dt><dd>NT${breakdown.total}</dd></div>
                 </dl>
                 <p className="text-xs text-muted-foreground">{tr("有折價券可在購物車套用（每筆限一張）。", "Apply a coupon in your cart (one per meal).")}</p>
+                {breakdown.discountPercent > 0 && <DiscountExplanation vendorId={item.vendor_id} discountPercent={breakdown.discountPercent} />}
               </div>
             )}
             <div className="flex items-center justify-between gap-3">

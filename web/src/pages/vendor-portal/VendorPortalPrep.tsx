@@ -12,6 +12,7 @@ import { Tag } from "@/components/ds";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyVendor } from "@/hooks/useMyVendor";
 import { useVendorCatalog } from "@/hooks/useVendorCatalog";
+import AiDraftWarning, { useConfirmAiDrafts } from "@/components/AiDraftWarning";
 import { useVendorMenu } from "@/hooks/useVendorMenu";
 import { useStockOnHand } from "@/hooks/useStockOnHand";
 import { amountText, componentPortions, craftItems, rawNeeds } from "@/lib/prep";
@@ -278,6 +279,7 @@ export default function VendorPortalPrep() {
   const toggleFold = (k: string) => setFold((f) => ({ ...f, [k]: !f[k] }));
   const [, navigate] = useLocation();
   const { data: catalog } = useVendorCatalog(vendorId);
+  const confirmAiDrafts = useConfirmAiDrafts(vendorId);
   const { data: menuItems = [] } = useVendorMenu(vendorId);
   const { stock, counted } = useStockOnHand(vendorId, date);
   const ingById = catalog?.ingredientsById ?? {};
@@ -364,9 +366,10 @@ export default function VendorPortalPrep() {
     window.setTimeout(() => window.print(), 50);
   }
 
-  /** 缺料 → LINE 叫貨（依小盤商分組，進位到採購單位） */
-  function shareShortages() {
+  /** 缺料 → LINE 叫貨（依小盤商分組，進位到採購單位）；份量還有 AI 草稿就先問 */
+  async function shareShortages() {
     if (!plan || !catalog) return;
+    if (!(await confirmAiDrafts())) return;
     const lines = plan.shortages.map((s) => {
       const ing = ingById[s.ingredient_id];
       return { name: s.name, supplier_id: ing?.supplier_id ?? null, units: toPurchaseUnits(s.short, ing?.purchase_unit_size ?? 1), unit_label: ing?.purchase_unit_label || s.unit };
@@ -411,6 +414,8 @@ export default function VendorPortalPrep() {
             {dates.map((d) => <Tag key={d} selected={date === d} onClick={() => setDate(d)}>{d === today ? tr("今天", "Today") : d < today ? tr("昨天", "Yesterday") : tr("下一個營業日", "Next day")} {d.slice(5)}</Tag>)}
           </div>
         </div>
+
+        <div className="print:hidden"><AiDraftWarning vendorId={vendorId} what={tr("備料份量與缺料", "prep amounts and shortages")} /></div>
 
         {/* 頂部三個數字卡 */}
         <div className="flex flex-wrap gap-3 print:hidden">
