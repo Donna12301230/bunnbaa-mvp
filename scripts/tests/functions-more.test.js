@@ -682,21 +682,18 @@ function geohash(lat, lng, precision = 7) {
     eq(x.cancel_reason, "disaster");
   });
 
-  await test("A-DIS-05", "退款失敗的那筆按「重新處理」只補失敗的，不重複退款與通知", async () => {
+  await test("A-DIS-05", "停班退款退成點數給付款人；按「重新處理」不重複退款與通知", async () => {
     const VD2 = await mkVendor(vid("dis2"), { address: `臺北市重處${RUN}區測試路 1 號` });
     const okBuyer = `zz2-dok-${RUN}`;
-    const good = await lock(okBuyer, VD2);
-    const bad = await lock(`zz2-dbad-${RUN}`, VD2, { transaction_id: "tx-that-fails" }); // emulator 沒有 LINE Pay 金鑰 → 退款失敗
+    const good = await lock(okBuyer, VD2, { paid_amount: 100, transaction_id: "fake-dis05" });
     const ev = await db.collection("disasterEvents").add({ type: "work_suspension", counties: ["臺北市"], towns: [`臺北市重處${RUN}區`], whole_counties: [], dates: [OPEN_DAY], source: "manual", summary: "測試", created_at: Timestamp.now() });
     const first = await waitFor(async () => (await ev.get()).data().result, 60000);
-    eq([first.cancelled, first.failed], [1, 1]);
-    eq((await ev.get()).data().processed, false, "有失敗 → processed=false");
-    eq((await get(`locks/${bad.id}`)).status, "locked", "失敗的那筆狀態要還原");
-    await bad.ref.update({ transaction_id: FieldValue.delete() });
-    const r = expectOk(await OWNER.call("reprocessDisasterEvent", { event_id: ev.id }));
-    eq([r.cancelled, r.failed], [1, 0]);
-    eq((await get(`locks/${bad.id}`)).status, "cancelled");
+    eq([first.cancelled, first.failed], [1, 0]);
     eq((await get(`locks/${good.id}`)).cancel_reason, "disaster");
+    eq((await get(`wallets/${okBuyer}`)).balance, 100, "全額退成點數");
+    const r = expectOk(await OWNER.call("reprocessDisasterEvent", { event_id: ev.id }));
+    eq([r.cancelled, r.failed], [0, 0]);
+    eq((await get(`wallets/${okBuyer}`)).balance, 100, "不重複退");
     eq((await notes(okBuyer, { kind: "disaster" })).length, 1, "已取消的不重複通知");
   });
 

@@ -13,6 +13,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import UsePointsToggle from "@/components/UsePointsToggle";
+import { useWallet } from "@/hooks/useWallet";
+import { formatNT } from "@/lib/format";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { auth, db, functions } from "@/lib/firebase";
 import type { Vendor, MenuItem, MealPlan, Lock, MealPeriod, RewardStatus } from "@/types";
@@ -86,6 +89,8 @@ export default function HomePage() {
   const searching = searchQuery.trim().length > 0;
   // 加入計畫確認視窗：開始日期＋時段由消費者選，送伺服器排日期、收款
   const [planDialog, setPlanDialog] = useState<{ plan: MealPlan; vendor: Vendor; item: MenuItem | null } | null>(null);
+  const [planUsePoints, setPlanUsePoints] = useState(true);
+  const { balance: pointBalance } = useWallet();
   const [planStartDate, setPlanStartDate] = useState("");
   const [planWindow, setPlanWindow] = useState("");
   const [planAck, setPlanAck] = useState(false);
@@ -279,9 +284,10 @@ export default function HomePage() {
     setJoiningPlan(true);
     try {
       const fn = httpsCallable(functions, "createPlanLinePayReservation");
-      const result = await fn({ plan_id: plan.id, start_date: planStartDate, pickup_window: planWindow });
-      const { payment_url: paymentUrl } = result.data as { order_id: string; payment_url: string };
-      window.location.href = paymentUrl;
+      const result = await fn({ plan_id: plan.id, start_date: planStartDate, pickup_window: planWindow, use_points: planUsePoints && pointBalance > 0 });
+      const { order_id: orderId, payment_url: paymentUrl, free } = result.data as { order_id: string; payment_url: string; free?: boolean };
+      if (free) navigate(`/payment/confirm/${orderId}`);
+      else window.location.href = paymentUrl;
     } catch (err) {
       toast({ title: t("加入計畫失敗", "Couldn't join the plan"), description: (err as Error).message, variant: "destructive" });
       setJoiningPlan(false);
@@ -574,7 +580,7 @@ export default function HomePage() {
                           ))}
                         </ul>
                         <p className="flex justify-between pt-2 mt-1 border-t border-border text-sm font-semibold">
-                          <span>{t("合計", "Total")}</span><span>NT$ {total}</span>
+                          <span>{t("合計", "Total")}</span><span>{formatNT(total)}</span>
                         </p>
                       </div>
                     ) : (
@@ -598,10 +604,14 @@ export default function HomePage() {
                       </span>
                     </div>
                   </div>
+                  {schedule && <UsePointsToggle total={total} checked={planUsePoints} onChange={setPlanUsePoints} />}
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setPlanDialog(null)} disabled={joiningPlan}>{t("取消", "Cancel")}</Button>
                     <Button disabled={!schedule || !planAck || joiningPlan} onClick={() => handleJoinPlan(plan)}>
-                      {joiningPlan ? t("前往付款中…", "Redirecting to payment…") : t(`確認並付款 NT$ ${total}`, `Confirm & pay NT$ ${total}`)}
+                      {(() => {
+                        const pay = Math.max(0, total - (planUsePoints ? Math.min(pointBalance, total) : 0));
+                        return joiningPlan ? t("前往付款中…", "Redirecting to payment…") : pay === 0 ? t("已全額折抵，確認加入", "Fully covered — confirm") : t(`確認並付款 ${formatNT(pay)}`, `Confirm & pay ${formatNT(pay)}`);
+                      })()}
                     </Button>
                   </DialogFooter>
                 </>

@@ -5,8 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDoc, collection, getDocs, limit, orderBy, query, serverTimestamp, where } from "firebase/firestore";
 import {
   Mail, Phone, GraduationCap, ArrowLeft, LogOut,
-  ClipboardList, Store, History, ShieldAlert, User, Utensils,
+  ClipboardList, Store, History, ShieldAlert, User, Utensils, Coins,
 } from "lucide-react";
+import WalletPanel from "@/components/WalletPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { logout } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -243,7 +244,7 @@ function AccountPanel({ user }: { user: UserProfile }) {
   );
 }
 
-type Tab = "account" | "orders" | "taste";
+type Tab = "account" | "orders" | "points" | "taste";
 
 function SidebarButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
@@ -263,7 +264,8 @@ export default function ProfilePage() {
   const [, navigate] = useLocation();
   const { user, isLoading } = useAuth();
   const { toast } = useToast();
-  const [tab, setTab] = useState<Tab>("account");
+  // ?tab=points（退款通知帶進來）
+  const [tab, setTab] = useState<Tab>(() => (/[?&]tab=points/.test(window.location.search + window.location.hash) ? "points" : "account"));
 
   const logoutMutation = useMutation({
     mutationFn: () => logout(),
@@ -299,6 +301,7 @@ export default function ProfilePage() {
             <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tr("會員專區", "Member area")}</p>
             <SidebarButton active={tab === "account"} icon={<User className="w-4 h-4" />} label={tr("帳號資訊", "Account")} onClick={() => setTab("account")} />
             <SidebarButton active={tab === "orders"} icon={<ClipboardList className="w-4 h-4" />} label={tr("我的訂單", "My orders")} onClick={() => setTab("orders")} />
+            <SidebarButton active={tab === "points"} icon={<Coins className="w-4 h-4" />} label={tr("平台點數", "Points")} onClick={() => setTab("points")} />
             <SidebarButton active={tab === "taste"} icon={<Utensils className="w-4 h-4" />} label={tr("口味與通知", "Taste & notifications")} onClick={() => setTab("taste")} />
 
             <div className="my-2 border-t border-border" />
@@ -335,6 +338,7 @@ export default function ProfilePage() {
           {user?.orderBanned && <BanAppealSection user={user} />}
           {user && tab === "account" && <AccountPanel user={user} />}
           {user && tab === "orders" && <OrdersPanel uid={user.id} />}
+          {user && tab === "points" && <WalletPanel />}
           {user && tab === "taste" && <TasteAndNotifySection user={user} />}
         </main>
       </div>

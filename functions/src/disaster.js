@@ -156,12 +156,26 @@ async function processEvent(ref, event) {
           try {
             if (await helpers.cancelAndRefund(doc.ref, "disaster")) {
               result.cancelled++;
-              await notifyUser(doc.data().buyer_uid, {
+              // 2026-10-09 起退款一律退成平台點數（給付款人），可結帳折抵或到會員中心退回 LINE Pay
+              const d = doc.data();
+              const payer = d.payer_uid || d.buyer_uid;
+              await notifyUser(d.buyer_uid, {
                 kind: "disaster",
                 title: t("停班停課，訂單已自動取消", "Work suspension — order cancelled"),
-                body: t(`${date}「${doc.data().item_name}」已全額退款，折價券已退回。`, `${date} ${doc.data().item_name} was fully refunded.`),
-                link: "/my-bookings",
+                body: payer === d.buyer_uid
+                  ? t(`${date}「${d.item_name}」已取消，款項已全額退成平台點數，可結帳折抵或到會員中心退回 LINE Pay；折價券已退回。`,
+                    `${date} ${d.item_name} was cancelled. The full amount is back as BunnBaa points — use them at checkout or send them back to LINE Pay from My account.`)
+                  : t(`${date}「${d.item_name}」已取消，款項已全額退成點數給原付款人。`, `${date} ${d.item_name} was cancelled; the payer got the full amount back as points.`),
+                link: payer === d.buyer_uid ? "/profile?tab=points" : "/my-bookings",
               });
+              if (payer !== d.buyer_uid) {
+                await notifyUser(payer, {
+                  kind: "refund",
+                  title: t("停班停課，款項已退成點數", "Work suspension — refunded as points"),
+                  body: t(`你付款的「${d.item_name}」（${date}）因停班停課取消，款項已全額退成平台點數。`, `${d.item_name} (${date}), which you paid for, was cancelled; the full amount is back as points.`),
+                  link: "/profile?tab=points",
+                });
+              }
             }
           } catch (err) {
             result.failed++;
@@ -171,8 +185,8 @@ async function processEvent(ref, event) {
         await db().collection("vendors").doc(vendor.id).set({ disaster_dates: FieldValue.arrayUnion(date) }, { merge: true });
       }
       await notifyVendor(vendor.id, {
-        title: "停班停課：訂單已自動取消退款",
-        body: `${(event.dates || []).join("、")} 的訂單已全額退款，不計入營業額與抽獎券，平台不收抽成。`,
+        title: t("停班停課：訂單已自動取消退款", "Work suspension: orders cancelled and refunded"),
+        body: t(`${(event.dates || []).join("、")} 的訂單已全額退成消費者的平台點數，不計入營業額與抽獎券，平台不收抽成。`, `Orders on ${(event.dates || []).join(", ")} were refunded to customers as points; they don't count toward revenue, tickets or commission.`),
         link: "/vendor-portal/orders",
       });
     } else if (event.type === "typhoon_warning") {

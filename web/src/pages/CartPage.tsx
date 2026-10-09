@@ -21,6 +21,8 @@ import { discountText } from "@/lib/pricing";
 import { customFields, itemMains, portionLabel, priceBreakdown, priceDeltaText, riceLabel, sideOptions } from "@/lib/bento";
 import { couponTitle } from "@/lib/rewards";
 import { tr, loc } from "@/lib/i18n";
+import UsePointsToggle, { usePointsPreview } from "@/components/UsePointsToggle";
+import { formatNT } from "@/lib/format";
 
 // 購物車（規格 §4）：每一行是一份便當，各自有取餐日（到下週五）、時段、配菜與加減飯；
 // 每筆（每一份）限用一張折價券，折抵 = min(券面, 加減後小計)。金額只是預覽，
@@ -32,6 +34,7 @@ export default function CartPage() {
   const { lines, vendorId, update, remove, clearCart } = useCart();
   const [checkingOut, setCheckingOut] = useState(false);
   const [ack, setAck] = useState(false);
+  const [usePoints, setUsePoints] = useState(true);
   const requireLogin = useRequireLogin();
   const { user } = useAuth();
   const { usable } = useMyCoupons(user?.id);
@@ -61,6 +64,7 @@ export default function CartPage() {
   const couponTotal = priced.reduce((s, p) => s + p.couponDiscount, 0);
   const grandTotal = priced.reduce((s, p) => s + p.total, 0);
   const blocked = priced.find((p) => p.problem);
+  const points = usePointsPreview(grandTotal, usePoints);
 
   async function handleCheckout() {
     if (!requireLogin()) return;
@@ -81,6 +85,7 @@ export default function CartPage() {
           note: l.note,
           coupon_id: l.couponId || null,
         })),
+        use_points: usePoints && points.balance > 0,
       });
       const { order_id: orderId, payment_url: paymentUrl, free } = result.data as { order_id: string; payment_url: string; free?: boolean };
       clearCart();
@@ -230,9 +235,10 @@ export default function CartPage() {
                 {adjustTotal !== 0 && <div className="flex justify-between gap-3"><dt className="text-muted-foreground">{tr("加減選項", "Adjustments")}</dt><dd>{adjustTotal > 0 ? "+" : "−"}NT${Math.abs(adjustTotal)}</dd></div>}
                 {couponTotal > 0 && <div className="flex justify-between gap-3 text-green-700"><dt>{tr("折價券", "Coupons")}</dt><dd>−NT${couponTotal}</dd></div>}
               </dl>
+              <UsePointsToggle total={grandTotal} checked={usePoints} onChange={setUsePoints} />
               <div className="flex items-baseline justify-between font-bold pt-3 border-t border-ink/30">
                 <span>{tr("實付", "Total")}</span>
-                <span className="font-heading text-4xl">NT${grandTotal}</span>
+                <span className="font-heading text-4xl">{formatNT(points.pay)}</span>
               </div>
               <label className="flex items-start gap-2 p-3 rounded-2xl bg-card border border-border cursor-pointer">
                 <Checkbox checked={ack} onCheckedChange={() => setAck((v) => !v)} className="mt-0.5 shrink-0" />
@@ -245,7 +251,7 @@ export default function CartPage() {
               </label>
               {blocked && <p className="text-xs text-red-600">{tr("有餐點已過截單或不能預訂，請先移除。", "Some meals are past cutoff — please remove them first.")}</p>}
               <Button className="w-full h-13 min-h-[52px] rounded-full text-base" onClick={handleCheckout} disabled={checkingOut || !ack || !!blocked}>
-                {checkingOut ? tr("處理中…", "Working…") : grandTotal === 0 ? tr("折價券全額折抵，送出預購", "Covered by coupons — place order") : tr("送出預購並以 LINE Pay 付款", "Place order & pay with LINE Pay")}
+                {checkingOut ? tr("處理中…", "Working…") : points.pay === 0 ? tr("已全額折抵，送出預購", "Fully covered — place order") : tr("送出預購並以 LINE Pay 付款", "Place order & pay with LINE Pay")}
               </Button>
             </div>
           </div>
@@ -258,10 +264,10 @@ export default function CartPage() {
         <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-card border-t border-ink p-3 flex items-center gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground">{tr("實付", "Total")}</p>
-            <p className="font-heading text-xl font-semibold truncate">NT${grandTotal}</p>
+            <p className="font-heading text-xl font-semibold truncate">{formatNT(points.pay)}</p>
           </div>
           <Button className="flex-1 h-12 rounded-full text-sm" onClick={handleCheckout} disabled={checkingOut || !ack || !!blocked}>
-            {checkingOut ? tr("處理中…", "Working…") : grandTotal === 0 ? tr("折價券全額折抵，送出預購", "Covered by coupons") : tr("送出預購並付款", "Place order & pay")}
+            {checkingOut ? tr("處理中…", "Working…") : points.pay === 0 ? tr("已全額折抵，送出預購", "Fully covered") : tr("送出預購並付款", "Place order & pay")}
           </Button>
         </div>
       )}

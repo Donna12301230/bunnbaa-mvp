@@ -5,6 +5,8 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { Clock, HeartHandshake, MapPin, UtensilsCrossed, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useWallet } from "@/hooks/useWallet";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db, functions } from "@/lib/firebase";
 import { isClean } from "@/lib/searchFilter";
@@ -57,6 +59,8 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [usePoints, setUsePoints] = useState(true);
+  const { balance: pointBalance } = useWallet();
   const { data: vendors = [] } = useVendors();
   const imageOf = useItemImages();
   const vendorName = (id: string) => loc(vendors.find((v) => v.id === id), "name");
@@ -145,7 +149,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
     setClaimingId(lockId);
     try {
       const fn = httpsCallable(functions, "createResaleLinePayReservation");
-      const result = await fn({ lock_id: lockId });
+      const result = await fn({ lock_id: lockId, use_points: usePoints && pointBalance > 0 });
       const { order_id: orderId, payment_url: paymentUrl, free } = result.data as { order_id: string; payment_url: string; free?: boolean };
       // 付款完成後由確認頁（/payment/confirm）換人、退款給原付款人
       if (free) navigate(`/payment/confirm/${orderId}`);
@@ -197,6 +201,12 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
           <>
             <div className="flex items-center justify-between flex-wrap gap-3.5">
               <span className="text-sm text-muted-foreground font-semibold">{tr(`目前 ${activeListings.length} 筆轉讓中`, `${activeListings.length} available`)}</span>
+              {pointBalance > 0 && (
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={usePoints} onCheckedChange={(v) => setUsePoints(v === true)} />
+                  {tr(`接手時用平台點數折抵（可用 ${pointBalance} 點）`, `Use BunnBaa points when taking over (${pointBalance} available)`)}
+                </label>
+              )}
             </div>
 
             {activeListings.length === 0 ? (

@@ -327,6 +327,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // 平台點數（functions/src/wallet.js，2026-10-09）：餘額、批次、明細只有本人能讀；
+    // 入帳、折抵、退回 LINE Pay 全部由 Functions（Admin SDK）寫，client 一律不能寫。
+    match /wallets/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+      match /{sub}/{docId} {
+        allow read: if request.auth != null && request.auth.uid == uid && sub in ['lots', 'entries'];
+        allow write: if false;
+      }
+    }
+
     // menu_items: real catalog backing VendorPage/MenuItemPage/CartPage
     // (replaces the old mockMenuItems). Publicly readable for browsing;
     // writes restricted to admin or that item's own vendor owner. The
