@@ -98,7 +98,7 @@
 - [ ] P1：補 60～90 天模擬資料、`AI.FORECAST` 預測寫回 Firestore、店家報表頁顯示「預估明天 N 份（參考）」
 - [ ] P1：`ML.KMEANS` 客群＋`AI.GENERATE` 每群一句描述
 - [ ] P1：Looker Studio 儀表板嵌入管理後台
-- [ ] README 環境變數段、`doc/ISMS_管理制度文件.md` 資料流同步更新
+- [ ] README（英文版，已寫成 Vertex AI 設定）與 `doc/開發說明.md` 環境變數段、`doc/ISMS_管理制度文件.md` 資料流同步更新
 
 - [ ] 正式站已部署最新 Functions、rules、indexes，並跑過一次 `backfillMenuEmbeddings`（C3 推播才會出現）
 - [ ] 帳號：店家 1、消費者 A（下單、轉讓）、消費者 B（接手；過去訂過類似菜色、常用地點在 10 公里內、今天還沒收過 2 則媒合通知）

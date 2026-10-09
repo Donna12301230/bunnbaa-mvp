@@ -20,7 +20,7 @@ Items in `[brackets]` must be filled in before submitting.
 
 **Proposal PDF:** [attach the PDF exported from the deck]
 
-**Code repository:** [GitHub link, if required]
+**Code repository:** https://github.com/Donna12301230/bunnbaa-mvp (setup, architecture and design decisions in the README)
 
 ### One-line pitch
 
