@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { rememberReturnPath } from "@/lib/returnPath";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
@@ -94,7 +95,7 @@ export default function FavoritesPage() {
             icon={<Heart size={32} />}
             title={tr("請先登入", "Please sign in")}
             description={tr("登入後就能收藏喜歡的店家。", "Sign in to save your favorite vendors.")}
-            action={<Button asChild><Link href="/login">{tr("前往登入", "Sign in")}</Link></Button>}
+            action={<Button asChild><Link href="/login" onClick={() => rememberReturnPath()}>{tr("前往登入", "Sign in")}</Link></Button>}
           />
         ) : loading ? (
           <SkeletonBlocks count={2} height={200} className="space-y-4" />
@@ -125,10 +126,10 @@ export default function FavoritesPage() {
                             {item.image
                               ? <img src={item.image} alt="" loading="lazy" className="w-full h-full object-cover" />
                               : <span className="w-full h-full flex items-center justify-center"><UtensilsCrossed className="w-7 h-7 text-secondary-foreground/50" aria-hidden="true" /></span>}
-                            {discountPercent > 0 && <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-[#f29e0c] text-[#2b180d]">{discountText(discountPercent)}</span>}
+                            {discountPercent > 0 && <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-brand text-brand-foreground">{discountText(discountPercent)}</span>}
                           </span>
                           <span className="block mt-2 text-sm font-semibold truncate">{loc(item, "name")}</span>
-                          <span className="font-heading text-lg font-semibold">${lockedPrice}</span>
+                          <span className="font-heading text-lg font-semibold">NT${lockedPrice}</span>
                         </button>
                       </li>
                     );
@@ -139,7 +140,7 @@ export default function FavoritesPage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {plans.map((plan) => (
                     <Link key={plan.id} href="/plans" className="text-xs font-semibold px-3 py-1.5 rounded-full border border-ink bg-accent hover:bg-secondary">
-                      {loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}・NT$ {plan.price_per_meal}{t(" / 餐", " / meal")}
+                      {loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}・NT${plan.price_per_meal}{t(" / 餐", " / meal")}
                     </Link>
                   ))}
                 </div>

@@ -1,5 +1,5 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { onDocumentCreated, onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
@@ -7,12 +7,11 @@ const { FieldValue } = require("firebase-admin/firestore");
 admin.initializeApp();
 const db = admin.firestore();
 
-const { onCall, HttpsError, assertAdminOrEmulator, assertAdminOrVendorOwner } = require("./common");
-const { generateVendorCalibrationReport } = require("./vendorCalibration");
-const { generateDiscountExplanation } = require("./consumerExplanation");
+const { onCall, HttpsError, assertAdminOrEmulator, assertAdminOrVendorOwner, t } = require("./common");
+const { generateVendorCalibrationReport, answerCalibrationScenario } = require("./vendorCalibration");
 const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./translate");
 const { loadPlatformConfig } = require("./config");
-const { commissionOf } = require("./pricing");
+const { commissionOf, revenueOf } = require("./pricing");
 
 // 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格1002.md）的功能拆在各模組：
 //   orders.js     下單計價、LINE Pay、截單判定許願、每日備料、QR 取餐、取消退款
@@ -80,6 +79,7 @@ async function buildVendorHistory(vendorId, { maxPeriods = 14 } = {}) {
 // Spec ref: README "尚未實作" — reliability_tone was a hand-set field;
 // this ties it to the same accuracy_rate the calibration report already
 // computes, so the badge on the consumer page stays in sync automatically.
+// accuracy_rate 由 vendorCalibration.calibrationStats 用程式算（不是 LLM），徽章才可信。
 const STABLE_ACCURACY_THRESHOLD = 0.8;
 
 async function runCalibrationForVendor(vendorId) {
@@ -163,10 +163,8 @@ exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request)
  * there's no merchant account to call it against.
  * ------------------------------------------------------------------ */
 
-/** 這筆訂單要撥給店家的金額（抽成前）：取消換券的單是留在店家的款項，其餘是實付金額 */
-function payableOf(lock) {
-  return lock.status === "cancelled" ? Number(lock.kept_amount) || 0 : Number(lock.locked_price) || 0;
-}
+/** 這筆訂單要撥給店家的金額（抽成前）：跟營收看板同一套（pricing.js revenueOf） */
+const payableOf = (lock) => revenueOf(lock);
 
 async function settleVendorPayout(vendorId) {
   // Reuses the same vendor_id index as buildVendorHistory/VendorRedeemPage
@@ -182,8 +180,8 @@ async function settleVendorPayout(vendorId) {
   const unsettled = snap.docs.filter((d) => {
     const data = d.data();
     if (data.payout_settled) return false;
-    // 愛心餐（未取餐轉入或主動捐出）照常計入店家營業額（§7.1）
-    if (["fulfilled", "resold_and_fulfilled", "charity"].includes(data.status)) return true;
+    // 愛心餐（未取餐轉入或主動捐出）照常計入店家營業額（§7.1）；舊制「未取餐」也是預付不退，2026-10-09 起一樣撥款
+    if (["fulfilled", "resold_and_fulfilled", "charity", "no_show"].includes(data.status)) return true;
     // 消費者取消只換折價券、不退現金（orders.js cancelForCoupon）：留下的款項也撥給店家，之後由店家兌現那張券
     return data.status === "cancelled" && payableOf(data) > 0;
   });
@@ -196,7 +194,7 @@ async function settleVendorPayout(vendorId) {
   const { commissionRate } = await loadPlatformConfig(db);
   const rate = Number(commissionRate) || 0;
   const gross = unsettled.reduce((sum, d) => sum + payableOf(d.data()), 0);
-  const commission = commissionOf(unsettled.map((d) => ({ locked_price: payableOf(d.data()) })), rate);
+  const commission = commissionOf(unsettled.map((d) => d.data()), rate);
   const amount = gross - commission;
   const lockIds = unsettled.map((d) => d.id);
 
@@ -262,7 +260,14 @@ exports.askCalibrationScenario = onCall({ region: "asia-east1" }, async (request
     throw new HttpsError("failed-precondition", "No history yet for this vendor");
   }
 
-  const report = await generateVendorCalibrationReport({ history, scenarioQuestion: question });
+  // 只回答追問、不重產整份報告（2026-10-09：省一次完整報告的 token）
+  let report;
+  try {
+    report = await answerCalibrationScenario({ history, question });
+  } catch (err) {
+    logger.warn("askCalibrationScenario failed", err);
+    throw new HttpsError("unavailable", t("AI 暫時無法回答，請稍後再試", "AI can't answer right now. Please try again shortly."));
+  }
   if (request.data?.lang === "en" && report.scenario_answer) {
     try {
       [report.scenario_answer] = await translateTexts([report.scenario_answer]);
@@ -276,90 +281,10 @@ exports.askCalibrationScenario = onCall({ region: "asia-east1" }, async (request
 });
 
 /* ------------------------------------------------------------------ *
- * 3. Consumer discount explanation — generate-on-lock-creation, cached
+ * 3. Consumer discount explanation：2026-10-09 起改成品項頁按需產生
+ *    （consumerExplanation.js getDiscountExplanation）。原本的 onLockCreated
+ *    每筆訂單都呼叫 Gemini＋翻譯，但沒有畫面顯示，已移除。
  * ------------------------------------------------------------------ */
-
-function cacheKeyFor({ vendor_id, item_name, discount_percent, resellable, pickup_window }) {
-  return [vendor_id, item_name, discount_percent, resellable, pickup_window]
-    .join("|")
-    .replace(/[^a-zA-Z0-9|_.:-]/g, "_")
-    .slice(0, 200);
-}
-
-/**
- * Fires when a new lock document is created. Looks up (or generates once
- * and caches) the plain-language discount explanation, and writes it back
- * onto the lock so the frontend can read it directly — no extra round trip
- * needed from the client.
- */
-exports.onLockCreated = onDocumentCreated(
-  { document: "locks/{lockId}", region: "asia-east1" },
-  async (event) => {
-    const lock = event.data.data();
-    const lockRef = event.data.ref;
-
-    const vendorSnap = await db.collection("vendors").doc(lock.vendor_id).get();
-    const vendor = vendorSnap.data();
-    if (!vendor) {
-      logger.warn(`Lock ${event.params.lockId} references unknown vendor ${lock.vendor_id}`);
-      return;
-    }
-
-    const key = cacheKeyFor({
-      vendor_id: lock.vendor_id,
-      item_name: lock.item_name,
-      discount_percent: lock.discount_percent,
-      resellable: lock.resellable !== false,
-      pickup_window: lock.pickup_window,
-    });
-
-    const cacheRef = db.collection("discount_explanations").doc(key);
-    const cached = await cacheRef.get();
-
-    let explanation;
-    if (cached.exists) {
-      explanation = cached.data();
-      if (typeof explanation.explanation_text_en !== "string") {
-        try {
-          [explanation.explanation_text_en] = await translateTexts([explanation.explanation_text]);
-          await cacheRef.update({ explanation_text_en: explanation.explanation_text_en });
-        } catch (err) {
-          logger.warn(`Couldn't translate cached explanation ${key}`, err);
-        }
-      }
-    } else {
-      // Gemini 失敗（沒設 key、503／429）只少一段說明文字，不能讓觸發器當掉
-      // （emulator 會殺掉 worker 重啟，拖慢後面所有觸發器）。測試文件 F-10。
-      try {
-        explanation = await generateDiscountExplanation({
-          discountPercent: lock.discount_percent,
-          resellable: lock.resellable !== false,
-          pickupWindow: lock.pickup_window,
-          // Qualitative only, per spec 6.2 — never expose the raw accuracy
-          // number to the consumer-facing agent.
-          vendorReliabilityTone: vendor.reliability_tone || "new",
-        });
-      } catch (err) {
-        logger.warn(`Couldn't generate discount explanation for lock ${event.params.lockId}`, err);
-        return;
-      }
-      try {
-        [explanation.explanation_text_en] = await translateTexts([explanation.explanation_text]);
-      } catch (err) {
-        logger.warn(`Couldn't translate explanation ${key}`, err);
-      }
-      await cacheRef.set({
-        ...explanation,
-        generated_at: FieldValue.serverTimestamp(),
-      });
-    }
-
-    await lockRef.update({
-      discount_explanation: explanation.explanation_text,
-      discount_explanation_en: explanation.explanation_text_en ?? null,
-    });
-  }
-);
 
 /* ------------------------------------------------------------------ *
  * 6. English copies of database content (translate.js) — vendors,
@@ -451,7 +376,7 @@ exports.translateAllContent = onCall({ region: "asia-east1", timeoutSeconds: 540
  * ------------------------------------------------------------------ */
 for (const mod of [
   "./orders", "./charity", "./rewardsFns", "./purchasing", "./insights", "./disaster",
-  "./finance", "./menuVision", "./resaleMatch", "./shoppingAssistant", "./pickupForecast",
+  "./finance", "./menuVision", "./resaleMatch", "./shoppingAssistant", "./pickupForecast", "./consumerExplanation", "./wallet",
 ]) {
   for (const [name, fn] of Object.entries(require(mod))) {
     // 只掛 Cloud Functions（helpers 等模組內部共用的東西不是函式或沒有 __trigger/run）

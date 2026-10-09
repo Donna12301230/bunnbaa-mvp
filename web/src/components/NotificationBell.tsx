@@ -42,7 +42,7 @@ export default function NotificationBell() {
         <Button variant="ghost" size="icon" className="relative w-10 h-10 text-muted-foreground [&_svg]:size-5" aria-label={tr(`通知，${unread} 則未讀`, `Notifications, ${unread} unread`)}>
           <Bell />
           {unread > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-micro font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">{unread > 9 ? "9+" : unread}</span>
+            <span className="absolute -top-0.5 -right-0.5 bg-destructive text-white text-micro font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">{unread > 9 ? "9+" : unread}</span>
           )}
         </Button>
       </DropdownMenuTrigger>

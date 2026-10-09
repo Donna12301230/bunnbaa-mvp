@@ -114,9 +114,9 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
         </Card>
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: tr("待取", "Waiting"), n: stats.waiting, cls: "bg-amber-50 border-amber-300 text-amber-900" },
-            { label: tr("已取", "Picked up"), n: stats.done, cls: "bg-green-50 border-green-300 text-green-900" },
-            { label: tr("轉愛心餐", "Charity"), n: stats.charity, cls: "bg-pink-50 border-pink-200 text-pink-900" },
+            { label: tr("待取", "Waiting"), n: stats.waiting, cls: "bg-warning-soft border-warning/50 text-warning-text" },
+            { label: tr("已取", "Picked up"), n: stats.done, cls: "bg-success-soft border-success/40 text-success-text" },
+            { label: tr("轉愛心餐", "Charity"), n: stats.charity, cls: "bg-charity-soft border-charity/40 text-charity" },
           ].map((x) => (
             <div key={x.label} className={cn("rounded-xl border-2 p-3 flex flex-col justify-center text-center", x.cls)}>
               <p className="text-3xl font-bold leading-none">{x.n}</p>
@@ -127,10 +127,10 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
       </div>
 
       {s && (
-        <Card className="border-4 border-orange-400">
+        <Card className="border-4 border-brand">
           <CardContent className="p-5 space-y-2">
             {s.kind === "charity" ? (
-              <p className="font-semibold flex items-center gap-1.5 text-pink-700"><HeartHandshake className="w-4 h-4" /> {tr("愛心餐預約", "Charity reservation")}</p>
+              <p className="font-semibold flex items-center gap-1.5 text-charity"><HeartHandshake className="w-4 h-4" /> {tr("愛心餐預約", "Charity reservation")}</p>
             ) : null}
             <div className="flex items-baseline justify-between">
               <span className="text-5xl font-extrabold tracking-widest">{s.pickup_code}</span>
@@ -141,9 +141,9 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
             {s.slots && s.slots.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {s.slots.map((slot, i) => (
-                  <span key={i} className={cn("rounded-md border px-2 py-0.5 text-sm", slot.removed ? "border-dashed text-muted-foreground line-through" : "bg-green-50 border-green-300")}>
+                  <span key={i} className={cn("rounded-md border px-2 py-0.5 text-sm", slot.removed ? "border-dashed text-muted-foreground line-through" : "bg-success-soft border-success/40")}>
                     {slot.removed ? slot.category : slot.dish}
-                    {slot.wished && slot.dish === slot.wished && <Badge variant="muted" className="ml-1 bg-orange-100 text-orange-700">{tr("許願", "wish")}</Badge>}
+                    {slot.wished && slot.dish === slot.wished && <Badge variant="muted" className="ml-1 bg-secondary text-accent-foreground">{tr("許願", "wish")}</Badge>}
                   </span>
                 ))}
               </div>
@@ -151,8 +151,8 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
             {s.sides && s.sides.length > 0 && <p className="text-sm">{s.sides.join("、")}</p>}
             {s.extra_side && <p className="text-sm">{s.extra_side.mode === "addon" ? tr(`加菜：${s.extra_side.dish}`, `Add-on: ${s.extra_side.dish}`) : s.extra_side.used ? tr(`備案已遞補：${s.extra_side.dish}`, `Backup used: ${s.extra_side.dish}`) : tr(`備案（未用到）：${s.extra_side.dish}`, `Backup (unused): ${s.extra_side.dish}`)}</p>}
             {customOptionTexts(s.custom_options).map((text, k) => <p key={k} className="text-sm">{text}</p>)}
-            {s.rice && s.rice !== "normal" && <p className="text-base font-bold text-amber-800">{s.rice === "add" ? tr("白飯一碗半", "1.5 bowls of rice") : tr("白飯半碗", "Half bowl of rice")}</p>}
-            {s.note && <p className="text-sm text-amber-700">{tr("備註：", "Note: ")}{s.note}</p>}
+            {s.rice && s.rice !== "normal" && <p className="text-base font-bold text-warning-text">{s.rice === "add" ? tr("白飯一碗半", "1.5 bowls of rice") : tr("白飯半碗", "Half bowl of rice")}</p>}
+            {s.note && <p className="text-sm text-warning-text">{tr("備註：", "Note: ")}{s.note}</p>}
             {s.kind === "lock" && (
               <p className="text-sm text-muted-foreground">
                 {(s.coupon_discount ?? 0) > 0 && tr(`折價券折抵 ${s.coupon_discount} 元・`, `Coupon −${s.coupon_discount} · `)}{tr(`實付 ${s.paid} 元（已線上付款）`, `Paid NT$${s.paid} online`)}
@@ -169,7 +169,7 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
       {done.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-sm">
           <span className="text-muted-foreground">{tr("剛完成：", "Just done: ")}</span>
-          {done.map((d, i) => <span key={i} className="rounded-full bg-green-100 px-2 py-0.5 font-mono font-semibold text-green-900">✓ {d.pickup_code}</span>)}
+          {done.map((d, i) => <span key={i} className="rounded-full bg-success-soft px-2 py-0.5 font-mono font-semibold text-success-text">✓ {d.pickup_code}</span>)}
         </div>
       )}
 
@@ -196,12 +196,12 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
               <section key={w} className="space-y-2">
                 <div className="flex items-center gap-3">
                   <span className="font-mono font-semibold text-sm w-28 shrink-0">{w}</span>
-                  <div className="flex-1 flex h-3 overflow-hidden rounded-full bg-amber-400" role="img" aria-label={tr(`已取 ${got} / ${rows.length}`, `${got} of ${rows.length}`)}>
-                    <div className="h-full bg-green-500" style={{ width: `${(got / rows.length) * 100}%` }} />
+                  <div className="flex-1 flex h-3 overflow-hidden rounded-full bg-warning" role="img" aria-label={tr(`已取 ${got} / ${rows.length}`, `${got} of ${rows.length}`)}>
+                    <div className="h-full bg-success-strong" style={{ width: `${(got / rows.length) * 100}%` }} />
                   </div>
                   <span className="text-xs text-muted-foreground w-12 text-right">{got} / {rows.length}</span>
                 </div>
-                {shown.length === 0 ? <p className="text-xs text-green-700 pl-1">{tr("這個時段都取完了 ✓", "All picked up ✓")}</p> : (
+                {shown.length === 0 ? <p className="text-xs text-success-text pl-1">{tr("這個時段都取完了 ✓", "All picked up ✓")}</p> : (
                   <div className="grid md:grid-cols-2 gap-2">
                     {shown.map((l) => <LockOrderRow key={l.id} lock={l} showDate={false} />)}
                   </div>

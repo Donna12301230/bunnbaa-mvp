@@ -73,7 +73,7 @@ export default function BentoBox({ cells, size = "thumb", onAdd, empty }: {
       className={cn(
         "grid gap-1 rounded-xl border-2 p-1",
         thumb ? "grid-cols-3 w-32 shrink-0 auto-rows-[2.25rem]" : "grid-cols-3 sm:grid-cols-4 auto-rows-[4rem]",
-        empty || cells.every((c) => c.missing) ? "border-dashed border-stone-400 bg-stone-50" : "border-stone-700 bg-stone-700",
+        empty || cells.every((c) => c.missing) ? "border-dashed border-input bg-background" : "border-foreground/70 bg-foreground/80",
       )}
       role="group"
       aria-label={tr("便當組成", "Bento layout")}
@@ -83,7 +83,7 @@ export default function BentoBox({ cells, size = "thumb", onAdd, empty }: {
           <>
             {c.missing ? (
               <>
-                <HelpCircle className={cn("text-stone-400", thumb ? "w-3.5 h-3.5" : "w-5 h-5")} aria-hidden="true" />
+                <HelpCircle className={cn("text-muted-foreground", thumb ? "w-3.5 h-3.5" : "w-5 h-5")} aria-hidden="true" />
                 {!thumb && c.name !== "?" && <span className="text-xs leading-tight line-clamp-1">{c.name}</span>}
               </>
             ) : (
@@ -96,7 +96,7 @@ export default function BentoBox({ cells, size = "thumb", onAdd, empty }: {
         );
         const cls = cn(
           "rounded-md border flex flex-col items-center justify-center text-center px-0.5 min-w-0 overflow-hidden",
-          c.missing ? "border-dashed border-stone-400 bg-white text-stone-500" : GROUP_CELL[c.group],
+          c.missing ? "border-dashed border-input bg-card text-muted-foreground" : GROUP_CELL[c.group],
           i === 0 && tall && "row-span-2",
         );
         return c.onClick ? (
@@ -108,7 +108,7 @@ export default function BentoBox({ cells, size = "thumb", onAdd, empty }: {
         );
       })}
       {onAdd && (
-        <button type="button" onClick={onAdd} className="rounded-md border border-dashed border-stone-400 bg-white text-stone-600 flex flex-col items-center justify-center text-xs hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <button type="button" onClick={onAdd} className="rounded-md border border-dashed border-input bg-card text-muted-foreground flex flex-col items-center justify-center text-xs hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Plus className="w-4 h-4" />
           {tr("加一格", "Add")}
         </button>
@@ -124,13 +124,13 @@ export function MarginBar({ cost, price }: { cost: number; price: number }) {
   const low = costPct > 60;
   return (
     <div className="space-y-0.5" aria-label={tr(`成本 ${costPct}%，毛利 ${100 - costPct}%`, `Cost ${costPct}%, margin ${100 - costPct}%`)}>
-      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-green-200">
-        <div className={cn("h-full", low ? "bg-red-500" : "bg-rose-400")} style={{ width: `${costPct}%` }} />
-        <div className="h-full flex-1 bg-green-500" />
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-success/25">
+        <div className={cn("h-full", low ? "bg-destructive" : "bg-danger")} style={{ width: `${costPct}%` }} />
+        <div className="h-full flex-1 bg-success-strong" />
       </div>
       <div className="flex justify-between text-[11px]">
-        <span className={low ? "text-red-700 font-semibold" : "text-rose-700"}>{tr("成本", "Cost")} {costPct}%</span>
-        <span className="text-green-700 font-semibold">{tr("毛利", "Margin")} {100 - costPct}%</span>
+        <span className={low ? "text-danger-text font-semibold" : "text-danger-text"}>{tr("成本", "Cost")} {costPct}%</span>
+        <span className="text-success-text font-semibold">{tr("毛利", "Margin")} {100 - costPct}%</span>
       </div>
     </div>
   );

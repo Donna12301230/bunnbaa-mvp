@@ -63,6 +63,13 @@
   --danger:  #d0604a;  --danger-soft:  #f8e3de;  --danger-text:  #af432e;
   --info:    #6b8fb3;  --info-soft:    #e6eef5;  --info-text:    #4a6d8f;
   /* 危險按鈕底：白字 on #D0604A 僅 3.85:1 → #C24E36（4.73:1） */
+  /* 品牌橘底上的深棕字（徽章、時間軸），亮暗都一樣：on #F29E0C 8.6:1 */
+  --text-on-brand: #2b180d;
+  /* 奶油黃強調底（認證徽章），亮暗都一樣，配 --text-on-brand */
+  --highlight: #ffe1a1;
+  /* 第五個語意色「紫」：食材分組的包材、時間軸的裝盒、成本色條的手續費 */
+  --plum: #9b86c4;  --plum-soft: #efeaf7;  --plum-text: #4b3a73;  --text-on-plum: #24183d;
+  --success-strong: #467d57;  /* 實心成功色底（白字 4.85:1）、進度條 */
   --danger-strong: #c24e36;
   --danger-strong-hover: #a84030;
 
@@ -177,6 +184,7 @@
   --warning-soft: #3a2f18;  --warning-text: #e8bd6a;
   --danger-soft:  #3d231d;  --danger-text:  #ec9a88;
   --info-soft:    #1f2b38;  --info-text:    #a5c0dc;
+  --plum-soft:    #2c2538;  --plum-text:    #c9b8ea;
 
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.32);

@@ -16,10 +16,14 @@ export const EARLY_BIRD_TIERS: EarlyBirdTier[] = [
 ];
 
 // 取餐日跟「今天」之間差幾天，四捨五入到整天；已過期或就是今天算 0 天。
+// 2026-10-09：一律用台北日期算（跟伺服器 functions/src/pricing.js earlyBirdPercent 一致），
+// 不用瀏覽器時區——人在國外時畫面跟結帳金額才不會差一級折扣。
 export function daysUntilPickup(pickupDate: string, today: Date = new Date()): number {
-  const pickup = new Date(`${pickupDate}T00:00:00`);
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const diffDays = Math.round((pickup.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  const toUtc = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  const diffDays = Math.round((toUtc(pickupDate) - toUtc(today.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }))) / (24 * 60 * 60 * 1000));
   return Math.max(0, diffDays);
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { RefreshCw } from "lucide-react";
 import { httpsCallable } from "@/lib/callable";
@@ -6,11 +6,23 @@ import { functions } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { tr } from "@/lib/i18n";
 
+export interface PickupQrInfo {
+  item_name?: string;
+  item_name_en?: string | null;
+  vendor_id?: string;
+  pickup_date?: string;
+  pickup_window?: string;
+}
+
 interface Props {
   lockId?: string;
   shareToken?: string;
+  /** 代領碼（8 碼，不用登入）；伺服器查出是哪一份 */
+  proxyCode?: string;
   reservationId?: string;
   size?: number;
+  /** 拿到 QR 時一併回傳的餐點資訊（代領畫面顯示是哪一份用） */
+  onInfo?: (info: PickupQrInfo) => void;
 }
 
 /**
@@ -18,28 +30,31 @@ interface Props {
  * 截圖重複使用或偽造皆無效。10 分鐘到期，畫面每 9 分鐘自動換一張。
  * 備援：店家也可以用 4 碼取餐號＋手機末三碼核對。
  */
-export default function PickupQr({ lockId, shareToken, reservationId, size = 180 }: Props) {
+export default function PickupQr({ lockId, shareToken, proxyCode, reservationId, size = 180, onInfo }: Props) {
   const [token, setToken] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const onInfoRef = useRef(onInfo);
+  onInfoRef.current = onInfo;
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const fn = httpsCallable(functions, "issuePickupQr");
-      const res = await fn(reservationId ? { reservation_id: reservationId } : { lock_id: lockId, share_token: shareToken });
-      const data = res.data as { token: string; pickup_code?: string };
+      const res = await fn(reservationId ? { reservation_id: reservationId } : proxyCode ? { proxy_code: proxyCode } : { lock_id: lockId, share_token: shareToken });
+      const data = res.data as { token: string; pickup_code?: string } & PickupQrInfo;
       setToken(data.token);
       setCode(data.pickup_code ?? null);
+      onInfoRef.current?.(data);
     } catch (err) {
       setError((err as Error).message);
       setToken(null);
     } finally {
       setLoading(false);
     }
-  }, [lockId, shareToken, reservationId]);
+  }, [lockId, shareToken, proxyCode, reservationId]);
 
   useEffect(() => {
     refresh();

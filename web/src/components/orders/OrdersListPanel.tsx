@@ -12,10 +12,10 @@ import type { Lock } from "@/types";
 // 訂單列表：依狀態篩選（色塊按鈕），可用取餐編號或品名搜尋。
 // 排序可切換：取餐時間（由近到遠，依取餐日期分組）或下單時間（最新的在前，依下單日期分組）。
 const filters = () => [
-  { value: "pending", label: tr("待取餐", "To pick up"), dot: "bg-amber-400", match: (l: Lock) => PENDING_STATUSES.has(l.status) },
-  { value: "done", label: tr("已完成", "Done"), dot: "bg-green-500", match: (l: Lock) => DONE_STATUSES.has(l.status) },
-  { value: "no_show", label: tr("未取餐／愛心餐", "No-show / charity"), dot: "bg-pink-400", match: (l: Lock) => l.status === "no_show" || l.status === "charity" },
-  { value: "all", label: tr("全部", "All"), dot: "bg-stone-400", match: () => true },
+  { value: "pending", label: tr("待取餐", "To pick up"), dot: "bg-warning", match: (l: Lock) => PENDING_STATUSES.has(l.status) },
+  { value: "done", label: tr("已完成", "Done"), dot: "bg-success-strong", match: (l: Lock) => DONE_STATUSES.has(l.status) },
+  { value: "no_show", label: tr("未取餐／愛心餐", "No-show / charity"), dot: "bg-charity", match: (l: Lock) => l.status === "no_show" || l.status === "charity" },
+  { value: "all", label: tr("全部", "All"), dot: "bg-muted-foreground/50", match: () => true },
 ] as const;
 
 type SortMode = "pickup" | "ordered";
@@ -105,7 +105,7 @@ export default function OrdersListPanel({ locks, loading, truncated }: { locks: 
                       {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       {sort === "ordered" && <span className="text-xs font-normal text-muted-foreground">{tr("下單", "Ordered")}</span>}
                       {date ? date.slice(5).replace("-", "/") : tr("時間不明", "Unknown")}
-                      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-normal">{list.length} {tr("份", "")}</span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal">{list.length} {tr("份", "")}</span>
                     </button>
                     {isOpen && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

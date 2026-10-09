@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import type { ExtraSideChoice, MenuItem, RiceOption, SlotChoice } from "@/types";
+import { authStore } from "@/lib/auth";
+import { vendorBlockedToast } from "@/hooks/useRequireLogin";
 
 // 購物車（存在 localStorage）。第一階段規格：每一行是一份（或多份同樣配置的）便當，
 // 各自帶取餐日期、時段、主菜、配菜選擇（含第四道）、飯量、折價券——可預訂 30 天內，一次結帳可以
@@ -56,8 +58,12 @@ export const cartStore = {
   get vendorId() { return _lines[0]?.vendorId ?? null; },
   get count() { return _lines.reduce((s, l) => s + l.quantity, 0); },
 
-  /** 加入一行；別家店的品項會清空購物車（一次只跟一家店預購） */
-  add(line: Omit<CartLine, "key">) {
+  /** 加入一行；別家店的品項會清空購物車（一次只跟一家店預購）。廠商帳號不能下單，回傳 false */
+  add(line: Omit<CartLine, "key">): boolean {
+    if (authStore.getSnapshot().user?.role === "vendor") {
+      vendorBlockedToast();
+      return false;
+    }
     if (_lines.length > 0 && _lines[0].vendorId !== line.vendorId) _lines = [];
     const existing = _lines.find((l) => sameConfig(l, line));
     if (existing) {
@@ -66,6 +72,7 @@ export const cartStore = {
       _lines = [..._lines, { ...line, key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }];
     }
     save();
+    return true;
   },
   update(key: string, patch: Partial<CartLine>) {
     _lines = _lines.map((l) => (l.key === key ? { ...l, ...patch } : l)).filter((l) => l.quantity > 0);
@@ -92,7 +99,7 @@ export function useCart() {
     lines: cartStore.lines,
     vendorId: cartStore.vendorId,
     count: cartStore.count,
-    add: (line: Omit<CartLine, "key">) => cartStore.add(line),
+    add: (line: Omit<CartLine, "key">): boolean => cartStore.add(line),
     update: (key: string, patch: Partial<CartLine>) => cartStore.update(key, patch),
     remove: (key: string) => cartStore.remove(key),
     clearCart: () => cartStore.clear(),

@@ -87,7 +87,7 @@ exports.donateLock = onCall({}, async (request) => {
   const vendor = { id: vendorSnap.id, ...vendorSnap.data() };
   const config = await loadPlatformConfig(db());
   const today = taipeiToday();
-  if (lock.pickup_date !== today) throw new HttpsError("failed-precondition", t("取餐當天才能捐為愛心餐；取餐 48 小時前可以取消換折價券", "You can donate on the pickup day; up to 48 hours before pickup you can cancel for a coupon instead"));
+  if (lock.pickup_date !== today) throw new HttpsError("failed-precondition", t(`取餐當天才能捐為愛心餐；取餐 ${config.cancelHoursBefore} 小時前可以取消換折價券`, `You can donate on the pickup day; up to ${config.cancelHoursBefore} hours before pickup you can cancel for a coupon instead`));
   const { end } = helpers.todayRange(vendor, today, lock.pickup_window, config);
   if (Date.now() > end.getTime()) throw new HttpsError("failed-precondition", t("取餐時段已結束", "The pickup window has ended"));
   const mealRef = db().collection("charityMeals").doc();
@@ -140,7 +140,7 @@ exports.convertToCharity = onSchedule({ schedule: "every 5 minutes", timeZone: "
           title: t("今天的便當沒有領到", "You didn't pick up today's meal"),
           body: t(
             "為了不浪費，店家已將它轉為愛心餐，開放給需要的人。這筆訂單的抽獎券已照常發放。下次來不了的話，可以在取餐前按「捐為愛心餐」，餐點會更新鮮。",
-            "To avoid waste, it's now a charity meal for someone in need. Your reward tickets were still issued. Next time, tap \"Donate\" before pickup so the meal is fresher."
+            "To avoid waste, it's now a charity meal for someone in need. Your draw tickets were still issued. Next time, tap \"Donate\" before pickup so the meal is fresher."
           ),
           link: "/my-bookings",
         });

@@ -63,7 +63,7 @@ interface AssistantReply {
 const EXAMPLES = [
   { zh: "下週一到五中午，預算 120，不吃牛", en: "Weekday lunches next week, under NT$120, no beef" },
   { zh: "明天想吃素食便當", en: "A vegetarian bento for tomorrow" },
-  { zh: "有沒有雞腿便當？", en: "Any chicken leg bentos?" },
+  { zh: "明天晚餐有什麼不辣的？", en: "Something not spicy for dinner tomorrow?" },
 ];
 
 export default function ShoppingAssistant({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -187,30 +187,30 @@ function CandidateCard({ card, onOpen }: { card: Card; onOpen: () => void }) {
       <button type="button" onClick={onOpen} className="text-left w-full rounded-xl border border-border bg-card p-3 hover:border-primary transition-colors">
         <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarCheck className="w-3.5 h-3.5" /> {card.vendor_name}・{card.label}</div>
         <p className="font-semibold text-sm">{card.name}</p>
-        <p className="text-xs">{tr(`${card.days} 天・每餐 NT$ ${card.price_per_meal}`, `${card.days} days · NT$ ${card.price_per_meal} per meal`)}</p>
+        <p className="text-xs">{tr(`${card.days} 天・每餐 NT$${card.price_per_meal}`, `${card.days} days · NT$${card.price_per_meal} per meal`)}</p>
       </button>
     );
   }
   return (
     <button type="button" onClick={onOpen} className="text-left w-full rounded-xl border border-border bg-card p-3 flex gap-3 hover:border-primary transition-colors">
-      <div className="w-14 h-14 rounded-lg overflow-hidden bg-orange-50 shrink-0 flex items-center justify-center">
-        {card.image ? <img src={card.image} alt="" className="w-full h-full object-cover" /> : <UtensilsCrossed className="w-5 h-5 text-orange-200" />}
+      <div className="w-14 h-14 rounded-lg overflow-hidden bg-accent shrink-0 flex items-center justify-center">
+        {card.image ? <img src={card.image} alt="" className="w-full h-full object-cover" /> : <UtensilsCrossed className="w-5 h-5 text-brand" />}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs text-muted-foreground truncate">{card.vendor_name}</p>
         <p className="font-semibold text-sm truncate">{card.name}</p>
         <p className="text-xs">
           {card.estimated_price !== null && card.estimated_price < card.list_price ? (
-            <><span className="font-semibold text-primary">NT$ {card.estimated_price}</span> <span className="line-through text-muted-foreground">{card.list_price}</span></>
+            <><span className="font-semibold text-primary">NT${card.estimated_price}</span> <span className="line-through text-muted-foreground">{card.list_price}</span></>
           ) : (
-            <span className="font-semibold">NT$ {card.list_price}</span>
+            <span className="font-semibold">NT${card.list_price}</span>
           )}
           {card.date && <span className="text-muted-foreground">・{card.date.slice(5)}{card.window ? ` ${slotLabel(card.window)}` : ""}</span>}
         </p>
         {(card.dietary_tags.length > 0 || card.closed_dates.length > 0) && (
           <p className="text-[11px] text-muted-foreground truncate">
             {card.dietary_tags.map((tag) => tr(tag, tagEn(tag))).join(" · ")}
-            {card.closed_dates.length > 0 && <span className="text-amber-700">{card.dietary_tags.length ? "・" : ""}{tr(`${card.closed_dates.map((d) => d.slice(5)).join("、")} 不能訂`, `unavailable ${card.closed_dates.map((d) => d.slice(5)).join(", ")}`)}</span>}
+            {card.closed_dates.length > 0 && <span className="text-warning-text">{card.dietary_tags.length ? "・" : ""}{tr(`${card.closed_dates.map((d) => d.slice(5)).join("、")} 不能訂`, `unavailable ${card.closed_dates.map((d) => d.slice(5)).join(", ")}`)}</span>}
           </p>
         )}
       </div>

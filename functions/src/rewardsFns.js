@@ -112,7 +112,7 @@ async function countLock(lockRef) {
     if (result.tickets > 0) {
       await notifyUser(result.payer, {
         kind: "reward",
-        title: t(`獲得 ${result.tickets} 張抽獎券`, `You got ${result.tickets} reward ticket(s)`),
+        title: t(`獲得 ${result.tickets} 張抽獎券`, `You got ${result.tickets} draw ticket(s)`),
         body: t(`「${result.name}」的回饋池開池後就能抽，人人有獎。`, `Draw once ${result.name}'s reward pool opens — everyone wins something.`),
         link: "/rewards",
       });

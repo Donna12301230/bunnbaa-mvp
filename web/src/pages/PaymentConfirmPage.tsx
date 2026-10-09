@@ -1,8 +1,9 @@
 import { tr, loc } from "@/lib/i18n";
+import { formatNT, formatPickupDate } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
 import { httpsCallable } from "@/lib/callable";
-import { arrayUnion, doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { CheckCircle2 } from "lucide-react";
 import { auth, db, functions } from "../lib/firebase";
@@ -53,7 +54,12 @@ export default function PaymentConfirmPage() {
         setStatus("done");
         try {
           const fcmToken = await registerForPickupReminders();
-          if (fcmToken) await setDoc(doc(db, "userTokens", user.uid), { tokens: arrayUnion(fcmToken) }, { merge: true });
+          if (fcmToken) {
+            // 規則限制最多 5 個 token（firestore.rules userTokens）：保留最新的 4 個再加這台，第 6 台裝置起才不會寫入失敗
+            const ref = doc(db, "userTokens", user.uid);
+            const prev = ((await getDoc(ref).catch(() => null))?.data()?.tokens as string[] | undefined) ?? [];
+            if (!prev.includes(fcmToken)) await setDoc(ref, { tokens: [...prev.slice(-4), fcmToken] }, { merge: true });
+          }
         } catch (err) {
           console.warn("Could not save push token:", err);
         }
@@ -90,7 +96,7 @@ export default function PaymentConfirmPage() {
                     <span className="font-heading text-lg font-semibold">{loc(l, "item_name")}</span>
                     <span className="font-heading text-lg font-semibold">NT${l.locked_price}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{l.pickup_date}・{l.pickup_window}・{tr("取餐號", "Code")} <strong className="text-foreground">{l.pickup_code}</strong></p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{formatPickupDate(l.pickup_date)}{tr("・", " · ")}{l.pickup_window}{tr("・", " · ")}{tr("取餐號", "Pickup no.")} <strong className="text-foreground">{l.pickup_code}</strong></p>
                   {(l.slots?.length ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {[
@@ -109,14 +115,14 @@ export default function PaymentConfirmPage() {
               {tr(`取餐前一天 ${vendorCutoffTime(null)} 截單並判定配菜許願，未成立會改預設菜並通知你。取餐時到「我的餐點」出示 QR Code。`,
                 `Orders close at ${vendorCutoffTime(null)} the day before; side-dish wishes are decided then. Show your QR code from My meals at pickup.`)}
             </p>
-            <Button asChild className="w-full h-12 rounded-full text-base"><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
+            <Button asChild className="w-full h-12 text-base"><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
           </div>
         )}
         {status === "error" && (
           <div className="bb-receipt space-y-3 text-center">
             <h1 className="font-heading text-3xl font-semibold">{tr("付款確認失敗", "Payment confirmation failed")}</h1>
             <p className="text-sm text-muted-foreground">{errorMessage}</p>
-            <Button asChild variant="outline" className="rounded-full"><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
+            <Button asChild variant="outline" className=""><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
           </div>
         )}
       </div>

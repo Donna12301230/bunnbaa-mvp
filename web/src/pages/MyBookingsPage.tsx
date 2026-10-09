@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatNT, formatPickupDate } from "@/lib/format";
+import { rememberReturnPath } from "@/lib/returnPath";
 import { collection, deleteField, doc, documentId, getDocs, limit, onSnapshot, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useItemImages } from "@/hooks/useItemImages";
@@ -22,16 +24,20 @@ import PickupQr from "@/components/PickupQr";
 import EditWishesDialog from "@/components/EditWishesDialog";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { customOptionTexts, extraSideText, riceLabel, slotText } from "@/lib/bento";
-import { isPastCutoff, todayStr } from "@/lib/pickupSlots";
+import { isPastCutoff, MEAL_PERIODS, mealPeriodLabel, mealPeriodOf, todayStr } from "@/lib/pickupSlots";
 import { defaultResalePrice, refundOnTakeover, resaleCap, resalePrice } from "@/lib/transfers";
 import { cancelCouponAmount, cancelDeadlineAt } from "@/lib/pricing";
 import { usePlatformConfig } from "@/lib/platformConfig";
-import type { Lock } from "@/types";
-import { EmptyState, Tag } from "@/components/ds";
+import type { Lock, MealPeriod } from "@/types";
+import { EmptyState, Tabs, Tag } from "@/components/ds";
 import TransferMarketPage from "@/pages/TransferMarketPage";
 import CharityMealsSection from "@/components/CharityMealsSection";
+import FreeTransfersSection from "@/components/FreeTransfersSection";
+import ProxyPickupPanel, { formatProxyCode } from "@/components/ProxyPickupPanel";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { Link } from "wouter";
+import { lockStatus } from "@/lib/lockOutcome";
+import { policy } from "@/lib/policy";
 
 // 對應 UI草圖 MyBookings.dc.html「我的商品」（2026-09-21 改名「我的餐點」，只給
 // 一般使用者看；廠商端這個 nav 分頁換成接受端的核對取餐，見 MarketplaceHeader.tsx）。
@@ -56,37 +62,15 @@ import { Link } from "wouter";
 //   - 「計畫型」（訂閱制多日方案）完全沒有真實資料模型（Firestore 沒有 plan
 //     collection），這次不補假資料，只顯示單點型的真實紀錄
 
-// 消費者視角的狀態文字（跟商家端 LOCK_STATUS_STYLE 用詞不同），render 時依語言組
-const statusStyle = (status: string): { label: string; className: string } => {
-  const map: Record<string, { label: string; className: string }> = {
-    locked: { label: tr("已鎖定", "Locked"), className: "bg-orange-100 text-orange-700" },
-    for_resale: { label: tr("轉賣中", "For resale"), className: "bg-amber-100 text-amber-800" },
-    for_gift: { label: tr("贈送中", "Being gifted"), className: "bg-blue-100 text-blue-700" },
-    fulfilled: { label: tr("已取餐", "Picked up"), className: "bg-green-100 text-green-700" },
-    resold_and_fulfilled: { label: tr("已由轉賣對象取餐", "Picked up by new owner"), className: "bg-green-100 text-green-700" },
-    no_show: { label: tr("已登記未取餐", "No-show"), className: "bg-red-100 text-red-700" },
-    charity: { label: tr("已轉為愛心餐", "Charity meal"), className: "bg-pink-100 text-pink-700" },
-    cancelling: { label: tr("退款中", "Refunding"), className: "bg-gray-100 text-gray-700" },
-    cancelled: { label: tr("已取消", "Cancelled"), className: "bg-gray-100 text-gray-700" },
-  };
-  return map[status] ?? { label: status, className: "bg-gray-100 text-gray-700" };
-};
+// 狀態文字與顏色：全站共用 lib/lockOutcome.ts（2026-10-09 統一）
+const statusStyle = (status: string) => lockStatus(status);
 
 const ACTIVE_STATUSES = new Set(["locked", "for_resale", "for_gift"]);
 const FEEDBACK_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled", "no_show", "charity"]);
 // 有實際拿到餐的才能評分（reviews，公開）；no_show 只能留私下回饋給商家校準
 const REVIEW_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled"]);
 
-function formatDateLabel(dateStr: string): string {
-  try {
-    return getLang() === "en"
-      ? format(new Date(`${dateStr}T00:00:00`), "EEE, M/d", { locale: enUS })
-      : format(new Date(`${dateStr}T00:00:00`), "M/d（EEE）", { locale: zhTW });
-  } catch {
-    return dateStr;
-  }
-}
-
+const formatDateLabel = (dateStr: string) => formatPickupDate(dateStr); // 全站同一種日期格式（lib/format.ts）
 // Mirrors ConsumerLockPage.tsx's pickupWindowEnd — used as the resale_deadline
 // after which anyone may free-claim (see firestore.rules).
 function pickupWindowEnd(pickupDate: string, pickupWindow: string): Date | null {
@@ -123,8 +107,24 @@ function addDays(d: Date, n: number): Date {
   return copy;
 }
 
+// 月曆格子很窄：餐期用一個字（早／午／晚），左邊色條區分；括號是取餐開始時間
+const PERIOD_SHORT: Record<MealPeriod, () => string> = {
+  breakfast: () => tr("早", "B"),
+  lunch: () => tr("午", "L"),
+  dinner: () => tr("晚", "D"),
+};
+const PERIOD_BORDER: Record<MealPeriod, string> = {
+  breakfast: "border-l-amber-400",
+  lunch: "border-l-orange-600",
+  dinner: "border-l-indigo-500",
+};
+const windowStart = (window: string) => window.split(/[-–]/)[0].trim();
+const periodOfLock = (lock: Lock): MealPeriod => lock.meal_period ?? mealPeriodOf(lock.pickup_window);
+
 const weekdayLabels = () =>
   getLang() === "en" ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["日", "一", "二", "三", "四", "五", "六"];
+
+type PageTab = "meals" | "market" | "charity" | "proxy";
 
 export default function MyBookingsPage() {
   const { toast } = useToast();
@@ -144,13 +144,19 @@ export default function MyBookingsPage() {
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Lock | null>(null);
-  // ?tab=market｜charity（通知、首頁連結帶進來）；讀完就清掉，之後重新整理停在使用者點的分頁
-  const [pageTab, setPageTab] = useState<"meals" | "market" | "charity">(() => {
-    const m = /tab=(market|charity)/.exec(`${window.location.search}${window.location.hash}`);
-    if (window.location.search) history.replaceState(history.state, "", window.location.pathname + window.location.hash);
-    return (m?.[1] as "market" | "charity" | undefined) ?? "meals";
+  const [proxyCodes, setProxyCodes] = useState<Record<string, string>>({});
+  // ?tab=market｜charity｜proxy（通知、首頁、代領連結帶進來）；讀完就清掉，之後重新整理停在使用者點的分頁。
+  // 代領連結 /?tab=proxy&code=XXXXXXXX#/my-bookings（hash 路由的 query 放在真正的 ?search，wouter 也是這樣）：直接帶入代領碼
+  const [proxyInitial] = useState(() => /[?&]code=([A-Za-z0-9-]+)/.exec(`${window.location.search}${window.location.hash}`)?.[1]);
+  const [pageTab, setPageTab] = useState<PageTab>(() => {
+    const m = /tab=(market|charity|proxy)/.exec(`${window.location.search}${window.location.hash}`);
+    return (m?.[1] as PageTab | undefined) ?? "meals";
   });
-  function switchTab(tab: "meals" | "market" | "charity") {
+  // 清 query 放在 effect：useState 初始化函式在 StrictMode 會跑兩次，在裡面清掉第二次就讀不到了
+  useEffect(() => {
+    if (window.location.search) history.replaceState(history.state, "", window.location.pathname + window.location.hash);
+  }, []);
+  function switchTab(tab: PageTab) {
     setPageTab(tab);
   }
   // 多數人期待「我的訂單」先看到清單，不是先找日期；月曆改成次要、可切換的檢視
@@ -283,7 +289,7 @@ export default function MyBookingsPage() {
         ...(deadline ? { resale_deadline: Timestamp.fromDate(deadline) } : {}),
       });
       setReselling(null);
-      toast({ title: tr("已上架轉讓市集", "Listed on the transfer market") });
+      toast({ title: price === 0 ? tr("已放到「附近愛心餐」免費領取", "Listed as a free meal under Charity meals nearby") : tr("已上架轉讓市集", "Listed on the transfer market") });
     } catch (err) {
       toast({ title: tr("上架失敗", "Couldn't list it"), description: (err as Error).message, variant: "destructive" });
     } finally {
@@ -340,8 +346,25 @@ export default function MyBookingsPage() {
     return `${window.location.origin}${window.location.pathname}#/gift/${lockId}`;
   }
 
-  function proxyLinkFor(lock: Lock): string {
-    return `${window.location.origin}${window.location.pathname}#/pickup/${lock.id}/${lock.share_token ?? ""}`;
+  // 代領：伺服器產生（或拿回）8 碼代領碼。連結直接開到「代領取餐」分頁並帶入代領碼，不用登入
+  function proxyMessageFor(lock: Lock, code: string): string {
+    const link = `${window.location.origin}${window.location.pathname}?tab=proxy&code=${code}#/my-bookings`;
+    return tr(
+      `幫我代領便當：${lock.item_name}（${formatPickupDate(lock.pickup_date)} ${lock.pickup_window}）。打開 ${link} ，或到飯飽「我的餐點 → 代領取餐」輸入代領碼 ${formatProxyCode(code)}，把 QR Code 給店員掃就好。`,
+      `Could you pick up my meal? ${lock.item_name_en || lock.item_name} (${formatPickupDate(lock.pickup_date)} ${lock.pickup_window}). Open ${link} or enter proxy code ${formatProxyCode(code)} under My meals → Pick up for a friend on BunnBaa, then show the QR code to the staff.`
+    );
+  }
+
+  async function showProxyCode(lock: Lock) {
+    setBusyId(lock.id);
+    try {
+      const res = await httpsCallable<{ lock_id: string }, { code: string }>(functions, "getProxyPickupCode")({ lock_id: lock.id });
+      setProxyCodes((prev) => ({ ...prev, [lock.id]: res.data.code }));
+    } catch (err) {
+      toast({ title: tr("代領碼產生失敗", "Couldn't create a proxy code"), description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function callLock(lock: Lock, name: "cancelLock" | "donateLock", done: string) {
@@ -379,16 +402,20 @@ export default function MyBookingsPage() {
   async function handleDonate(lock: Lock) {
     const ok = await confirm({
       title: tr("捐為愛心餐？", "Donate as a charity meal?"),
-      description: tr("這份便當會立即開放給需要的人領取，不退款，照常發放抽獎券，並計入你的愛心紀錄。", "It'll be open for someone in need right away. No refund; reward tickets are still issued."),
+      description: tr("這份便當會立即開放給需要的人領取，不退款，照常發放抽獎券，並計入你的愛心紀錄。", "It'll be open for someone in need right away. No refund; draw tickets are still issued, and it counts toward your giving record."),
       confirmLabel: tr("捐出", "Donate"),
     });
     if (ok) await callLock(lock, "donateLock", tr("謝謝你的愛心", "Thank you for your kindness"));
   }
 
   async function copyLink(text: string) {
+    await copyText(text, tr("已複製連結", "Link copied"));
+  }
+
+  async function copyText(text: string, done: string) {
     try {
       await navigator.clipboard.writeText(text);
-      toast({ title: tr("已複製連結", "Link copied") });
+      toast({ title: done });
     } catch {
       toast({ title: tr("複製失敗，請手動選取連結", "Couldn't copy — please select the link manually"), variant: "destructive" });
     }
@@ -403,7 +430,7 @@ export default function MyBookingsPage() {
     const canReview = REVIEW_ELIGIBLE.has(lock.status) && !reviewedIds.has(lock.id);
 
     return (
-      <article key={lock.id} className="bg-card border border-ink rounded-[1.75rem] p-5 flex flex-col gap-2.5 max-w-md overflow-hidden">
+      <article key={lock.id} className="bg-card border border-ink rounded-card p-5 flex flex-col gap-2.5 max-w-md overflow-hidden">
                       {imageOf(lock) && (
                         <img src={imageOf(lock)} alt="" loading="lazy" className="-mx-5 -mt-5 mb-2 aspect-[16/9] w-[calc(100%+2.5rem)] max-w-none object-cover border-b border-ink" />
                       )}
@@ -412,8 +439,8 @@ export default function MyBookingsPage() {
                       </Badge>
                       <h3 className="text-h3 leading-snug">{loc(lock, "item_name")}</h3>
                       <p className="text-body-sm text-muted-foreground">
-                        {formatDateLabel(lock.pickup_date)}・{lock.pickup_window} {tr("取餐", "pickup")}・${lock.locked_price}
-                        {lock.pickup_code && <span>・{tr("取餐號", "Code")} <strong className="text-foreground">{lock.pickup_code}</strong></span>}
+                        {formatDateLabel(lock.pickup_date)}{tr("・", " · ")}{mealPeriodLabel(periodOfLock(lock))}{tr(`（${lock.pickup_window}）取餐`, ` (${lock.pickup_window}) pickup`)}{tr("・", " · ")}{formatNT(lock.locked_price)}
+                        {lock.pickup_code && <span>・{tr("取餐號", "Pickup no.")} <strong className="text-foreground">{lock.pickup_code}</strong></span>}
                       </p>
                       {(lock.slots?.length ?? 0) > 0 && (
                         <ul className="text-caption text-muted-foreground space-y-0.5">
@@ -425,20 +452,22 @@ export default function MyBookingsPage() {
                         </ul>
                       )}
                       {(lock.coupon_discount ?? 0) > 0 && (
-                        <p className="text-caption text-green-700">{tr(`已用折價券折抵 ${lock.coupon_discount} 元`, `Coupon: −NT$${lock.coupon_discount}`)}</p>
+                        <p className="text-caption text-success-text">{tr(`已用折價券折抵 ${lock.coupon_discount} 元`, `Coupon: −NT$${lock.coupon_discount}`)}</p>
                       )}
                       {lock.status === "cancelled" && ((lock.refund_coupon_amount ?? 0) > 0 || (lock.refunded_amount ?? 0) > 0) && (
                         <p className="text-caption text-muted-foreground">
                           {(lock.refund_coupon_amount ?? 0) > 0
-                            ? tr(`已發一張折 ${lock.refund_coupon_amount} 元的折價券，可在「成長獎勵」查看。`, `A NT$${lock.refund_coupon_amount} coupon was issued.`)
-                            : tr(`已退款 NT$${lock.refunded_amount}（原付款方式）。`, `NT$${lock.refunded_amount} refunded.`)}
+                            ? tr(`已發一張折 ${lock.refund_coupon_amount} 元的折價券，可在「成長獎勵」查看。`, `A NT$${lock.refund_coupon_amount} coupon was issued — see it under Rewards.`)
+                            : lock.refunded_as === "points"
+                              ? <>{tr(`已全額退成 ${lock.refunded_amount} 點平台點數，`, `${lock.refunded_amount} points were refunded to your balance — `)}<Link href="/profile?tab=points" className="underline underline-offset-2">{tr("查看點數", "see your points")}</Link></>
+                              : tr(`已退款 NT$${lock.refunded_amount}（原付款方式）。`, `NT$${lock.refunded_amount} refunded to your original payment.`)}
                         </p>
                       )}
                       {lock.status === "charity" && (
-                        <p className="text-caption text-pink-700">
+                        <p className="text-caption text-charity">
                           {lock.charity_source === "donated"
                             ? tr("謝謝你的愛心，這份已開放給需要的人領取。", "Thank you — it's open for someone in need.")
-                            : tr("這份沒有領到，已轉為愛心餐。抽獎券照常發放；下次來不了可以先按「捐為愛心餐」。", "Not picked up, so it became a charity meal. Tickets were still issued.")}
+                            : tr("這份沒有領到，已轉為愛心餐。抽獎券照常發放；下次來不了可以先按「捐為愛心餐」。", "Not picked up, so it became a charity meal. Draw tickets were still issued — next time, tap Donate before the window ends.")}
                         </p>
                       )}
 
@@ -467,8 +496,8 @@ export default function MyBookingsPage() {
                                   <Pencil /> {lock.plan_id ? tr("改時段", "Change time") : tr("修改", "Change")}
                                 </Button>
                                 {isPayer && canCancel && (
-                                  <Button variant="outline" size="sm" className="flex-1 border-red-300 text-red-600 hover:bg-red-50" disabled={isBusy} onClick={() => handleCancel(lock)}>
-                                    <XCircle /> {tr("取消換券", "Cancel")}
+                                  <Button variant="outline" size="sm" className="flex-1 border-danger/40 text-danger-text hover:bg-danger-soft" disabled={isBusy} onClick={() => handleCancel(lock)}>
+                                    <XCircle /> {tr("取消換券", "Cancel for a coupon")}
                                   </Button>
                                 )}
                               </div>
@@ -486,13 +515,24 @@ export default function MyBookingsPage() {
                                 <QrCode /> {tr("使用（顯示取餐碼）", "Use (show pickup code)")}
                               </Button>
                             ))}
-                            {lock.share_token && lock.status === "locked" && (
-                              <Button variant="outline" size="sm" onClick={() => copyLink(proxyLinkFor(lock))}>
-                                <Users /> {tr("複製代領連結", "Copy proxy pickup link")}
+                            {lock.status === "locked" && (proxyCodes[lock.id] ? (
+                              <div className="rounded-xl border border-border bg-secondary/40 p-3 space-y-2">
+                                <p className="text-caption text-muted-foreground">{tr("把代領碼告訴朋友，請他到「我的餐點 → 代領取餐」輸入（不用登入）：", "Give your friend this code — they enter it under My meals → Pick up for a friend (no sign-in needed):")}</p>
+                                <p className="font-mono text-2xl font-bold tracking-[0.2em] text-center select-all">{formatProxyCode(proxyCodes[lock.id])}</p>
+                                <div className="flex gap-2">
+                                  <Button variant="outline" size="sm" className="flex-1" onClick={() => copyText(proxyMessageFor(lock, proxyCodes[lock.id]), tr("已複製代領訊息", "Message copied"))}>
+                                    <Copy /> {tr("複製訊息傳給朋友", "Copy message")}
+                                  </Button>
+                                  <Button variant="link" size="sm" onClick={() => setProxyCodes(({ [lock.id]: _, ...rest }) => rest)}>{tr("收起", "Hide")}</Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <Button variant="outline" size="sm" disabled={isBusy} onClick={() => showProxyCode(lock)}>
+                                <Users /> {tr("請朋友代領", "Ask a friend to pick up")}
                               </Button>
-                            )}
+                            ))}
                             {pickupDay && windowOpen && lock.status !== "for_gift" && (
-                              <Button variant="outline" size="sm" className="border-pink-300 text-pink-700 hover:bg-pink-50" disabled={isBusy} onClick={() => handleDonate(lock)}>
+                              <Button variant="outline" size="sm" className="border-charity/40 text-charity hover:bg-charity-soft" disabled={isBusy} onClick={() => handleDonate(lock)}>
                                 <HeartHandshake /> {tr("來不了？捐為愛心餐", "Can't make it? Donate it")}
                               </Button>
                             )}
@@ -522,7 +562,7 @@ export default function MyBookingsPage() {
                               <Copy />
                             </Button>
                           </div>
-                          <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-600" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
+                          <Button variant="outline" size="sm" className="border-danger/40 text-danger-text hover:bg-danger-soft hover:text-danger-text" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
                             {tr("取消贈送", "Cancel gift")}
                           </Button>
                         </div>
@@ -531,15 +571,15 @@ export default function MyBookingsPage() {
                       {lock.status === "for_resale" && (
                         <div className="flex flex-col gap-1.5 pt-1">
                           <p className="text-caption text-muted-foreground">
-                            {deadline ? formatCountdown(deadline, now) : tr("等待有人接手", "Waiting for someone to take it")}{tr("・已上架到轉讓市集", " · listed on the transfer market")}
+                            {deadline ? formatCountdown(deadline, now) : tr("等待有人接手", "Waiting for someone to take it")}{resalePrice(lock) === 0 ? tr("・已放到「附近愛心餐」免費領取", " · free under Charity meals nearby") : tr("・已上架到轉讓市集", " · listed on the transfer market")}
                           </p>
                           <p className="text-caption text-muted-foreground">
                             {(lock.payer_uid ?? lock.buyer_uid) === lock.buyer_uid && refundOnTakeover(lock) > 0
-                              ? tr(`轉讓價 NT$${resalePrice(lock)}；有人付款接手後，NT$${refundOnTakeover(lock)} 會退回你的原付款方式。逾時沒人接手會開放免費領取、不退款。`,
-                                `Listed at NT$${resalePrice(lock)}. Once someone pays, NT$${refundOnTakeover(lock)} goes back to you. If nobody takes it in time it becomes free to claim, with no refund.`)
+                              ? tr(`轉讓價 NT$${resalePrice(lock)}；有人付款接手後，會退 ${refundOnTakeover(lock)} 點平台點數給你（可折抵或退回 LINE Pay）。逾時沒人接手會移到「附近愛心餐」開放免費領取、不退款。`,
+                                `Listed at NT$${resalePrice(lock)}. Once someone pays, ${refundOnTakeover(lock)} points come back to you (use them or send them back to LINE Pay). If nobody takes it in time it becomes free to claim, with no refund.`)
                               : tr(`轉讓價 NT$${resalePrice(lock)}。`, `Listed at NT$${resalePrice(lock)}.`)}
                           </p>
-                          <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-600" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
+                          <Button variant="outline" size="sm" className="border-danger/40 text-danger-text hover:bg-danger-soft hover:text-danger-text" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
                             {tr("取消轉讓", "Cancel transfer")}
                           </Button>
                         </div>
@@ -568,7 +608,7 @@ export default function MyBookingsPage() {
                                         onClick={() => setRatingDraft((prev) => ({ ...prev, [lock.id]: n }))}
                                         className="p-0.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                       >
-                                        <Star className={`w-5 h-5 ${n <= (ratingDraft[lock.id] ?? 0) ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
+                                        <Star className={`w-5 h-5 ${n <= (ratingDraft[lock.id] ?? 0) ? "fill-warning text-warning" : "text-muted-foreground"}`} />
                                       </button>
                                     ))}
                                   </div>
@@ -616,35 +656,48 @@ export default function MyBookingsPage() {
     <div className="min-h-screen bg-background">
       <MarketplaceHeader active="bookings" />
 
-      <PageHero eyebrow={tr("我的預約", "Your bookings")} title={tr("我的餐點", "My meals")} description={tr("查看訂單詳情、出示取餐碼、截單前修改、取餐 48 小時前取消換折價券，或轉讓／贈送／捐為愛心餐。", "See order details, show your pickup code, change or cancel before cutoff, or transfer / gift / donate a meal.")} />
+      <PageHero eyebrow={tr("訂單與取餐", "Orders & pickup")} title={tr("我的餐點", "My meals")} description={tr(`查看訂單詳情、出示取餐碼、截單前修改、${policy.cancelShort()}，或轉讓／贈送／請朋友代領／捐為愛心餐。`, `See order details, show your pickup code, change before cutoff, ${policy.cancelShort()}, or transfer / gift / send a friend / donate a meal.`)} />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
         {/* 頁上方分頁：我的餐點｜轉讓市集｜附近愛心餐（§4.5：「轉讓・愛心餐」併入我的餐點） */}
-        <div className="flex gap-2 flex-wrap" role="tablist" aria-label={tr("我的餐點分頁", "My meals tabs")}>
-          <Tag selected={pageTab === "meals"} onClick={() => switchTab("meals")}>{tr("我的餐點", "My meals")}</Tag>
-          <Tag selected={pageTab === "market"} onClick={() => switchTab("market")}>{tr("轉讓市集", "Transfer market")}</Tag>
-          <Tag selected={pageTab === "charity"} onClick={() => switchTab("charity")}>{tr("附近愛心餐", "Charity meals nearby")}</Tag>
+        <div className="overflow-x-auto bb-thin-scroll">
+          <Tabs
+            aria-label={tr("我的餐點分頁", "My meals tabs")}
+            value={pageTab}
+            onValueChange={(v) => switchTab(v as PageTab)}
+            items={[
+              { value: "meals", label: tr("我的餐點", "My meals") },
+              { value: "market", label: tr("轉讓市集", "Transfer market") },
+              { value: "charity", label: tr("附近愛心餐", "Charity meals nearby") },
+              { value: "proxy", label: tr("代領取餐", "Pick up for a friend") },
+            ]}
+          />
         </div>
 
         {pageTab === "market" ? (
-          <TransferMarketPage />
+          <TransferMarketPage onShowFree={() => switchTab("charity")} />
+        ) : pageTab === "proxy" ? (
+          <ProxyPickupPanel initial={proxyInitial} />
         ) : pageTab === "charity" ? (
-          <CharityMealsSection />
+          <div className="space-y-8">
+            <FreeTransfersSection />
+            <CharityMealsSection />
+          </div>
         ) : !authLoading && !uid ? (
           <EmptyState
             icon={<ClipboardList size={32} />}
             title={tr("請先登入", "Please sign in")}
             description={tr("登入後就能看到你預購的餐點。", "Sign in to see the meals you've pre-ordered.")}
-            action={<Button asChild><Link href="/login">{tr("前往登入", "Sign in")}</Link></Button>}
+            action={<Button asChild><Link href="/login" onClick={() => rememberReturnPath()}>{tr("前往登入", "Sign in")}</Link></Button>}
           />
         ) : loading ? (
           <SkeletonBlocks count={3} height={160} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" />
         ) : locks.length === 0 ? (
           <EmptyState
             icon={<ClipboardList size={32} />}
-            title={tr("還沒有預約紀錄", "No bookings yet")}
+            title={tr("還沒有預購紀錄", "No bookings yet")}
             description={tr("到「預購餐點」鎖一份餐點，隔天就不用排隊。", "Lock in a meal under Pre-order and skip tomorrow's queue.")}
-            action={<Button asChild><Link href="/home">{tr("去預約餐點", "Pre-order a meal")}</Link></Button>}
+            action={<Button asChild><Link href="/home">{tr("去預購餐點", "Pre-order a meal")}</Link></Button>}
           />
         ) : (
           <>
@@ -683,6 +736,15 @@ export default function MyBookingsPage() {
                       <div key={label}>{label}</div>
                     ))}
                   </div>
+                  <div className="flex flex-wrap gap-3 pb-2 text-xs text-muted-foreground">
+                    {MEAL_PERIODS.map((p) => (
+                      <span key={p} className="inline-flex items-center gap-1.5">
+                        <span className={`h-3 border-l-[3px] ${PERIOD_BORDER[p]}`} aria-hidden="true" />
+                        {PERIOD_SHORT[p]()}＝{mealPeriodLabel(p)}
+                      </span>
+                    ))}
+                    <span>{tr("括號內是取餐時間", "Pickup time in brackets")}</span>
+                  </div>
                   {calendarWeeks.map((week, wi) => (
                     <div key={wi} className="grid grid-cols-7 gap-1.5">
                       {week.map((day) => {
@@ -697,22 +759,26 @@ export default function MyBookingsPage() {
                             }`}
                           >
                             <span className={`font-heading text-sm font-semibold ${isToday ? "text-foreground" : "text-muted-foreground"}`}>{day.getDate()}{isToday && <span className="sr-only">{tr("（今天）", " (today)")}</span>}</span>
-                            {dayLocks.map((lock) => {
+                            {/* 依早／午／晚分開，每份標「午（12:00）」取餐時間（2026-10-09） */}
+                            {MEAL_PERIODS.map((period) => dayLocks.filter((l) => periodOfLock(l) === period)).map((periodLocks) => periodLocks.map((lock) => {
                               const statusInfo = statusStyle(lock.status);
+                              const period = periodOfLock(lock);
+                              const when = `${PERIOD_SHORT[period]()}${tr(`（${windowStart(lock.pickup_window)}）`, ` (${windowStart(lock.pickup_window)})`)}`;
                               return (
                                 <button
                                   key={lock.id}
                                   onClick={() => setExpandedId((prev) => (prev === lock.id ? null : lock.id))}
                                   aria-expanded={expandedId === lock.id}
-                                  className={`text-left text-micro leading-tight rounded-sm px-1.5 py-1 truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${statusInfo.className} ${
+                                  className={`text-left text-micro leading-tight rounded-sm border-l-[3px] px-1.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${PERIOD_BORDER[period]} ${statusInfo.className} ${
                                     expandedId === lock.id ? "ring-2 ring-primary" : ""
                                   }`}
-                                  title={loc(lock, "item_name")}
+                                  title={`${mealPeriodLabel(period)} ${lock.pickup_window} ${loc(lock, "item_name")}`}
                                 >
-                                  {loc(lock, "item_name")}
+                                  <span className="block font-bold whitespace-nowrap">{when}</span>
+                                  <span className="block truncate">{loc(lock, "item_name")}</span>
                                 </button>
                               );
-                            })}
+                            }))}
                           </div>
                         );
                       })}
@@ -729,7 +795,7 @@ export default function MyBookingsPage() {
 
       <Dialog open={!!zoomedLock} onOpenChange={(open) => !open && setZoomedLock(null)}>
         <DialogContent className="max-w-xs flex flex-col items-center gap-3 py-8">
-          <DialogTitle className="text-center">{tr("取餐核銷碼", "Pickup code")}</DialogTitle>
+          <DialogTitle className="text-center">{tr("取餐碼", "Pickup code")}</DialogTitle>
           {zoomedLock && (
             <>
               <PickupQr lockId={zoomedLock.id} size={260} />
@@ -753,25 +819,39 @@ export default function MyBookingsPage() {
                   <DialogDescription>{loc(reselling, "item_name")}・{formatDateLabel(reselling.pickup_date)} {reselling.pickup_window}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2">
-                  <Label htmlFor="resale-price">{tr(`轉讓價（NT$0 ～ ${cap}，不能高於原價）`, `Price (NT$0 – ${cap}, no higher than the list price)`)}</Label>
+                  {/* 常用金額一鍵帶入，也可以直接打任何 0 ～ 原價的金額 */}
+                  <div className="flex flex-wrap gap-2" role="group" aria-label={tr("常用轉讓價", "Quick prices")}>
+                    {[
+                      { label: tr(`原價 NT$${cap}`, `Full NT$${cap}`), v: cap },
+                      { label: tr(`早鳥價 NT$${defaultResalePrice(reselling)}`, `Early-bird NT$${defaultResalePrice(reselling)}`), v: defaultResalePrice(reselling) },
+                      { label: tr(`半價 NT$${Math.round(cap / 2)}`, `Half NT$${Math.round(cap / 2)}`), v: Math.round(cap / 2) },
+                      { label: tr("免費 $0", "Free $0"), v: 0 },
+                    ].filter((o, i, all) => all.findIndex((x) => x.v === o.v) === i).map((o) => (
+                      <Tag key={o.v} selected={valid && price === o.v} onClick={() => setResaleDraft(String(o.v))}>{o.label}</Tag>
+                    ))}
+                  </div>
+                  <Label htmlFor="resale-price">{tr(`或自訂金額（NT$0 ～ ${cap}，不能高於原價）`, `Or enter a price (NT$0 – ${cap}, no higher than the list price)`)}</Label>
                   <Input id="resale-price" type="number" inputMode="numeric" min={0} max={cap} step={1} value={resaleDraft} onChange={(e) => setResaleDraft(e.target.value)} />
+                  {valid && price === 0 && (
+                    <p className="text-caption text-charity">{tr("$0 的餐點不會放在轉讓市集，會出現在「附近愛心餐」分頁，讓需要的人免費領取（先到先得）。", "$0 meals aren't shown in the transfer market — they appear under Charity meals nearby for anyone to claim, first come, first served.")}</p>
+                  )}
                   {!valid ? (
-                    <p className="text-caption text-red-600">{tr(`請填 0 ～ ${cap} 的整數`, `Enter a whole number from 0 to ${cap}`)}</p>
+                    <p className="text-caption text-danger-text">{tr(`請填 0 ～ ${cap} 的整數`, `Enter a whole number from 0 to ${cap}`)}</p>
                   ) : isPayer && back > 0 ? (
                     <p className="text-caption text-muted-foreground">
-                      {tr(`有人付款接手後，NT$${back} 會退回你的原付款方式。`, `Once someone pays, NT$${back} goes back to you.`)}
-                      {price > back && tr("退款不會超過你實付的金額，多的部分歸店家。", " Refunds can't exceed what you paid; the rest goes to the vendor.")}
+                      {tr(`有人付款接手後，會退 ${back} 點平台點數給你（可結帳折抵或到會員中心退回 LINE Pay）。`, `Once someone pays, ${back} points come back to you (use them at checkout or send them back to LINE Pay).`)}
+                      {price > back && tr("退回的點數不會超過你實付的金額，多的部分歸店家。", " You can't get back more than you paid; the rest goes to the vendor.")}
                     </p>
                   ) : isPayer ? (
                     <p className="text-caption text-muted-foreground">{tr("被接手後沒有款項會退給你。", "Nothing will be refunded to you.")}</p>
                   ) : (
                     <p className="text-caption text-muted-foreground">{tr("這份不是你付款的，被接手後款項不會退給你。", "You didn't pay for this meal, so nothing is refunded to you.")}</p>
                   )}
-                  <p className="text-caption text-muted-foreground">{tr("取餐時段結束還沒人接手，會開放免費領取、不退款。", "If nobody takes it by the end of the pickup window it becomes free to claim, with no refund.")}</p>
+                  <p className="text-caption text-muted-foreground">{tr("取餐時段結束還沒人接手，會移到「附近愛心餐」開放免費領取、不退款。", "If nobody takes it by the end of the pickup window it moves to Charity meals nearby, free to claim, with no refund.")}</p>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setReselling(null)}>{tr("先不要", "Not now")}</Button>
-                  <Button disabled={!valid || busyId === reselling.id} onClick={() => handleResell(reselling, price)}>{tr("上架", "List it")}</Button>
+                  <Button disabled={!valid || busyId === reselling.id} onClick={() => handleResell(reselling, price)}>{valid && price === 0 ? tr("免費送出", "Give it away") : tr("上架", "List it")}</Button>
                 </DialogFooter>
               </>
             );

@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { liveConfig } from "@/lib/platformConfig";
+import { businessDaysText } from "@/lib/pickupSlots";
+import { policy } from "@/lib/policy";
 import { doc, setDoc } from "firebase/firestore";
 import { SlidersHorizontal } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
@@ -11,13 +14,15 @@ import { db } from "@/lib/firebase";
 import { queryClient } from "@/lib/queryClient";
 import { DEFAULT_PLATFORM_CONFIG, PLATFORM_CONFIG_FIELDS, usePlatformConfig, type PlatformConfig } from "@/lib/platformConfig";
 import { tr } from "@/lib/i18n";
+import PortalPageHeader from "@/components/PortalPageHeader";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 /**
  * 平台全域參數（規格 §2）：存於 platformConfig/global，平台統一設定；第一階段店家只能在
  * 「店家可調」的範圍內調整。Functions 與前端都讀同一份（缺的欄位用預設值）。
  */
 function PlatformContent() {
-  const { data: config } = usePlatformConfig();
+  const { data: config, isLoading } = usePlatformConfig();
   const { toast } = useToast();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -35,7 +40,7 @@ function PlatformContent() {
         const raw = draft[f.key];
         const def = DEFAULT_PLATFORM_CONFIG[f.key];
         (out as Record<string, unknown>)[f.key] = typeof def === "number" ? Number(raw) : raw;
-        if (typeof def === "number" && !Number.isFinite(Number(raw))) throw new Error(`${f.label} 不是數字`);
+        if (typeof def === "number" && !Number.isFinite(Number(raw))) throw new Error(tr(`${f.label} 不是數字`, `${f.labelEn} is not a number`));
       }
       await setDoc(doc(db, "platformConfig", "global"), { ...out, updated_at: new Date() }, { merge: true });
       queryClient.invalidateQueries({ queryKey: ["platformConfig"] });
@@ -47,6 +52,8 @@ function PlatformContent() {
     }
   }
 
+  if (isLoading) return <SkeletonBlocks count={6} height={36} className="space-y-2" />;
+
   return (
     <Card>
       <CardContent className="p-4 space-y-2">
@@ -55,14 +62,21 @@ function PlatformContent() {
           <tbody>
             {PLATFORM_CONFIG_FIELDS.map((f) => (
               <tr key={f.key} className="border-t">
-                <td className="py-1.5 pr-2">{f.label}{f.unit && <span className="text-xs text-muted-foreground">（{f.unit}）</span>}</td>
+                <td className="py-1.5 pr-2">{tr(f.label, f.labelEn)}{f.unit && <span className="text-xs text-muted-foreground">{tr(`（${f.unit}）`, ` (${f.unitEn ?? f.unit})`)}</span>}</td>
                 <td className="pr-2"><Input className="h-8 w-32" value={draft[f.key] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))} /></td>
-                <td className="text-xs text-muted-foreground">{f.vendorAdjustable ?? tr("否", "No")}</td>
+                <td className="text-xs text-muted-foreground">{f.vendorAdjustable ? tr(f.vendorAdjustable, f.vendorAdjustableEn ?? f.vendorAdjustable) : tr("否", "No")}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="text-xs text-muted-foreground">{tr("營業日（週一至週五）、餐期範圍（早 06:00–10:30／中 10:30–14:00／晚 16:30–20:00）、預訂開放範圍（30 天）、早鳥級距（明天 95 折／提前 2–30 天 8 折）、週進料鎖定（週六 12:00）為第一階段固定規則。基本工資在 platformConfig/minimumWage（依生效日自動套用）。", "Business days, meal periods, the 30-day booking range, early-bird tiers and the weekly lock are fixed in phase 1.")}</p>
+        <p className="text-xs text-muted-foreground">{(() => {
+          const c = liveConfig();
+          const mp = c.mealPeriods;
+          return tr(
+            `營業日（${businessDaysText()}）、餐期範圍（早 ${mp.breakfast}／中 ${mp.lunch}／晚 ${mp.dinner}）、預訂開放範圍（${c.bookingRangeDays} 天）也存在 platformConfig/global，前後端都會讀，但不在上面這張表裡；要改請直接改資料庫。早鳥級距（${policy.earlyBird()}）寫在程式裡（functions/src/pricing.js 與 web/src/lib/pricing.ts，要一起改）。基本工資在 platformConfig/minimumWage（依生效日自動套用）。`,
+            `Business days (${businessDaysText()}), meal periods and the ${c.bookingRangeDays}-day booking range also live in platformConfig/global and are read by both the server and the app, but aren't editable here — change them in the database. Early-bird tiers (${policy.earlyBird()}) are in code (functions/src/pricing.js and web/src/lib/pricing.ts).`
+          );
+        })()}</p>
         <Button onClick={save} disabled={saving}>{saving ? tr("儲存中…", "Saving…") : tr("儲存", "Save")}</Button>
       </CardContent>
     </Card>
@@ -72,7 +86,7 @@ function PlatformContent() {
 export default function AdminPlatformPage() {
   return (
     <AdminLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3 flex items-center gap-2"><SlidersHorizontal className="w-5 h-5" /> {tr("平台參數", "Platform parameters")}</h1>
+      <PortalPageHeader icon={SlidersHorizontal} title={tr("平台參數", "Platform parameters")} />
       <RequireRealAdmin><PlatformContent /></RequireRealAdmin>
     </AdminLayout>
   );

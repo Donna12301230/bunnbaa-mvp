@@ -54,7 +54,7 @@ function RealSignInForm({ title, description }: { title: string; description: st
           required
           aria-label={tr("密碼", "Password")}
         />
-        {error && <p role="alert" className="text-caption text-red-600">{error}</p>}
+        {error && <p role="alert" className="text-caption text-danger-text">{error}</p>}
         <Button type="submit" className="w-full" disabled={submitting}>
           {submitting ? tr("登入中…", "Signing in…") : tr("登入", "Sign in")}
         </Button>
@@ -90,8 +90,8 @@ export function RequireVendorSignIn({ children }: { children: ReactNode }) {
 
   return (
     <RealSignInForm
-      title={tr("商家登入", "Vendor sign-in")}
-      description={tr("這裡有撥款與履約資料，請用商家帳號登入（帳號由平台管理員建立並綁定商家）。", "This page has payout and fulfilment data. Sign in with your vendor account (created and linked by a platform admin).")}
+      title={tr("店家登入", "Vendor sign-in")}
+      description={tr("這裡有撥款與履約資料，請用店家帳號登入（帳號由平台管理員建立並綁定店家）。", "This page has payout and fulfilment data. Sign in with your vendor account (created and linked by a platform admin).")}
     />
   );
 }

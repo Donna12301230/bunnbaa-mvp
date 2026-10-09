@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { selectClass } from "@/lib/fieldStyles";
 import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { AlertTriangle, Check, ChefHat, ChevronDown, ChevronRight, ClipboardList, MessageCircle, MessageCircleQuestion, Pencil, Printer, RefreshCw, Replace, Sparkles, Tag as TagIcon, TrendingUp, Zap } from "lucide-react";
 import { useLocation } from "wouter";
@@ -8,10 +9,13 @@ import InfoTip from "@/components/InfoTip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tag } from "@/components/ds";
+import { EmptyState, Tag } from "@/components/ds";
+import PortalPageHeader from "@/components/PortalPageHeader";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyVendor } from "@/hooks/useMyVendor";
 import { useVendorCatalog } from "@/hooks/useVendorCatalog";
+import AiDraftWarning, { useConfirmAiDrafts } from "@/components/AiDraftWarning";
 import { useVendorMenu } from "@/hooks/useVendorMenu";
 import { useStockOnHand } from "@/hooks/useStockOnHand";
 import { amountText, componentPortions, craftItems, rawNeeds } from "@/lib/prep";
@@ -76,16 +80,16 @@ function PickupTimeline({ timeline, range, label, showNow }: { timeline: Timelin
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const segs = [
-    { key: "fire", a: fire, b: pack, text: tr("開火", "Cook"), cls: "bg-orange-400 text-orange-950" },
-    { key: "pack", a: pack, b: ps, text: tr("裝盒", "Pack"), cls: "bg-violet-400 text-violet-950" },
-    { key: "pickup", a: ps, b: pickupEnd, text: tr("取餐", "Pickup"), cls: "bg-green-500 text-green-950" },
+    { key: "fire", a: fire, b: pack, text: tr("開火", "Cook"), cls: "bg-brand text-brand-foreground" },
+    { key: "pack", a: pack, b: ps, text: tr("裝盒", "Pack"), cls: "bg-plum text-plum-foreground" },
+    { key: "pickup", a: ps, b: pickupEnd, text: tr("取餐", "Pickup"), cls: "bg-success-soft text-success-text" },
   ].filter((x) => x.b > x.a);
   const hours: number[] = [];
   for (let m = from; m <= to; m += 60) hours.push(m);
   return (
     <div className="space-y-1">
       {label && <p className="text-xs font-semibold">{label}</p>}
-      <div className="relative h-9 rounded-md bg-stone-100 overflow-hidden" role="img" aria-label={segs.map((x) => `${x.text} ${hhmm(x.a)}–${hhmm(x.b)}`).join("，")}>
+      <div className="relative h-9 rounded-md bg-muted overflow-hidden" role="img" aria-label={segs.map((x) => `${x.text} ${hhmm(x.a)}–${hhmm(x.b)}`).join("，")}>
         {segs.map((x) => (
           <div key={x.key} className={cn("absolute top-0 bottom-0 flex items-center justify-center text-xs font-semibold border-r border-white/70", x.cls)} style={{ left: pct(x.a), width: width(x.a, x.b) }} title={`${x.text} ${hhmm(x.a)}–${hhmm(x.b)}`}>
             <span className="truncate px-1">{x.text}</span>
@@ -174,9 +178,9 @@ function PickupForecastCard({ vendorId, date, lockCount }: { vendorId: string; d
     <Card className="print:hidden">
       <CardContent className="p-4 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-orange-500" />
+          <TrendingUp className="w-4 h-4 text-accent-foreground" />
           <span className="text-sm">{tr("預估實際取餐", "Expected pickups")}</span>
-          <span className="text-2xl font-bold text-orange-600">{forecast.low === forecast.high ? forecast.low : `${forecast.low}–${forecast.high}`}</span>
+          <span className="text-2xl font-bold text-accent-foreground">{forecast.low === forecast.high ? forecast.low : `${forecast.low}–${forecast.high}`}</span>
           <span className="text-sm text-muted-foreground">/ {forecast.locked} {tr("份", "")}</span>
           <InfoTip>{tr(`依${basis}的取餐紀錄估的；沒來拿的會在取餐時段結束後轉為愛心餐。`, `Based on ${basis}; unclaimed meals become charity meals.`)} {forecast.disclaimer}</InfoTip>
           <button type="button" className="ml-auto text-xs text-primary underline" onClick={() => setAskOpen((v) => !v)}>{tr("問 AI", "Ask AI")}</button>
@@ -187,7 +191,7 @@ function PickupForecastCard({ vendorId, date, lockCount }: { vendorId: string; d
             <Button size="sm" variant="outline" onClick={ask} disabled={asking || !question.trim()}><MessageCircleQuestion /> {asking ? tr("思考中…", "Thinking…") : tr("追問", "Ask")}</Button>
           </div>
         )}
-        {answer && <p className="text-sm bg-orange-50 rounded p-2 whitespace-pre-line">{answer}</p>}
+        {answer && <p className="text-sm bg-accent rounded p-2 whitespace-pre-line">{answer}</p>}
       </CardContent>
     </Card>
   );
@@ -196,7 +200,7 @@ function PickupForecastCard({ vendorId, date, lockCount }: { vendorId: string; d
 /** 頂部數字卡 */
 function StatCard({ label, children, tone }: { label: ReactNode; children: ReactNode; tone?: "red" | "green" }) {
   return (
-    <Card className={cn("flex-1 min-w-[9rem]", tone === "red" && "border-red-300 bg-red-50/60", tone === "green" && "border-green-300 bg-green-50/60")}>
+    <Card className={cn("flex-1 min-w-[9rem]", tone === "red" && "border-danger/40 bg-danger-soft/60", tone === "green" && "border-success/40 bg-success-soft/60")}>
       <CardContent className="p-4 space-y-1">
         <p className="text-xs text-muted-foreground">{label}</p>
         {children}
@@ -216,7 +220,7 @@ function PrepTile({ name, sub, group, done, onToggle, onDetail }: { name: string
         aria-pressed={done}
         className={cn(
           "w-full min-h-[5.5rem] rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          done ? "border-green-600 bg-green-500 text-white" : GROUP_CELL[group],
+          done ? "border-success bg-success-strong text-white" : GROUP_CELL[group],
           onToggle && !done && "hover:brightness-95",
         )}
       >
@@ -269,6 +273,9 @@ export default function VendorPortalPrep() {
   const [date, setDate] = useState(today);
   const [plan, setPlan] = useState<PrepPlan | null>(null);
   const [locks, setLocks] = useState<Lock[]>([]);
+  // 目前日期的訂單／備料單是否已讀回（切換日期時重新顯示載入中）
+  const [loadedLocksDate, setLoadedLocksDate] = useState<string | null>(null);
+  const [loadedPlanDate, setLoadedPlanDate] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sub, setSub] = useState({ from: "", to: "" });
   // 列印：出餐標籤或領料單（分開印）
@@ -278,6 +285,7 @@ export default function VendorPortalPrep() {
   const toggleFold = (k: string) => setFold((f) => ({ ...f, [k]: !f[k] }));
   const [, navigate] = useLocation();
   const { data: catalog } = useVendorCatalog(vendorId);
+  const confirmAiDrafts = useConfirmAiDrafts(vendorId);
   const { data: menuItems = [] } = useVendorMenu(vendorId);
   const { stock, counted } = useStockOnHand(vendorId, date);
   const ingById = catalog?.ingredientsById ?? {};
@@ -285,10 +293,20 @@ export default function VendorPortalPrep() {
 
   useEffect(() => {
     if (!vendorId) return;
-    const unsubPlan = onSnapshot(doc(db, "vendors", vendorId, "prepPlans", date), (snap) => setPlan(snap.exists() && snap.data().locked_at ? (snap.data() as PrepPlan) : null), () => setPlan(null));
+    const unsubPlan = onSnapshot(doc(db, "vendors", vendorId, "prepPlans", date), (snap) => {
+      setPlan(snap.exists() && snap.data().locked_at ? (snap.data() as PrepPlan) : null);
+      setLoadedPlanDate(date);
+    }, () => {
+      setPlan(null);
+      setLoadedPlanDate(date);
+    });
     const unsubLocks = onSnapshot(query(collection(db, "locks"), where("vendor_id", "==", vendorId), where("pickup_date", "==", date)), (snap) => {
       setLocks(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Lock).filter((l) => PENDING_STATUSES.has(l.status) || l.status === "fulfilled" || l.status === "resold_and_fulfilled" || l.status === "charity"));
-    }, (err) => toast({ variant: "destructive", title: tr("訂單讀取失敗", "Couldn't load orders"), description: err.message }));
+      setLoadedLocksDate(date);
+    }, (err) => {
+      setLoadedLocksDate(date);
+      toast({ variant: "destructive", title: tr("訂單讀取失敗", "Couldn't load orders"), description: err.message });
+    });
     return () => {
       unsubPlan();
       unsubLocks();
@@ -364,9 +382,10 @@ export default function VendorPortalPrep() {
     window.setTimeout(() => window.print(), 50);
   }
 
-  /** 缺料 → LINE 叫貨（依小盤商分組，進位到採購單位） */
-  function shareShortages() {
+  /** 缺料 → LINE 叫貨（依小盤商分組，進位到採購單位）；份量還有 AI 草稿就先問 */
+  async function shareShortages() {
     if (!plan || !catalog) return;
+    if (!(await confirmAiDrafts())) return;
     const lines = plan.shortages.map((s) => {
       const ing = ingById[s.ingredient_id];
       return { name: s.name, supplier_id: ing?.supplier_id ?? null, units: toPurchaseUnits(s.short, ing?.purchase_unit_size ?? 1), unit_label: ing?.purchase_unit_label || s.unit };
@@ -392,6 +411,7 @@ export default function VendorPortalPrep() {
   const doneCount = plan ? tiles.filter((t) => plan.done?.[t.key]).length : 0;
   const dishes = plan ? [...new Set(plan.labels.flatMap((l) => l.sides))].filter((s) => !s.includes("不要")) : [];
   const total = plan ? plan.order_count : locks.length;
+  const loadingDay = !!vendorId && (loadedLocksDate !== date || loadedPlanDate !== date);
   const dayLabel = date === today ? tr("今天", "Today") : date < today ? tr("昨天", "Yesterday") : tr("下一個營業日", "Next day");
   const periodTimelines = plan?.timelines && Object.keys(plan.timelines).length > 0
     ? MEAL_PERIODS.filter((p) => plan.timelines![p]).map((p) => ({ key: p, label: `${mealPeriodLabel(p)}・${plan.timelines![p]!.order_count} ${tr("份", "")}`, timeline: plan.timelines![p]!, range: plan.timelines![p]!.range }))
@@ -403,42 +423,46 @@ export default function VendorPortalPrep() {
     <VendorPortalLayout>
       <div className="space-y-4">
         <div className="print:hidden space-y-3">
-          <h1 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-2">
-            <ChefHat className="w-6 h-6 text-orange-500" /> {tr("今日備料", "Today's prep")}
+          <PortalPageHeader icon={ChefHat} title={<>
+            {tr("今日備料", "Today's prep")}
             <InfoTip>{tr(`前一天 ${vendorCutoffTime(vendor)} 截單後自動產生。點一張卡片＝那一樣做好了。菜單的格子填好組成後，卡片會變成每道配菜的份量，並算出缺料。`, `Generated after the ${vendorCutoffTime(vendor)} cutoff the day before. Tap a card when it's done. Once menu cells have recipes, cards show each dish and shortages.`)}</InfoTip>
-          </h1>
+          </>} />
           <div className="flex gap-2 flex-wrap">
             {dates.map((d) => <Tag key={d} selected={date === d} onClick={() => setDate(d)}>{d === today ? tr("今天", "Today") : d < today ? tr("昨天", "Yesterday") : tr("下一個營業日", "Next day")} {d.slice(5)}</Tag>)}
           </div>
         </div>
 
+        <div className="print:hidden"><AiDraftWarning vendorId={vendorId} what={tr("備料份量與缺料", "prep amounts and shortages")} /></div>
+
         {/* 頂部三個數字卡 */}
         <div className="flex flex-wrap gap-3 print:hidden">
           <StatCard label={`${dayLabel} ${date.slice(5).replace("-", "/")}`}>
-            <p className="text-3xl font-bold text-orange-600 leading-none">{total}<span className="text-base font-semibold text-foreground"> {tr(plan ? "份要做" : "份已訂", plan ? " to make" : " ordered")}</span></p>
+            <p className="text-3xl font-bold text-accent-foreground leading-none">{total}<span className="text-base font-semibold text-foreground"> {tr(plan ? "份要做" : "份已訂", plan ? " to make" : " ordered")}</span></p>
           </StatCard>
           <StatCard label={tr("完成進度", "Progress")} tone={plan && tiles.length > 0 && doneCount === tiles.length ? "green" : undefined}>
             {plan ? (
               <>
                 <p className="text-3xl font-bold leading-none">{doneCount}<span className="text-base text-muted-foreground"> / {tiles.length}</span></p>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-200" role="progressbar" aria-valuenow={doneCount} aria-valuemin={0} aria-valuemax={tiles.length}>
-                  <div className="h-full bg-green-500 transition-all" style={{ width: `${tiles.length ? (doneCount / tiles.length) * 100 : 0}%` }} />
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-border" role="progressbar" aria-valuenow={doneCount} aria-valuemin={0} aria-valuemax={tiles.length}>
+                  <div className="h-full bg-success-strong transition-all" style={{ width: `${tiles.length ? (doneCount / tiles.length) * 100 : 0}%` }} />
                 </div>
               </>
             ) : <p className="text-sm font-semibold pt-1">{tr("截單後開始", "Starts at cutoff")}</p>}
           </StatCard>
           <StatCard label={plan ? tr("缺料", "Short") : tr("缺料（預估）", "Short (est.)")} tone={shortNames.length > 0 ? "red" : undefined}>
             {shortNames.length > 0 ? (
-              <p className="text-xl font-bold text-red-700 leading-tight flex items-center gap-1"><AlertTriangle className="w-5 h-5 shrink-0" />{shortNames.slice(0, 2).join("、")}{shortNames.length > 2 ? tr(` 等 ${shortNames.length} 項`, ` +${shortNames.length - 2}`) : ""}</p>
-            ) : <p className="text-xl font-bold text-green-700 leading-tight">{total > 0 && (plan ? planNeeds.size > 0 : !!estimate?.needs.size) ? tr("都夠", "All good") : "—"}</p>}
+              <p className="text-xl font-bold text-danger-text leading-tight flex items-center gap-1"><AlertTriangle className="w-5 h-5 shrink-0" />{shortNames.slice(0, 2).join("、")}{shortNames.length > 2 ? tr(` 等 ${shortNames.length} 項`, ` +${shortNames.length - 2}`) : ""}</p>
+            ) : <p className="text-xl font-bold text-success-text leading-tight">{total > 0 && (plan ? planNeeds.size > 0 : !!estimate?.needs.size) ? tr("都夠", "All good") : "—"}</p>}
           </StatCard>
         </div>
 
         {vendorId && date >= today && <PickupForecastCard vendorId={vendorId} date={date} lockCount={locks.length} />}
 
-        {!plan ? (
+        {loadingDay ? (
+          <SkeletonBlocks count={4} height={96} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 print:hidden" />
+        ) : !plan ? (
           locks.length === 0 ? (
-            <p className="text-sm text-muted-foreground print:hidden">{tr(`${date.slice(5)} 還沒有訂單；有人訂了，這裡會出現要做的品項。`, "No orders yet for this day.")}</p>
+            <EmptyState size="compact" className="print:hidden" icon={<ChefHat size={32} />} title={tr(`${date.slice(5)} 還沒有訂單`, "No orders yet for this day")} description={tr("有人訂了，這裡會出現要做的品項。", "Items to prepare will appear here once orders come in.")} />
           ) : (
             <div className="space-y-4 print:hidden">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -469,9 +493,9 @@ export default function VendorPortalPrep() {
 
             {/* 缺料：一個圖示、一個詞，點開才看細節 */}
             {plan.shortages.length > 0 && (
-              <Card className="border-red-300 print:hidden">
+              <Card className="border-danger/40 print:hidden">
                 <CardContent className="p-3 flex flex-wrap items-center gap-2">
-                  <button type="button" className="flex-1 min-w-[12rem] flex items-center gap-1.5 text-left font-semibold text-red-700" onClick={() => toggleFold("short")} aria-expanded={!!fold.short}>
+                  <button type="button" className="flex-1 min-w-[12rem] flex items-center gap-1.5 text-left font-semibold text-danger-text" onClick={() => toggleFold("short")} aria-expanded={!!fold.short}>
                     <AlertTriangle className="w-4 h-4 shrink-0" />{tr(`缺料：${plan.shortages.map((s) => s.name).join("、")}`, `Short: ${plan.shortages.map((s) => s.name).join(", ")}`)}
                     {fold.short ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
@@ -500,13 +524,13 @@ export default function VendorPortalPrep() {
                   <PrepTile key={t.key} name={t.name} sub={t.sub} group={t.group} done={!!plan.done?.[t.key]} onToggle={() => toggleDone(t.key, !plan.done?.[t.key])} onDetail={t.detail ? () => setOpenTask(openTask === t.detail ? null : t.detail) : undefined} />
                 ))}
               </div>
-              {tiles.length > 0 && doneCount === tiles.length && <p className="text-sm text-green-700 font-semibold">{tr("全部完成，辛苦了！", "All done — great work!")}</p>}
+              {tiles.length > 0 && doneCount === tiles.length && <p className="text-sm text-success-text font-semibold">{tr("全部完成，辛苦了！", "All done — great work!")}</p>}
               {openTask && (
                 <Card>
                   <CardContent className="p-4 space-y-2 text-sm">
                     {detailComp ? (
                       <>
-                        <p className="font-semibold">{detailComp.name}・{tr(`${Math.round(detailPortions * 10) / 10} 份`, `× ${detailPortions}`)}</p>
+                        <p className="font-semibold">{detailComp.name}{tr("・", " · ")}{tr(`${Math.round(detailPortions * 10) / 10} 份`, `× ${detailPortions}`)}</p>
                         <p className="text-xs text-muted-foreground">{tr(`${detailComp.equipment}・每批 ${detailComp.batch_capacity} 份 → 做 ${Math.ceil(detailPortions / Math.max(1, detailComp.batch_capacity))} 批・每批 ${detailComp.prep_minutes} 分鐘`, `${detailComp.equipment} · ${Math.ceil(detailPortions / Math.max(1, detailComp.batch_capacity))} batch(es) × ${detailComp.prep_minutes} min`)}</p>
                         <RecipeCraft
                           items={detailComp.ingredients.flatMap((l) => {
@@ -525,10 +549,10 @@ export default function VendorPortalPrep() {
             </div>
 
             {Object.keys(plan.wish_results ?? {}).length > 0 && (
-              <Fold className="print:hidden" title={<span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-orange-500" />{tr("配菜許願結果", "Side-dish wishes")}</span>} open={!!fold.wish} onToggle={() => toggleFold("wish")}>
+              <Fold className="print:hidden" title={<span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-accent-foreground" />{tr("配菜許願結果", "Side-dish wishes")}</span>} open={!!fold.wish} onToggle={() => toggleFold("wish")}>
                 <div className="text-sm space-y-1">
                   {Object.values(plan.wish_results).map((w, i) => (
-                    <div key={i} className="flex justify-between"><span>{w.dish}</span><span className={w.ok ? "text-green-700" : "text-muted-foreground"}>{w.count}/{w.min_qty} {w.ok ? tr("成立", "on") : tr("未成立，改預設菜", "off")}</span></div>
+                    <div key={i} className="flex justify-between"><span>{w.dish}</span><span className={w.ok ? "text-success-text" : "text-muted-foreground"}>{w.count}/{w.min_qty} {w.ok ? tr("成立", "on") : tr("未成立，改預設菜", "off")}</span></div>
                   ))}
                 </div>
               </Fold>
@@ -547,7 +571,7 @@ export default function VendorPortalPrep() {
               <Card className="print:hidden">
                 <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-1.5"><Replace className="w-4 h-4" /> {tr("天災、缺貨：等值替換配菜", "Swap a side (disaster / out of stock)")}</CardTitle></CardHeader>
                 <CardContent className="flex flex-wrap gap-2 items-center">
-                  <select className="h-10 rounded-md border border-input px-2 text-sm" value={sub.from} onChange={(e) => setSub({ ...sub, from: e.target.value })} aria-label={tr("原配菜", "From")}>
+                  <select className={selectClass()} value={sub.from} onChange={(e) => setSub({ ...sub, from: e.target.value })} aria-label={tr("原配菜", "From")}>
                     <option value="">{tr("原配菜", "From")}</option>
                     {dishes.map((d) => <option key={d}>{d}</option>)}
                   </select>
@@ -585,7 +609,7 @@ export default function VendorPortalPrep() {
                 <div className="text-sm space-y-4">
                   {periodTimelines.map((t) => (
                     <div key={t.key}>
-                      {t.label && <p className="font-semibold mb-1">{t.label}・{tr(`取餐 ${t.range}`, `pickup ${t.range}`)}</p>}
+                      {t.label && <p className="font-semibold mb-1">{t.label}{tr("・", " · ")}{tr(`取餐 ${t.range}`, `pickup ${t.range}`)}</p>}
                       <TimelineTable timeline={t.timeline} />
                     </div>
                   ))}
@@ -599,7 +623,7 @@ export default function VendorPortalPrep() {
               <h3 className="font-semibold mb-2 print:hidden">{tr(`出餐標籤（${plan.labels.length} 張）`, `Labels (${plan.labels.length})`)}</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 print:grid-cols-3">
                 {plan.labels.map((l) => (
-                  <div key={l.lock_id} className="border border-dashed border-gray-400 rounded p-2 text-xs bg-white break-inside-avoid">
+                  <div key={l.lock_id} className="border border-dashed border-input rounded p-2 text-xs bg-card break-inside-avoid">
                     <div className="flex justify-between items-baseline"><span className="text-xl font-extrabold tracking-widest">{l.pickup_code}</span><span>{l.pickup_window}</span></div>
                     <p className="font-semibold">{l.item}</p>
                     {l.main && <p>{l.main}{l.fixed?.length ? `＋${l.fixed.join("、")}` : ""}</p>}

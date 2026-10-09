@@ -202,8 +202,6 @@ export interface Lock {
   no_show_note?: string | null;
   note?: string; // 消費者下單時的備註（例如「不要香菜」），購物車結帳才會有
   consumer_feedback?: string | null;
-  discount_explanation?: string | null; // filled in by onLockCreated
-  discount_explanation_en?: string | null;
   buyer_uid: string;
   // 曾經持有過、後來被別人接手（轉賣／免費領取／贈送）的 uid，接手時追加。
   // 「我的轉讓」靠這個查回已被接手的項目，原持有人也因此保有讀取權限。
@@ -235,7 +233,7 @@ export interface Lock {
   payer_uid?: string;
   paid_amount?: number; // payer 在 transaction_id 實付的金額（退款依據）
   resale_hold?: { uid: string; intent_id: string; expires_at: unknown } | null; // 有人正在付款接手
-  transfer_refund?: { uid: string; amount: number; status: "done" | "failed" | "none" } | null;
+  transfer_refund?: { uid: string; amount: number; status: "done" | "failed" | "none"; as?: "points" } | null;
   pickup_code?: string; // 4 碼取餐號
   share_token?: string; // 代領連結
   cutoff_at?: unknown; // Firestore Timestamp
@@ -245,6 +243,9 @@ export interface Lock {
   refunded_amount?: number;
   // 消費者取消不退現金，改發折價券（原價 30%）：券的面額與 id；kept_amount 是留在店家的款項
   refund_coupon_amount?: number;
+  /** 2026-10-09 起退款退成平台點數（functions/src/wallet.js）；舊資料沒有＝退回 LINE Pay */
+  refunded_as?: "points";
+  points_used?: number;
   refund_coupon_id?: string | null;
   kept_amount?: number;
   tickets_issued?: number;
@@ -268,7 +269,8 @@ export interface AccuracyReport {
   vendor_id: string;
   horizon: string;
   accuracy_rate: number;
-  error_range: string;
+  error_range: string; // 程式算的（vendorCalibration.calibrationStats），不是 LLM
+  error_range_en?: string;
   explanation: string;
   pattern_note: string;
   explanation_en?: string;

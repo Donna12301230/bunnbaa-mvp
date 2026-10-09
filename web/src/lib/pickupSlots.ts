@@ -1,6 +1,6 @@
 import { tr } from "@/lib/i18n";
 import type { BusinessHour, MealPeriod, MenuItem, Vendor } from "@/types";
-import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
+import { DEFAULT_PLATFORM_CONFIG, liveConfig } from "@/lib/platformConfig";
 import { EARLY_BIRD_TIERS } from "@/lib/pricing";
 
 // 取餐時段——跟 functions/src/pricing.js 是同一套規則（伺服器會再驗證一次），要改兩邊一起改。
@@ -31,7 +31,7 @@ export function isValidWindow(window: string): boolean {
 }
 
 type ScheduleSource = Pick<Vendor, "pickup_windows" | "business_hours" | "holidays"> & Partial<Pick<Vendor, "cutoff_time" | "disaster_dates">>;
-type MaybeSchedule = ScheduleSource | null | undefined;
+export type MaybeSchedule = ScheduleSource | null | undefined;
 
 /** 這家店的取餐時段（依開始時間排序）；沒設定就用預設。 */
 export function vendorWindows(vendor: MaybeSchedule): string[] {
@@ -53,7 +53,7 @@ export function mealPeriodOf(window: string): MealPeriod {
   let best: MealPeriod = "lunch";
   let bestDistance = Infinity;
   for (const period of MEAL_PERIODS) {
-    const [from, to] = DEFAULT_PLATFORM_CONFIG.mealPeriods[period].split("-").map(toMinutes);
+    const [from, to] = liveConfig().mealPeriods[period].split("-").map(toMinutes);
     if (start >= from && start < to) return period;
     const distance = Math.min(Math.abs(start - from), Math.abs(start - to));
     if (distance < bestDistance) {
@@ -86,7 +86,7 @@ export function servesPeriod(vendor: MaybeSchedule, item: Pick<MenuItem, "meal_p
 /** 截單時間：店家只能比平台早 */
 export function vendorCutoffTime(vendor: MaybeSchedule): string {
   const own = vendor?.cutoff_time;
-  const platform = DEFAULT_PLATFORM_CONFIG.cutoffTime;
+  const platform = liveConfig().cutoffTime;
   return typeof own === "string" && TIME_PATTERN.test(own) && own < platform ? own : platform;
 }
 
@@ -104,10 +104,20 @@ export function weekdayOf(dateStr: string): number {
   return new Date(`${dateStr}T00:00:00Z`).getUTCDay();
 }
 
+/** 營業日文字：週一至週五／Mon–Fri（依平台參數） */
+export function businessDaysText(): string {
+  const days = [...liveConfig().businessWeekdays].sort();
+  const zh = ["日", "一", "二", "三", "四", "五", "六"];
+  const en = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const contiguous = days.every((d, i) => i === 0 || d === days[i - 1] + 1);
+  if (contiguous && days.length > 2) return tr(`週${zh[days[0]]}至週${zh[days[days.length - 1]]}`, `${en[days[0]]}–${en[days[days.length - 1]]}`);
+  return tr(days.map((d) => `週${zh[d]}`).join("、"), days.map((d) => en[d]).join(", "));
+}
+
 /** 這天店家有沒有休息：非營業日（週末）、特定公休日、每週營業時段裡那天沒開、停班停課。 */
 export function vendorClosedReason(vendor: MaybeSchedule, pickupDate: string): string | null {
   const weekday = weekdayOf(pickupDate);
-  if (!DEFAULT_PLATFORM_CONFIG.businessWeekdays.includes(weekday)) return tr("第一階段只做週一至週五", "Weekdays only");
+  if (!liveConfig().businessWeekdays.includes(weekday)) return tr(`營業日是${businessDaysText()}`, `Open ${businessDaysText()} only`);
   if (vendor?.disaster_dates?.includes(pickupDate)) return tr("這天因停班停課暫停供餐", "No service (work suspension)");
   if (vendor?.holidays?.includes(pickupDate)) return tr("這天是店家公休日", "The vendor is closed on this day");
   const hours: BusinessHour | undefined = vendor?.business_hours?.find((h) => h.weekday === weekday);
@@ -134,12 +144,12 @@ export function mondayOf(dateStr: string): string {
 
 /** 最遠可以預約到哪天：30 天後（規格 §2 預訂開放範圍） */
 export function maxPickupDateStr(now: Date = new Date()): string {
-  return addDaysStr(todayStr(now), DEFAULT_PLATFORM_CONFIG.bookingRangeDays);
+  return addDaysStr(todayStr(now), liveConfig().bookingRangeDays);
 }
 
 /** 這天還能不能訂（營業、還沒截單、在預訂範圍內）；不能訂時回傳原因 */
 export function bookingProblem(vendor: MaybeSchedule, pickupDate: string, now: Date = new Date()): string | null {
-  if (pickupDate < todayStr(now) || pickupDate > maxPickupDateStr(now)) return tr("最遠只能預訂 30 天內", "You can book up to 30 days ahead");
+  if (pickupDate < todayStr(now) || pickupDate > maxPickupDateStr(now)) return tr(`最遠只能預訂 ${liveConfig().bookingRangeDays} 天內`, `You can book up to ${liveConfig().bookingRangeDays} days ahead`);
   const closed = vendorClosedReason(vendor, pickupDate);
   if (closed) return closed;
   if (isPastCutoff(pickupDate, vendor, now)) {
@@ -171,7 +181,7 @@ export function bookableDateRange(now: Date = new Date()): string[] {
   const out: string[] = [];
   const last = maxPickupDateStr(now);
   for (let d = todayStr(now); d <= last; d = addDaysStr(d, 1)) {
-    if (DEFAULT_PLATFORM_CONFIG.businessWeekdays.includes(weekdayOf(d))) out.push(d);
+    if (liveConfig().businessWeekdays.includes(weekdayOf(d))) out.push(d);
   }
   return out;
 }
@@ -217,7 +227,7 @@ export function planPickupSchedule(
     if (!bookingProblem(vendor, date, now)) {
       dates.push(date);
       if (skipped) postponed.push(date);
-    } else if (DEFAULT_PLATFORM_CONFIG.businessWeekdays.includes(weekdayOf(date))) {
+    } else if (liveConfig().businessWeekdays.includes(weekdayOf(date))) {
       skipped = true;
     }
   }

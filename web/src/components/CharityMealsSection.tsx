@@ -13,9 +13,16 @@ import PickupQr from "@/components/PickupQr";
 import { currentPosition, decodeGeohash, distanceMeters, formatDistance, walkMinutes } from "@/lib/geo";
 import { todayStr } from "@/lib/pickupSlots";
 import { tr } from "@/lib/i18n";
+import { liveConfig } from "@/lib/platformConfig";
+import { policy } from "@/lib/policy";
 import type { CharityMeal, CharityReservation } from "@/types";
 
 const RANGES = [500, 1000, 2000, 3000];
+/** 愛心餐截止（時段結束後幾小時／分鐘），讀平台參數 */
+const closeHours = () => {
+  const m = liveConfig().charityCloseAfterMinutes;
+  return m % 60 === 0 ? tr(`${m / 60} 小時`, `${m / 60} hour${m === 60 ? "" : "s"}`) : tr(`${m} 分鐘`, `${m} min`);
+};
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 
 /**
@@ -96,14 +103,14 @@ export default function CharityMealsSection() {
     if (!requireLogin()) return;
     const ok = await confirm({
       title: tr("預約愛心餐", "Reserve a charity meal"),
-      description: tr("每人每天限 1 份，預約後 30 分鐘內到店出示 QR Code。逾時未到，這份會釋出，且 7 天內不能再預約愛心餐（不影響一般訂餐）。", "One per person per day. Arrive within 30 minutes and show the QR code. If you don't, it's released and you can't reserve charity meals for 7 days (regular orders aren't affected)."),
+      description: `${policy.charityReserve()}。`,
       confirmLabel: tr("我了解，預約", "I understand — reserve"),
     });
     if (!ok) return;
     setBusy(vendorId);
     try {
       await httpsCallable(functions, "reserveCharity")({ vendor_id: vendorId });
-      toast({ title: tr("已預約，請在 10 分鐘內到場出示 QR code", "Reserved — please arrive within 10 minutes") });
+      toast({ title: tr(`已預約，請在 ${liveConfig().charityReserveMinutes} 分鐘內到場出示 QR Code`, `Reserved — please arrive within ${liveConfig().charityReserveMinutes} minutes and show the QR code`) });
     } catch (err) {
       toast({ title: tr("預約失敗", "Couldn't reserve"), description: (err as Error).message, variant: "destructive" });
     } finally {
@@ -113,16 +120,16 @@ export default function CharityMealsSection() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[1.75rem] bg-accent border border-ink p-6 text-sm space-y-2">
+      <div className="rounded-card bg-accent border border-ink p-6 text-sm space-y-2">
         <p className="font-heading text-2xl font-semibold flex items-center gap-2"><HeartHandshake className="w-6 h-6 text-primary" aria-hidden="true" /> {tr("愛心餐", "Charity meals")}</p>
         <p className="text-xs leading-relaxed">
-          {tr("沒有被領取或訂購人主動捐出的便當，當天開放給需要的人。可以線上預約（手機驗證帳號、每人每天 1 份、預約後 10 分鐘內到場，逾時自動釋出給下一位、不停權），或直接到店現場領取（未被預約的份數先到先領、不需帳號）。取餐時段結束 2 小時後截止。",
-            "Meals not picked up, or donated by classmates, are open to anyone in need on the same day. Reserve online (phone-verified account, one per day, arrive within 30 min) or just walk in — unreserved meals are first come, first served. Closes 2 hours after the pickup window.")}
+          {tr(`沒有被領取或訂購人主動捐出的便當，當天開放給需要的人。可以線上預約（手機驗證帳號；${policy.charityReserve()}），或直接到店現場領取（未被預約的份數先到先領、不需帳號）。取餐時段結束 ${closeHours()} 後截止。`,
+            `Meals not picked up, or donated by classmates, are open to anyone in need on the same day. Reserve online (phone-verified account; ${policy.charityReserve()}) or just walk in — unreserved meals are first come, first served. Closes ${closeHours()} after the pickup window.`)}
         </p>
       </div>
 
       {activeReservation && (
-        <div className="rounded-[1.5rem] bg-card border-2 border-ink p-5 max-w-sm">
+        <div className="rounded-card bg-card border-2 border-ink p-5 max-w-sm">
           <p className="font-semibold">{tr("你的愛心餐預約", "Your reservation")}：{activeReservation.vendor_name}</p>
           <p className="text-xs text-muted-foreground">
             {tr(`請在 ${new Date(millis(activeReservation.expires_at)).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })} 前到場`, `Arrive by ${new Date(millis(activeReservation.expires_at)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`)}
@@ -142,7 +149,7 @@ export default function CharityMealsSection() {
       </div>
 
       {byVendor.length === 0 ? (
-        <EmptyState icon={<HeartHandshake size={32} />} title={tr("附近目前沒有愛心餐", "No charity meals nearby right now")} description={tr("通常在午餐取餐時段結束後 30 分鐘開放。", "They usually open 30 minutes after the lunch pickup window.")} />
+        <EmptyState icon={<HeartHandshake size={32} />} title={tr("附近目前沒有愛心餐", "No charity meals nearby right now")} description={tr(`通常在各餐期取餐時段結束後 ${liveConfig().charityConvertAfterMinutes} 分鐘開放。`, `They usually open ${liveConfig().charityConvertAfterMinutes} minutes after each meal's pickup window ends.`)} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {byVendor.map((g) => {
@@ -150,16 +157,16 @@ export default function CharityMealsSection() {
             const walk = Number.isFinite(g.distance) ? walkMinutes(g.distance) : null;
             const tooFar = walk !== null && walk > minutesLeft;
             return (
-              <article key={g.vendor_id} className="rounded-[1.75rem] bg-card border border-ink p-6 flex flex-col gap-2.5">
+              <article key={g.vendor_id} className="rounded-card bg-card border border-ink p-6 flex flex-col gap-2.5">
                 <h3 className="font-heading text-xl font-semibold">{g.name}</h3>
                 {g.address && <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {g.address}</p>}
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span className="font-semibold text-foreground">{tr(`剩 ${g.available.length} 份`, `${g.available.length} left`)}</span>
                   <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {tr(`${minutesLeft} 分後截止`, `closes in ${minutesLeft} min`)}</span>
-                  {walk !== null && <span className="flex items-center gap-1"><Footprints className="w-3.5 h-3.5" /> {formatDistance(g.distance)}・{tr(`步行 ${walk} 分`, `${walk} min walk`)}</span>}
+                  {walk !== null && <span className="flex items-center gap-1"><Footprints className="w-3.5 h-3.5" /> {formatDistance(g.distance)}{tr("・", " · ")}{tr(`步行 ${walk} 分`, `${walk} min walk`)}</span>}
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2">{g.available.slice(0, 3).map((m) => m.item_name).join("、")}</p>
-                {tooFar && <span className="text-xs font-semibold text-red-700">{tr("來不及（步行時間超過剩餘時間）", "Too far to make it in time")}</span>}
+                {tooFar && <span className="text-xs font-semibold text-danger-text">{tr("來不及（步行時間超過剩餘時間）", "Too far to make it in time")}</span>}
                 <Button size="sm" className="mt-auto" disabled={!!activeReservation || busy === g.vendor_id || tooFar} onClick={() => reserve(g.vendor_id)}>
                   {busy === g.vendor_id ? tr("預約中…", "Reserving…") : tr("預約一份", "Reserve one")}
                 </Button>

@@ -1,4 +1,5 @@
 import { tr } from "@/lib/i18n";
+import { usePrompt } from "@/components/ConfirmDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { collection, doc, getDocs, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -12,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import PortalPageHeader from "@/components/PortalPageHeader";
+import { EmptyState } from "@/components/ds";
 
 interface BanAppeal {
   id: string;
@@ -41,6 +44,7 @@ function AppealsList() {
     },
   });
 
+  const prompt = usePrompt();
   const processAppealMutation = useMutation({
     mutationFn: async ({ appeal, approved, adminNote }: { appeal: BanAppeal; approved: boolean; adminNote?: string }) => {
       const batch = writeBatch(db);
@@ -71,18 +75,15 @@ function AppealsList() {
 
   return (
     <>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("解封申訴管理", "Ban appeals")}</h1>
+      <PortalPageHeader icon={ShieldAlert} title={tr("解封申訴", "Appeals")} />
       {isLoading ? (
         <SkeletonBlocks count={2} height={96} className="space-y-3" />
       ) : appeals.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <ShieldAlert className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>{tr("目前無申訴案件", "No appeals right now")}</p>
-        </div>
+        <EmptyState icon={<ShieldAlert size={32} />} title={tr("目前無申訴案件", "No appeals right now")} />
       ) : (
         <div className="space-y-3">
           {appeals.map(appeal => (
-            <Card key={appeal.id} className={appeal.status === "pending" ? "border-orange-200" : ""}>
+            <Card key={appeal.id} className={appeal.status === "pending" ? "border-brand/40" : ""}>
               <CardHeader className="pb-1 flex flex-row items-start justify-between">
                 <div>
                   <CardTitle className="text-base text-sm">
@@ -94,15 +95,15 @@ function AppealsList() {
                   </div>
                 </div>
                 <Badge className={
-                  appeal.status === "pending" ? "bg-orange-100 text-orange-800 border-0" :
-                  appeal.status === "approved" ? "bg-green-100 text-green-800 border-0" :
-                  "bg-gray-100 text-gray-600 border-0"
+                  appeal.status === "pending" ? "bg-secondary text-accent-foreground border-0" :
+                  appeal.status === "approved" ? "bg-success-soft text-success-text border-0" :
+                  "bg-muted text-muted-foreground border-0"
                 }>
                   {appeal.status === "pending" ? tr("待審核", "Pending") : appeal.status === "approved" ? tr("已核准", "Approved") : tr("已拒絕", "Rejected")}
                 </Badge>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="text-sm bg-gray-50 rounded p-2">
+                <div className="text-sm bg-background rounded p-2">
                   <span className="text-xs text-muted-foreground block mb-1">{tr("申訴原因：", "Reason:")}</span>
                   {appeal.reason}
                 </div>
@@ -113,7 +114,7 @@ function AppealsList() {
                   <div className="flex gap-2 pt-1">
                     <Button
                       size="sm"
-                      className="h-7 text-xs bg-green-500 hover:bg-green-600 text-white"
+                      className="h-7 text-xs bg-success-strong hover:bg-success-strong/90 text-white"
                       disabled={processAppealMutation.isPending}
                       onClick={() => processAppealMutation.mutate({ appeal, approved: true })}
                     >
@@ -122,11 +123,17 @@ function AppealsList() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 text-xs text-red-500"
+                      className="h-7 text-xs text-danger-text"
                       disabled={processAppealMutation.isPending}
-                      onClick={() => {
-                        const adminNote = window.prompt(tr("拒絕原因（選填，會顯示給使用者看）", "Reason for rejection (optional, shown to the user)")) ?? undefined;
-                        processAppealMutation.mutate({ appeal, approved: false, adminNote });
+                      onClick={async () => {
+                        const note = await prompt({
+                          title: tr("拒絕這筆申訴？", "Reject this appeal?"),
+                          inputLabel: tr("拒絕原因（選填，會顯示給使用者看）", "Reason for rejection (optional, shown to the user)"),
+                          confirmLabel: tr("拒絕申訴", "Reject"),
+                          destructive: true,
+                        });
+                        if (note === null) return;
+                        processAppealMutation.mutate({ appeal, approved: false, adminNote: note.trim() || undefined });
                       }}
                     >
                       <XCircle className="w-3.5 h-3.5 mr-1" /> {tr("拒絕", "Reject")}
