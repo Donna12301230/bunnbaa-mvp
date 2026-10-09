@@ -137,7 +137,7 @@ export default function LoginPage() {
       return applyAsVendor({ email: vendorEmail, password: vendorPassword, storeName, phone: vendorPhone });
     },
     onSuccess: () => {
-      toast({ title: tr("廠商申請已送出", "Application submitted"), description: tr("管理員審核通過後即可使用廠商後台。", "You can use the vendor portal once an admin approves it.") });
+      toast({ title: tr("店家申請已送出", "Application submitted"), description: tr("管理員審核通過後即可使用店家後台。", "You can use the vendor portal once an admin approves it.") });
       navigate("/home");
     },
     onError: (err: Error) => toast({ variant: "destructive", title: tr("申請失敗", "Application failed"), description: err.message }),
@@ -181,7 +181,7 @@ export default function LoginPage() {
               { icon: ShoppingBag, title: tr("線上預訂", "Order online"), desc: tr("輕鬆挑選、輕鬆下單", "Easy to browse and order") },
               { icon: Clock, title: tr("提前預訂", "Book ahead"), desc: tr("提前安排、省時省力", "Plan ahead, save time") },
               { icon: Tag, title: tr("早鳥優惠", "Early-bird deals"), desc: tr("越早訂購越划算", "The earlier, the cheaper") },
-              { icon: Store, title: tr("多家廠商", "Many vendors"), desc: tr("周邊精選店家", "Hand-picked local spots") },
+              { icon: Store, title: tr("多家合作店家", "Many vendors"), desc: tr("周邊精選店家", "Hand-picked local spots") },
             ].map(({ icon: Icon, title, desc }) => (
               <li key={title} className="flex items-start gap-3 bg-card rounded-2xl border border-ink p-3 md:p-4">
                 <span className="hidden sm:flex w-10 h-10 shrink-0 rounded-full bg-secondary border border-ink items-center justify-center">
@@ -211,7 +211,7 @@ export default function LoginPage() {
                 <TabsList className="w-full mb-4">
                   <TabsTrigger value="login" className="flex-1">{tr("登入", "Sign in")}</TabsTrigger>
                   <TabsTrigger value="register" className="flex-1">{tr("會員註冊", "Sign up")}</TabsTrigger>
-                  <TabsTrigger value="vendor" className="flex-1">{tr("廠商申請", "Vendors")}</TabsTrigger>
+                  <TabsTrigger value="vendor" className="flex-1">{tr("店家申請", "Vendor application")}</TabsTrigger>
                 </TabsList>
 
                 {/* Login */}
@@ -242,7 +242,7 @@ export default function LoginPage() {
                         </Button>
                       </div>
                       <Button type="submit" className="w-full" disabled={isPendingLogin}>
-                        {isPendingLogin ? tr("登入中...", "Signing in...") : tr("登入", "Sign in")}
+                        {isPendingLogin ? tr("登入中…", "Signing in…") : tr("登入", "Sign in")}
                       </Button>
                       {import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true" && (
                         <p className="text-center text-caption text-muted-foreground">
@@ -274,7 +274,7 @@ export default function LoginPage() {
                             />
                           </div>
                           <Button type="submit" className="w-full" disabled={isPendingSendOtp}>
-                            {isPendingSendOtp ? tr("傳送中...", "Sending...") : tr("取得驗證碼", "Get code")}
+                            {isPendingSendOtp ? tr("傳送中…", "Sending…") : tr("取得驗證碼", "Get code")}
                           </Button>
                         </form>
                       ) : (
@@ -292,7 +292,7 @@ export default function LoginPage() {
                             <p className="text-caption text-muted-foreground mt-1">{tr("已發送到", "Sent to")} {otpPhone}</p>
                           </div>
                           <Button type="submit" className="w-full" disabled={isPendingConfirmOtp}>
-                            {isPendingConfirmOtp ? tr("驗證中...", "Verifying...") : tr("驗證並登入", "Verify & sign in")}
+                            {isPendingConfirmOtp ? tr("驗證中…", "Verifying…") : tr("驗證並登入", "Verify & sign in")}
                           </Button>
                           <Button
                             type="button"
@@ -365,7 +365,7 @@ export default function LoginPage() {
                         </div>
                         <div>
                           <Label>{tr("顯示名稱", "Display name")}</Label>
-                          <Input autoComplete="name" placeholder={tr("顯示給廠商的名字", "Name shown to vendors")} value={displayName} onChange={e => setDisplayName(e.target.value)} />
+                          <Input autoComplete="name" placeholder={tr("顯示給店家的名字", "Name shown to vendors")} value={displayName} onChange={e => setDisplayName(e.target.value)} />
                         </div>
                       </div>
                       <div>
@@ -432,7 +432,7 @@ export default function LoginPage() {
                         </div>
                       </div>
                       <Button type="submit" className="w-full" disabled={isPendingReg}>
-                        {isPendingReg ? tr("註冊中...", "Signing up...") : tr("立即註冊", "Sign up")}
+                        {isPendingReg ? tr("註冊中…", "Signing up…") : tr("立即註冊", "Sign up")}
                       </Button>
                     </form>
                   )}
@@ -456,7 +456,7 @@ export default function LoginPage() {
                           className="mt-0.5"
                         />
                         <label htmlFor="vendor-agree" className="text-sm text-gray-700 cursor-pointer leading-snug">
-                          {tr("我已詳細閱讀並同意上述廠商申請須知及相關服務條款", "I have read and agree to the vendor terms above")}
+                          {tr("我已詳細閱讀並同意上述店家申請須知及相關服務條款", "I have read and agree to the vendor terms above")}
                         </label>
                       </div>
 
@@ -514,7 +514,7 @@ export default function LoginPage() {
                         </div>
                       </div>
                       <Button type="submit" className="w-full" disabled={isPendingVendor}>
-                        {isPendingVendor ? tr("申請中...", "Submitting...") : tr("申請成為廠商", "Apply as a vendor")}
+                        {isPendingVendor ? tr("申請中…", "Submitting…") : tr("申請成為店家", "Apply as a vendor")}
                       </Button>
                     </form>
                   )}
@@ -554,7 +554,7 @@ export default function LoginPage() {
               disabled={!resetEmail.trim() || resetPasswordMutation.isPending}
               onClick={() => resetPasswordMutation.mutate(resetEmail.trim())}
             >
-              {resetPasswordMutation.isPending ? tr("寄送中...", "Sending...") : tr("寄送重設信", "Send reset email")}
+              {resetPasswordMutation.isPending ? tr("寄送中…", "Sending…") : tr("寄送重設信", "Send reset email")}
             </Button>
           </DialogFooter>
         </DialogContent>

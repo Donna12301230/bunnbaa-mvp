@@ -1,5 +1,5 @@
 import { componentCost, rawAmount } from "@/lib/bento";
-import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
+import { liveConfig } from "@/lib/platformConfig";
 import { tr } from "@/lib/i18n";
 import type { Component, Ingredient, Lock, MenuItem, RiceOption } from "@/types";
 
@@ -14,7 +14,7 @@ function add(map: Map<string, number>, key: string | null | undefined, amount: n
 }
 
 /** 白飯份數：半碗 0.5、一碗 1、一碗半 1 ＋ 多加克數 ÷ 每份熟重 */
-export function ricePortions(rice: RiceOption | undefined, riceComponent: Component | undefined, config = DEFAULT_PLATFORM_CONFIG): number {
+export function ricePortions(rice: RiceOption | undefined, riceComponent: Component | undefined, config = liveConfig()): number {
   const grams = Number(riceComponent?.portion_grams) || 0;
   let portions = rice === "less" ? 0.5 : 1;
   if (rice === "add") portions += grams > 0 ? (config.riceAddGrams || 100) / grams : 0.5;
@@ -26,7 +26,7 @@ export function componentPortionsForLock(
   lock: Pick<Lock, "rice" | "slots" | "extra_side"> & { main_component_id?: string | null },
   item: MenuItem | undefined,
   componentsById: Record<string, Component>,
-  config = DEFAULT_PLATFORM_CONFIG,
+  config = liveConfig(),
 ): Portions {
   const out: Portions = new Map();
   if (!item) return out;
@@ -55,7 +55,7 @@ export function componentPortionsForLock(
 }
 
 /** 多筆訂單合計的半成品份數 */
-export function componentPortions(locks: (Lock & { main_component_id?: string | null })[], itemsById: Record<string, MenuItem>, componentsById: Record<string, Component>, config = DEFAULT_PLATFORM_CONFIG): Portions {
+export function componentPortions(locks: (Lock & { main_component_id?: string | null })[], itemsById: Record<string, MenuItem>, componentsById: Record<string, Component>, config = liveConfig()): Portions {
   const total: Portions = new Map();
   for (const lock of locks) {
     for (const [id, n] of componentPortionsForLock(lock, itemsById[lock.menu_item_id ?? ""], componentsById, config)) add(total, id, n);

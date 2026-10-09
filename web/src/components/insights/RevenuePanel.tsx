@@ -5,7 +5,7 @@ import { httpsCallable } from "@/lib/callable";
 import { db, functions } from "@/lib/firebase";
 import type { AccuracyReport, Lock } from "@/types";
 import { addDaysStr, todayStr } from "@/lib/pickupSlots";
-import { DONE_STATUSES, REVENUE_STATUSES } from "@/lib/lockOutcome";
+import { DONE_STATUSES, REVENUE_STATUSES, revenueOf } from "@/lib/lockOutcome";
 import { tr, loc, planBaseName } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,13 +31,14 @@ interface ReportStats {
   topItems: { name: string; qty: number; revenue: number }[];
 }
 
-// 以取餐日落在最近 REPORT_DAYS 天（含今天）的鎖定計算；鎖定是全額預付，未取餐也算收入，
-// 取消退款的不算（狀態口徑跟每日收入圖 getDailyRevenueSeries 相同）。
+// 以取餐日落在最近 REPORT_DAYS 天（含今天）的鎖定計算；口徑跟撥款相同（lockOutcome revenueOf）：
+// 預付的照實付算（未取餐也算），顧客取消換券留下的款項也算，退成點數的不算。份數只算有出餐的。
 function computeStats(locks: Lock[]): ReportStats | null {
   const { start, end } = reportRange();
-  const rows = locks.filter((l) => l.pickup_date >= start && l.pickup_date <= end && REVENUE_STATUSES.has(l.status));
-  if (rows.length === 0) return null;
-  const totalRevenue = rows.reduce((sum, l) => sum + (l.locked_price || 0), 0);
+  const inRange = locks.filter((l) => l.pickup_date >= start && l.pickup_date <= end);
+  const rows = inRange.filter((l) => REVENUE_STATUSES.has(l.status));
+  if (rows.length === 0 && !inRange.some((l) => revenueOf(l) > 0)) return null;
+  const totalRevenue = inRange.reduce((sum, l) => sum + revenueOf(l), 0);
   const byItem = new Map<string, { qty: number; revenue: number }>();
   for (const l of rows) {
     const name = planBaseName(loc(l, "item_name")); // 計畫型「A方案・第1/5天」併成同一項
@@ -49,7 +50,7 @@ function computeStats(locks: Lock[]): ReportStats | null {
   return {
     totalRevenue,
     totalOrders: rows.length,
-    avgOrder: Math.round(totalRevenue / rows.length),
+    avgOrder: rows.length ? Math.round(rows.reduce((s, l) => s + revenueOf(l), 0) / rows.length) : 0,
     completedOrders: rows.filter((l) => DONE_STATUSES.has(l.status)).length,
     topItems: [...byItem].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.qty - a.qty).slice(0, 10),
   };
@@ -134,7 +135,7 @@ export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: strin
 
           <Card className="border-2">
             <CardContent className="p-4 space-y-2">
-              <p className="font-semibold flex items-center gap-1">{tr("每天收入、材料成本與淨利", "Daily revenue, materials & net profit")}<InfoTip>{tr(`最近 ${REPORT_DAYS} 天，依取餐日。預付制未取餐也算收入，取消退款的不算。`, `Last ${REPORT_DAYS} days by pickup date.`)}</InfoTip></p>
+              <p className="font-semibold flex items-center gap-1">{tr("每天收入、材料成本與淨利", "Daily revenue, materials & net profit")}<InfoTip>{tr(`最近 ${REPORT_DAYS} 天，依取餐日；口徑跟撥款相同：預付制未取餐也算收入，顧客取消換券留下的款項也算，停班停課等退成點數的不算。`, `Last ${REPORT_DAYS} days by pickup date.`)}</InfoTip></p>
               <RevenueCostChart vendorId={vendorId} />
             </CardContent>
           </Card>

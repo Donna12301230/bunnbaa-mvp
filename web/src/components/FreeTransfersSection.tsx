@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatNT, formatPickupDate } from "@/lib/format";
 import { collection, limit, onSnapshot, query, where } from "firebase/firestore";
 import { Gift, MapPin, UtensilsCrossed } from "lucide-react";
 import { useLocation } from "wouter";
@@ -97,7 +98,7 @@ export default function FreeTransfersSection() {
               <h3 className="font-heading text-lg font-semibold leading-snug">{loc(item, "item_name")}</h3>
               <p className="flex items-start gap-1 text-xs text-muted-foreground">
                 <MapPin className="w-3.5 h-3.5 shrink-0 mt-px" aria-hidden="true" />
-                <span>{vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}</span>
+                <span>{vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{formatPickupDate(item.pickup_date)} · {item.pickup_window}</span>
               </p>
               <Button size="sm" className="mt-auto" disabled={busy === item.id} onClick={() => claim(item)}>
                 {busy === item.id ? tr("處理中…", "Working…") : tr("免費領取", "Claim free")}

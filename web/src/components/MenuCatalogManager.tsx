@@ -105,7 +105,7 @@ export default function MenuCatalogManager({ open, onClose, vendorId, listed, it
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{tr("取消", "Cancel")}</Button>
-          <Button disabled={busy || !!problem} onClick={save}>{busy ? tr("儲存中...", "Saving...") : tr("儲存", "Save")}</Button>
+          <Button disabled={busy || !!problem} onClick={save}>{busy ? tr("儲存中…", "Saving…") : tr("儲存", "Save")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

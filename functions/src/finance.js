@@ -13,14 +13,17 @@ const {
 } = require("./common");
 const { loadPlatformConfig, loadMinimumWage, wageOn } = require("./config");
 const { componentPortions, rawNeeds, buildTimeline } = require("./prep");
-const { mealPeriodOf, vendorPeriodRanges, MEAL_PERIODS, commissionOf } = require("./pricing");
+const { mealPeriodOf, vendorPeriodRanges, MEAL_PERIODS, commissionOf, EARLY_BIRD_TIERS } = require("./pricing");
+const MAX_EARLY_BIRD = Math.max(...EARLY_BIRD_TIERS.map((x) => x.discountPercent));
 const { taipeiToday, addDays, weekdayOf, mondayOf, splitWindow, toMinutes } = require("./calendar");
 const { helpers: purchasing } = require("./purchasing");
 
 const DAY_MS = 86400000;
 const DEFAULT_LINEPAY_FEE_RATE = 0.0275;
-// 全額預付且沒退款（未取餐、轉愛心餐也不退）。跟 web/src/lib/lockOutcome.ts 的 REVENUE_STATUSES 一致
-const PAID_STATUSES = ["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "charity", "no_show"];
+// 營收口徑跟撥款一致：pricing.js revenueOf（預付的照實付算；取消換券留下的款項也算；退成點數的不算）
+const { PAID_STATUSES, revenueOf } = require("./pricing");
+/** 有出餐成本的訂單（取消的沒做餐點，只算營收不算材料與人工） */
+const hasMeal = (l) => PAID_STATUSES.includes(l.status);
 
 /* ------------------------------------------------------------------ *
  * 基本工資（§9.3）：平台自動更新（以勞動部公告為準、生效日套用）；
@@ -61,7 +64,7 @@ exports.syncMinimumWage = onSchedule({ schedule: "10 0 * * *", timeZone: "Asia/T
       await notifyVendor(vendor.id, {
         title: t("基本工資調整", "Minimum wage updated"),
         body: t(`${wage.effectiveFrom} 起基本工資為時薪 ${wage.hourly}、月薪 ${wage.monthly}，已自動調整：${raised.join("、")}。`, `From ${wage.effectiveFrom} the minimum wage is ${wage.hourly}/h, ${wage.monthly}/month. Adjusted: ${raised.join(", ")}.`),
-        link: "/vendor-portal",
+        link: "/vendor-portal/settings",
       });
     }
   });
@@ -147,7 +150,7 @@ function dayLaborMinutes(locks, catalog, vendor, config) {
   return minutes;
 }
 
-/** 每份毛利（§9.3）：8 折後售價 − 單份材料成本；毛利低於材料成本 30% 標紅 */
+/** 每份毛利（§9.3）：最深早鳥折扣後的售價（EARLY_BIRD_TIERS，目前 8 折）− 單份材料成本；毛利低於材料成本 30% 標紅 */
 function itemMargins(catalog, config) {
   const out = [];
   for (const item of Object.values(catalog.itemsById)) {
@@ -159,7 +162,7 @@ function itemMargins(catalog, config) {
       const lock = { menu_item_id: item.id, rice: "normal", slots: [], main_component_id: main.component_id || null };
       const needs = rawNeeds(componentPortions([lock], catalog.itemsById, catalog.componentsById, config), catalog.componentsById, catalog.ingredientsById);
       const material = needsCost(needs, catalog.ingredientsById);
-      const discounted = Math.round(price * 0.8);
+      const discounted = Math.round(price * (1 - MAX_EARLY_BIRD / 100));
       const margin = discounted - material;
       out.push({
         menu_item_id: item.id, name: mains.length > 1 && main.name ? `${item.name}（${main.name}）` : item.name,
@@ -180,13 +183,13 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
   const last = days[days.length - 1];
   const snap = await db().collection("locks").where("vendor_id", "==", vendor.id)
     .where("pickup_date", ">=", addDays(first, -28)).where("pickup_date", "<=", last).get();
-  const all = snap.docs.map((d) => d.data()).filter((l) => PAID_STATUSES.includes(l.status));
+  const all = snap.docs.map((d) => d.data()).filter((l) => revenueOf(l) > 0 || hasMeal(l));
   const inMonth = all.filter((l) => l.pickup_date >= first);
 
   // 近 4 週平均實付（預估營收用）
   const recent = all.filter((l) => l.pickup_date < today && l.pickup_date >= addDays(today, -28));
-  const avgPaid = recent.length > 0 ? recent.reduce((s, l) => s + (l.locked_price || 0), 0) / recent.length
-    : (inMonth.length > 0 ? inMonth.reduce((s, l) => s + (l.locked_price || 0), 0) / inMonth.length : 0);
+  const avgPaid = recent.length > 0 ? recent.reduce((s, l) => s + revenueOf(l), 0) / recent.length
+    : (inMonth.length > 0 ? inMonth.reduce((s, l) => s + revenueOf(l), 0) / inMonth.length : 0);
 
   const forecast = await purchasing.forecastByWeekday(vendor, mondayOf(today));
   const excluded = purchasing.excludedDates(vendor);
@@ -209,8 +212,9 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
     const wd = weekdayOf(date);
     const open = config.businessWeekdays.includes(wd) && !excluded.has(date);
     if (open) businessDays++;
-    const locks = inMonth.filter((l) => l.pickup_date === date);
-    const revenue = locks.reduce((s, l) => s + (l.locked_price || 0), 0);
+    const dayAll = inMonth.filter((l) => l.pickup_date === date);
+    const locks = dayAll.filter(hasMeal);
+    const revenue = dayAll.reduce((s, l) => s + revenueOf(l), 0);
     confirmedRevenue += revenue;
     confirmedQty += locks.length;
     // 還沒到截單的日期補上預測份數（預設配菜、一般飯量）
@@ -235,7 +239,7 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
     for (const l of locks) {
       const p = byPeriod[l.meal_period || mealPeriodOf(l.pickup_window || "11:00-11:30", config)];
       if (!p) continue;
-      p.revenue += l.locked_price || 0;
+      p.revenue += revenueOf(l);
       p.qty += 1;
     }
     if (locks.length > 0) {
@@ -301,6 +305,7 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
     by_meal_period: Object.fromEntries(Object.entries(byPeriod).map(([k, v]) => [k, { revenue: round(v.revenue), qty: v.qty, material_cost: round(v.material_cost) }])),
     top_needs: topNeeds,
     item_margins: itemMargins(catalog, config),
+    max_early_bird_percent: MAX_EARLY_BIRD,
     daily,
     minimum_wage: wageOn(wageDoc, today),
   };
@@ -319,7 +324,8 @@ async function dailySeries(vendor, today) {
   const from = addDays(today, -14);
   const snap = await db().collection("locks").where("vendor_id", "==", vendor.id)
     .where("pickup_date", ">=", from).where("pickup_date", "<=", today).get();
-  const locks = snap.docs.map((d) => d.data()).filter((l) => PAID_STATUSES.includes(l.status));
+  const all = snap.docs.map((d) => d.data()).filter((l) => revenueOf(l) > 0 || hasMeal(l));
+  const locks = all.filter(hasMeal);
   const ownHourly = Number(vendor.hourly_wage) || 0;
   const feeRate = Number(vendor.linepay_fee_rate) >= 0 && vendor.linepay_fee_rate != null ? Number(vendor.linepay_fee_rate) : DEFAULT_LINEPAY_FEE_RATE;
   const commissionRate = Number(config.commissionRate) || 0;
@@ -328,11 +334,12 @@ async function dailySeries(vendor, today) {
   for (let i = 0; i < 15; i++) {
     const date = addDays(from, i);
     const mine = locks.filter((l) => l.pickup_date === date);
+    const mineAll = all.filter((l) => l.pickup_date === date);
     const needs = rawNeeds(componentPortions(mine, catalog.itemsById, catalog.componentsById, config), catalog.componentsById, catalog.ingredientsById);
-    const revenue = mine.reduce((s, l) => s + (l.locked_price || 0), 0);
+    const revenue = mineAll.reduce((s, l) => s + revenueOf(l), 0);
     const material = needsCost(needs, catalog.ingredientsById);
     const labor = mine.length > 0 ? (dayLaborMinutes(mine, catalog, vendor, config) / 60) * Math.max(ownHourly, wageOn(wageDoc, date).hourly) : 0;
-    const fees = revenue * feeRate + commissionOf(mine, commissionRate);
+    const fees = revenue * feeRate + commissionOf(mineAll, commissionRate);
     const fixed = monthlyFixed / monthDays(date.slice(0, 7)).length;
     out.push({
       date, revenue, material_cost: Math.round(material), qty: mine.length,

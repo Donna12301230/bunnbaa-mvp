@@ -114,8 +114,8 @@ export default function AdminVendorsPage() {
     onSuccess: (_, vars) => {
       invalidate();
       toast({
-        title: vars.approved ? tr("已核准並綁定商家", "Approved and linked") : tr("已拒絕申請", "Application rejected"),
-        description: vars.approved ? tr("對方重新整理或重新登入後就會看到廠商後台。", "They'll see the vendor portal after refreshing or signing in again.") : undefined,
+        title: vars.approved ? tr("已核准並綁定店家", "Approved and linked") : tr("已拒絕申請", "Application rejected"),
+        description: vars.approved ? tr("對方重新整理或重新登入後就會看到店家後台。", "They'll see the vendor portal after refreshing or signing in again.") : undefined,
       });
     },
     onError: (err: Error) => toast({ variant: "destructive", title: tr("操作失敗", "Action failed"), description: err.message }),
@@ -138,7 +138,7 @@ export default function AdminVendorsPage() {
   async function handleUnbind(vendor: Vendor) {
     const ok = await confirm({
       title: tr(`解除「${vendor.name}」的帳號綁定？`, `Unlink the account for ${vendor.name}?`),
-      description: tr("解除後原本的商家帳號就進不了廠商後台，也看不到撥款與校準報告。", "The vendor account will lose access to the vendor portal, payouts and calibration reports."),
+      description: tr("解除後原本的店家帳號就進不了店家後台，也看不到撥款與校準報告。", "The vendor account will lose access to the vendor portal, payouts and calibration reports."),
       confirmLabel: tr("解除綁定", "Unlink"),
       destructive: true,
     });
@@ -147,7 +147,7 @@ export default function AdminVendorsPage() {
 
   return (
     <AdminLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("待審核的廠商申請", "Pending vendor applications")} ({applications.length})</h1>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("待審核的店家申請", "Pending vendor applications")} ({applications.length})</h1>
       {loadingApps ? (
         <SkeletonBlocks count={2} height={96} className="space-y-3 mb-8" />
       ) : applications.length === 0 ? (
@@ -177,9 +177,9 @@ export default function AdminVendorsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NEW_VENDOR}>{tr(`建立新商家「${app.store_name}」`, `Create new vendor "${app.store_name}"`)}</SelectItem>
+                    <SelectItem value={NEW_VENDOR}>{tr(`建立新店家「${app.store_name}」`, `Create new vendor "${app.store_name}"`)}</SelectItem>
                     {unboundVendors.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>{tr("綁定到既有商家：", "Link to existing vendor: ")}{v.name}</SelectItem>
+                      <SelectItem key={v.id} value={v.id}>{tr("綁定到既有店家：", "Link to existing vendor: ")}{v.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -208,7 +208,7 @@ export default function AdminVendorsPage() {
         </div>
       )}
 
-      <h2 className="text-lg font-bold mb-3">{tr("所有商家", "All vendors")} ({vendors.length})</h2>
+      <h2 className="text-lg font-bold mb-3">{tr("所有店家", "All vendors")} ({vendors.length})</h2>
       {loadingVendors ? (
         <SkeletonBlocks count={3} height={72} className="space-y-3" />
       ) : (

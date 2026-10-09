@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { formatNT, formatPickupDate } from "@/lib/format";
 import { Users } from "lucide-react";
 import PickupQr, { type PickupQrInfo } from "@/components/PickupQr";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,7 @@ export function ProxyPickupView({ target }: { target: Target }) {
         <p className="text-sm">
           <strong>{itemName}</strong>
           {vendor && <>・{loc(vendor, "name")}</>}
-          {info?.pickup_date && <span className="block text-muted-foreground">{info.pickup_date} {info.pickup_window} {tr("取餐", "pickup")}</span>}
+          {info?.pickup_date && <span className="block text-muted-foreground">{formatPickupDate(info.pickup_date)} {info.pickup_window} {tr("取餐", "pickup")}</span>}
         </p>
       )}
       <p className="text-sm text-muted-foreground">{tr("到店把這個 QR Code 給店員掃描即可。", "Show this QR code to the staff.")}</p>

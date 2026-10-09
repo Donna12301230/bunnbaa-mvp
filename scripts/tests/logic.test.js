@@ -303,10 +303,17 @@ try { fin = req("finance.js").helpers; } catch (e) { fin = null; }
 test("V-FEE-01", "合作方案：不收月費，每份實付抽成 5%（逐份四捨五入）", () => {
   assert.equal(CFG.commissionRate, 0.05);
   assert.equal(CFG.maintenanceFee, undefined, "月費參數應已移除");
-  assert.equal(pricing.commissionOf([{ locked_price: 80 }, { locked_price: 90 }, { locked_price: 0 }], 0.05), 4 + 5);
-  assert.equal(pricing.commissionOf([{ locked_price: 110 }], 0.05), 6, "5.5 進位");
+  assert.equal(pricing.commissionOf([{ status: "fulfilled", locked_price: 80 }, { status: "charity", locked_price: 90 }, { status: "fulfilled", locked_price: 0 }], 0.05), 4 + 5);
+  assert.equal(pricing.commissionOf([{ status: "fulfilled", locked_price: 110 }], 0.05), 6, "5.5 進位");
   assert.equal(pricing.commissionOf([], 0.05), 0);
 });
+test("V-REV-07", "營收口徑＝撥款口徑：預付照實付（含未取餐）、取消換券算留下的款項、退成點數的不算", () => {
+  eq3(pricing.revenueOf({ status: "no_show", locked_price: 80 }), 80);
+  eq3(pricing.revenueOf({ status: "cancelled", cancel_reason: "customer", locked_price: 60, kept_amount: 60 }), 60);
+  eq3(pricing.revenueOf({ status: "cancelled", cancel_reason: "disaster", locked_price: 90, refunded_amount: 90 }), 0);
+  eq3(pricing.commissionOf([{ status: "cancelled", kept_amount: 60 }, { status: "cancelled", refunded_amount: 90, locked_price: 90 }], 0.05), 3);
+});
+function eq3(a, b) { assert.equal(a, b); }
 test("C-CXL-01", "取消期限：取餐時段開始前 48 小時；折價券＝原價（含加減項）30%，不超過實付", () => {
   const deadline = pricing.cancelDeadlineAt("2026-10-05", "11:00-11:30", CFG);
   assert.equal(deadline.toISOString(), new Date("2026-10-03T11:00:00+08:00").toISOString());

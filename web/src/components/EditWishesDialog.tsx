@@ -16,7 +16,7 @@ import type { ExtraSideChoice, Lock, MenuItem, RiceOption, SlotChoice, Vendor } 
 
 /**
  * 截單前修改（規格 §4.1）：取餐時段（同一天，計畫的每一天也在這裡個別改）、主菜、配菜、飯量、第四道。
- * 金額以下單時的早鳥折數重算：變便宜會退差額；變貴第一階段要取消後重訂（伺服器 updateLockChoices 擋）。
+ * 金額以下單時的早鳥折數重算：變便宜差額退成平台點數；變貴目前不能線上補差額（伺服器 updateLockChoices 擋）。
  */
 export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null; onClose: () => void }) {
   const { toast } = useToast();
@@ -77,7 +77,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
       if (bento) Object.assign(payload, { slots: choices.map((choice) => ({ choice })), rice, main_index: mainIndex, extra_side: extra });
       const res = await httpsCallable(functions, "updateLockChoices")(payload);
       const refunded = (res.data as { refunded?: number }).refunded || 0;
-      toast({ title: tr("已更新", "Updated"), description: refunded > 0 ? tr(`已退差額 NT$ ${refunded}`, `Refunded NT$ ${refunded}`) : undefined });
+      toast({ title: tr("已更新", "Updated"), description: refunded > 0 ? tr(`差額 ${refunded} 點已退到你的平台點數`, `${refunded} points were added to your balance`) : undefined });
       onClose();
     } catch (err) {
       toast({ title: tr("更新失敗", "Couldn't update"), description: (err as Error).message, variant: "destructive" });
@@ -95,7 +95,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
         <DialogHeader>
           <DialogTitle>{isPlanDay ? tr("修改這一天的取餐時段", "Change this day's pickup time") : tr("修改訂單", "Change order")}</DialogTitle>
           <DialogDescription>
-            {tr("截單前都可以改。變便宜會自動退差額；要補差額的改法請取消後重訂。", "You can change this until cutoff. If it gets cheaper we refund the difference; changes that cost more need a cancel and re-order.")}
+            {tr("截單前都可以改。變便宜的差額會退成平台點數；變貴目前還不能線上補差額。", "You can change this until cutoff. If it gets cheaper the difference comes back as points; changes that cost more aren't supported yet.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -120,7 +120,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
           <label className="block space-y-1">
             <span className="text-xs font-semibold text-muted-foreground">{tr("主菜", "Main")}</span>
             <select className="w-full h-10 rounded-md border border-input bg-background px-2 text-sm" value={mainIndex ?? 0} onChange={(e) => setMainIndex(Number(e.target.value))}>
-              {mains.map((m, i) => <option key={i} value={i}>{m.name}（NT$ {m.price}）</option>)}
+              {mains.map((m, i) => <option key={i} value={i}>{m.name}（NT${m.price}）</option>)}
             </select>
           </label>
         )}
@@ -186,8 +186,8 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
         {preview != null && lock && preview !== lock.locked_price && (
           <p className={cn("text-sm", preview > lock.locked_price ? "text-red-600" : "text-green-700")}>
             {preview > lock.locked_price
-              ? tr(`這樣要補 NT$ ${preview - lock.locked_price}，請取消後重訂`, `This costs NT$ ${preview - lock.locked_price} more — cancel and re-order instead`)
-              : tr(`新金額 NT$ ${preview}，會退差額 NT$ ${lock.locked_price - preview}`, `New price NT$ ${preview}; we'll refund NT$ ${lock.locked_price - preview}`)}
+              ? tr(`這樣要多 NT$${preview - lock.locked_price}，目前還不能線上補差額，請保留原本的選項`, `This costs NT$${preview - lock.locked_price} more, and topping up isn't supported yet — please keep your current choices`)
+              : tr(`新金額 NT$${preview}，差額 ${lock.locked_price - preview} 點會退到你的平台點數`, `New price NT$${preview}; ${lock.locked_price - preview} points come back to your balance`)}
           </p>
         )}
 

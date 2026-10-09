@@ -404,7 +404,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   await test("C-MY-23", "截單前改成變貴（白飯一碗半）被擋，資料不變", async () => {
     const { id } = await lock(uids.A, { discount_percent: 20, early_bird_amount: 20, adjust_amount: 0 });
     const r = expectCode(await A.call("updateLockChoices", { lock_id: id, rice: "add" }), "failed-precondition");
-    assert(/多 NT\$ 10/.test(r.message), r.message);
+    assert(/多 NT\$10/.test(r.message), r.message);
     const l = await get(`locks/${id}`);
     eq([l.locked_price, l.rice], [80, "normal"]);
   });

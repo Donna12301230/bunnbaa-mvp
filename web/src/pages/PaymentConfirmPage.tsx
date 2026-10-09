@@ -1,8 +1,9 @@
 import { tr, loc } from "@/lib/i18n";
+import { formatNT, formatPickupDate } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
 import { httpsCallable } from "@/lib/callable";
-import { arrayUnion, doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { CheckCircle2 } from "lucide-react";
 import { auth, db, functions } from "../lib/firebase";
@@ -53,7 +54,12 @@ export default function PaymentConfirmPage() {
         setStatus("done");
         try {
           const fcmToken = await registerForPickupReminders();
-          if (fcmToken) await setDoc(doc(db, "userTokens", user.uid), { tokens: arrayUnion(fcmToken) }, { merge: true });
+          if (fcmToken) {
+            // 規則限制最多 5 個 token（firestore.rules userTokens）：保留最新的 4 個再加這台，第 6 台裝置起才不會寫入失敗
+            const ref = doc(db, "userTokens", user.uid);
+            const prev = ((await getDoc(ref).catch(() => null))?.data()?.tokens as string[] | undefined) ?? [];
+            if (!prev.includes(fcmToken)) await setDoc(ref, { tokens: [...prev.slice(-4), fcmToken] }, { merge: true });
+          }
         } catch (err) {
           console.warn("Could not save push token:", err);
         }
@@ -90,7 +96,7 @@ export default function PaymentConfirmPage() {
                     <span className="font-heading text-lg font-semibold">{loc(l, "item_name")}</span>
                     <span className="font-heading text-lg font-semibold">NT${l.locked_price}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{l.pickup_date}・{l.pickup_window}・{tr("取餐號", "Code")} <strong className="text-foreground">{l.pickup_code}</strong></p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{formatPickupDate(l.pickup_date)}{tr("・", " · ")}{l.pickup_window}{tr("・", " · ")}{tr("取餐號", "Pickup no.")} <strong className="text-foreground">{l.pickup_code}</strong></p>
                   {(l.slots?.length ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {[

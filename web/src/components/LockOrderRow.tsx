@@ -1,4 +1,5 @@
 import { tr, loc } from "@/lib/i18n";
+import { formatNT, formatPickupDate } from "@/lib/format";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,14 +37,14 @@ export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; sh
     <div className="border border-border rounded-lg p-3 bg-white space-y-2">
       <div className="flex items-start gap-3">
         {/* 第一欄：核銷碼，店家掃一眼就能對 */}
-        <div className="shrink-0 min-w-[4.5rem] rounded-md bg-stone-100 px-1.5 py-1 text-center" title={tr("核銷碼：取餐號＋手機末三碼", "Pickup code + last 3 phone digits")}>
+        <div className="shrink-0 min-w-[4.5rem] rounded-md bg-stone-100 px-1.5 py-1 text-center" title={tr("取餐碼：取餐號＋手機末三碼", "Pickup code + last 3 phone digits")}>
           <p className="font-mono text-lg font-bold leading-tight tracking-wider">{pickupCode(lock)}</p>
           <p className="font-mono text-[11px] leading-tight text-muted-foreground">{lock.phone_last3 ? `${tr("末三碼", "tel")} ${lock.phone_last3}` : tr("取餐號", "code")}</p>
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-medium text-sm truncate">{loc(lock, "item_name")}</p>
           <p className="text-xs text-muted-foreground">
-            {showDate && <>{lock.pickup_date} · </>}{lock.pickup_window} · NT${lock.locked_price}
+            {showDate && <>{formatPickupDate(lock.pickup_date)} · </>}{lock.pickup_window} · {formatNT(lock.locked_price)}
           </p>
           {(lock.slots?.length ?? 0) > 0 && (
             <p className="text-xs text-muted-foreground">{[...lock.slots!.map(slotText), ...customOptionTexts(lock.custom_options)].join("／")}{riceLabel(lock.rice) ? `／${riceLabel(lock.rice)}` : ""}</p>

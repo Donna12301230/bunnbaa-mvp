@@ -13,9 +13,16 @@ import PickupQr from "@/components/PickupQr";
 import { currentPosition, decodeGeohash, distanceMeters, formatDistance, walkMinutes } from "@/lib/geo";
 import { todayStr } from "@/lib/pickupSlots";
 import { tr } from "@/lib/i18n";
+import { liveConfig } from "@/lib/platformConfig";
+import { policy } from "@/lib/policy";
 import type { CharityMeal, CharityReservation } from "@/types";
 
 const RANGES = [500, 1000, 2000, 3000];
+/** 愛心餐截止（時段結束後幾小時／分鐘），讀平台參數 */
+const closeHours = () => {
+  const m = liveConfig().charityCloseAfterMinutes;
+  return m % 60 === 0 ? tr(`${m / 60} 小時`, `${m / 60} hour${m === 60 ? "" : "s"}`) : tr(`${m} 分鐘`, `${m} min`);
+};
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 
 /**
@@ -96,14 +103,14 @@ export default function CharityMealsSection() {
     if (!requireLogin()) return;
     const ok = await confirm({
       title: tr("預約愛心餐", "Reserve a charity meal"),
-      description: tr("每人每天限 1 份，預約後 30 分鐘內到店出示 QR Code。逾時未到，這份會釋出，且 7 天內不能再預約愛心餐（不影響一般訂餐）。", "One per person per day. Arrive within 30 minutes and show the QR code. If you don't, it's released and you can't reserve charity meals for 7 days (regular orders aren't affected)."),
+      description: `${policy.charityReserve()}。`,
       confirmLabel: tr("我了解，預約", "I understand — reserve"),
     });
     if (!ok) return;
     setBusy(vendorId);
     try {
       await httpsCallable(functions, "reserveCharity")({ vendor_id: vendorId });
-      toast({ title: tr("已預約，請在 10 分鐘內到場出示 QR code", "Reserved — please arrive within 10 minutes") });
+      toast({ title: tr(`已預約，請在 ${liveConfig().charityReserveMinutes} 分鐘內到場出示 QR Code`, `Reserved — please arrive within ${liveConfig().charityReserveMinutes} minutes and show the QR code`) });
     } catch (err) {
       toast({ title: tr("預約失敗", "Couldn't reserve"), description: (err as Error).message, variant: "destructive" });
     } finally {
@@ -116,8 +123,8 @@ export default function CharityMealsSection() {
       <div className="rounded-[1.75rem] bg-accent border border-ink p-6 text-sm space-y-2">
         <p className="font-heading text-2xl font-semibold flex items-center gap-2"><HeartHandshake className="w-6 h-6 text-primary" aria-hidden="true" /> {tr("愛心餐", "Charity meals")}</p>
         <p className="text-xs leading-relaxed">
-          {tr("沒有被領取或訂購人主動捐出的便當，當天開放給需要的人。可以線上預約（手機驗證帳號、每人每天 1 份、預約後 10 分鐘內到場，逾時自動釋出給下一位、不停權），或直接到店現場領取（未被預約的份數先到先領、不需帳號）。取餐時段結束 2 小時後截止。",
-            "Meals not picked up, or donated by classmates, are open to anyone in need on the same day. Reserve online (phone-verified account, one per day, arrive within 30 min) or just walk in — unreserved meals are first come, first served. Closes 2 hours after the pickup window.")}
+          {tr(`沒有被領取或訂購人主動捐出的便當，當天開放給需要的人。可以線上預約（手機驗證帳號；${policy.charityReserve()}），或直接到店現場領取（未被預約的份數先到先領、不需帳號）。取餐時段結束 ${closeHours()} 後截止。`,
+            `Meals not picked up, or donated by classmates, are open to anyone in need on the same day. Reserve online (phone-verified account; ${policy.charityReserve()}) or just walk in — unreserved meals are first come, first served. Closes ${closeHours()} after the pickup window.`)}
         </p>
       </div>
 
@@ -142,7 +149,7 @@ export default function CharityMealsSection() {
       </div>
 
       {byVendor.length === 0 ? (
-        <EmptyState icon={<HeartHandshake size={32} />} title={tr("附近目前沒有愛心餐", "No charity meals nearby right now")} description={tr("通常在午餐取餐時段結束後 30 分鐘開放。", "They usually open 30 minutes after the lunch pickup window.")} />
+        <EmptyState icon={<HeartHandshake size={32} />} title={tr("附近目前沒有愛心餐", "No charity meals nearby right now")} description={tr(`通常在各餐期取餐時段結束後 ${liveConfig().charityConvertAfterMinutes} 分鐘開放。`, `They usually open ${liveConfig().charityConvertAfterMinutes} minutes after each meal's pickup window ends.`)} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {byVendor.map((g) => {

@@ -1,6 +1,6 @@
 import { tr } from "@/lib/i18n";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
-import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
+import { DEFAULT_PLATFORM_CONFIG, liveConfig } from "@/lib/platformConfig";
 import type { BentoCustomField, BentoMain, Component, ExtraSideChoice, Ingredient, LockExtraSide, LockSlot, MenuItem, RiceOption, SlotChoice } from "@/types";
 
 // 便當計價與配方換算（規格 §3、§4）。跟 functions/src/bento.js 同一套規則；
@@ -111,7 +111,7 @@ export function priceBreakdown(
 ) {
   const listPrice = itemListPrice(item, opts.mainIndex);
   const { lockedPrice: early, discountPercent } = applyEarlyBirdPrice(listPrice, pickupDate);
-  const adjust = adjustAmount(rice, choices, DEFAULT_PLATFORM_CONFIG, opts.extra) + customAmount(item, opts.customPicks);
+  const adjust = adjustAmount(rice, choices, liveConfig(), opts.extra) + customAmount(item, opts.customPicks);
   const subtotal = Math.max(0, early + adjust);
   const coupon = Math.min(couponDiscount, subtotal);
   return { listPrice, discountPercent, earlyBird: listPrice - early, adjust, subtotal, coupon, total: subtotal - coupon };
@@ -120,7 +120,7 @@ export function priceBreakdown(
 /** 訂單上第四道的文字 */
 export function extraSideText(extra: LockExtraSide | null | undefined): string | null {
   if (!extra) return null;
-  if (extra.mode === "addon") return tr(`加菜：${extra.resolved || extra.dish}（+10）`, `Add-on: ${extra.resolved || extra.dish} (+10)`);
+  if (extra.mode === "addon") return tr(`加菜：${extra.resolved || extra.dish}（+${liveConfig().addonSidePrice}）`, `Add-on: ${extra.resolved || extra.dish} (+${liveConfig().addonSidePrice})`);
   if (extra.used_for_slot != null) return tr(`備案：${extra.dish}（已遞補）`, `Backup: ${extra.dish} (used)`);
   return tr(`備案：${extra.dish}（前三道沒成立才遞補）`, `Backup: ${extra.dish} (used only if a wish fails)`);
 }

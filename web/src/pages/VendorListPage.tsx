@@ -35,8 +35,8 @@ export default function VendorListPage() {
   return (
     <CustomerLayout
       hero={
-        <PageHero eyebrow={tr("合作店家", "Partners")} title={tr("商家", "Vendors")} description={tr("選一家商家看看他們的預購品項。", "Pick a vendor to see what you can pre-order.")}>
-          <HeroSearch id="vendorSearch" label={tr("搜尋商家", "Search vendors")} value={search} onChange={setSearch} placeholder={tr("搜尋商家名稱或介紹", "Search by name or description")} />
+        <PageHero eyebrow={tr("合作店家", "Partners")} title={tr("店家", "Vendors")} description={tr("選一家店家看看他們的預購品項。", "Pick a vendor to see what you can pre-order.")}>
+          <HeroSearch id="vendorSearch" label={tr("搜尋店家", "Search vendors")} value={search} onChange={setSearch} placeholder={tr("搜尋店家名稱或介紹", "Search by name or description")} />
         </PageHero>
       }
     >
@@ -52,8 +52,8 @@ export default function VendorListPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<Store size={32} />}
-            title={search || area ? tr("找不到符合的商家", "No matching vendors") : tr("目前還沒有合作商家", "No partner vendors yet")}
-            description={search || area ? tr("換個關鍵字或地區試試看。", "Try a different keyword or area.") : tr("新商家上架後會出現在這裡。", "New vendors will show up here.")}
+            title={search || area ? tr("找不到符合的店家", "No matching vendors") : tr("目前還沒有合作店家", "No partner vendors yet")}
+            description={search || area ? tr("換個關鍵字或地區試試看。", "Try a different keyword or area.") : tr("新店家上架後會出現在這裡。", "New vendors will show up here.")}
           />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
@@ -72,7 +72,7 @@ export default function VendorListPage() {
                     </div>
                   )}
                   {vendor.verified && (
-                    <span className="absolute top-3 left-3 text-caption font-bold px-2.5 py-1 rounded-full bg-card/95 border border-ink">{tr("認證商家", "Verified")}</span>
+                    <span className="absolute top-3 left-3 text-caption font-bold px-2.5 py-1 rounded-full bg-card/95 border border-ink">{tr("認證店家", "Verified")}</span>
                   )}
                 </div>
                 <div className="flex items-start gap-3 mt-4">

@@ -77,7 +77,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
   const navItems: NavItem[] = isVendor
     ? [
         { tab: "plans", href: "/home", label: t("上架顯示", "Storefront"), icon: ClipboardList },
-        { tab: "portal", href: "/vendor-portal/dashboard", label: t("廠商後台", "Vendor portal"), icon: Store },
+        { tab: "portal", href: "/vendor-portal/dashboard", label: t("店家後台", "Vendor portal"), icon: Store },
       ]
     : [
         { tab: "plans", href: "/home", label: t("預購餐點", "Pre-order"), icon: ClipboardList },
@@ -225,7 +225,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                 )}
                 {isVendor && (
                   <DropdownMenuItem onClick={() => navigate("/vendor-portal/dashboard")}>
-                    <Store className="w-4 h-4 mr-2" /> {t("廠商後台", "Vendor portal")}
+                    <Store className="w-4 h-4 mr-2" /> {t("店家後台", "Vendor portal")}
                   </DropdownMenuItem>
                 )}
                 {isAdmin && (

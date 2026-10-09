@@ -11,7 +11,7 @@ const { onCall, HttpsError, assertAdminOrEmulator, assertAdminOrVendorOwner, t }
 const { generateVendorCalibrationReport, answerCalibrationScenario } = require("./vendorCalibration");
 const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./translate");
 const { loadPlatformConfig } = require("./config");
-const { commissionOf } = require("./pricing");
+const { commissionOf, revenueOf } = require("./pricing");
 
 // 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格1002.md）的功能拆在各模組：
 //   orders.js     下單計價、LINE Pay、截單判定許願、每日備料、QR 取餐、取消退款
@@ -163,10 +163,8 @@ exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request)
  * there's no merchant account to call it against.
  * ------------------------------------------------------------------ */
 
-/** 這筆訂單要撥給店家的金額（抽成前）：取消換券的單是留在店家的款項，其餘是實付金額 */
-function payableOf(lock) {
-  return lock.status === "cancelled" ? Number(lock.kept_amount) || 0 : Number(lock.locked_price) || 0;
-}
+/** 這筆訂單要撥給店家的金額（抽成前）：跟營收看板同一套（pricing.js revenueOf） */
+const payableOf = (lock) => revenueOf(lock);
 
 async function settleVendorPayout(vendorId) {
   // Reuses the same vendor_id index as buildVendorHistory/VendorRedeemPage
@@ -182,8 +180,8 @@ async function settleVendorPayout(vendorId) {
   const unsettled = snap.docs.filter((d) => {
     const data = d.data();
     if (data.payout_settled) return false;
-    // 愛心餐（未取餐轉入或主動捐出）照常計入店家營業額（§7.1）
-    if (["fulfilled", "resold_and_fulfilled", "charity"].includes(data.status)) return true;
+    // 愛心餐（未取餐轉入或主動捐出）照常計入店家營業額（§7.1）；舊制「未取餐」也是預付不退，2026-10-09 起一樣撥款
+    if (["fulfilled", "resold_and_fulfilled", "charity", "no_show"].includes(data.status)) return true;
     // 消費者取消只換折價券、不退現金（orders.js cancelForCoupon）：留下的款項也撥給店家，之後由店家兌現那張券
     return data.status === "cancelled" && payableOf(data) > 0;
   });
@@ -196,7 +194,7 @@ async function settleVendorPayout(vendorId) {
   const { commissionRate } = await loadPlatformConfig(db);
   const rate = Number(commissionRate) || 0;
   const gross = unsettled.reduce((sum, d) => sum + payableOf(d.data()), 0);
-  const commission = commissionOf(unsettled.map((d) => ({ locked_price: payableOf(d.data()) })), rate);
+  const commission = commissionOf(unsettled.map((d) => d.data()), rate);
   const amount = gross - commission;
   const lockIds = unsettled.map((d) => d.id);
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatNT, formatPickupDate } from "@/lib/format";
 import { Link, useParams } from "wouter";
 import { doc, getDoc } from "firebase/firestore";
 import { Gift } from "lucide-react";
@@ -60,7 +61,7 @@ export default function GiftClaimPage() {
             <span className="bb-receipt__check" aria-hidden="true"><Gift className="w-9 h-9" /></span>
             <h1 className="font-heading font-semibold text-[clamp(30px,5vw,44px)] leading-tight">{tr("有同學送你一份便當", "A classmate gifted you a meal")}</h1>
             <p className="font-heading text-2xl font-semibold">{loc(lock, "item_name")}</p>
-            <p className="text-sm text-muted-foreground">{lock.pickup_date}・{lock.pickup_window}</p>
+            <p className="text-sm text-muted-foreground">{formatPickupDate(lock.pickup_date)} {lock.pickup_window}</p>
             {(lock.slots?.length ?? 0) > 0 && (
               <ul className="text-xs text-muted-foreground">{lock.slots!.map((s, i) => <li key={i}>• {slotText(s)}</li>)}</ul>
             )}

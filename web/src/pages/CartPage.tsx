@@ -22,6 +22,7 @@ import { customFields, itemMains, portionLabel, priceBreakdown, priceDeltaText, 
 import { couponTitle } from "@/lib/rewards";
 import { tr, loc } from "@/lib/i18n";
 import UsePointsToggle, { usePointsPreview } from "@/components/UsePointsToggle";
+import WaiverText from "@/components/WaiverText";
 import { formatNT } from "@/lib/format";
 
 // 購物車（規格 §4）：每一行是一份便當，各自有取餐日（到下週五）、時段、配菜與加減飯；
@@ -126,7 +127,7 @@ export default function CartPage() {
             {vendor && (
               <p className="text-sm text-muted-foreground">
                 {tr("來自 ", "From ")}<span className="font-semibold text-foreground">{loc(vendor, "name")}</span>
-                {tr("・一次只能跟一家商家預購", " · one vendor per checkout")}
+                {tr("・一次只能跟一家店家預購", " · one vendor per checkout")}
               </p>
             )}
 
@@ -242,12 +243,7 @@ export default function CartPage() {
               </div>
               <label className="flex items-start gap-2 p-3 rounded-2xl bg-card border border-border cursor-pointer">
                 <Checkbox checked={ack} onCheckedChange={() => setAck((v) => !v)} className="mt-0.5 shrink-0" />
-                <span className="text-caption leading-relaxed text-muted-foreground">
-                  {tr(
-                    `我了解：取餐前一天 ${vendorCutoffTime(vendor)} 截單。取餐 48 小時前可以取消，但不退現金，改發原價 30% 的折價券（30 天內有效）；之後不能取消，但可以轉讓、贈送或捐為愛心餐。取餐時段結束 30 分鐘仍未取餐，將轉為愛心餐、不退款（照常發抽獎券）。停班停課當日訂單自動全額退款；天災期間店家可等值替換配菜。`,
-                    `I understand: orders close at ${vendorCutoffTime(vendor)} the day before pickup. Up to 48 hours before pickup you can cancel, but not for cash — you get a coupon worth 30% of the list price, valid for 30 days. After that you can't cancel, but you can transfer, gift or donate the meal. Meals not picked up 30 min after the window become charity meals (no refund; reward tickets still issued). Orders are refunded automatically on work-suspension days; during disasters the vendor may substitute an equivalent side.`
-                  )}
-                </span>
+                <span className="text-caption leading-relaxed text-muted-foreground"><WaiverText vendor={vendor} /></span>
               </label>
               {blocked && <p className="text-xs text-red-600">{tr("有餐點已過截單或不能預訂，請先移除。", "Some meals are past cutoff — please remove them first.")}</p>}
               <Button className="w-full h-13 min-h-[52px] rounded-full text-base" onClick={handleCheckout} disabled={checkingOut || !ack || !!blocked}>

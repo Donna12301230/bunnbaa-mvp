@@ -1,5 +1,5 @@
 import { tr, useI18n } from "@/lib/i18n";
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Switch, Route, Link, Router, Redirect, useLocation } from "wouter";
@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { ConfirmProvider } from "@/components/ConfirmDialog";
 import { SiteThemeRoot } from "@/lib/siteLook";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlatformConfig } from "@/lib/platformConfig";
 
 const VendorRedeemPage = lazy(() => import("./pages/VendorRedeemPage"));
 const PaymentConfirmPage = lazy(() => import("./pages/PaymentConfirmPage"));
@@ -137,6 +138,19 @@ function useSyncUserLang(lang: "zh" | "en") {
   }, [user?.id, user?.lang, lang]);
 }
 
+// 平台參數（截單時間、營業日、可訂天數、加飯價…）先讀進來再畫頁面，前端算的日期與金額才會跟伺服器一致
+// （lib/platformConfig.ts liveConfig）。最多等 1.5 秒，讀不到就用預設值照常顯示。
+function PlatformConfigGate({ children }: { children: React.ReactNode }) {
+  const { isPlaceholderData } = usePlatformConfig();
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setTimedOut(true), 1500);
+    return () => clearTimeout(id);
+  }, []);
+  if (isPlaceholderData && !timedOut) return <RouteFallback />;
+  return <>{children}</>;
+}
+
 // 會員專用頁（2026-10-09）：廠商帳號只用「上架顯示」與廠商後台，打開這些頁直接導去廠商後台
 function MemberOnly({ children }: { children: React.ReactNode }) {
   const { isVendor } = useAuth();
@@ -161,6 +175,7 @@ export default function App() {
       {/* 設計系統 tokens 限定在 .bb-theme 之內；包住全站，頁面才能直接使用 @/components/ds */}
       <SiteThemeRoot>
       <ConfirmProvider>
+      <PlatformConfigGate>
       <Router hook={useHashLocation} key={lang}>
         <ScrollToTopOnRouteChange />
         <Suspense fallback={<RouteFallback />}>
@@ -341,6 +356,7 @@ export default function App() {
         </Switch>
         </Suspense>
       </Router>
+      </PlatformConfigGate>
       </ConfirmProvider>
       <Toaster />
       </SiteThemeRoot>

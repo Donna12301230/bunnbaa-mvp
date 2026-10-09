@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { liveConfig } from "@/lib/platformConfig";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs } from "firebase/firestore";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -94,7 +95,7 @@ export default function OpenWishDialog({ open, onOpenChange, vendorId, vendorNam
             </button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">{tr("許願不保證供應；近 30 天達 20 人時會通知店家參考。", "Wishes don't guarantee the dish; the vendor is notified once 20 people wish within 30 days.")}</p>
+        <p className="text-xs text-muted-foreground">{tr(`許願不保證供應；近 ${liveConfig().openWishWindowDays} 天達 ${liveConfig().openWishThreshold} 人時會通知店家參考。`, `Wishes don't guarantee the dish; the vendor is notified once ${liveConfig().openWishThreshold} people wish within ${liveConfig().openWishWindowDays} days.`)}</p>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>{tr("取消", "Cancel")}</Button>
           <Button onClick={submit} disabled={busy || (!picked && !text.trim())}>{busy ? tr("送出中…", "Sending…") : tr("送出許願", "Send wish")}</Button>

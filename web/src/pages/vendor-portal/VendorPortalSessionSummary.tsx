@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { useVendorLocks } from "@/hooks/useVendorLocks";
-import { DONE_STATUSES, PENDING_STATUSES } from "@/lib/lockOutcome";
+import { DONE_STATUSES, PENDING_STATUSES, revenueOf } from "@/lib/lockOutcome";
 import { slotLabel } from "@/lib/pickupSlots";
 
 // 時段明細：2026-09-28 改用真實 locks。網址參數是「取餐日__時段」（見
@@ -39,7 +39,7 @@ export default function VendorPortalSessionSummary() {
   const active = slotLocks.filter((l) => l.status !== "no_show");
   const pending = slotLocks.filter((l) => PENDING_STATUSES.has(l.status)).length;
   const done = slotLocks.filter((l) => DONE_STATUSES.has(l.status)).length;
-  const revenue = slotLocks.reduce((sum, l) => sum + (l.locked_price || 0), 0);
+  const revenue = slotLocks.reduce((sum, l) => sum + revenueOf(l), 0); // 跟撥款同一口徑（退成點數的不算）
 
   // 備料彙總：計畫型品名「A方案・第1/5天」合併成同一道
   const items = useMemo(() => {

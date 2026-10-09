@@ -1,10 +1,14 @@
 import { tr } from "@/lib/i18n";
+import { liveConfig } from "@/lib/platformConfig";
+import { policy } from "@/lib/policy";
 import { BellRing, CalendarClock, HeartHandshake, Recycle, ShieldCheck, Sparkles } from "lucide-react";
 import CustomerLayout from "@/components/CustomerLayout";
 import PageHero from "@/components/PageHero";
 import Reveal from "@/components/Reveal";
 
-const VALUES = [
+// 寫成函式：規則數字讀平台參數（lib/policy.ts），切換語言時也會重新產生
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const values = () => [
   {
     icon: Recycle,
     title: tr("減少剩食", "Less food waste"),
@@ -17,24 +21,24 @@ const VALUES = [
     icon: CalendarClock,
     title: tr("越早訂越划算", "Book early, save more"),
     body: tr(
-      "最晚前一天 20:00 預訂，最遠可訂 30 天後；明天 95 折、提前 2 天以上 8 折；店家依確定訂單備料，不浪費。",
-      "Order by 20:00 the day before, up to 30 days ahead — 5% off tomorrow, 20% off 2+ days ahead. Vendors prep only what's ordered."
+      `${policy.cutoff()}，${policy.bookingRange()}；${policy.earlyBird()}；店家依確定訂單備料，不浪費。`,
+      `${cap(policy.cutoff())}; ${policy.bookingRange()} — ${policy.earlyBird()}. Vendors prep only what's ordered.`
     ),
   },
   {
     icon: ShieldCheck,
     title: tr("履約有保障", "Guaranteed fulfilment"),
     body: tr(
-      "取餐 48 小時前可以取消，換成原價 30% 的折價券；去不了也可以轉讓或捐為愛心餐。颱風停班停課時，當天訂單自動取消並全額退款；每累計 100 元一張抽獎券，人人有獎。",
-      "Cancel up to 48 hours before pickup for a coupon worth 30% of the price, or transfer or donate if you can't make it. On typhoon or work-suspension days, orders are cancelled and fully refunded automatically; every NT$100 you pay earns a reward ticket and everyone wins."
+      `${policy.cancelShort()}；去不了也可以轉讓、請朋友代領或捐為愛心餐。停班停課時當天訂單自動取消、全額退成平台點數；每累計 ${liveConfig().ticketUnit} 元一張抽獎券。`,
+      `${cap(policy.cancelShort())}, or transfer, send a friend, or donate if you can't make it. On work-suspension days orders are cancelled and fully refunded as points; every NT$${liveConfig().ticketUnit} you pay earns a draw ticket.`
     ),
   },
   {
     icon: BellRing,
     title: tr("準時提醒取餐", "Pickup reminders"),
     body: tr(
-      "取餐時段開始前推播通知，排隊時間留給自己；結束前 30 分鐘還沒取，會再提醒一次，30 分鐘後仍未取餐就轉給需要的人，不會白白浪費。",
-      "Get a push notification before your pickup window starts — no more queuing. We'll remind you again 30 minutes before it ends, and if it's still unclaimed 30 minutes after, it goes to someone who needs it."
+      `取餐時段結束前 30 分鐘還沒取，會推播提醒你；結束 ${liveConfig().charityConvertAfterMinutes} 分鐘後仍未取餐就轉給需要的人，不會白白浪費。`,
+      `If you haven't picked up 30 minutes before your window ends, we'll send a reminder; ${liveConfig().charityConvertAfterMinutes} minutes after it ends, an unclaimed meal goes to someone who needs it.`
     ),
   },
 ];
@@ -81,7 +85,7 @@ export default function AboutPage() {
         <section>
           <Reveal><h2 className="font-heading text-3xl md:text-5xl font-semibold mb-10">{tr("我們在意的事", "What we care about")}</h2></Reveal>
           <ol className="grid gap-x-12 md:grid-cols-2 border-t border-ink">
-            {VALUES.map(({ icon: Icon, title, body }, i) => (
+            {values().map(({ icon: Icon, title, body }, i) => (
               <li key={title} className="border-b border-ink">
                 <Reveal delay={i * 90} className="flex gap-5 py-8 h-full">
                   <span className="font-heading italic text-primary text-lg w-8 shrink-0" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>

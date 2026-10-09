@@ -145,7 +145,7 @@ export default function VendorPortalMenu() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!myVendor) throw new Error(tr("這個帳號還沒綁定商家，請聯絡平台", "This account isn't linked to a vendor yet. Please contact the platform"));
+      if (!myVendor) throw new Error(tr("這個帳號還沒綁定店家，請聯絡平台", "This account isn't linked to a vendor yet. Please contact the platform"));
       if (bento.mealPeriods.length === 0) throw new Error(tr("請至少勾選一個供應餐期", "Pick at least one meal period"));
       const comps = Object.fromEntries((catalog?.components ?? []).map((c) => [c.id, c]));
       const withPortion = (componentId: string | null | undefined, name: string) =>
@@ -227,7 +227,7 @@ export default function VendorPortalMenu() {
     },
     onError: (err: any) => {
       const description = err?.code === "permission-denied"
-        ? tr("帳號尚未綁定商家權限，請聯絡管理員", "This account doesn't have vendor access yet. Please contact an admin")
+        ? tr("帳號尚未綁定店家權限，請聯絡管理員", "This account doesn't have vendor access yet. Please contact an admin")
         : err.message;
       toast({ variant: "destructive", title: tr("儲存失敗", "Couldn't save"), description });
     },
@@ -243,7 +243,7 @@ export default function VendorPortalMenu() {
     },
     onError: (err: any) => {
       const description = err?.code === "permission-denied"
-        ? tr("帳號尚未綁定商家權限，請聯絡管理員", "This account doesn't have vendor access yet. Please contact an admin")
+        ? tr("帳號尚未綁定店家權限，請聯絡管理員", "This account doesn't have vendor access yet. Please contact an admin")
         : err.message;
       toast({ variant: "destructive", title: tr("刪除失敗", "Couldn't delete"), description });
     },
@@ -409,7 +409,7 @@ export default function VendorPortalMenu() {
                       {d.dietary_tags.map((tag) => <Badge key={tag} variant="outline" className="text-xs text-green-700 border-green-200">{tr(tag, tagEn(tag))}</Badge>)}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {d.price ? `NT$ ${d.price}` : tr("價格未讀到", "No price found")}
+                      {d.price ? `NT$${d.price}` : tr("價格未讀到", "No price found")}
                       {d.allergens.length > 0 && <span className="text-red-500">{tr("・可能含：", " · May contain: ")}{d.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</span>}
                     </div>
                   </div>
@@ -459,7 +459,7 @@ export default function VendorPortalMenu() {
                               <Badge variant="outline" className="text-xs text-orange-700 border-orange-300"><Sparkles className="w-3 h-3 mr-0.5" />{tr("AI 草稿", "AI draft")}</Badge>
                             )}
                           </div>
-                          <div className="text-orange-600 font-semibold text-sm">NT$ {item.price}{(item.mains?.length ?? 0) > 1 ? tr(" 起", "+") : ""}</div>
+                          <div className="text-orange-600 font-semibold text-sm">NT${item.price}{(item.mains?.length ?? 0) > 1 ? tr(" 起", "+") : ""}</div>
                           {(() => {
                             if (!catalog) return null;
                             const targets = recipeTargets(item, catalog);
@@ -640,7 +640,7 @@ export default function VendorPortalMenu() {
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending || !form.name || (bento.itemType !== "bento" && !form.price)}
             >
-              {saveMutation.isPending ? tr("儲存中...", "Saving...") : tr("儲存", "Save")}
+              {saveMutation.isPending ? tr("儲存中…", "Saving…") : tr("儲存", "Save")}
             </Button>
           </DialogFooter>
         </DialogContent>

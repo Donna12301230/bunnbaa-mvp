@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatNT, formatPickupDate } from "@/lib/format";
 import { collection, doc, limit, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "@/lib/callable";
 import { onAuthStateChanged } from "firebase/auth";
@@ -175,7 +176,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
   return (
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground max-w-2xl">{tr("安全轉讓已鎖定的餐點，截單後也能轉；$0 元與逾時沒人接手的餐點會移到「附近愛心餐」免費領取。", "Pass locked meals between classmates, even after cutoff. $0 meals and ones nobody took in time move to Charity meals nearby, free to claim.")}</p>
+          <p className="text-sm text-muted-foreground max-w-2xl">{tr("安全轉讓已鎖定的餐點，截單後也能轉；$0 與逾時沒人接手的餐點會移到「附近愛心餐」免費領取。", "Pass locked meals between classmates, even after cutoff. $0 meals and ones nobody took in time move to Charity meals nearby, free to claim.")}</p>
           <input
             type="search"
             value={search}
@@ -232,12 +233,12 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
                       <div className="flex flex-col gap-2.5 p-5 flex-1">
                         <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
+                          <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{formatPickupDate(item.pickup_date)} · {item.pickup_window}
                         </div>
                         <div className="flex items-center justify-between mt-auto pt-1.5">
                           <span className="flex flex-col leading-tight">
                             <span className="text-micro text-muted-foreground">{tr("接手價", "Price")}</span>
-                            <span className="font-heading text-2xl font-semibold">${resalePrice(item)}</span>
+                            <span className="font-heading text-2xl font-semibold">NT${resalePrice(item)}</span>
                           </span>
                           <Button
                             size="sm"
@@ -293,12 +294,12 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
                     <div className="flex flex-col gap-2.5 p-5 flex-1">
                       <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
+                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{formatPickupDate(item.pickup_date)} · {item.pickup_window}
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-1.5">
                         <span className="flex flex-col leading-tight">
-                          <span className="font-heading text-2xl font-semibold">${resalePrice(item)}</span>
-                          <span className="text-micro text-muted-foreground">{tr(`有人接手後退你 NT$${refundOnTakeover(item)}`, `NT$${refundOnTakeover(item)} back to you once taken`)}</span>
+                          <span className="font-heading text-2xl font-semibold">NT${resalePrice(item)}</span>
+                          <span className="text-micro text-muted-foreground">{tr(`有人接手後退你 ${refundOnTakeover(item)} 點`, `${refundOnTakeover(item)} points back to you once taken`)}</span>
                         </span>
                         <Button
                           size="sm"
@@ -340,7 +341,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
                     <div className="flex flex-col gap-2.5 p-5 flex-1">
                       <h3 className="font-heading text-xl font-semibold leading-snug">{loc(item, "item_name")}</h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{item.pickup_date} · {item.pickup_window}
+                        <MapPin className="w-3.5 h-3.5" /> {vendorName(item.vendor_id) ? `${vendorName(item.vendor_id)} · ` : ""}{formatPickupDate(item.pickup_date)} · {item.pickup_window}
                       </div>
                     </div>
                   </article>

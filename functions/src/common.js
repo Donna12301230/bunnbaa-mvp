@@ -78,7 +78,9 @@ async function notifyUser(uid, { title, body, link = null, kind = "general" }) {
     const tokenSnap = await db().collection("userTokens").doc(uid).get();
     const tokens = tokenSnap.exists ? tokenSnap.data().tokens || [] : [];
     for (const token of tokens.slice(-3)) {
-      await admin.messaging().send({ token, notification: { title, body } }).catch((err) => logger.debug("push failed", err.message));
+      // data-only：由 service worker 顯示並處理點擊（打開 link 那一頁）；用 notification 欄位會被 SDK 自動再顯示一次、點了也不會開頁
+      await admin.messaging().send({ token, data: { title: String(title || ""), body: String(body || ""), link: String(link || "") } })
+        .catch((err) => logger.debug("push failed", err.message));
     }
   } catch (err) {
     logger.warn(`notifyUser ${uid} failed`, err);

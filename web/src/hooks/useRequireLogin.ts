@@ -7,8 +7,8 @@ import { rememberReturnPath } from "@/lib/returnPath";
 /** 廠商帳號只用來看上架顯示與廠商後台（2026-10-09），會員功能（下單、轉讓、收藏、愛心餐…）一律擋下 */
 export function vendorBlockedToast() {
   toast({
-    title: tr("廠商帳號不能使用會員功能", "Vendor accounts can't use member features"),
-    description: tr("廠商帳號只能查看上架顯示與廠商後台；要訂餐請改用一般會員帳號。", "Vendor accounts are for checking your listings and the vendor portal. Use a member account to order."),
+    title: tr("店家帳號不能使用會員功能", "Vendor accounts can't use member features"),
+    description: tr("店家帳號只能查看上架顯示與店家後台；要訂餐請改用一般會員帳號。", "Vendor accounts are for checking your listings and the vendor portal. Use a member account to order."),
   });
 }
 

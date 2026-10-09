@@ -1,4 +1,5 @@
 import { tr } from "@/lib/i18n";
+import { lockStatus } from "@/lib/lockOutcome";
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -11,19 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClipboardList } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { usePrompt } from "@/components/ConfirmDialog";
+import { httpsCallable } from "@/lib/callable";
+import { functions } from "@/lib/firebase";
 
-// 用函式包起來，每次 render 依目前語言組標籤
-const statusLabels = (): Record<LockStatus, string> => ({
-  locked: tr("鎖定中", "Locked"),
-  for_resale: tr("轉賣中", "For resale"),
-  for_gift: tr("贈送中", "Being gifted"),
-  resold_and_fulfilled: tr("已轉賣完成取餐", "Picked up by new owner"),
-  fulfilled: tr("已完成取餐", "Picked up"),
-  no_show: tr("未取餐（舊制）", "No-show (legacy)"),
-  charity: tr("已轉愛心餐", "Charity meal"),
-  cancelling: tr("退款中", "Refunding"),
-  cancelled: tr("已取消", "Cancelled"),
-});
+// 狀態文字：全站共用 lib/lockOutcome.ts，管理頁用比較精確的說法（例：未取餐（舊制））
+const ALL_STATUSES: LockStatus[] = ["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "no_show", "charity", "cancelling", "cancelled"];
+const statusLabels = () => Object.fromEntries(ALL_STATUSES.map((st) => [st, lockStatus(st, true).label])) as Record<LockStatus, string>;
 
 /**
  * Real Firestore data (the `/lock` legacy-ui pre-order flow's `locks`
@@ -38,6 +33,7 @@ function LocksContent() {
   const [statusFilter, setStatusFilter] = useState<LockStatus | "all">("all");
   const [vendorFilter, setVendorFilter] = useState<string>("all");
   const [actingId, setActingId] = useState<string | null>(null);
+  const prompt = usePrompt();
 
   useEffect(() => {
     const q = query(collection(db, "locks"), orderBy("created_at", "desc"), limit(300));
@@ -66,10 +62,37 @@ function LocksContent() {
     [locks, statusFilter, vendorFilter]
   );
 
+  /** 店家未如期出餐（或其他平台確認的狀況）：全額退成平台點數給付款人（functions/src/wallet.js refundLockAsPoints） */
+  async function refundAsPoints(lock: Lock) {
+    const note = await prompt({
+      title: tr(`「${lock.item_name}」全額退成點數？`, `Refund ${lock.item_name} in full as points?`),
+      description: tr(`NT$${lock.paid_amount ?? lock.locked_price} 會退成平台點數給付款人，訂單改為已取消、不撥款給店家。確認店家確實沒有出餐再按。`, `NT$${lock.paid_amount ?? lock.locked_price} goes back to the payer as points; the order is cancelled and not paid out to the vendor.`),
+      inputLabel: tr("原因（例：店家當天沒開）", "Reason (e.g. the vendor was closed)"),
+      confirmLabel: tr("全額退成點數", "Refund as points"),
+      destructive: true,
+    });
+    if (note === null) return;
+    setActingId(lock.id);
+    try {
+      const res = await httpsCallable<{ lock_id: string; note: string }, { refunded_points: number }>(functions, "refundLockAsPoints")({ lock_id: lock.id, note });
+      toast({ title: tr(`已退 ${res.data.refunded_points} 點給付款人`, `${res.data.refunded_points} points refunded to the payer`) });
+    } catch (err) {
+      toast({ variant: "destructive", title: tr("退款失敗", "Refund failed"), description: (err as Error).message });
+    } finally {
+      setActingId(null);
+    }
+  }
+
   async function overrideStatus(lock: Lock, status: LockStatus) {
     let no_show_note: string | undefined;
     if (status === "no_show") {
-      no_show_note = window.prompt(tr("未取餐備註（給校準報告分析用，可留空）", "No-show note (for the calibration report, optional)")) ?? undefined;
+      const note = await prompt({
+        title: tr("標記未取餐", "Mark as no-show"),
+        inputLabel: tr("未取餐備註（給校準報告分析用，可留空）", "No-show note (for the calibration report, optional)"),
+        confirmLabel: tr("標記未取餐", "Mark no-show"),
+      });
+      if (note === null) return;
+      no_show_note = note.trim() || undefined;
     }
     setActingId(lock.id);
     try {
@@ -111,9 +134,9 @@ function LocksContent() {
           </SelectContent>
         </Select>
         <Select value={vendorFilter} onValueChange={setVendorFilter}>
-          <SelectTrigger className="sm:w-48" aria-label={tr("篩選商家", "Filter by vendor")}><SelectValue /></SelectTrigger>
+          <SelectTrigger className="sm:w-48" aria-label={tr("篩選店家", "Filter by vendor")}><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{tr("全部商家", "All vendors")}</SelectItem>
+            <SelectItem value="all">{tr("全部店家", "All vendors")}</SelectItem>
             {Object.values(vendors).map((v) => (
               <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
             ))}
@@ -138,7 +161,7 @@ function LocksContent() {
                   </p>
                   <p className="text-xs text-muted-foreground">#{lock.id.slice(-8).toUpperCase()}</p>
                 </div>
-                <Badge className="bg-orange-100 text-orange-800 border-0 shrink-0">
+                <Badge className={`${lockStatus(lock.status, true).className} border-0 shrink-0`}>
                   {statusLabels()[lock.status]}
                 </Badge>
               </div>
@@ -153,7 +176,7 @@ function LocksContent() {
                 {lock.status !== "resold_and_fulfilled" && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
                     onClick={() => overrideStatus(lock, "resold_and_fulfilled")}>
-                    {tr("標記轉賣完成取餐", "Mark picked up by new owner")}
+                    {tr("標記受讓人已取餐", "Mark picked up by new owner")}
                   </Button>
                 )}
                 {lock.status !== "no_show" && (
@@ -162,10 +185,16 @@ function LocksContent() {
                     {tr("標記未取餐", "Mark no-show")}
                   </Button>
                 )}
-                {lock.status !== "locked" && (
+                {lock.status !== "locked" && lock.status !== "cancelled" && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={actingId === lock.id}
                     onClick={() => overrideStatus(lock, "locked")}>
-                    {tr("退回鎖定中", "Revert to locked")}
+                    {tr("退回已鎖定", "Revert to locked")}
+                  </Button>
+                )}
+                {lock.status !== "cancelled" && (
+                  <Button size="sm" variant="outline" className="h-7 text-xs text-danger-text border-danger/40" disabled={actingId === lock.id}
+                    onClick={() => refundAsPoints(lock)}>
+                    {tr("店家未出餐：全額退點數", "Vendor didn't serve: refund as points")}
                   </Button>
                 )}
               </div>

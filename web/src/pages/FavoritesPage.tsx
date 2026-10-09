@@ -129,7 +129,7 @@ export default function FavoritesPage() {
                             {discountPercent > 0 && <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-[#f29e0c] text-[#2b180d]">{discountText(discountPercent)}</span>}
                           </span>
                           <span className="block mt-2 text-sm font-semibold truncate">{loc(item, "name")}</span>
-                          <span className="font-heading text-lg font-semibold">${lockedPrice}</span>
+                          <span className="font-heading text-lg font-semibold">NT${lockedPrice}</span>
                         </button>
                       </li>
                     );
@@ -140,7 +140,7 @@ export default function FavoritesPage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {plans.map((plan) => (
                     <Link key={plan.id} href="/plans" className="text-xs font-semibold px-3 py-1.5 rounded-full border border-ink bg-accent hover:bg-secondary">
-                      {loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}・NT$ {plan.price_per_meal}{t(" / 餐", " / meal")}
+                      {loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}・NT${plan.price_per_meal}{t(" / 餐", " / meal")}
                     </Link>
                   ))}
                 </div>

@@ -49,7 +49,7 @@ function PayoutsContent() {
       </Card>
 
       {payouts.length === 0 ? (
-        <EmptyState icon={<Wallet size={32} />} title={tr("尚無撥款紀錄", "No payouts yet")} description={tr("商家完成取餐核銷後，撥款會出現在這裡。", "Payouts appear here after vendors redeem pickups.")} />
+        <EmptyState icon={<Wallet size={32} />} title={tr("尚無撥款紀錄", "No payouts yet")} description={tr("店家完成取餐核銷後，撥款會出現在這裡。", "Payouts appear here after vendors redeem pickups.")} />
       ) : (
         <div className="space-y-3">
           {payouts.map((p) => (

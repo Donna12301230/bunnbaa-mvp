@@ -69,6 +69,14 @@ export const PLATFORM_CONFIG_FIELDS: { key: ScalarKey; label: string; unit?: str
   { key: "commissionRate", label: "平台抽成比例（每份餐點實付金額的）" },
 ];
 
+// 目前生效的平台參數（2026-10-09）：App 啟動時讀一次 platformConfig/global 存在這裡，
+// 截單、營業日、可訂天數、加飯價等純函式（pickupSlots.ts、bento.ts）用 liveConfig() 取值，
+// 管理員在後台改了參數，前端畫面就會跟伺服器一致。讀到之前用預設值。
+let live: PlatformConfig = DEFAULT_PLATFORM_CONFIG;
+export function liveConfig(): PlatformConfig {
+  return live;
+}
+
 export function usePlatformConfig() {
   return useQuery({
     queryKey: ["platformConfig"],
@@ -79,7 +87,8 @@ export function usePlatformConfig() {
       for (const key of Object.keys(DEFAULT_PLATFORM_CONFIG)) {
         if (data[key] !== undefined && data[key] !== null) merged[key] = data[key];
       }
-      return merged as PlatformConfig;
+      live = merged as PlatformConfig;
+      return live;
     },
     staleTime: 30 * 60 * 1000,
     placeholderData: DEFAULT_PLATFORM_CONFIG,

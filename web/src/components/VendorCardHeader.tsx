@@ -20,7 +20,7 @@ export default function VendorCardHeader({ vendor, subtitle, reward }: { vendor:
           <h3 className="font-heading text-xl font-semibold">{name}</h3>
           {vendor.verified && (
             <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-ink">
-              <BadgeCheck className="w-3 h-3" /> {t("認證商家", "Verified")}
+              <BadgeCheck className="w-3 h-3" /> {t("認證店家", "Verified")}
             </span>
           )}
           {vendor.reliability_tone === "stable" && (

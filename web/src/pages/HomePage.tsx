@@ -14,6 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import UsePointsToggle from "@/components/UsePointsToggle";
+import WaiverText from "@/components/WaiverText";
+import { policy } from "@/lib/policy";
+import { liveConfig } from "@/lib/platformConfig";
 import { useWallet } from "@/hooks/useWallet";
 import { formatNT } from "@/lib/format";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
@@ -59,18 +62,6 @@ const SORT_OPTIONS = [
   { id: "rating", label: "評分高到低", labelEn: "Rating: high to low" },
 ] as const;
 type SortId = (typeof SORT_OPTIONS)[number]["id"];
-
-// 消保法聲明（單點、加入計畫共用）
-function WaiverText() {
-  const { t } = useI18n();
-  return (
-    <>
-      {t("我了解本商品為現做餐點，依消保法通訊交易解除權合理例外情事適用準則，", "I understand these are freshly made meals. Under Taiwan's Consumer Protection Act exceptions for distance sales, ")}
-      <strong className="text-foreground">{t(`取餐前一天 ${vendorCutoffTime(null)} 截單；取餐 48 小時前可取消並換成原價 30% 的折價券（不退現金），不適用 7 天猶豫期`, `orders close at ${vendorCutoffTime(null)} the day before; up to 48 hours before pickup you can cancel for a coupon worth 30% of the list price (no cash refund), and the 7-day cooling-off period doesn't apply`)}</strong>
-      {t("（可轉讓、贈送或捐為愛心餐；停班停課自動全額退款，天災期間店家可等值替換配菜）", " (you can still transfer, gift or donate it; work-suspension days are refunded automatically, and vendors may substitute an equivalent side during disasters)")}
-    </>
-  );
-}
 
 export default function HomePage() {
   const { toast } = useToast();
@@ -254,8 +245,8 @@ export default function HomePage() {
     }
     if (cartVendorId && cartVendorId !== item.vendor_id) {
       toast({
-        title: t("購物車裡有別家商家的品項", "Your cart has items from another vendor"),
-        description: t("一次只能跟一家商家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
+        title: t("購物車裡有別家店家的品項", "Your cart has items from another vendor"),
+        description: t("一次只能跟一家店家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
         variant: "destructive",
       });
       return;
@@ -311,7 +302,7 @@ export default function HomePage() {
             {t("今天想吃什麼？", "What are you eating?")}
           </h1>
           <p className="mt-4 text-muted-foreground max-w-xl leading-relaxed">
-            {t("明天 95 折、提前 2 天以上 8 折，最遠可訂 30 天後。", "Tomorrow 5% off, 2+ days ahead 20% off — book up to 30 days out.")}
+            {t(`${policy.earlyBird()}，${policy.bookingRange()}。`, `${policy.earlyBird()} — ${policy.bookingRange()}.`)}
           </p>
         </div>
         <button
@@ -469,8 +460,8 @@ export default function HomePage() {
                             <button type="button" onClick={() => openItem(item, vendor)} className="block w-full text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                               <span className="block mt-2.5 text-sm font-semibold truncate">{loc(item, "name")}</span>
                               <span className="flex items-baseline gap-1.5">
-                                {discountPercent > 0 && !searching && <span className="text-xs text-muted-foreground line-through">${base}</span>}
-                                <span className="font-heading text-lg font-semibold">${searching ? base : lockedPrice}{hasMains ? t(" 起", "+") : ""}</span>
+                                {discountPercent > 0 && !searching && <span className="text-xs text-muted-foreground line-through">NT${base}</span>}
+                                <span className="font-heading text-lg font-semibold">NT${searching ? base : lockedPrice}{hasMains ? t(" 起", "+") : ""}</span>
                                 <span className="ml-auto text-xs font-semibold text-primary underline underline-offset-4 decoration-1 group-hover:decoration-2">
                                   {isBento(item) && item.item_type !== "single" ? t("組便當", "Build") : t("預訂", "Book")}
                                 </span>
@@ -514,9 +505,9 @@ export default function HomePage() {
                           <p className="font-heading text-base font-semibold mb-0.5">{loc(plan, "label")}{t("：", ": ")}{loc(plan, "name")}</p>
                           <p className="text-xs text-muted-foreground mb-3">{loc(plan, "description")}</p>
                           <p className="text-sm mb-1">
-                            <span className="font-heading text-lg font-semibold">NT$ {firstPrice}</span>
+                            <span className="font-heading text-lg font-semibold">NT${firstPrice}</span>
                             <span className="text-muted-foreground"> {t("/ 餐", "/ meal")}・{plan.days} {t("天", "days")}</span>
-                            {firstPrice < plan.price_per_meal && <span className="ml-1.5 text-xs text-muted-foreground line-through">NT$ {plan.price_per_meal}</span>}
+                            {firstPrice < plan.price_per_meal && <span className="ml-1.5 text-xs text-muted-foreground line-through">NT${plan.price_per_meal}</span>}
                           </p>
                           <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
                             {planRatings.get(plan.id) ? (
@@ -551,7 +542,7 @@ export default function HomePage() {
                   </DialogHeader>
                   <div className="space-y-3 py-1">
                     <p className="text-sm text-muted-foreground">
-                      {loc(vendor, "name")}・{t(`原價 NT$ ${plan.price_per_meal} × ${plan.days} 天，每天依提前天數各自打早鳥折扣`, `NT$ ${plan.price_per_meal} × ${plan.days} days, early-bird applied per day`)}
+                      {loc(vendor, "name")}・{t(`原價 NT$${plan.price_per_meal} × ${plan.days} 天，每天依提前天數各自打早鳥折扣`, `NT$${plan.price_per_meal} × ${plan.days} days, early-bird applied per day`)}
                     </p>
                     <PickupPicker
                       date={planStartDate}
@@ -575,7 +566,7 @@ export default function HomePage() {
                               {d.postponed && <span className="text-caption font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">{t("順延", "Postponed")}</span>}
                               <span className="text-xs text-muted-foreground">{slotLabel(planWindow)}</span>
                               <span className="ml-auto text-xs text-muted-foreground">{discountText(d.discountPercent)}</span>
-                              <span className="w-14 text-right font-semibold">${d.lockedPrice}</span>
+                              <span className="w-14 text-right font-semibold">NT${d.lockedPrice}</span>
                             </li>
                           ))}
                         </ul>
@@ -586,7 +577,7 @@ export default function HomePage() {
                     ) : (
                       <div className="flex gap-1.5 p-2.5 rounded-lg bg-red-50 border border-red-200 text-caption text-red-800">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                        {t(`這個開始日期／時段排不滿 ${plan.days} 天（最遠只能預訂 30 天內），請改選其他日期或時段。`, `This start date and time can't fit ${plan.days} days within the 30-day booking range. Please pick another date or time.`)}
+                        {t(`這個開始日期／時段排不滿 ${plan.days} 天（${policy.bookingRange()}），請改選其他日期或時段。`, `This start date and time can't fit ${plan.days} days within the 30-day booking range. Please pick another date or time.`)}
                       </div>
                     )}
                     <div className="flex gap-1.5 p-2.5 rounded-lg bg-secondary border border-border text-caption leading-relaxed">
@@ -595,12 +586,12 @@ export default function HomePage() {
                     </div>
                     <label className="flex items-start gap-1.5 p-2 rounded-lg bg-muted border border-border cursor-pointer">
                       <Checkbox checked={planAck} onCheckedChange={() => setPlanAck((v) => !v)} className="mt-0.5 shrink-0" />
-                      <span className="text-caption leading-relaxed text-muted-foreground"><WaiverText /></span>
+                      <span className="text-caption leading-relaxed text-muted-foreground"><WaiverText vendor={vendor} /></span>
                     </label>
                     <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
                       <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
                       <span className="text-caption leading-relaxed text-orange-900">
-                        {t("每一天都是獨立的一份，當天沒空可以單獨轉讓或捐為愛心餐；取餐時段結束 30 分鐘仍未取餐，將", "Each day is a separate meal you can transfer or donate on its own. If it isn't picked up 30 min after the window ends, it ")}<strong>{t("轉為愛心餐、開放給需要的人", "becomes a charity meal for someone in need")}</strong>
+                        {t(`每一天都是獨立的一份，當天沒空可以單獨轉讓或捐為愛心餐；取餐時段結束 ${liveConfig().charityConvertAfterMinutes} 分鐘仍未取餐，將`, `Each day is a separate meal you can transfer or donate on its own. If it isn't picked up ${liveConfig().charityConvertAfterMinutes} min after the window ends, it `)}<strong>{t("轉為愛心餐、開放給需要的人", "becomes a charity meal for someone in need")}</strong>
                       </span>
                     </div>
                   </div>

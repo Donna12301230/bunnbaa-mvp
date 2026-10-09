@@ -33,7 +33,7 @@ export default function ContactPage() {
           <div className="flex items-start gap-4 rounded-[1.5rem] border border-ink bg-card p-6">
             <HelpCircle className="w-6 h-6 shrink-0 text-primary" aria-hidden="true" />
             <span className="text-muted-foreground">
-              {tr("訂單、取消轉讓、未取餐限制等常見問題，先看看 ", "For common questions about orders, transfers, or pickup restrictions, check the ")}
+              {tr("訂單、取消、轉讓、退款與點數等常見問題，先看看 ", "For common questions about orders, cancellations, transfers, refunds and points, check the ")}
               <Link href="/faq" className="text-foreground font-semibold underline underline-offset-4">{tr("常見問題", "FAQ")}</Link>
               {tr("，可能已經有答案。", " first — you might find your answer right away.")}
             </span>

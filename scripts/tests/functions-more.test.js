@@ -784,7 +784,7 @@ function geohash(lat, lng, precision = 7) {
   });
 
   // ════ 1b. 撥款 ════
-  await test("F-01 A-PAY-01", "手動結算：已取餐＋愛心餐＋轉讓取餐＋取消換券留下的款項計入，未取餐、已退款的不算；扣 5% 抽成；重按不重複結算", async () => {
+  await test("F-01 A-PAY-01", "手動結算：已取餐＋愛心餐＋轉讓取餐＋舊制未取餐＋取消換券留下的款項計入，還沒取餐、已退款的不算；扣 5% 抽成；重按不重複結算", async () => {
     const VS3 = await mkVendor(vid("pay"));
     await lock(`zz2-pa-${RUN}`, VS3, { status: "fulfilled", locked_price: 80 });
     await lock(`zz2-pb-${RUN}`, VS3, { status: "charity", locked_price: 100 });
@@ -792,10 +792,11 @@ function geohash(lat, lng, precision = 7) {
     await lock(`zz2-pd-${RUN}`, VS3, { status: "locked", locked_price: 70 });
     await lock(`zz2-pe-${RUN}`, VS3, { status: "cancelled", cancel_reason: "customer", locked_price: 60, kept_amount: 60, refunded_amount: 0 }); // 取消換券：款項留在店家
     await lock(`zz2-pf-${RUN}`, VS3, { status: "cancelled", cancel_reason: "disaster", locked_price: 90, refunded_amount: 90 }); // 停班全額退款：不撥
+    await lock(`zz2-pg-${RUN}`, VS3, { status: "no_show", locked_price: 40 }); // 舊制未取餐：預付不退，照常撥款（2026-10-09）
     const r = expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VS3 }));
     const p = await get(`payouts/${r.payout_id}`);
-    // 抽成逐份四捨五入：80→4、100→5、50→3、60→3
-    eq([p.gross_amount, p.commission_amount, p.amount, p.lock_count], [290, 15, 275, 4]);
+    // 抽成逐份四捨五入：80→4、100→5、50→3、60→3、40→2
+    eq([p.gross_amount, p.commission_amount, p.amount, p.lock_count], [330, 17, 313, 5]);
     eq(expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VS3 })).payout_id, null, "重按");
   });
 

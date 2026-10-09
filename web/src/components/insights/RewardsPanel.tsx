@@ -69,14 +69,17 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
   const current = periods.find((p) => p.status === "pooled") ?? periods.find((p) => p.status === "closed");
   const m = useMemo(() => {
     const sum = (list: Coupon[]) => list.reduce((s, c) => s + (c.discount || 0), 0);
+    // 取消換券的券（tier refund）不屬於回饋池：沒有 pool_period，不算「退回回饋池」，另外列出
     const owned = coupons.filter((c) => c.status === "owned");
+    const pool = coupons.filter((c) => c.tier !== "refund");
     const redeemed = coupons.filter((c) => c.status === "redeemed");
     const soon = owned.filter((c) => millis(c.expires_at) < Date.now() + 7 * 86400000);
     return {
       liability: sum(owned), ownedCount: owned.length,
+      refundLiability: sum(owned.filter((c) => c.tier === "refund")),
       redeemedAll: sum(redeemed), redeemedCount: redeemed.length,
       redeemedPeriod: sum(redeemed.filter((c) => c.pool_period === current?.id)),
-      returned: sum(coupons.filter((c) => c.status === "expired" || c.status === "unclaimed")) + periods.reduce((s, p) => s + (p.leftover || 0), 0),
+      returned: sum(pool.filter((c) => c.status === "expired" || c.status === "unclaimed")) + periods.reduce((s, p) => s + (p.leftover || 0), 0),
       expiringSoon: sum(soon), expiringCount: soon.length,
     };
   }, [coupons, periods, current?.id]);
@@ -85,9 +88,11 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
   const found = lookup.trim() ? coupons.filter((c) => c.id === lookup.trim() || c.lock_id === lookup.trim()) : [];
 
   function exportCsv() {
-    const rows = coupons.filter((c) => (!from || c.pool_period >= from) && (!to || c.pool_period <= to));
+    // 回饋池的券依期別篩；取消換券的券沒有期別，用發券日篩
+    const periodOf = (c: Coupon) => c.pool_period || (millis((c as { created_at?: unknown }).created_at) ? new Date(millis((c as { created_at?: unknown }).created_at)).toISOString().slice(0, 10) : "");
+    const rows = coupons.filter((c) => (!from || periodOf(c) >= from) && (!to || periodOf(c) <= to));
     const header = ["coupon_id", "pool_period", "tier", "discount", "status", "expires_at", "lock_id"];
-    const csv = [header, ...rows.map((c) => [c.id, c.pool_period, c.tier, c.discount, c.status, c.expires_at ? new Date(millis(c.expires_at)).toISOString() : "", c.lock_id ?? ""])]
+    const csv = [header, ...rows.map((c) => [c.id, c.pool_period ?? "", c.tier, c.discount, c.status, c.expires_at ? new Date(millis(c.expires_at)).toISOString() : "", c.lock_id ?? ""])]
       .map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -151,6 +156,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
             <p className="text-xs text-muted-foreground">{tr("還在客人手上的券（潛在成本）", "Outstanding coupons (liability)")}</p>
             <p className="text-3xl font-bold text-orange-700 tabular-nums">{nt(m.liability)}</p>
             <p className="text-xs text-muted-foreground">{tr(`${m.ownedCount} 張`, `${m.ownedCount} coupons`)}{m.expiringCount > 0 ? tr(`・7 天內到期 ${nt(m.expiringSoon)}`, ` · ${nt(m.expiringSoon)} expiring in 7 d`) : ""}</p>
+            {m.refundLiability > 0 && <p className="text-xs text-muted-foreground">{tr(`其中取消換券 ${nt(m.refundLiability)}（不屬於回饋池）`, `incl. ${nt(m.refundLiability)} from cancellations (not from the reward pool)`)}</p>}
           </CardContent>
         </Card>
         <Card className="border-2">

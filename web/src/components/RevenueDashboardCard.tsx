@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { EARLY_BIRD_TIERS, discountText } from "@/lib/pricing";
+const BEST_EARLY_BIRD = Math.max(...EARLY_BIRD_TIERS.map((x) => x.discountPercent));
 import { doc, onSnapshot } from "firebase/firestore";
 import { AlertTriangle, Calculator, RefreshCw, Settings2, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,7 +49,7 @@ interface Forecast {
   generated_at?: { toMillis?: () => number };
 }
 
-const nt = (n: number | null | undefined) => `NT$ ${Math.round(n ?? 0).toLocaleString()}`;
+const nt = (n: number | null | undefined) => `NT$${Math.round(n ?? 0).toLocaleString()}`;
 
 function Row({ label, value, minus, strong }: { label: string; value: number; minus?: boolean; strong?: boolean }) {
   return (
@@ -237,7 +239,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                 <div>
                   <p className="text-sm font-semibold mb-2 flex items-center gap-1">
                     {tr("每份賺多少", "Margin per meal")}
-                    <InfoTip>{tr("8 折後售價 − 材料成本。紅色＝毛利低於材料成本 30%。", "Price after 20% off − materials. Red = margin under 30% of material cost.")}</InfoTip>
+                    <InfoTip>{tr(`最深早鳥折扣（${discountText(BEST_EARLY_BIRD)}）後的售價 − 材料成本。紅色＝毛利低於材料成本 30%。`, `Price after the deepest early-bird discount (${BEST_EARLY_BIRD}% off) − materials. Red = margin under 30% of material cost.`)}</InfoTip>
                   </p>
                   <ul className="space-y-2 max-h-56 overflow-y-auto bb-thin-scroll pr-1">
                     {data.item_margins.map((m) => {

@@ -187,7 +187,7 @@ function CandidateCard({ card, onOpen }: { card: Card; onOpen: () => void }) {
       <button type="button" onClick={onOpen} className="text-left w-full rounded-xl border border-border bg-card p-3 hover:border-primary transition-colors">
         <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarCheck className="w-3.5 h-3.5" /> {card.vendor_name}・{card.label}</div>
         <p className="font-semibold text-sm">{card.name}</p>
-        <p className="text-xs">{tr(`${card.days} 天・每餐 NT$ ${card.price_per_meal}`, `${card.days} days · NT$ ${card.price_per_meal} per meal`)}</p>
+        <p className="text-xs">{tr(`${card.days} 天・每餐 NT$${card.price_per_meal}`, `${card.days} days · NT$${card.price_per_meal} per meal`)}</p>
       </button>
     );
   }
@@ -201,9 +201,9 @@ function CandidateCard({ card, onOpen }: { card: Card; onOpen: () => void }) {
         <p className="font-semibold text-sm truncate">{card.name}</p>
         <p className="text-xs">
           {card.estimated_price !== null && card.estimated_price < card.list_price ? (
-            <><span className="font-semibold text-primary">NT$ {card.estimated_price}</span> <span className="line-through text-muted-foreground">{card.list_price}</span></>
+            <><span className="font-semibold text-primary">NT${card.estimated_price}</span> <span className="line-through text-muted-foreground">{card.list_price}</span></>
           ) : (
-            <span className="font-semibold">NT$ {card.list_price}</span>
+            <span className="font-semibold">NT${card.list_price}</span>
           )}
           {card.date && <span className="text-muted-foreground">・{card.date.slice(5)}{card.window ? ` ${slotLabel(card.window)}` : ""}</span>}
         </p>

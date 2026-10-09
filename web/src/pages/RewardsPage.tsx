@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { liveConfig } from "@/lib/platformConfig";
 import { rememberReturnPath } from "@/lib/returnPath";
 import { Link } from "wouter";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -66,7 +67,7 @@ export default function RewardsPage() {
   return (
     <div className="min-h-screen bg-background">
       <MarketplaceHeader active="rewards" />
-      <PageHero eyebrow={tr("人人有獎", "Everyone wins")} title={tr("成長獎勵", "Rewards")} description={tr("每累計實付 100 元一張抽獎券；店家累積營業額滿 1 萬元就開獎，拿出其中 5% 當回饋池，人人有獎。", "Every NT$100 you pay earns a ticket. Once a vendor's sales reach NT$10,000 the draw opens, with 5% of those sales as the reward pool — everyone wins.")} />
+      <PageHero eyebrow={tr("人人有獎", "Everyone wins")} title={tr("成長獎勵", "Rewards")} description={tr(`每累計實付 ${liveConfig().ticketUnit} 元一張抽獎券；店家累積營業額滿 ${liveConfig().minRevenueToOpen.toLocaleString()} 元就開獎，拿出其中 ${Math.round(liveConfig().rewardRate * 100)}% 當回饋池，人人有獎。`, `Every NT$${liveConfig().ticketUnit} you pay earns a ticket. Once a vendor's sales reach NT$${liveConfig().minRevenueToOpen.toLocaleString()} the draw opens, with ${Math.round(liveConfig().rewardRate * 100)}% of those sales as the reward pool — everyone wins.`)} />
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-12 space-y-14">
         {!user ? (
           <EmptyState icon={<Trophy size={32} />} title={tr("請先登入", "Please sign in")} description={tr("登入後就能看到你的抽獎券、抽獎進度與折價券。", "Sign in to see your tickets, draw progress and coupons.")} action={<Button asChild><Link href="/login" onClick={() => rememberReturnPath()}>{tr("前往登入", "Sign in")}</Link></Button>} />
@@ -127,7 +128,7 @@ export default function RewardsPage() {
                   ))}
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">{tr("折價券只能在發券店家使用、綁定帳號不可轉讓；每筆訂單限用一張，折抵不超過訂單小計、不找零。訂單取消（取餐 48 小時前）時，用掉的券會退回並保留原到期日。", "Coupons are for the issuing vendor only and can't be transferred. One per order, no change given. If you cancel the order (up to 48 hours before pickup), the coupon you used comes back with its original expiry.")}</p>
+              <p className="text-xs text-muted-foreground">{tr(`折價券只能在發券店家使用、綁定帳號不可轉讓；每筆訂單限用一張，折抵不超過訂單小計、不找零。訂單取消（取餐 ${liveConfig().cancelHoursBefore} 小時前）時，用掉的券會退回並保留原到期日。`, `Coupons are for the issuing vendor only and can't be transferred. One per order, no change given. If you cancel the order (up to ${liveConfig().cancelHoursBefore} hours before pickup), the coupon you used comes back with its original expiry.`)}</p>
               {pastCoupons.length > 0 && (
                 <details className="text-sm">
                   <summary className="cursor-pointer text-muted-foreground">{tr("已使用／過期", "Used / expired")}（{pastCoupons.length}）</summary>

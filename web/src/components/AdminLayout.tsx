@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 
 // 用函式包起來，每次 render 依目前語言組標籤
 const navItems = () => [
-  { href: "/admin/vendors", label: tr("廠商管理", "Vendors"), icon: Store },
+  { href: "/admin/vendors", label: tr("店家管理", "Vendors"), icon: Store },
   { href: "/admin/platform", label: tr("平台參數", "Parameters"), icon: SlidersHorizontal },
   { href: "/admin/dishes", label: tr("菜色庫與模板", "Dishes"), icon: BookMarked },
   { href: "/admin/anomalies", label: tr("異常審核", "Anomalies"), icon: AlertOctagon },

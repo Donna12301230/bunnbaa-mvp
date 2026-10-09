@@ -1,4 +1,6 @@
 import { tr, loc } from "@/lib/i18n";
+import { formatNT, formatPickupDate } from "@/lib/format";
+import { lockStatus } from "@/lib/lockOutcome";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -117,31 +119,8 @@ function BanAppealSection({ user }: { user: UserProfile }) {
 }
 
 const roleLabel = (role: string) =>
-  ({ customer: tr("一般會員", "Member"), vendor: tr("廠商", "Vendor"), admin: tr("平台管理員", "Admin") } as Record<string, string>)[role] ?? role;
+  ({ customer: tr("一般會員", "Member"), vendor: tr("店家", "Vendor"), admin: tr("平台管理員", "Admin") } as Record<string, string>)[role] ?? role;
 
-const orderStatusLabel = (): Record<LockStatus, string> => ({
-  locked: tr("鎖定中", "Locked"),
-  for_resale: tr("轉賣中", "For resale"),
-  for_gift: tr("贈送中", "Being gifted"),
-  resold_and_fulfilled: tr("已轉賣完成取餐", "Picked up by new owner"),
-  fulfilled: tr("已完成取餐", "Picked up"),
-  no_show: tr("未取餐（舊制）", "No-show (legacy)"),
-  charity: tr("已轉愛心餐", "Charity meal"),
-  cancelling: tr("退款中", "Refunding"),
-  cancelled: tr("已取消", "Cancelled"),
-});
-
-const orderStatusTone: Record<LockStatus, string> = {
-  locked: "bg-orange-50 text-orange-700",
-  for_resale: "bg-blue-50 text-blue-700",
-  for_gift: "bg-blue-50 text-blue-700",
-  resold_and_fulfilled: "bg-green-50 text-green-700",
-  fulfilled: "bg-green-50 text-green-700",
-  no_show: "bg-gray-100 text-gray-600",
-  charity: "bg-pink-50 text-pink-700",
-  cancelling: "bg-gray-100 text-gray-600",
-  cancelled: "bg-gray-100 text-gray-600",
-};
 
 function formatDate(ts: unknown): string {
   const d = (ts as { toDate?: () => Date } | undefined)?.toDate?.();
@@ -161,7 +140,6 @@ function OrdersPanel({ uid }: { uid: string }) {
   const recent = [...locks]
     .sort((a, b) => (b.created_at?.toMillis?.() ?? 0) - (a.created_at?.toMillis?.() ?? 0))
     .slice(0, 20);
-  const labels = orderStatusLabel();
 
   return (
     <section className="bg-card rounded-[1.75rem] border border-ink overflow-hidden">
@@ -181,7 +159,7 @@ function OrdersPanel({ uid }: { uid: string }) {
             <thead>
               <tr className="bg-gray-50 text-xs text-muted-foreground">
                 <th className="text-left font-medium px-4 py-2">{tr("品項", "Item")}</th>
-                <th className="text-left font-medium px-4 py-2">{tr("商家", "Vendor")}</th>
+                <th className="text-left font-medium px-4 py-2">{tr("店家", "Vendor")}</th>
                 <th className="text-left font-medium px-4 py-2">{tr("取餐日期", "Pickup")}</th>
                 <th className="text-left font-medium px-4 py-2">{tr("金額", "Price")}</th>
                 <th className="text-left font-medium px-4 py-2">{tr("狀態", "Status")}</th>
@@ -193,11 +171,11 @@ function OrdersPanel({ uid }: { uid: string }) {
                 <tr key={lock.id} className="border-t border-border">
                   <td className="px-4 py-2.5">{loc(lock, "item_name")}</td>
                   <td className="px-4 py-2.5 text-muted-foreground">{loc(vendors.find((v) => v.id === lock.vendor_id), "name") || "—"}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">{lock.pickup_date}（{slotLabel(lock.pickup_window)}）</td>
-                  <td className="px-4 py-2.5">${lock.locked_price}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">{formatPickupDate(lock.pickup_date)} {slotLabel(lock.pickup_window)}</td>
+                  <td className="px-4 py-2.5">NT${lock.locked_price}</td>
                   <td className="px-4 py-2.5">
-                    <span className={cn("inline-block text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap", orderStatusTone[lock.status])}>
-                      {labels[lock.status]}
+                    <span className={cn("inline-block text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap", lockStatus(lock.status).className)}>
+                      {lockStatus(lock.status).label}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">{formatDate(lock.created_at)}</td>
@@ -314,10 +292,10 @@ export default function ProfilePage() {
             </button>
             {user?.role === "customer" && (
               <button
-                onClick={() => comingSoon(tr("申請成為廠商", "Vendor applications"))}
+                onClick={() => comingSoon(tr("申請成為店家", "Vendor applications"))}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm font-medium text-left text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               >
-                <Store className="w-4 h-4" /> {tr("申請成為廠商", "Become a vendor")}
+                <Store className="w-4 h-4" /> {tr("申請成為店家", "Become a vendor")}
               </button>
             )}
 

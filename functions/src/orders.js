@@ -155,7 +155,7 @@ async function buildDrafts(line, ctx) {
   const item = await loadOrderableMenuItem(line?.menu_item_id);
   const vendor = await loadVendor(item.vendor_id, ctx.vendorCache);
   if (ctx.vendorId && ctx.vendorId !== vendor.id) {
-    throw new HttpsError("invalid-argument", t("一次只能跟一家商家預購", "One vendor per checkout"));
+    throw new HttpsError("invalid-argument", t("一次只能跟一家店家預購", "One vendor per checkout"));
   }
   ctx.vendorId = vendor.id;
   const pickupDate = line.pickup_date;
@@ -683,7 +683,7 @@ async function cancelForCoupon(lockRef, config) {
     const expiresAt = Timestamp.fromMillis(Date.now() + config.couponValidDays * 86400000);
     if (amount > 0) {
       tx.set(couponRef, {
-        vendor_id: lock.vendor_id, vendor_name: vendor.name || "", tier: "refund", label: "取消退款券", discount: amount,
+        vendor_id: lock.vendor_id, vendor_name: vendor.name || "", tier: "refund", label: "取消補償券", discount: amount,
         status: "owned", user_id: lock.buyer_uid, owned_at: FieldValue.serverTimestamp(), expires_at: expiresAt,
         source_lock_id: lockRef.id, issued_at: FieldValue.serverTimestamp(),
       });
@@ -1018,8 +1018,8 @@ exports.updateLockChoices = onCall({}, async (request) => {
     newLocked = subtotal - couponDiscount;
     if (newLocked > lock.locked_price) {
       throw new HttpsError("failed-precondition", t(
-        `這樣改要多 NT$ ${newLocked - lock.locked_price}，目前還不能線上補差額，請保留原本的選項`,
-        `This change costs NT$ ${newLocked - lock.locked_price} more, and topping up isn't supported yet — please keep your current choices`
+        `這樣改要多 NT$${newLocked - lock.locked_price}，目前還不能線上補差額，請保留原本的選項`,
+        `This change costs NT$${newLocked - lock.locked_price} more, and topping up isn't supported yet — please keep your current choices`
       ));
     }
     Object.assign(patch, {

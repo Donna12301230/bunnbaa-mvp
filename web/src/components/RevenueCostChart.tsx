@@ -27,13 +27,13 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-sm space-y-0.5">
       <p className="font-semibold text-foreground">{d.date}・{tr(`${d.qty} 份`, `${d.qty} meals`)}</p>
-      <p className="flex items-center gap-1.5 text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-revenue)]" aria-hidden="true" />{tr("收入", "Revenue")} NT$ {d.revenue.toLocaleString()}</p>
-      <p className="flex items-center gap-1.5 text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-cost)]" aria-hidden="true" />{tr("材料成本", "Material cost")} NT$ {d.material_cost.toLocaleString()}</p>
-      <p className="text-muted-foreground">{tr("毛利", "Gross margin")} NT$ {margin.toLocaleString()}</p>
+      <p className="flex items-center gap-1.5 text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-revenue)]" aria-hidden="true" />{tr("收入", "Revenue")} NT${d.revenue.toLocaleString()}</p>
+      <p className="flex items-center gap-1.5 text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-cost)]" aria-hidden="true" />{tr("材料成本", "Material cost")} NT${d.material_cost.toLocaleString()}</p>
+      <p className="text-muted-foreground">{tr("毛利", "Gross margin")} NT${margin.toLocaleString()}</p>
       {d.net_profit != null && (
         <>
-          <p className="text-muted-foreground">{tr("人工、手續費、抽成、固定成本", "Labor, fees, commission, fixed")} NT$ {(d.other_cost ?? 0).toLocaleString()}</p>
-          <p className="flex items-center gap-1.5 font-semibold text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-profit)]" aria-hidden="true" />{tr("淨利", "Net profit")} NT$ {d.net_profit.toLocaleString()}</p>
+          <p className="text-muted-foreground">{tr("人工、手續費、抽成、固定成本", "Labor, fees, commission, fixed")} NT${(d.other_cost ?? 0).toLocaleString()}</p>
+          <p className="flex items-center gap-1.5 font-semibold text-foreground"><span className="w-2.5 h-0.5 rounded bg-[var(--chart-profit)]" aria-hidden="true" />{tr("淨利", "Net profit")} NT${d.net_profit.toLocaleString()}</p>
         </>
       )}
     </div>
@@ -90,9 +90,9 @@ export default function RevenueCostChart({ vendorId }: { vendorId: string | null
         </LineChart>
       </ResponsiveContainer>
       <p className="text-xs text-muted-foreground">
-        {tr(`15 天收入 NT$ ${totalRevenue.toLocaleString()}、材料成本 NT$ ${totalCost.toLocaleString()}，毛利 NT$ ${(totalRevenue - totalCost).toLocaleString()}`,
-          `15-day revenue NT$ ${totalRevenue.toLocaleString()}, materials NT$ ${totalCost.toLocaleString()}, gross margin NT$ ${(totalRevenue - totalCost).toLocaleString()}`)}
-        {hasNet && tr(`，淨利 NT$ ${totalNet.toLocaleString()}`, `, net profit NT$ ${totalNet.toLocaleString()}`)}
+        {tr(`15 天收入 NT$${totalRevenue.toLocaleString()}、材料成本 NT$${totalCost.toLocaleString()}，毛利 NT$${(totalRevenue - totalCost).toLocaleString()}`,
+          `15-day revenue NT$${totalRevenue.toLocaleString()}, materials NT$${totalCost.toLocaleString()}, gross margin NT$${(totalRevenue - totalCost).toLocaleString()}`)}
+        {hasNet && tr(`，淨利 NT$${totalNet.toLocaleString()}`, `, net profit NT$${totalNet.toLocaleString()}`)}
         {tr("（材料成本依最新單價估算；淨利再扣備料人工、LINE Pay 手續費、平台抽成，以及正職薪資與固定成本按天平均分攤，成本參數在「店家設定」）",
           " (materials at latest unit prices; net profit also deducts prep labor, LINE Pay fees, platform commission, and salaries/fixed costs spread evenly per day — set them in Settings)")}
       </p>

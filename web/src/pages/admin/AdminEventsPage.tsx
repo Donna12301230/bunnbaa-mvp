@@ -17,7 +17,7 @@ interface DisasterEvent { id: string; type: string; counties?: string[]; towns?:
 interface Anomaly { id: string; type: string; user_id: string; vendor_id: string | null; detail: string; date: string; status: string }
 
 const TYPE_LABEL: Record<string, string> = { work_suspension: "停班停課", typhoon_warning: "颱風警報", price_spike: "菜價暴漲" };
-const ANOMALY_LABEL: Record<string, string> = { refunds: "7 天內退款 ≥ 3 筆", ticket_share: "單一使用者抽獎券占比 > 20%", device: "同一裝置 > 2 帳號領券" };
+const ANOMALY_LABEL: Record<string, string> = { refunds: "7 天內取消 ≥ 3 筆", ticket_share: "單一使用者抽獎券占比 > 20%", device: "同一裝置 > 2 帳號領券" };
 
 /** 天災事件（§11）：自動抓 NCDR（彙整氣象署、人事總處）；資料來源失效時管理者手動建立。 */
 function DisasterContent() {

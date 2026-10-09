@@ -1,4 +1,5 @@
 import { tr } from "@/lib/i18n";
+import { usePrompt } from "@/components/ConfirmDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { collection, doc, getDocs, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -41,6 +42,7 @@ function AppealsList() {
     },
   });
 
+  const prompt = usePrompt();
   const processAppealMutation = useMutation({
     mutationFn: async ({ appeal, approved, adminNote }: { appeal: BanAppeal; approved: boolean; adminNote?: string }) => {
       const batch = writeBatch(db);
@@ -124,9 +126,15 @@ function AppealsList() {
                       variant="outline"
                       className="h-7 text-xs text-red-500"
                       disabled={processAppealMutation.isPending}
-                      onClick={() => {
-                        const adminNote = window.prompt(tr("拒絕原因（選填，會顯示給使用者看）", "Reason for rejection (optional, shown to the user)")) ?? undefined;
-                        processAppealMutation.mutate({ appeal, approved: false, adminNote });
+                      onClick={async () => {
+                        const note = await prompt({
+                          title: tr("拒絕這筆申訴？", "Reject this appeal?"),
+                          inputLabel: tr("拒絕原因（選填，會顯示給使用者看）", "Reason for rejection (optional, shown to the user)"),
+                          confirmLabel: tr("拒絕申訴", "Reject"),
+                          destructive: true,
+                        });
+                        if (note === null) return;
+                        processAppealMutation.mutate({ appeal, approved: false, adminNote: note.trim() || undefined });
                       }}
                     >
                       <XCircle className="w-3.5 h-3.5 mr-1" /> {tr("拒絕", "Reject")}

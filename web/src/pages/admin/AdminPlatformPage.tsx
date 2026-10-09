@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { liveConfig } from "@/lib/platformConfig";
+import { businessDaysText } from "@/lib/pickupSlots";
+import { policy } from "@/lib/policy";
 import { doc, setDoc } from "firebase/firestore";
 import { SlidersHorizontal } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
@@ -62,7 +65,14 @@ function PlatformContent() {
             ))}
           </tbody>
         </table>
-        <p className="text-xs text-muted-foreground">{tr("營業日（週一至週五）、餐期範圍（早 06:00–10:30／中 10:30–14:00／晚 16:30–20:00）、預訂開放範圍（30 天）、早鳥級距（明天 95 折／提前 2–30 天 8 折）、週進料鎖定（週六 12:00）為第一階段固定規則。基本工資在 platformConfig/minimumWage（依生效日自動套用）。", "Business days, meal periods, the 30-day booking range, early-bird tiers and the weekly lock are fixed in phase 1.")}</p>
+        <p className="text-xs text-muted-foreground">{(() => {
+          const c = liveConfig();
+          const mp = c.mealPeriods;
+          return tr(
+            `營業日（${businessDaysText()}）、餐期範圍（早 ${mp.breakfast}／中 ${mp.lunch}／晚 ${mp.dinner}）、預訂開放範圍（${c.bookingRangeDays} 天）也存在 platformConfig/global，前後端都會讀，但不在上面這張表裡；要改請直接改資料庫。早鳥級距（${policy.earlyBird()}）寫在程式裡（functions/src/pricing.js 與 web/src/lib/pricing.ts，要一起改）。基本工資在 platformConfig/minimumWage（依生效日自動套用）。`,
+            `Business days (${businessDaysText()}), meal periods and the ${c.bookingRangeDays}-day booking range also live in platformConfig/global and are read by both the server and the app, but aren't editable here — change them in the database. Early-bird tiers (${policy.earlyBird()}) are in code (functions/src/pricing.js and web/src/lib/pricing.ts).`
+          );
+        })()}</p>
         <Button onClick={save} disabled={saving}>{saving ? tr("儲存中…", "Saving…") : tr("儲存", "Save")}</Button>
       </CardContent>
     </Card>

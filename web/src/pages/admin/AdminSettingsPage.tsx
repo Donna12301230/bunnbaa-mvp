@@ -43,10 +43,10 @@ function VendorVerificationCard() {
 
   return (
     <Card className="p-5">
-      <h3 className="font-semibold mb-2">{tr("認證商家", "Verified vendors")}</h3>
+      <h3 className="font-semibold mb-2">{tr("認證店家", "Verified vendors")}</h3>
       <p className="text-sm text-muted-foreground mb-3">{tr("平台審核後手動認證，跟系統自動算的「履約穩定度」是兩件事。", "Set manually after platform review — separate from the automatically calculated reliability.")}</p>
       {vendors.length === 0 ? (
-        <EmptyState size="compact" icon={<Store size={32} />} title={tr("目前沒有商家資料", "No vendors yet")} />
+        <EmptyState size="compact" icon={<Store size={32} />} title={tr("目前沒有店家資料", "No vendors yet")} />
       ) : (
         <div className="space-y-2">
           {vendors.map((vendor) => (
@@ -61,7 +61,7 @@ function VendorVerificationCard() {
                 disabled={busyId === vendor.id}
                 onClick={() => toggleVerified(vendor)}
               >
-                {vendor.verified ? tr("取消認證", "Remove verification") : tr("設為認證商家", "Mark as verified")}
+                {vendor.verified ? tr("取消認證", "Remove verification") : tr("設為認證店家", "Mark as verified")}
               </Button>
             </div>
           ))}

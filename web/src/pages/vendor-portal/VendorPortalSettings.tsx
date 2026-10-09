@@ -21,7 +21,7 @@ import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, parseISO, sta
 import { deleteField, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DEFAULT_PICKUP_WINDOWS, MAX_HOLIDAYS, MAX_PICKUP_RANGE_MINUTES, MAX_PICKUP_WINDOWS, MEAL_PERIODS, isValidWindow, mealPeriodLabel, mealPeriodOf, pickupRangeMinutes, slotLabel, windowsOverlap } from "@/lib/pickupSlots";
-import { DEFAULT_PLATFORM_CONFIG, usePlatformConfig } from "@/lib/platformConfig";
+import { DEFAULT_PLATFORM_CONFIG, liveConfig, usePlatformConfig } from "@/lib/platformConfig";
 import { withCommission } from "@/lib/pricing";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -102,7 +102,7 @@ export default function VendorPortalSettings() {
   const [pickupWindows, setPickupWindows] = useState<string[]>(DEFAULT_PICKUP_WINDOWS);
   const [slotCapacity, setSlotCapacity] = useState("");
   // 第一階段規格 §2「店家可調」
-  const [cutoffTime, setCutoffTime] = useState(DEFAULT_PLATFORM_CONFIG.cutoffTime);
+  const [cutoffTime, setCutoffTime] = useState(liveConfig().cutoffTime);
   const [safetyRate, setSafetyRate] = useState(String(DEFAULT_PLATFORM_CONFIG.safetyStockRate * 100));
   const [minQty, setMinQty] = useState(String(DEFAULT_PLATFORM_CONFIG.candidateMinQty));
   const [lat, setLat] = useState("");
@@ -131,7 +131,7 @@ export default function VendorPortalSettings() {
     setBusinessHours(bh && bh.length === 7 ? bh : DEFAULT_BH);
     setPickupWindows(realVendor.pickup_windows?.length ? realVendor.pickup_windows : DEFAULT_PICKUP_WINDOWS);
     setSlotCapacity(realVendor.slot_capacity ? String(realVendor.slot_capacity) : "");
-    setCutoffTime(realVendor.cutoff_time ?? DEFAULT_PLATFORM_CONFIG.cutoffTime);
+    setCutoffTime(realVendor.cutoff_time ?? liveConfig().cutoffTime);
     setSafetyRate(String(Math.round((realVendor.safety_stock_rate ?? DEFAULT_PLATFORM_CONFIG.safetyStockRate) * 100)));
     setMinQty(String(realVendor.candidate_min_qty ?? DEFAULT_PLATFORM_CONFIG.candidateMinQty));
     setLat(realVendor.lat != null ? String(realVendor.lat) : "");
@@ -142,7 +142,7 @@ export default function VendorPortalSettings() {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!realVendor) throw new Error(tr("這個帳號還沒綁定商家，請聯絡平台", "This account isn't linked to a vendor yet. Please contact the platform"));
+      if (!realVendor) throw new Error(tr("這個帳號還沒綁定店家，請聯絡平台", "This account isn't linked to a vendor yet. Please contact the platform"));
       const windowsProblem = pickupWindowsProblem(pickupWindows);
       if (windowsProblem) throw new Error(windowsProblem);
       const capacityText = slotCapacity.trim();
@@ -151,8 +151,8 @@ export default function VendorPortalSettings() {
         throw new Error(tr("份數上限請填 0～10000 的整數（空白或 0 代表不限）", "The limit must be a whole number from 0 to 10000 (blank or 0 means no limit)"));
       }
       if (holidays.length > MAX_HOLIDAYS) throw new Error(tr(`公休日最多 ${MAX_HOLIDAYS} 天`, `At most ${MAX_HOLIDAYS} closing days`));
-      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoffTime) || cutoffTime > DEFAULT_PLATFORM_CONFIG.cutoffTime) {
-        throw new Error(tr(`截單時間只能提前，不能晚於前一天 ${DEFAULT_PLATFORM_CONFIG.cutoffTime}`, `Cutoff can only be earlier than ${DEFAULT_PLATFORM_CONFIG.cutoffTime}`));
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoffTime) || cutoffTime > liveConfig().cutoffTime) {
+        throw new Error(tr(`截單時間只能提前，不能晚於前一天 ${liveConfig().cutoffTime}`, `Cutoff can only be earlier than ${liveConfig().cutoffTime}`));
       }
       const safety = Number(safetyRate) / 100;
       if (!(safety >= 0 && safety <= 1)) throw new Error(tr("安全庫存請填 0～100%", "Safety stock must be 0–100%"));
@@ -428,9 +428,9 @@ export default function VendorPortalSettings() {
             <div className="grid sm:grid-cols-3 gap-3">
               <Card className="border-2">
                 <CardContent className="p-4 space-y-2">
-                  <p className="text-sm font-semibold flex items-center gap-1">{tr("截單時間", "Order cutoff")}<InfoTip>{tr(`取餐前一天的這個時間截單、判定許願、產生備料清單。只能提前，不能晚於 ${DEFAULT_PLATFORM_CONFIG.cutoffTime}。`, `Orders close at this time the day before. Earlier only, not after ${DEFAULT_PLATFORM_CONFIG.cutoffTime}.`)}</InfoTip></p>
+                  <p className="text-sm font-semibold flex items-center gap-1">{tr("截單時間", "Order cutoff")}<InfoTip>{tr(`取餐前一天的這個時間截單、判定許願、產生備料清單。只能提前，不能晚於 ${liveConfig().cutoffTime}。`, `Orders close at this time the day before. Earlier only, not after ${liveConfig().cutoffTime}.`)}</InfoTip></p>
                   <p className="text-xs text-muted-foreground">{tr("前一天", "Day before")}</p>
-                  <Input id="cutoff" type="time" value={cutoffTime} max={DEFAULT_PLATFORM_CONFIG.cutoffTime} onChange={(e) => setCutoffTime(e.target.value)} className="h-12 text-2xl font-bold" />
+                  <Input id="cutoff" type="time" value={cutoffTime} max={liveConfig().cutoffTime} onChange={(e) => setCutoffTime(e.target.value)} className="h-12 text-2xl font-bold" />
                 </CardContent>
               </Card>
               <Card className="border-2">
@@ -515,9 +515,9 @@ export default function VendorPortalSettings() {
       {section !== "plan" && (
         <div className="fixed bottom-16 md:bottom-0 left-0 right-0 md:left-60 z-30 border-t border-border bg-card/95 backdrop-blur px-4 py-3">
           <div className="max-w-3xl flex items-center gap-3">
-            <p className="flex-1 text-xs text-muted-foreground">{!realVendor ? tr("這個帳號還沒綁定商家，無法儲存。", "Not linked to a vendor.") : windowsProblem ? <span className="text-red-600">{windowsProblem}</span> : tr("五個分頁的設定一起存", "Saves all five sections")}</p>
+            <p className="flex-1 text-xs text-muted-foreground">{!realVendor ? tr("這個帳號還沒綁定店家，無法儲存。", "Not linked to a vendor.") : windowsProblem ? <span className="text-red-600">{windowsProblem}</span> : tr("五個分頁的設定一起存", "Saves all five sections")}</p>
             <Button size="lg" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !realVendor}>
-              <Save /> {saveMutation.isPending ? tr("儲存中...", "Saving...") : tr("儲存設定", "Save settings")}
+              <Save /> {saveMutation.isPending ? tr("儲存中…", "Saving…") : tr("儲存設定", "Save settings")}
             </Button>
           </div>
         </div>

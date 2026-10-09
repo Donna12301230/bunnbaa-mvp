@@ -28,7 +28,7 @@ function useImageUpload(vendorId: string | undefined, onChange: (url: string) =>
     if (!file) return;
     setUploading(true);
     try {
-      if (!vendorId) throw new Error(tr("這個帳號還沒綁定商家，請聯絡平台", "This account isn't linked to a vendor yet. Please contact the platform"));
+      if (!vendorId) throw new Error(tr("這個帳號還沒綁定店家，請聯絡平台", "This account isn't linked to a vendor yet. Please contact the platform"));
       if (!file.type.startsWith("image/")) throw new Error(tr("只能上傳圖片檔", "Only image files can be uploaded"));
       if (file.size > MAX_BYTES) throw new Error(tr("圖片不能超過 5MB", "Images must be 5 MB or smaller"));
       const ext = file.name.includes(".") ? file.name.split(".").pop() : "img";
@@ -107,7 +107,7 @@ export function ImageUploadField({ label, vendorId, value, onChange }: Props) {
           onClick={() => fileInputRef.current?.click()}
         >
           <Upload className="w-4 h-4" />
-          {uploading ? tr("上傳中...", "Uploading...") : tr("上傳", "Upload")}
+          {uploading ? tr("上傳中…", "Uploading…") : tr("上傳", "Upload")}
         </Button>
       </div>
       <input

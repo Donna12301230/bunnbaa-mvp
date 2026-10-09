@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { policy } from "@/lib/policy";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, doc, getDocs, getDoc, query, where } from "firebase/firestore";
@@ -240,8 +241,8 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     if (!canAdd || !vendor) return;
     if (cartVendorId && cartVendorId !== item!.vendor_id) {
       toast({
-        title: tr("購物車裡有別家商家的品項", "Your cart has items from another vendor"),
-        description: tr("一次只能跟一家商家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
+        title: tr("購物車裡有別家店家的品項", "Your cart has items from another vendor"),
+        description: tr("一次只能跟一家店家預購，請先結帳或清空購物車再加入。", "You can only pre-order from one vendor at a time. Check out or clear your cart first."),
         variant: "destructive",
       });
       return;
@@ -343,12 +344,12 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              {tr(`取餐前一天 ${vendorCutoffTime(vendor)} 截單，截單前可免費修改；取餐 48 小時前可取消換折價券（原價 30%）。`, `Orders close at ${vendorCutoffTime(vendor)} the day before; change for free until then, or cancel up to 48 hours before pickup for a coupon (30% of the price).`)}
+              {tr(`${policy.cutoff(vendor)}，截單前可免費修改；${policy.cancelShort()}。`, `${policy.cutoff(vendor).replace(/^o/, "O")}; change for free until then, or ${policy.cancelShort()}.`)}
             </p>
             {typhoon && (
               <div className="flex gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
-                {tr("颱風警報期間：這天可能因停班停課取消，取消時會自動全額退款。", "Typhoon warning: this day may be cancelled for a work suspension — you'd get a full automatic refund.")}
+                {tr("颱風警報期間：這天可能因停班停課取消，取消時會自動全額退成平台點數。", "Typhoon warning: this day may be cancelled for a work suspension — you'd get a full automatic refund as BunnBaa points.")}
               </div>
             )}
           </section>
@@ -375,7 +376,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               {mains.length > 0 && (
                 <DishSelectRow label={tr("主菜", "Main")} image={main?.image_url}>
                   <Select aria-label={tr("主菜", "Main")} value={String(mainIndex ?? 0)} disabled={mains.length === 1} onChange={(e) => setMainIndex(Number(e.target.value))}>
-                    {mains.map((m, i) => <option key={i} value={i}>{m.name}{mains.length > 1 ? `（NT$ ${m.price}）` : ""}</option>)}
+                    {mains.map((m, i) => <option key={i} value={i}>{m.name}{mains.length > 1 ? `（NT$${m.price}）` : ""}</option>)}
                   </Select>
                 </DishSelectRow>
               )}
@@ -468,7 +469,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                 ))}
                 <span className="font-semibold text-muted-foreground" aria-hidden="true">→</span>
                 <span className="inline-flex items-center rounded-lg border-2 border-ink bg-ink text-[var(--text-on-inverse)] px-2.5 py-1.5 font-semibold">
-                  {loc(item, "name")}{breakdown ? `・NT$ ${breakdown.total}` : ""}
+                  {loc(item, "name")}{breakdown ? `・NT$${breakdown.total}` : ""}
                 </span>
               </div>
               {extra?.mode === "backup" && extraOpt && <p className="text-xs text-muted-foreground">{tr(`備案：${extraOpt.name}（前面許願沒成立才遞補）`, `Backup: ${extraOpt.name} (only if a wish fails)`)}</p>}
@@ -503,7 +504,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                 className="min-w-0 text-left rounded-xl px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="flex items-center gap-1 font-heading text-xl font-semibold">
-                  {tr("合計", "Total")} NT$ {breakdown ? breakdown.total * qty : "—"}
+                  {tr("合計", "Total")} NT${breakdown ? breakdown.total * qty : "—"}
                   <ChevronUp className={cn("w-4 h-4 transition-transform", !showMaterials && "rotate-180")} aria-hidden="true" />
                 </span>
                 <span className="block text-xs text-muted-foreground truncate">

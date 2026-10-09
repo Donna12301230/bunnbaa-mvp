@@ -11,11 +11,10 @@ import { ComponentDialog, EMPTY_COMP, IngredientDialog, saveCatalogDoc, type Com
 import { useStockOnHand } from "@/hooks/useStockOnHand";
 import { useToast } from "@/hooks/use-toast";
 import { RICE_OPTIONS, componentCost, portionLabel, portionLevelFor, priceDeltaText } from "@/lib/bento";
-import { DEFAULT_PLATFORM_CONFIG as PLATFORM_DEFAULTS } from "@/lib/platformConfig";
 
-const COMMISSION_PCT = Math.round(PLATFORM_DEFAULTS.commissionRate * 1000) / 10;
+const commissionPct = () => Math.round(liveConfig().commissionRate * 1000) / 10;
 import { componentPortionsForLock, costIssue, costIssueText, craftItems, portionsCost, rawNeeds, type CostIssue } from "@/lib/prep";
-import { DEFAULT_PLATFORM_CONFIG } from "@/lib/platformConfig";
+import { liveConfig } from "@/lib/platformConfig";
 import { MEAL_PERIODS, mealPeriodLabel } from "@/lib/pickupSlots";
 import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -104,7 +103,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
   const [picks, setPicks] = useState<number[]>([]);
   const [qty, setQty] = useState(1);
   const { stock, counted } = useStockOnHand(vendorId);
-  const cfg = DEFAULT_PLATFORM_CONFIG;
+  const cfg = liveConfig();
   const mains = value.mains.filter((m) => m.name);
   const slots = value.slots.filter((s) => s.default.name);
   const fields = value.customFields.filter((f) => f.label && f.options.some((o) => o.name));
@@ -216,7 +215,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
           </span>
         ))}
         <span className="text-muted-foreground" aria-hidden="true">→</span>
-        <span className="rounded bg-foreground text-background px-2 py-0.5 font-semibold">{itemName || tr("便當", "Bento")}・NT$ {finalPrice}</span>
+        <span className="rounded bg-foreground text-background px-2 py-0.5 font-semibold">{itemName || tr("便當", "Bento")}・NT${finalPrice}</span>
       </div>
 
       {/* 材料總和（合成格子） */}
@@ -232,7 +231,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
         </div>
         <RecipeCraft
           items={craftItems(needs, ingredientsById, stock)}
-          target={{ name: itemName || tr("便當", "Bento"), sub: qty > 1 ? tr(`× ${qty} 份`, `× ${qty}`) : `NT$ ${finalPrice}` }}
+          target={{ name: itemName || tr("便當", "Bento"), sub: qty > 1 ? tr(`× ${qty} 份`, `× ${qty}`) : `NT$${finalPrice}` }}
           haveNote={counted ? tr("上週六盤點＋本週到貨−已用", "last count + deliveries − used") : tr("理論庫存（上週六未盤點）", "theoretical stock (not counted)")}
           compact
         />
@@ -240,8 +239,8 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
           <p className="text-xs text-amber-800 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 shrink-0" />{tr(`${unlinked.join("、")} 未接配方，不會算進材料、備料和叫貨`, `${unlinked.join(", ")}: no recipe — not counted in prep or purchasing`)}</p>
         )}
         <p className="text-sm flex flex-wrap gap-x-3">
-          <span>{tr("一份成本", "Cost/serving")} <b>NT$ {cost.toFixed(1)}</b>{incomplete && <span className="text-amber-700 text-xs">{tr("（不完整）", " (incomplete)")}</span>}</span>
-          <span>{tr("售價", "Price")} <b>NT$ {finalPrice}</b></span>
+          <span>{tr("一份成本", "Cost/serving")} <b>NT${cost.toFixed(1)}</b>{incomplete && <span className="text-amber-700 text-xs">{tr("（不完整）", " (incomplete)")}</span>}</span>
+          <span>{tr("售價", "Price")} <b>NT${finalPrice}</b></span>
           {finalPrice > 0 && cost > 0 && <span className={margin < LOW_MARGIN ? "text-orange-600 font-semibold" : "text-green-700"}>{tr("毛利", "Margin")} {Math.round(margin * 100)}%{margin < LOW_MARGIN ? tr("（偏低）", " (low)") : ""}</span>}
         </p>
       </div>
@@ -384,7 +383,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
     else onChange({ ...value, parts: [...value.parts, { component_id: v.component_id, name: v.name, portions: 1 }] });
     setAdding(null);
   };
-  const canAdd = !isBento || value.slots.filter((sl) => sl.default.name).length < DEFAULT_PLATFORM_CONFIG.maxSides;
+  const canAdd = !isBento || value.slots.filter((sl) => sl.default.name).length < liveConfig().maxSides;
   const bentoGrid = (
     <div className="rounded-md border border-border bg-white p-2 space-y-2">
       <p className="text-xs font-semibold">{tr("便當格子：點格子改配菜和份量，按「加一格」新增配菜", "Bento cells: tap a cell to edit it, Add for a new dish")}</p>
@@ -446,7 +445,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
       {!isBento ? preview : (
         <>
           <div className="rounded-md border border-border bg-white p-2 space-y-2">
-            <p className="text-xs font-semibold">{tr(`主菜（消費者單選，各自定價，便當價以所選主菜為準；平台每份抽成 ${COMMISSION_PCT}%，定價請加上去）`, `Mains (customer picks one; each has its own price — add the ${COMMISSION_PCT}% platform commission when pricing)`)}</p>
+            <p className="text-xs font-semibold">{tr(`主菜（消費者單選，各自定價，便當價以所選主菜為準；平台每份抽成 ${commissionPct()}%，定價請加上去）`, `Mains (customer picks one; each has its own price — add the ${commissionPct()}% platform commission when pricing)`)}</p>
             {value.mains.map((m, i) => (
               <div key={i} className="flex gap-2 items-start flex-wrap sm:flex-nowrap">
                 <ImageThumbUpload vendorId={vendorId} value={m.image_url} onChange={(url) => setMain(i, { ...m, image_url: url || null })} label={tr("主菜照片", "Main photo")} />
@@ -502,7 +501,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
                           {[1, 0.5].map((l) => <option key={l} value={l}>{portionLabel(l)}</option>)}
                         </select>
                         <Input className="h-9 w-16" type="number" placeholder={tr("週上限", "Cap")} title={tr("本週供應上限（依週進料庫存）", "Weekly cap")} aria-label={tr("週上限", "Weekly cap")} value={c.weekly_cap ?? ""} onChange={(e) => setCand({ weekly_cap: e.target.value ? Number(e.target.value) : null })} />
-                        <Input className="h-9 w-16" type="number" placeholder={tr("最低", "Min")} title={tr(`成立最低量（空白＝店家設定，預設 ${DEFAULT_PLATFORM_CONFIG.candidateMinQty}）`, "Minimum to happen")} aria-label={tr("成立最低量", "Minimum quantity")} value={c.min_qty ?? ""} onChange={(e) => setCand({ min_qty: e.target.value ? Number(e.target.value) : null })} />
+                        <Input className="h-9 w-16" type="number" placeholder={tr("最低", "Min")} title={tr(`成立最低量（空白＝店家設定，預設 ${liveConfig().candidateMinQty}）`, "Minimum to happen")} aria-label={tr("成立最低量", "Minimum quantity")} value={c.min_qty ?? ""} onChange={(e) => setCand({ min_qty: e.target.value ? Number(e.target.value) : null })} />
                       </>
                     )}
                     <span className="self-center">{costBadge(c.component_id, c.name, (id, n) => setCand({ component_id: id, name: c.name || n }))}</span>
@@ -511,7 +510,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
                   </div>
                 );
               })}
-              {slot.candidates.length < DEFAULT_PLATFORM_CONFIG.maxCandidatesPerSlot && (
+              {slot.candidates.length < liveConfig().maxCandidatesPerSlot && (
                 <Button size="sm" variant="outline" className="ml-3" onClick={() => setSlot(i, { ...slot, candidates: [...slot.candidates, { name: "", component_id: null, portion_level: 1, weekly_cap: null, min_qty: null }] })}>
                   <Plus /> {tr("候選菜（同類別，最多 3 道）", "Candidate (same category, max 3)")}
                 </Button>
@@ -519,7 +518,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
             </div>
           ))}
           <div className="flex gap-2 flex-wrap">
-            <Button size="sm" variant="outline" disabled={value.slots.length >= DEFAULT_PLATFORM_CONFIG.maxSides} onClick={() => onChange({ ...value, slots: [...value.slots, { category: "青菜類", default: { name: "" }, candidates: [] }] })}><Plus /> {tr("配菜", "Side")}</Button>
+            <Button size="sm" variant="outline" disabled={value.slots.length >= liveConfig().maxSides} onClick={() => onChange({ ...value, slots: [...value.slots, { category: "青菜類", default: { name: "" }, candidates: [] }] })}><Plus /> {tr("配菜", "Side")}</Button>
             <Button size="sm" variant="outline" onClick={recalc}><Calculator /> {tr("依成本計算份量級距", "Calculate portion levels")}</Button>
             {value.slots.some((sl) => sl.candidates.length > 0) && (
               <Button size="sm" variant="ghost" onClick={() => setCandidateDetails((v) => !v)} aria-expanded={candidateDetails}>
@@ -573,8 +572,8 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
                 <Plus /> {tr("自訂欄位（例：湯品、飲料、辣度）", "Custom field (e.g. soup, drink, spice)")}
               </Button>
               <p className="text-xs text-muted-foreground">
-                {tr(`標準配菜數＝上面的配菜數（建議 3 道）；消費者最多選 ${DEFAULT_PLATFORM_CONFIG.maxSides} 道，第四道可選「備案」（不加價，許願沒成立時遞補）或「加菜」+${DEFAULT_PLATFORM_CONFIG.addonSidePrice}。份量比例＝預設菜單份成本 ÷ 候選菜單份成本；截單後份量鎖定。`,
-                  `Standard sides = the sides above (3 recommended). Customers can pick up to ${DEFAULT_PLATFORM_CONFIG.maxSides}; the 4th is a free backup or a +${DEFAULT_PLATFORM_CONFIG.addonSidePrice} add-on.`)}
+                {tr(`標準配菜數＝上面的配菜數（建議 3 道）；消費者最多選 ${liveConfig().maxSides} 道，第四道可選「備案」（不加價，許願沒成立時遞補）或「加菜」+${liveConfig().addonSidePrice}。份量比例＝預設菜單份成本 ÷ 候選菜單份成本；截單後份量鎖定。`,
+                  `Standard sides = the sides above (3 recommended). Customers can pick up to ${liveConfig().maxSides}; the 4th is a free backup or a +${liveConfig().addonSidePrice} add-on.`)}
               </p>
               </>
             )}

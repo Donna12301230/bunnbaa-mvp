@@ -62,8 +62,8 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
     if (!isLoading && !isVendor) {
       toast(
         user
-          ? { variant: "destructive", title: tr("沒有權限瀏覽此頁面", "You don't have access to this page"), description: tr("此頁面僅限廠商帳號使用，目前登入的帳號權限不足。", "This page is for vendor accounts only.") }
-          : { variant: "destructive", title: tr("請先登入 / 註冊帳號", "Please sign in or sign up"), description: tr("此頁面僅限廠商帳號使用，請先登入廠商帳號。", "This page is for vendor accounts only. Please sign in with a vendor account.") }
+          ? { variant: "destructive", title: tr("沒有權限瀏覽此頁面", "You don't have access to this page"), description: tr("此頁面僅限店家帳號使用，目前登入的帳號權限不足。", "This page is for vendor accounts only.") }
+          : { variant: "destructive", title: tr("請先登入 / 註冊帳號", "Please sign in or sign up"), description: tr("此頁面僅限店家帳號使用，請先登入店家帳號。", "This page is for vendor accounts only. Please sign in with a vendor account.") }
       );
       navigate("/");
     }
@@ -82,7 +82,7 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
           <Link href="/landing" className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <img src="/飯飽wordR.png" alt={tr("飯飽 BunnBaa 首頁", "BunnBaa home")} className="h-8" />
           </Link>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground border border-ink">{tr("商家後台", "Vendor portal")}</span>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground border border-ink">{tr("店家後台", "Vendor portal")}</span>
         </div>
         <Link href="/home" className="flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("看上架顯示", "View storefront")}
@@ -92,7 +92,7 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
       <div className="flex">
         {/* Sidebar */}
         <aside className="w-60 shrink-0 min-h-[calc(100vh-4rem)] border-r border-border p-4 hidden md:flex flex-col">
-          <nav className="flex-1 sticky top-20 space-y-4" aria-label={tr("商家後台", "Vendor portal")}>
+          <nav className="flex-1 sticky top-20 space-y-4" aria-label={tr("店家後台", "Vendor portal")}>
             {navGroups().map((group, i) => (
               <div key={group.title ?? i} className="space-y-1">
                 {group.title && (
@@ -120,7 +120,7 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
         </aside>
 
         {/* Mobile bottom nav */}
-        <nav aria-label={tr("商家後台", "Vendor portal")} className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border flex md:hidden z-50 overflow-x-auto">
+        <nav aria-label={tr("店家後台", "Vendor portal")} className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border flex md:hidden z-50 overflow-x-auto">
           {navItems().map((item) => { const { href, label, icon: Icon } = item; const active = isActive(location, item); return (
             <Link key={href} href={href} aria-current={active ? "page" : undefined} className="flex-1 min-w-[64px]">
               <div className={cn(
