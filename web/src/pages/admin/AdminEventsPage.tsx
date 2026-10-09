@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { selectClass } from "@/lib/fieldStyles";
 import { collection, doc, limit, onSnapshot, orderBy, query, setDoc, updateDoc } from "firebase/firestore";
 import { CloudLightning, ShieldAlert, RefreshCw } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
@@ -12,6 +13,9 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
 import { tr } from "@/lib/i18n";
+import PortalPageHeader from "@/components/PortalPageHeader";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { EmptyState } from "@/components/ds";
 
 interface DisasterEvent { id: string; type: string; counties?: string[]; towns?: string[]; dates?: string[]; source: string; summary?: string; processed?: boolean; result?: { vendors: number; cancelled: number; failed: number; notified: number } }
 interface Anomaly { id: string; type: string; user_id: string; vendor_id: string | null; detail: string; date: string; status: string }
@@ -34,7 +38,8 @@ const anomalyLabel = (t: string) => (ANOMALY_LABEL[t] ? tr(ANOMALY_LABEL[t].zh, 
 function DisasterContent() {
   const { toast } = useToast();
   const confirm = useConfirm();
-  const [events, setEvents] = useState<DisasterEvent[]>([]);
+  const [eventList, setEvents] = useState<DisasterEvent[] | null>(null);
+  const events = eventList ?? [];
   const [form, setForm] = useState({ type: "work_suspension", counties: "", dates: "" });
   const [busy, setBusy] = useState(false);
 
@@ -79,7 +84,7 @@ function DisasterContent() {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">{tr("手動建立天災事件（資料來源失效時的備援）", "Create an event manually")}</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-2 items-end">
-          <select className="h-10 rounded-md border px-2 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+          <select className={selectClass()} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
             {Object.keys(TYPE_LABEL).map((k) => <option key={k} value={k}>{typeLabel(k)}</option>)}
           </select>
           <Input className="w-48" placeholder={tr("縣市（空白＝全部）", "Counties (blank = all)")} value={form.counties} onChange={(e) => setForm({ ...form, counties: e.target.value })} />
@@ -91,7 +96,8 @@ function DisasterContent() {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">{tr("事件紀錄", "Events")}</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm">
-          {events.length === 0 && <p className="text-muted-foreground">{tr("目前沒有事件。", "No events.")}</p>}
+          {eventList === null && <SkeletonBlocks count={3} height={48} className="space-y-2" />}
+          {eventList?.length === 0 && <EmptyState size="compact" icon={<CloudLightning size={32} />} title={tr("目前沒有事件", "No events")} />}
           {events.map((e) => (
             <div key={e.id} className="border-b pb-2">
               <div className="flex items-center gap-2 flex-wrap">
@@ -99,7 +105,7 @@ function DisasterContent() {
                 <span>{(e.counties ?? []).join("、") || tr("全部縣市", "All counties")}{e.towns?.length ? `（${e.towns.join("、")}）` : ""}</span>
                 <span className="text-muted-foreground">{(e.dates ?? []).join("、")}</span>
                 <span className="text-xs text-muted-foreground">{e.source}</span>
-                {e.processed ? <Badge variant="muted" className="bg-green-100 text-green-700">{tr("已處理", "Processed")}</Badge> : <Badge variant="muted" className="bg-amber-100 text-amber-800">{tr("待處理／有失敗", "Pending")}</Badge>}
+                {e.processed ? <Badge variant="muted" className="bg-success-soft text-success-text">{tr("已處理", "Processed")}</Badge> : <Badge variant="muted" className="bg-warning-soft text-warning-text">{tr("待處理／有失敗", "Pending")}</Badge>}
                 {!e.processed && <Button size="sm" variant="outline" disabled={busy} onClick={() => call("reprocessDisasterEvent", { event_id: e.id })}>{tr("重新處理", "Reprocess")}</Button>}
               </div>
               {e.summary && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{e.summary}</p>}
@@ -114,12 +120,14 @@ function DisasterContent() {
 
 /** 異常偵測（§9.5）：標記並通知平台與店家，不自動處分。 */
 function AnomalyContent() {
-  const [items, setItems] = useState<Anomaly[]>([]);
+  const [itemList, setItems] = useState<Anomaly[] | null>(null);
+  const items = itemList ?? [];
   useEffect(() => onSnapshot(query(collection(db, "anomalies"), orderBy("created_at", "desc"), limit(100)), (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Anomaly))), []);
   return (
     <Card>
       <CardContent className="p-4 space-y-2 text-sm">
-        {items.length === 0 && <p className="text-muted-foreground">{tr("目前沒有異常標記。", "No anomalies.")}</p>}
+        {itemList === null && <SkeletonBlocks count={3} height={40} className="space-y-2" />}
+        {itemList?.length === 0 && <EmptyState size="compact" icon={<ShieldAlert size={32} />} title={tr("目前沒有異常標記", "No anomalies")} />}
         {items.map((a) => (
           <div key={a.id} className="flex items-center gap-2 border-b pb-2 flex-wrap">
             <Badge variant="muted">{anomalyLabel(a.type)}</Badge>
@@ -138,7 +146,7 @@ function AnomalyContent() {
 export function AdminDisastersPage() {
   return (
     <AdminLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3 flex items-center gap-2"><CloudLightning className="w-5 h-5" /> {tr("天災事件", "Disaster events")}</h1>
+      <PortalPageHeader icon={CloudLightning} title={tr("天災事件", "Disaster events")} />
       <RequireRealAdmin><DisasterContent /></RequireRealAdmin>
     </AdminLayout>
   );
@@ -147,7 +155,7 @@ export function AdminDisastersPage() {
 export function AdminAnomaliesPage() {
   return (
     <AdminLayout>
-      <h2 className="text-lg font-bold mb-3 flex items-center gap-2"><ShieldAlert className="w-5 h-5" /> {tr("異常審核", "Anomalies")}</h2>
+      <PortalPageHeader icon={ShieldAlert} title={tr("異常審核", "Anomalies")} />
       <RequireRealAdmin><AnomalyContent /></RequireRealAdmin>
     </AdminLayout>
   );

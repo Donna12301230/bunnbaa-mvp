@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPinned, TicketPercent, TrendingUp } from "lucide-react";
+import { BarChart3, MapPinned, TicketPercent, TrendingUp } from "lucide-react";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import RevenuePanel, { REPORT_DAYS } from "@/components/insights/RevenuePanel";
 import AreaPanel from "@/components/insights/AreaPanel";
@@ -7,6 +7,7 @@ import RewardsPanel from "@/components/insights/RewardsPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import PortalPageHeader from "@/components/PortalPageHeader";
 
 export type InsightsTab = "revenue" | "area" | "rewards";
 
@@ -29,12 +30,12 @@ export function InsightsHub({ initial = "revenue" }: { initial?: InsightsTab }) 
 
   return (
     <VendorPortalLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-4">{tr("報表與洞察", "Reports & insights")}</h1>
+      <PortalPageHeader icon={BarChart3} title={tr("報表與洞察", "Reports & insights")} />
       <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5" role="tablist">
         {tabs.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
             className={cn("rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", tab === t.key ? "border-foreground bg-card shadow-sm" : "border-border bg-card/60 hover:bg-card")}>
-            <span className="flex items-center gap-1.5 font-semibold"><t.icon className="w-5 h-5 text-orange-500" />{t.label}</span>
+            <span className="flex items-center gap-1.5 font-semibold"><t.icon className="w-5 h-5 text-accent-foreground" />{t.label}</span>
             <span className="mt-1 block text-xl sm:text-2xl font-bold leading-none tabular-nums truncate">{t.v}</span>
             <span className="text-xs text-muted-foreground">{t.sub}</span>
           </button>

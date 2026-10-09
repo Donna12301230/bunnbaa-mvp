@@ -14,6 +14,7 @@ import { PENDING_STATUSES } from "@/lib/lockOutcome";
 import { todayStr } from "@/lib/pickupSlots";
 import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import PortalPageHeader from "@/components/PortalPageHeader";
 import type { CharityMeal, Lock } from "@/types";
 
 export type OrdersTab = "pickup" | "charity" | "orders" | "slots";
@@ -65,12 +66,12 @@ export function OrdersHub({ initial = "pickup" }: { initial?: OrdersTab }) {
 
   return (
     <VendorPortalLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-4">{tr("訂單取餐", "Orders & pickup")}</h1>
+      <PortalPageHeader icon={ClipboardList} title={tr("訂單取餐", "Orders & pickup")} />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5" role="tablist">
         {tabs.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
             className={cn("rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", tab === t.key ? "border-foreground bg-card shadow-sm" : "border-border bg-card/60 hover:bg-card")}>
-            <span className="flex items-center gap-1.5 font-semibold"><t.icon className="w-5 h-5 text-orange-500" />{t.label}</span>
+            <span className="flex items-center gap-1.5 font-semibold"><t.icon className="w-5 h-5 text-accent-foreground" />{t.label}</span>
             <span className="mt-1 block text-2xl font-bold leading-none">{t.n}</span>
             <span className="text-xs text-muted-foreground">{t.sub}</span>
           </button>

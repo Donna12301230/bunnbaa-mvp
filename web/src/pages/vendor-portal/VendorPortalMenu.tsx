@@ -35,6 +35,7 @@ import { useVendorCatalog } from "@/hooks/useVendorCatalog";
 import { useVendorMenu } from "@/hooks/useVendorMenu";
 import BentoBox, { itemCells, MarginBar } from "@/components/BentoBox";
 import InfoTip from "@/components/InfoTip";
+import PortalPageHeader from "@/components/PortalPageHeader";
 import { fillingText, useRecipeGaps } from "@/components/RecipeGapCard";
 import { recipeTargets } from "@/lib/aiFill";
 import { GROUP_DOT, groupLabel, type FoodGroup } from "@/lib/foodColors";
@@ -328,12 +329,13 @@ export default function VendorPortalMenu() {
 
   return (
     <VendorPortalLayout>
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h1 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-1">
+      <PortalPageHeader
+        icon={UtensilsCrossed}
+        title={<>
           {tr("菜單管理", "Menu")}
           <InfoTip>{tr("每道菜長得像一個便當：每格是一道配菜，顏色是食材類別。格子都填好，系統就能算每份成本、毛利，並自動產生叫貨單和備料。單價、供應商在「食材與供應商」。", "Each item looks like a bento box: each cell is a dish, colored by food group. Fill the cells and cost, margin, purchasing and prep are calculated for you. Prices and suppliers live in Ingredients.")}</InfoTip>
-        </h1>
-        <div className="flex gap-2">
+        </>}
+        actions={<>
           <input
             ref={photoInput}
             type="file"
@@ -354,8 +356,8 @@ export default function VendorPortalMenu() {
           <Button  onClick={openAdd}>
             <Plus className="w-4 h-4 mr-1" /> {tr("新增品項", "Add item")}
           </Button>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* 菜單完成度：只回答「哪些菜可以算成本」 */}
       {gaps.stats && gaps.listed.length > 0 && (
@@ -366,8 +368,8 @@ export default function VendorPortalMenu() {
               <p className="font-heading text-3xl font-semibold leading-none">
                 {gaps.stats.ready.length}<span className="text-lg text-muted-foreground"> / {gaps.listed.length} {tr("道", "")}</span>
               </p>
-              <div className="h-2.5 w-full max-w-xs overflow-hidden rounded-full bg-stone-200">
-                <div className="h-full bg-green-500 transition-all" style={{ width: `${Math.round((gaps.stats.ready.length / gaps.listed.length) * 100)}%` }} />
+              <div className="h-2.5 w-full max-w-xs overflow-hidden rounded-full bg-border">
+                <div className="h-full bg-success-strong transition-all" style={{ width: `${Math.round((gaps.stats.ready.length / gaps.listed.length) * 100)}%` }} />
               </div>
             </div>
             {gaps.stats.gapItems.length > 0 ? (
@@ -375,7 +377,7 @@ export default function VendorPortalMenu() {
                 <Sparkles /> {gaps.progress ? fillingText(gaps.progress) : tr(`一次補完全部（${gaps.stats.gapItems.length} 道）`, `Fill them all (${gaps.stats.gapItems.length})`)}
               </Button>
             ) : gaps.stats.unpriced.length > 0 ? (
-              <Link href="/vendor-portal/recipes" className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-200">
+              <Link href="/vendor-portal/recipes" className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1.5 text-sm font-medium text-warning-text hover:bg-warning/30">
                 <AlertTriangle className="w-4 h-4" />{tr(`缺單價：${gaps.stats.unpriced.slice(0, 2).map(([, n]) => n).join("、")}`, `No price: ${gaps.stats.unpriced.slice(0, 2).map(([, n]) => n).join(", ")}`)}{gaps.stats.unpriced.length > 2 ? tr(` 等 ${gaps.stats.unpriced.length} 項`, "…") : ""}
               </Link>
             ) : null}
@@ -389,28 +391,28 @@ export default function VendorPortalMenu() {
       )}
 
       {drafts.length > 0 && (
-        <Card className="mb-5 border-orange-200 bg-orange-50/40">
+        <Card className="mb-5 border-brand/40 bg-accent/40">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="font-semibold flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-orange-500" /> {tr(`AI 讀到 ${drafts.length} 個品項草稿`, `AI found ${drafts.length} draft item(s)`)}</p>
+                <p className="font-semibold flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-accent-foreground" /> {tr(`AI 讀到 ${drafts.length} 個品項草稿`, `AI found ${drafts.length} draft item(s)`)}</p>
                 <p className="text-xs text-muted-foreground">{tr("草稿還沒上架。按「填入表單」確認價格、飲食標記與過敏原後再儲存。", "Nothing is listed yet. Use Fill in form to check price, dietary tags and allergens, then save.")}</p>
-                {draftNote && <p className="text-xs text-amber-700 mt-1">{draftNote}</p>}
+                {draftNote && <p className="text-xs text-warning-text mt-1">{draftNote}</p>}
               </div>
               <Button variant="ghost" size="sm" onClick={() => { setDrafts([]); setDraftNote(""); }}>{tr("全部清除", "Clear all")}</Button>
             </div>
             <div className="space-y-2">
               {drafts.map((d, i) => (
-                <div key={`${d.name}-${i}`} className="flex items-center gap-3 bg-white rounded-lg border px-3 py-2">
+                <div key={`${d.name}-${i}`} className="flex items-center gap-3 bg-card rounded-lg border px-3 py-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">{d.name}</span>
                       <span className="text-xs text-muted-foreground">{d.category}</span>
-                      {d.dietary_tags.map((tag) => <Badge key={tag} variant="outline" className="text-xs text-green-700 border-green-200">{tr(tag, tagEn(tag))}</Badge>)}
+                      {d.dietary_tags.map((tag) => <Badge key={tag} variant="outline" className="text-xs text-success-text border-success/40">{tr(tag, tagEn(tag))}</Badge>)}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {d.price ? `NT$${d.price}` : tr("價格未讀到", "No price found")}
-                      {d.allergens.length > 0 && <span className="text-red-500">{tr("・可能含：", " · May contain: ")}{d.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</span>}
+                      {d.allergens.length > 0 && <span className="text-danger-text">{tr("・可能含：", " · May contain: ")}{d.allergens.map((a) => tr(a, tagEn(a))).join(tr("、", ", "))}</span>}
                     </div>
                   </div>
                   <Button size="sm" onClick={() => openDraft(i)}>{tr("填入表單", "Fill in form")}</Button>
@@ -456,10 +458,10 @@ export default function VendorPortalMenu() {
                             <button type="button" className="font-heading text-lg font-semibold text-left hover:underline" onClick={() => openEdit(item)}>{item.name}</button>
                             {!item.is_available && <Badge variant="secondary" className="text-xs">{tr("已下架", "Unavailable")}</Badge>}
                             {hasAiDraft(item) && (
-                              <Badge variant="outline" className="text-xs text-orange-700 border-orange-300"><Sparkles className="w-3 h-3 mr-0.5" />{tr("AI 草稿", "AI draft")}</Badge>
+                              <Badge variant="outline" className="text-xs text-accent-foreground border-brand/40"><Sparkles className="w-3 h-3 mr-0.5" />{tr("AI 草稿", "AI draft")}</Badge>
                             )}
                           </div>
-                          <div className="text-orange-600 font-semibold text-sm">NT${item.price}{(item.mains?.length ?? 0) > 1 ? tr(" 起", "+") : ""}</div>
+                          <div className="text-accent-foreground font-semibold text-sm">NT${item.price}{(item.mains?.length ?? 0) > 1 ? tr(" 起", "+") : ""}</div>
                           {(() => {
                             if (!catalog) return null;
                             const targets = recipeTargets(item, catalog);
@@ -476,7 +478,7 @@ export default function VendorPortalMenu() {
                             const issue = issuesById[item.id]?.[0];
                             if (issue) {
                               return (
-                                <button type="button" className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-xs font-medium hover:bg-amber-200" onClick={() => openEdit(item)}>
+                                <button type="button" className="inline-flex items-center gap-1 rounded-full bg-warning-soft text-warning-text px-2 py-0.5 text-xs font-medium hover:bg-warning/30" onClick={() => openEdit(item)}>
                                   <AlertTriangle className="w-3 h-3 shrink-0" />{costIssueText(issue.issue)}
                                 </button>
                               );
@@ -490,7 +492,7 @@ export default function VendorPortalMenu() {
                           <Button variant="ghost" size="icon" className="w-8 h-8" aria-label={tr(`編輯「${item.name}」`, `Edit ${item.name}`)} onClick={() => openEdit(item)}>
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="w-8 h-8 text-red-500"
+                          <Button variant="ghost" size="icon" className="w-8 h-8 text-danger-text"
                             aria-label={tr(`刪除「${item.name}」`, `Delete ${item.name}`)}
                             onClick={async () => {
                               if (await confirm({ title: tr(`要刪除「${item.name}」嗎？`, `Delete ${item.name}?`), description: tr("刪除後無法復原。", "This can't be undone."), confirmLabel: tr("確定刪除", "Delete"), destructive: true })) {
@@ -516,7 +518,7 @@ export default function VendorPortalMenu() {
             <DialogTitle>{editId ? tr("編輯品項", "Edit item") : tr("新增品項", "Add item")}</DialogTitle>
           </DialogHeader>
           {activeDraft !== null && (
-            <p className="text-xs text-amber-800 bg-amber-50 rounded p-2">{tr("這是 AI 從照片讀出的草稿，請確認價格、飲食標記與過敏原（食安法規定）正確再儲存。", "This is an AI draft from your photo. Check price, dietary tags and allergens (required by law) before saving.")}</p>
+            <p className="text-xs text-warning-text bg-warning-soft rounded p-2">{tr("這是 AI 從照片讀出的草稿，請確認價格、飲食標記與過敏原（食安法規定）正確再儲存。", "This is an AI draft from your photo. Check price, dietary tags and allergens (required by law) before saving.")}</p>
           )}
           {/* 2026-10-09 簡化：①必填的基本資料 ②便當內容與價格 ③過敏原（法規），說明、英文、目錄、飲食標記收進「更多設定」 */}
           <div className="space-y-4 py-2">
@@ -566,14 +568,14 @@ export default function VendorPortalMenu() {
                 {bento.itemType === "bento" ? tr("② 便當內容與價格（價格依主菜設定）", "② Contents & price (priced per main)") : tr("② 內容", "② Contents")}
               </h3>
               {nextWeekLocked && bento.itemType === "bento" && (
-                <p className="text-xs text-amber-700 bg-amber-50 rounded p-2">{tr("下週叫貨單已產生，下週主菜已鎖定；請只做等值的配菜替換。", "Next week's purchase list is out, so mains are locked — only swap sides for equivalents.")}</p>
+                <p className="text-xs text-warning-text bg-warning-soft rounded p-2">{tr("下週叫貨單已產生，下週主菜已鎖定；請只做等值的配菜替換。", "Next week's purchase list is out, so mains are locked — only swap sides for equivalents.")}</p>
               )}
               <BentoEditor itemName={form.name} itemPrice={Number(form.price) || 0} value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} orderCount={editId && nextDay && nextDayCounts?.[editId] ? { label: tr(`${nextDay.slice(5)} 已訂`, `${nextDay.slice(5)} booked`), n: nextDayCounts[editId] } : undefined} />
             </section>
 
             {/* 過敏原標示（食安法要求）：唯一必看的標示，留在外面 */}
             <section aria-labelledby="menu-step-allergens">
-              <h3 id="menu-step-allergens" className="text-sm font-semibold mb-1.5">{tr("③ 過敏原標示", "③ Allergens")} <span className="text-xs text-red-500 font-normal">{tr("（食安法規定）", "(required by food safety law)")}</span></h3>
+              <h3 id="menu-step-allergens" className="text-sm font-semibold mb-1.5">{tr("③ 過敏原標示", "③ Allergens")} <span className="text-xs text-danger-text font-normal">{tr("（食安法規定）", "(required by food safety law)")}</span></h3>
               <div className="flex flex-wrap gap-2">
                 {ALLERGEN_LIST.map(tag => (
                   <Tag key={tag} selected={form.allergens.includes(tag)} onClick={() => toggleTag("allergens", tag)}>
@@ -604,7 +606,7 @@ export default function VendorPortalMenu() {
                   </div>
                 </div>
                 {/* 英文版（給英文介面的顧客看） */}
-                <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
+                <div className="border rounded-lg p-3 space-y-2 bg-background">
                   <p className="text-xs font-semibold text-muted-foreground">
                     {tr("英文版（自動翻譯，可修改）", "English (auto-translated, editable)")}
                   </p>

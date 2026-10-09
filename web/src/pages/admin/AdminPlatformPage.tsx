@@ -14,13 +14,15 @@ import { db } from "@/lib/firebase";
 import { queryClient } from "@/lib/queryClient";
 import { DEFAULT_PLATFORM_CONFIG, PLATFORM_CONFIG_FIELDS, usePlatformConfig, type PlatformConfig } from "@/lib/platformConfig";
 import { tr } from "@/lib/i18n";
+import PortalPageHeader from "@/components/PortalPageHeader";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 /**
  * 平台全域參數（規格 §2）：存於 platformConfig/global，平台統一設定；第一階段店家只能在
  * 「店家可調」的範圍內調整。Functions 與前端都讀同一份（缺的欄位用預設值）。
  */
 function PlatformContent() {
-  const { data: config } = usePlatformConfig();
+  const { data: config, isLoading } = usePlatformConfig();
   const { toast } = useToast();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -49,6 +51,8 @@ function PlatformContent() {
       setSaving(false);
     }
   }
+
+  if (isLoading) return <SkeletonBlocks count={6} height={36} className="space-y-2" />;
 
   return (
     <Card>
@@ -82,7 +86,7 @@ function PlatformContent() {
 export default function AdminPlatformPage() {
   return (
     <AdminLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3 flex items-center gap-2"><SlidersHorizontal className="w-5 h-5" /> {tr("平台參數", "Platform parameters")}</h1>
+      <PortalPageHeader icon={SlidersHorizontal} title={tr("平台參數", "Platform parameters")} />
       <RequireRealAdmin><PlatformContent /></RequireRealAdmin>
     </AdminLayout>
   );

@@ -15,6 +15,9 @@ import { toast } from "@/hooks/use-toast";
 import { usePrompt } from "@/components/ConfirmDialog";
 import { httpsCallable } from "@/lib/callable";
 import { functions } from "@/lib/firebase";
+import PortalPageHeader from "@/components/PortalPageHeader";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { EmptyState } from "@/components/ds";
 
 // 狀態文字：全站共用 lib/lockOutcome.ts，管理頁用比較精確的說法（例：未取餐（舊制））
 const ALL_STATUSES: LockStatus[] = ["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "no_show", "charity", "cancelling", "cancelled"];
@@ -28,7 +31,8 @@ const statusLabels = () => Object.fromEntries(ALL_STATUSES.map((st) => [st, lock
  * new composite index for what's a handful of documents at pilot scale.
  */
 function LocksContent() {
-  const [locks, setLocks] = useState<Lock[]>([]);
+  const [lockList, setLocks] = useState<Lock[] | null>(null);
+  const locks = useMemo(() => lockList ?? [], [lockList]);
   const [vendors, setVendors] = useState<Record<string, Vendor>>({});
   const [statusFilter, setStatusFilter] = useState<LockStatus | "all">("all");
   const [vendorFilter, setVendorFilter] = useState<string>("all");
@@ -144,11 +148,10 @@ function LocksContent() {
         </Select>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>{tr("沒有符合條件的訂單", "No matching orders")}</p>
-        </div>
+      {lockList === null ? (
+        <SkeletonBlocks count={3} height={112} className="space-y-3" />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={<ClipboardList size={32} />} title={tr("沒有符合條件的訂單", "No matching orders")} />
       ) : (
         <div className="space-y-3">
           {filtered.map((lock) => (
@@ -209,7 +212,7 @@ function LocksContent() {
 export default function AdminLocksPage() {
   return (
     <AdminLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-3">{tr("訂單總覽", "Orders")}</h1>
+      <PortalPageHeader icon={ClipboardList} title={tr("訂單總覽", "Orders")} />
       <RequireRealAdmin>
         <LocksContent />
       </RequireRealAdmin>

@@ -13,8 +13,10 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import {
   Settings, Plus, Minus, CreditCard, AlertTriangle, CheckCircle2, Image as ImageIcon, LocateFixed, Mail, MapPin, Phone, Save, SlidersHorizontal, Store,
-  Clock, X, CalendarOff, Copy, LoaderCircle, Timer, Users } from "lucide-react";
+  Clock, X, CalendarOff, Copy, Timer, Users } from "lucide-react";
 import InfoTip from "@/components/InfoTip";
+import PortalPageHeader from "@/components/PortalPageHeader";
+import { Spinner } from "@/components/ds";
 import { cn } from "@/lib/utils";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, parseISO, startOfMonth } from "date-fns";
@@ -222,10 +224,7 @@ export default function VendorPortalSettings() {
   if (realVendorLoading) return (
     <VendorPortalLayout>
       <div className="flex justify-center py-20">
-        <div role="status" className="flex flex-col items-center gap-2 text-muted-foreground">
-          <LoaderCircle className="w-6 h-6 animate-spin text-orange-400 motion-reduce:animate-none" aria-hidden="true" />
-          <span className="sr-only">{tr("載入中", "Loading")}</span>
-        </div>
+        <Spinner size={24} className="text-muted-foreground" />
       </div>
     </VendorPortalLayout>
   );
@@ -255,19 +254,17 @@ export default function VendorPortalSettings() {
 
   return (
     <VendorPortalLayout>
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold mb-4 flex items-center gap-2">
-        <Settings className="w-6 h-6 text-orange-500" /> {tr("店家設定", "Store settings")}
-      </h1>
+      <PortalPageHeader icon={Settings} title={tr("店家設定", "Store settings")} />
 
       {/* 五張大分頁卡，每張一行現況 */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-5" role="tablist">
         {sections.map((s) => (
           <button key={s.key} type="button" role="tab" aria-selected={section === s.key} onClick={() => setSection(s.key)}
             className={cn("relative rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", section === s.key ? "border-foreground bg-card shadow-sm" : "border-border bg-card/60 hover:bg-card")}>
-            <s.icon className="w-5 h-5 text-orange-500" />
+            <s.icon className="w-5 h-5 text-accent-foreground" />
             <p className="mt-1 font-semibold">{s.label}</p>
             <p className="text-xs text-muted-foreground leading-snug">{s.sub}</p>
-            {s.warn && <AlertTriangle className="absolute top-2.5 right-2.5 w-4 h-4 text-amber-500" aria-label={tr("待補", "Needs attention")} />}
+            {s.warn && <AlertTriangle className="absolute top-2.5 right-2.5 w-4 h-4 text-primary" aria-label={tr("待補", "Needs attention")} />}
           </button>
         ))}
       </div>
@@ -276,7 +273,7 @@ export default function VendorPortalSettings() {
         {/* ── 店面 ── */}
         {section === "store" && (
           <Card className="border-2 overflow-hidden">
-            <div className="relative h-40 sm:h-52 bg-stone-100">
+            <div className="relative h-40 sm:h-52 bg-muted">
               {coverImage ? <img src={coverImage} alt={tr("店家封面", "Cover")} className="w-full h-full object-cover" /> : (
                 <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground"><ImageIcon className="w-10 h-10" /><span className="text-sm">{tr("還沒有封面照片", "No cover photo yet")}</span></div>
               )}
@@ -310,7 +307,7 @@ export default function VendorPortalSettings() {
             <Card className="border-2">
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold flex items-center gap-1.5"><Clock className="w-4 h-4 text-orange-500" />{tr("每週營業時間", "Weekly hours")}<InfoTip>{tr("點星期幾切換營業／休息。訂餐截止是關店前 30 分鐘。", "Tap a day to toggle open/closed. Ordering closes 30 min before closing.")}</InfoTip></p>
+                  <p className="font-semibold flex items-center gap-1.5"><Clock className="w-4 h-4 text-accent-foreground" />{tr("每週營業時間", "Weekly hours")}<InfoTip>{tr("點星期幾切換營業／休息。訂餐截止是關店前 30 分鐘。", "Tap a day to toggle open/closed. Ordering closes 30 min before closing.")}</InfoTip></p>
                   {openDaysCount > 1 && <Button type="button" variant="ghost" size="sm" onClick={syncAllOpenTimes}><Copy /> {tr("全部照第一天", "Copy first day")}</Button>}
                 </div>
                 {businessHours.map(h => {
@@ -321,12 +318,12 @@ export default function VendorPortalSettings() {
                     <div key={h.weekday} className="flex flex-wrap items-center gap-2 sm:gap-3">
                       <button type="button" onClick={() => setBH(h.weekday, { open: !h.open })} aria-pressed={h.open}
                         aria-label={tr(`星期${dayNames()[h.weekday]}${h.open ? "營業" : "公休"}`, `${dayNames()[h.weekday]}: ${h.open ? "open" : "closed"}`)}
-                        className={cn("w-11 h-11 shrink-0 rounded-xl text-base font-bold border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", h.open ? "bg-orange-500 text-white border-orange-500" : "bg-card text-muted-foreground border-border")}>
+                        className={cn("w-11 h-11 shrink-0 rounded-xl text-base font-bold border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", h.open ? "bg-primary text-white border-primary" : "bg-card text-muted-foreground border-border")}>
                         {dayNames()[h.weekday]}
                       </button>
-                      <div className="relative flex-1 min-w-[8rem] h-7 rounded-md bg-stone-100 overflow-hidden" aria-hidden="true">
-                        {h.open && b > a && <div className="absolute top-0 bottom-0 bg-orange-300" style={{ left: `${a}%`, width: `${b - a}%` }} />}
-                        {[6, 12, 18].map((x) => <div key={x} className="absolute top-0 bottom-0 w-px bg-stone-300" style={{ left: `${(x / 24) * 100}%` }} />)}
+                      <div className="relative flex-1 min-w-[8rem] h-7 rounded-md bg-muted overflow-hidden" aria-hidden="true">
+                        {h.open && b > a && <div className="absolute top-0 bottom-0 bg-brand/50" style={{ left: `${a}%`, width: `${b - a}%` }} />}
+                        {[6, 12, 18].map((x) => <div key={x} className="absolute top-0 bottom-0 w-px bg-input" style={{ left: `${(x / 24) * 100}%` }} />)}
                         {!h.open && <span className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">{tr("休息", "Closed")}</span>}
                       </div>
                       {h.open && (
@@ -346,13 +343,13 @@ export default function VendorPortalSettings() {
 
             <Card className="border-2">
               <CardContent className="p-4 space-y-3">
-                <p className="font-semibold flex items-center gap-1.5"><CalendarOff className="w-4 h-4 text-orange-500" />{tr("公休日：點日期就休息", "Closing days: tap a date")}<InfoTip>{tr("國定假日、臨時休息等特定日期，優先於每週營業時間。再點一次取消。", "Specific dates like holidays; override weekly hours. Tap again to undo.")}</InfoTip></p>
+                <p className="font-semibold flex items-center gap-1.5"><CalendarOff className="w-4 h-4 text-accent-foreground" />{tr("公休日：點日期就休息", "Closing days: tap a date")}<InfoTip>{tr("國定假日、臨時休息等特定日期，優先於每週營業時間。再點一次取消。", "Specific dates like holidays; override weekly hours. Tap again to undo.")}</InfoTip></p>
                 <div className="grid sm:grid-cols-2 gap-4">
                   {[0, 1].map((k) => <MonthGrid key={k} offset={k} holidays={holidays} closedWeekdays={businessHours.filter((h) => !h.open).map((h) => h.weekday)} onToggle={(d) => setHolidays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort())} />)}
                 </div>
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-red-500" />{tr("公休", "Closed")}</span>
-                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-stone-200" />{tr("每週休息", "Weekly off")}</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-destructive" />{tr("公休", "Closed")}</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-border" />{tr("每週休息", "Weekly off")}</span>
                   <span className="ml-auto inline-flex items-center gap-1.5">
                     {tr("更遠的日期：", "Later date:")}
                     <Input type="date" value={newHoliday} min={today} onChange={e => setNewHoliday(e.target.value)} className="h-8 w-40" />
@@ -362,7 +359,7 @@ export default function VendorPortalSettings() {
                 {upcomingHolidays.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {upcomingHolidays.map(d => (
-                      <button key={d} type="button" onClick={() => setHolidays(prev => prev.filter(x => x !== d))} className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-sm text-red-800 hover:bg-red-100" aria-label={tr(`移除公休日 ${fmtHoliday(d)}`, `Remove ${fmtHoliday(d)}`)}>
+                      <button key={d} type="button" onClick={() => setHolidays(prev => prev.filter(x => x !== d))} className="inline-flex items-center gap-1 rounded-full bg-danger-soft border border-danger/40 px-2.5 py-1 text-sm text-danger-text hover:bg-danger/25" aria-label={tr(`移除公休日 ${fmtHoliday(d)}`, `Remove ${fmtHoliday(d)}`)}>
                         {fmtHoliday(d)} <X className="w-3.5 h-3.5" />
                       </button>
                     ))}
@@ -378,16 +375,16 @@ export default function VendorPortalSettings() {
           <>
             <Card className="border-2">
               <CardContent className="p-4 space-y-3">
-                <p className="font-semibold flex items-center gap-1.5"><Timer className="w-4 h-4 text-orange-500" />{tr("取餐時段", "Pickup times")}<InfoTip>{tr("消費者只能選這些時段。依開始時間歸早餐 06:00–10:30／午餐 10:30–14:00／晚餐 16:30–20:00，每個餐期整段不超過 2 小時。休息日、公休日不開放。", "Customers can only choose these times. Each slot belongs to breakfast/lunch/dinner by start time; each meal's window is at most 2 hours.")}</InfoTip></p>
-                <div className="relative h-14 rounded-lg bg-stone-100 overflow-hidden" role="img" aria-label={pickupWindows.map(slotLabel).join("、")}>
+                <p className="font-semibold flex items-center gap-1.5"><Timer className="w-4 h-4 text-accent-foreground" />{tr("取餐時段", "Pickup times")}<InfoTip>{tr("消費者只能選這些時段。依開始時間歸早餐 06:00–10:30／午餐 10:30–14:00／晚餐 16:30–20:00，每個餐期整段不超過 2 小時。休息日、公休日不開放。", "Customers can only choose these times. Each slot belongs to breakfast/lunch/dinner by start time; each meal's window is at most 2 hours.")}</InfoTip></p>
+                <div className="relative h-14 rounded-lg bg-muted overflow-hidden" role="img" aria-label={pickupWindows.map(slotLabel).join("、")}>
                   {MEAL_PERIODS.map((p) => (
-                    <div key={p} className="absolute top-0 bottom-0 bg-amber-100/80 border-x border-amber-200" style={bandOf(DEFAULT_PLATFORM_CONFIG.mealPeriods[p])}>
-                      <span className="absolute top-0.5 left-1 text-[10px] text-amber-800">{mealPeriodLabel(p)}</span>
+                    <div key={p} className="absolute top-0 bottom-0 bg-warning-soft/80 border-x border-warning/50" style={bandOf(DEFAULT_PLATFORM_CONFIG.mealPeriods[p])}>
+                      <span className="absolute top-0.5 left-1 text-[10px] text-warning-text">{mealPeriodLabel(p)}</span>
                     </div>
                   ))}
                   {pickupWindows.filter(isValidWindow).map((w, i) => {
                     const [a, b] = w.split("-");
-                    return <div key={i} className="absolute bottom-1.5 h-6 rounded bg-orange-500 border border-white" style={{ left: pos(a), width: `calc(${pos(b)} - ${pos(a)})` }} title={slotLabel(w)} />;
+                    return <div key={i} className="absolute bottom-1.5 h-6 rounded bg-primary border border-white" style={{ left: pos(a), width: `calc(${pos(b)} - ${pos(a)})` }} title={slotLabel(w)} />;
                   })}
                 </div>
                 <div className="flex justify-between text-[11px] text-muted-foreground font-mono" aria-hidden="true">{["06", "09", "12", "15", "18", "20:30"].map((x) => <span key={x}>{x}</span>)}</div>
@@ -396,23 +393,23 @@ export default function VendorPortalSettings() {
                     const [start, end] = pickupWindows[i].split("-");
                     return (
                       <div key={i} className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1.5">
-                        <span className="w-9 text-xs font-semibold text-amber-800">{isValidWindow(pickupWindows[i]) ? mealPeriodLabel(mealPeriodOf(pickupWindows[i])) : ""}</span>
+                        <span className="w-9 text-xs font-semibold text-warning-text">{isValidWindow(pickupWindows[i]) ? mealPeriodLabel(mealPeriodOf(pickupWindows[i])) : ""}</span>
                         <Input type="time" value={start} aria-label={tr(`第 ${i + 1} 個時段開始`, `Pickup time ${i + 1} start`)} onChange={e => setWindowPart(i, 0, e.target.value)} className="h-9 w-[6.4rem] px-2" />
                         <span className="text-muted-foreground text-xs">─</span>
                         <Input type="time" value={end} aria-label={tr(`第 ${i + 1} 個時段結束`, `Pickup time ${i + 1} end`)} onChange={e => setWindowPart(i, 1, e.target.value)} className="h-9 w-[6.4rem] px-2" />
-                        <Button type="button" variant="ghost" size="icon" className="ml-auto h-8 w-8 text-muted-foreground hover:text-red-600" aria-label={tr(`刪除第 ${i + 1} 個時段`, `Delete pickup time ${i + 1}`)} disabled={pickupWindows.length <= 1} onClick={() => setPickupWindows(prev => prev.filter((_, j) => j !== i))}><X className="w-4 h-4" /></Button>
+                        <Button type="button" variant="ghost" size="icon" className="ml-auto h-8 w-8 text-muted-foreground hover:text-danger-text" aria-label={tr(`刪除第 ${i + 1} 個時段`, `Delete pickup time ${i + 1}`)} disabled={pickupWindows.length <= 1} onClick={() => setPickupWindows(prev => prev.filter((_, j) => j !== i))}><X className="w-4 h-4" /></Button>
                       </div>
                     );
                   })}
                 </div>
-                {windowsProblem && <p className="text-sm text-red-600 flex items-center gap-1"><AlertTriangle className="w-4 h-4" />{windowsProblem}</p>}
+                {windowsProblem && <p className="text-sm text-danger-text flex items-center gap-1"><AlertTriangle className="w-4 h-4" />{windowsProblem}</p>}
                 <Button type="button" size="sm" variant="outline" onClick={addPickupWindow} disabled={pickupWindows.length >= MAX_PICKUP_WINDOWS}><Plus /> {tr("加一個時段", "Add a time")}</Button>
               </CardContent>
             </Card>
 
             <Card className="border-2">
               <CardContent className="p-4 space-y-2">
-                <p className="font-semibold flex items-center gap-1.5"><Users className="w-4 h-4 text-orange-500" />{tr("每個時段最多做幾份", "Max meals per pickup time")}<InfoTip>{tr("同一天同一時段所有餐點合計，額滿後消費者就選不到這個時段。0 代表不限。", "Total across all items for one date and time. 0 = no limit.")}</InfoTip></p>
+                <p className="font-semibold flex items-center gap-1.5"><Users className="w-4 h-4 text-accent-foreground" />{tr("每個時段最多做幾份", "Max meals per pickup time")}<InfoTip>{tr("同一天同一時段所有餐點合計，額滿後消費者就選不到這個時段。0 代表不限。", "Total across all items for one date and time. 0 = no limit.")}</InfoTip></p>
                 <div className="flex flex-wrap items-center gap-3">
                   <Stepper value={Number(slotCapacity) || 0} step={5} onChange={(n) => setSlotCapacity(n > 0 ? String(n) : "")} label={tr("份數上限", "Limit")} />
                   <span className="text-lg font-semibold">{Number(slotCapacity) > 0 ? tr(`${slotCapacity} 份`, `${slotCapacity} meals`) : tr("不限", "No limit")}</span>
@@ -437,7 +434,7 @@ export default function VendorPortalSettings() {
                 <CardContent className="p-4 space-y-2">
                   <p className="text-sm font-semibold flex items-center gap-1">{tr("叫貨多備", "Safety stock")}<InfoTip>{tr("叫貨時預測用量多抓這個比例，以免不夠。", "Purchasing adds this % on top of forecast use.")}</InfoTip></p>
                   <p className="text-3xl font-bold">+{safetyRate || 0}%</p>
-                  <input type="range" min={0} max={50} step={5} value={Number(safetyRate) || 0} onChange={(e) => setSafetyRate(e.target.value)} className="w-full accent-orange-500" aria-label={tr("安全庫存", "Safety stock")} />
+                  <input type="range" min={0} max={50} step={5} value={Number(safetyRate) || 0} onChange={(e) => setSafetyRate(e.target.value)} className="w-full accent-primary" aria-label={tr("安全庫存", "Safety stock")} />
                 </CardContent>
               </Card>
               <Card className="border-2">
@@ -449,10 +446,10 @@ export default function VendorPortalSettings() {
               </Card>
             </div>
 
-            <Card className={cn("border-2", (!lat || !lng) && "border-amber-300")}>
+            <Card className={cn("border-2", (!lat || !lng) && "border-warning/50")}>
               <CardContent className="p-4 space-y-2">
-                <p className="font-semibold flex items-center gap-1.5"><MapPin className="w-4 h-4 text-orange-500" />{tr("取餐點位置", "Pickup location")}<InfoTip>{tr("附近愛心餐地圖、區域洞察用。", "Used for the charity map and area insights.")}</InfoTip></p>
-                {lat && lng ? <p className="text-sm text-green-700 flex items-center gap-1"><CheckCircle2 className="w-4 h-4" />{tr("已設定", "Set")} <span className="font-mono text-muted-foreground">{lat}, {lng}</span></p> : <p className="text-sm text-amber-800">{tr("還沒設定，區域洞察和附近愛心餐看不到你的店", "Not set — area insights and the charity map can't find you")}</p>}
+                <p className="font-semibold flex items-center gap-1.5"><MapPin className="w-4 h-4 text-accent-foreground" />{tr("取餐點位置", "Pickup location")}<InfoTip>{tr("附近愛心餐地圖、區域洞察用。", "Used for the charity map and area insights.")}</InfoTip></p>
+                {lat && lng ? <p className="text-sm text-success-text flex items-center gap-1"><CheckCircle2 className="w-4 h-4" />{tr("已設定", "Set")} <span className="font-mono text-muted-foreground">{lat}, {lng}</span></p> : <p className="text-sm text-warning-text">{tr("還沒設定，區域洞察和附近愛心餐看不到你的店", "Not set — area insights and the charity map can't find you")}</p>}
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" onClick={async () => { try { const p = await currentPosition(); setLat(p.lat.toFixed(5)); setLng(p.lng.toFixed(5)); } catch { toast({ variant: "destructive", title: tr("無法定位", "Couldn't locate") }); } }}><LocateFixed /> {tr("我現在就在店裡，用目前位置", "I'm at the shop — use my location")}</Button>
                 </div>
@@ -488,10 +485,10 @@ export default function VendorPortalSettings() {
 
         {/* ── 合作方案：不收月費，每份餐點抽成 ── */}
         {section === "plan" && realVendor && (
-          <Card className="border-2 border-green-300 bg-green-50">
+          <Card className="border-2 border-success/40 bg-success-soft">
             <CardContent className="p-5 space-y-3">
               <div className="flex flex-wrap items-center gap-3">
-                <CreditCard className="w-8 h-8 text-orange-500" />
+                <CreditCard className="w-8 h-8 text-accent-foreground" />
                 <div className="flex-1">
                   <p className="text-2xl font-bold">{tr("合作方案", "Partner plan")}</p>
                   <p className="text-sm text-muted-foreground">{tr("沒有月費、沒有上架費", "No monthly fee, no listing fee")}</p>
@@ -515,7 +512,7 @@ export default function VendorPortalSettings() {
       {section !== "plan" && (
         <div className="fixed bottom-16 md:bottom-0 left-0 right-0 md:left-60 z-30 border-t border-border bg-card/95 backdrop-blur px-4 py-3">
           <div className="max-w-3xl flex items-center gap-3">
-            <p className="flex-1 text-xs text-muted-foreground">{!realVendor ? tr("這個帳號還沒綁定店家，無法儲存。", "Not linked to a vendor.") : windowsProblem ? <span className="text-red-600">{windowsProblem}</span> : tr("五個分頁的設定一起存", "Saves all five sections")}</p>
+            <p className="flex-1 text-xs text-muted-foreground">{!realVendor ? tr("這個帳號還沒綁定店家，無法儲存。", "Not linked to a vendor.") : windowsProblem ? <span className="text-danger-text">{windowsProblem}</span> : tr("五個分頁的設定一起存", "Saves all five sections")}</p>
             <Button size="lg" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !realVendor}>
               <Save /> {saveMutation.isPending ? tr("儲存中…", "Saving…") : tr("儲存設定", "Save settings")}
             </Button>
@@ -556,7 +553,7 @@ function MonthGrid({ offset, holidays, closedWeekdays, onToggle }: { offset: num
           return (
             <button key={key} type="button" disabled={past} onClick={() => onToggle(key)} aria-pressed={off} aria-label={tr(`${format(d, "M/d")}${off ? " 公休" : ""}`, `${format(d, "MMM d")}${off ? " closed" : ""}`)}
               className={cn("h-9 rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                off ? "bg-red-500 text-white font-bold" : weekly ? "bg-stone-200 text-muted-foreground" : "bg-card hover:bg-accent border border-border",
+                off ? "bg-destructive text-white font-bold" : weekly ? "bg-border text-muted-foreground" : "bg-card hover:bg-accent border border-border",
                 key === today && !off && "ring-2 ring-foreground", past && "opacity-40 cursor-default")}>
               {format(d, "d")}
             </button>
