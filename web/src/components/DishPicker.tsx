@@ -41,7 +41,7 @@ export default function DishPicker({ value, onChange, components, onCreate, plac
   return (
     <div className={cn("relative min-w-0 flex-1", className)}>
       <Input
-        className={cn("h-9 pr-7", !value.component_id && q && "border-amber-500")}
+        className={cn("h-9 pr-7", !value.component_id && q && "border-primary")}
         placeholder={placeholder ?? tr("菜名（打字找配方）", "Dish (type to find recipe)")}
         value={value.name}
         onFocus={() => { window.clearTimeout(blurTimer.current); setOpen(true); }}
@@ -56,7 +56,7 @@ export default function DishPicker({ value, onChange, components, onCreate, plac
         aria-autocomplete="list"
       />
       <span className="absolute right-2 top-2.5" aria-hidden="true">
-        {value.component_id ? <Check className="w-4 h-4 text-green-600" /> : <BookOpen className="w-4 h-4 text-muted-foreground/60" />}
+        {value.component_id ? <Check className="w-4 h-4 text-success-text" /> : <BookOpen className="w-4 h-4 text-muted-foreground/60" />}
       </span>
       {linked && linked.name !== value.name && <p className="text-[11px] text-muted-foreground truncate">{tr(`配方：${linked.name}`, `Recipe: ${linked.name}`)}</p>}
       {open && (
@@ -69,7 +69,7 @@ export default function DishPicker({ value, onChange, components, onCreate, plac
             <button key={c.id} type="button" role="option" aria-selected={c.id === value.component_id} className="w-full text-left px-2 py-1.5 hover:bg-accent flex items-center gap-2" onClick={() => pick(c)}>
               <span className="flex-1 truncate">{c.name}</span>
               <span className="text-[11px] text-muted-foreground shrink-0">{c.ingredients?.length ? tr("已有配方", "has recipe") : tr("待補配方", "no recipe yet")}</span>
-              {c.id === value.component_id && <Check className="w-3.5 h-3.5 text-green-600" />}
+              {c.id === value.component_id && <Check className="w-3.5 h-3.5 text-success-text" />}
             </button>
           ))}
           {matches.length === 0 && !q && <p className="px-2 py-1.5 text-xs text-muted-foreground">{tr("還沒有半成品，打菜名就能建立", "No components yet — type a name to create one")}</p>}

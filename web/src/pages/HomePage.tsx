@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { selectClass } from "@/lib/fieldStyles";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, limit, onSnapshot, query, where } from "firebase/firestore";
@@ -364,7 +365,7 @@ export default function HomePage() {
               <select
                 value={selectedSort}
                 onChange={(e) => setSelectedSort(e.target.value as SortId)}
-                className="h-9 rounded-full border border-border bg-card px-3 text-sm text-foreground"
+                className={selectClass("md", "h-9 rounded-full border-border bg-card px-3")}
               >
                 {SORT_OPTIONS.map((opt) => <option key={opt.id} value={opt.id}>{t(opt.label, opt.labelEn)}</option>)}
               </select>
@@ -441,7 +442,7 @@ export default function HomePage() {
                                     </span>
                                   )}
                                   {discountPercent > 0 && !searching && (
-                                    <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-[#f29e0c] text-[#2b180d]">
+                                    <span className="absolute top-2 left-2 text-caption font-bold px-2 py-0.5 rounded-full bg-brand text-[#2b180d]">
                                       {discountText(discountPercent)}
                                     </span>
                                   )}
@@ -511,7 +512,7 @@ export default function HomePage() {
                           </p>
                           <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
                             {planRatings.get(plan.id) ? (
-                              <><Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {planRatings.get(plan.id)!.average}（{planRatings.get(plan.id)!.count}）</>
+                              <><Star className="w-3 h-3 fill-warning text-warning" /> {planRatings.get(plan.id)!.average}（{planRatings.get(plan.id)!.count}）</>
                             ) : t("尚無評分", "No ratings yet")}
                           </p>
                           <Button className="mt-auto w-full text-sm" onClick={() => openPlanDialog(group.vendor, plan)}>
@@ -563,7 +564,7 @@ export default function HomePage() {
                             <li key={d.date} className="flex items-center gap-2 py-1.5">
                               <span className="w-14 text-xs text-muted-foreground">{t(`第 ${i + 1} 天`, `Day ${i + 1}`)}</span>
                               <span className="font-medium">{d.date.slice(5).replace("-", "/")}</span>
-                              {d.postponed && <span className="text-caption font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">{t("順延", "Postponed")}</span>}
+                              {d.postponed && <span className="text-caption font-bold px-1.5 py-0.5 rounded bg-warning-soft text-warning-text">{t("順延", "Postponed")}</span>}
                               <span className="text-xs text-muted-foreground">{slotLabel(planWindow)}</span>
                               <span className="ml-auto text-xs text-muted-foreground">{discountText(d.discountPercent)}</span>
                               <span className="w-14 text-right font-semibold">NT${d.lockedPrice}</span>
@@ -575,7 +576,7 @@ export default function HomePage() {
                         </p>
                       </div>
                     ) : (
-                      <div className="flex gap-1.5 p-2.5 rounded-lg bg-red-50 border border-red-200 text-caption text-red-800">
+                      <div className="flex gap-1.5 p-2.5 rounded-lg bg-danger-soft border border-danger/40 text-caption text-danger-text">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                         {t(`這個開始日期／時段排不滿 ${plan.days} 天（${policy.bookingRange()}），請改選其他日期或時段。`, `This start date and time can't fit ${plan.days} days within the 30-day booking range. Please pick another date or time.`)}
                       </div>
@@ -588,9 +589,9 @@ export default function HomePage() {
                       <Checkbox checked={planAck} onCheckedChange={() => setPlanAck((v) => !v)} className="mt-0.5 shrink-0" />
                       <span className="text-caption leading-relaxed text-muted-foreground"><WaiverText vendor={vendor} /></span>
                     </label>
-                    <div className="flex gap-1.5 p-2 rounded-lg bg-orange-50 border border-orange-200">
-                      <AlertTriangle className="w-3.5 h-3.5 text-orange-700 shrink-0 mt-0.5" />
-                      <span className="text-caption leading-relaxed text-orange-900">
+                    <div className="flex gap-1.5 p-2 rounded-lg bg-accent border border-brand/40">
+                      <AlertTriangle className="w-3.5 h-3.5 text-accent-foreground shrink-0 mt-0.5" />
+                      <span className="text-caption leading-relaxed text-accent-foreground">
                         {t(`每一天都是獨立的一份，當天沒空可以單獨轉讓或捐為愛心餐；取餐時段結束 ${liveConfig().charityConvertAfterMinutes} 分鐘仍未取餐，將`, `Each day is a separate meal you can transfer or donate on its own. If it isn't picked up ${liveConfig().charityConvertAfterMinutes} min after the window ends, it `)}<strong>{t("轉為愛心餐、開放給需要的人", "becomes a charity meal for someone in need")}</strong>
                       </span>
                     </div>
@@ -613,7 +614,7 @@ export default function HomePage() {
 
         {/* 同學轉讓（轉讓市集併入「我的餐點」，這裡只放預覽） */}
         {mode === "single" && !searching && (
-          <section className="rounded-[2rem] p-6 md:p-10 bg-[var(--surface-inverse)] text-[var(--text-on-inverse)] space-y-6">
+          <section className="rounded-card p-6 md:p-10 bg-[var(--surface-inverse)] text-[var(--text-on-inverse)] space-y-6">
             <div className="flex items-center justify-between gap-6 flex-wrap">
               <div className="flex items-center gap-3.5">
                 <Repeat className="w-7 h-7 shrink-0" />

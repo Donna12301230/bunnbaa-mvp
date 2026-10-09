@@ -1,4 +1,5 @@
 import { tr, loc } from "@/lib/i18n";
+import PageHero from "@/components/PageHero";
 import { formatNT, formatPickupDate } from "@/lib/format";
 import { lockStatus } from "@/lib/lockOutcome";
 import { useState } from "react";
@@ -75,16 +76,16 @@ function BanAppealSection({ user }: { user: UserProfile }) {
   const canSubmitNew = !isLoading && (!latestAppeal || latestAppeal.status === "rejected");
 
   return (
-    <section className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-3">
-      <div className="flex items-center gap-2 text-red-700 font-semibold">
+    <section className="bg-danger-soft border border-danger/40 rounded-xl p-5 space-y-3">
+      <div className="flex items-center gap-2 text-danger-text font-semibold">
         <ShieldAlert className="w-5 h-5 shrink-0" /> {tr("帳號目前限制下單", "Ordering is restricted on your account")}
       </div>
-      <p className="text-sm text-red-700">
+      <p className="text-sm text-danger-text">
         {tr("因累計多次未取餐，暫時無法鎖定新的餐點。如果有特殊狀況，可以在下面提出申訴，管理員審核通過後會立即解除限制。", "After repeated no-shows you can't lock new meals for now. If there were special circumstances, submit an appeal below — the restriction is lifted as soon as an admin approves it.")}
       </p>
 
       {!isLoading && latestAppeal && (
-        <div className="text-sm bg-white rounded-lg border border-red-100 p-3">
+        <div className="text-sm bg-card rounded-lg border border-danger/40 p-3">
           <p className="font-medium">
             {tr("最近一次申訴：", "Latest appeal: ")}{appealStatusLabel(latestAppeal.status)}
           </p>
@@ -142,7 +143,7 @@ function OrdersPanel({ uid }: { uid: string }) {
     .slice(0, 20);
 
   return (
-    <section className="bg-card rounded-[1.75rem] border border-ink overflow-hidden">
+    <section className="bg-card rounded-card border border-ink overflow-hidden">
       <div className="p-4 border-b border-border flex items-center justify-between gap-2">
         <h2 className="font-semibold">{tr("我的訂單", "My orders")}</h2>
         <Button asChild size="sm" variant="outline"><Link href="/my-bookings">{tr("查看完整我的餐點", "See full order history")}</Link></Button>
@@ -157,7 +158,7 @@ function OrdersPanel({ uid }: { uid: string }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-xs text-muted-foreground">
+              <tr className="bg-background text-xs text-muted-foreground">
                 <th className="text-left font-medium px-4 py-2">{tr("品項", "Item")}</th>
                 <th className="text-left font-medium px-4 py-2">{tr("店家", "Vendor")}</th>
                 <th className="text-left font-medium px-4 py-2">{tr("取餐日期", "Pickup")}</th>
@@ -191,7 +192,7 @@ function OrdersPanel({ uid }: { uid: string }) {
 
 function AccountPanel({ user }: { user: UserProfile }) {
   return (
-    <section className="bg-card rounded-[1.75rem] border border-ink p-6 md:p-8">
+    <section className="bg-card rounded-card border border-ink p-6 md:p-8">
       <div className="flex items-center gap-5 mb-6">
         <div className="w-20 h-20 rounded-full bg-secondary border border-ink shrink-0 overflow-hidden">
           <img src={avatarUrl(user.id)} alt="" className="w-full h-full" />
@@ -263,19 +264,15 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-background">
       <MarketplaceHeader />
-      <section className="max-w-[1400px] mx-auto px-4 md:px-6 pt-10 md:pt-16">
-        <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground mb-4">
-          <span className="w-8 h-px bg-current opacity-60" aria-hidden="true" />{tr("會員專區", "Member area")}
-        </p>
-        <h1 className="font-heading font-semibold text-[clamp(40px,6vw,84px)] leading-[1.04] tracking-[-0.025em]">
-          {user ? tr(`嗨，${user.displayName || user.username}`, `Hi, ${user.displayName || user.username}`) : tr("會員中心", "My account")}
-        </h1>
-      </section>
+      <PageHero
+        eyebrow={tr("會員專區", "Member area")}
+        title={user ? tr(`嗨，${user.displayName || user.username}`, `Hi, ${user.displayName || user.username}`) : tr("會員中心", "My account")}
+      />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-10 flex flex-col md:flex-row gap-8">
         {/* ── 左側：會員專區導覽 ── */}
         <aside className="md:w-56 shrink-0">
-          <nav aria-label={tr("會員專區", "Member area")} className="bg-card rounded-[1.5rem] border border-ink p-3 space-y-1 md:sticky md:top-24">
+          <nav aria-label={tr("會員專區", "Member area")} className="bg-card rounded-card border border-ink p-3 space-y-1 md:sticky md:top-24">
             <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tr("會員專區", "Member area")}</p>
             <SidebarButton active={tab === "account"} icon={<User className="w-4 h-4" />} label={tr("帳號資訊", "Account")} onClick={() => setTab("account")} />
             <SidebarButton active={tab === "orders"} icon={<ClipboardList className="w-4 h-4" />} label={tr("我的訂單", "My orders")} onClick={() => setTab("orders")} />
@@ -304,7 +301,7 @@ export default function ProfilePage() {
             <button
               onClick={() => logoutMutation.mutate()}
               disabled={logoutMutation.isPending}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm font-medium text-left text-red-700 hover:bg-red-50 transition-colors"
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm font-medium text-left text-danger-text hover:bg-danger-soft transition-colors"
             >
               <LogOut className="w-4 h-4" /> {tr("登出", "Sign out")}
             </button>

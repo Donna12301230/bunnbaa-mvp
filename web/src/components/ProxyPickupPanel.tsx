@@ -47,7 +47,7 @@ export default function ProxyPickupPanel({ initial }: { initial?: string }) {
 
   return (
     <div className="max-w-md mx-auto space-y-6">
-      <form onSubmit={submit} className="bg-card border border-ink rounded-[1.75rem] p-5 space-y-3">
+      <form onSubmit={submit} className="bg-card border border-ink rounded-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-primary" aria-hidden="true" />
           <h2 className="font-heading text-xl font-semibold">{tr("幫朋友代領", "Pick up for a friend")}</h2>
@@ -67,7 +67,7 @@ export default function ProxyPickupPanel({ initial }: { initial?: string }) {
           />
           <Button type="submit">{tr("顯示取餐碼", "Show code")}</Button>
         </div>
-        {error && <p role="alert" className="text-caption text-red-600">{error}</p>}
+        {error && <p role="alert" className="text-caption text-danger-text">{error}</p>}
       </form>
 
       {target && <ProxyPickupView key={"code" in target ? target.code : `${target.lockId}/${target.token}`} target={target} />}

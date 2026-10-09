@@ -193,8 +193,8 @@ function CandidateCard({ card, onOpen }: { card: Card; onOpen: () => void }) {
   }
   return (
     <button type="button" onClick={onOpen} className="text-left w-full rounded-xl border border-border bg-card p-3 flex gap-3 hover:border-primary transition-colors">
-      <div className="w-14 h-14 rounded-lg overflow-hidden bg-orange-50 shrink-0 flex items-center justify-center">
-        {card.image ? <img src={card.image} alt="" className="w-full h-full object-cover" /> : <UtensilsCrossed className="w-5 h-5 text-orange-200" />}
+      <div className="w-14 h-14 rounded-lg overflow-hidden bg-accent shrink-0 flex items-center justify-center">
+        {card.image ? <img src={card.image} alt="" className="w-full h-full object-cover" /> : <UtensilsCrossed className="w-5 h-5 text-brand" />}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs text-muted-foreground truncate">{card.vendor_name}</p>
@@ -210,7 +210,7 @@ function CandidateCard({ card, onOpen }: { card: Card; onOpen: () => void }) {
         {(card.dietary_tags.length > 0 || card.closed_dates.length > 0) && (
           <p className="text-[11px] text-muted-foreground truncate">
             {card.dietary_tags.map((tag) => tr(tag, tagEn(tag))).join(" · ")}
-            {card.closed_dates.length > 0 && <span className="text-amber-700">{card.dietary_tags.length ? "・" : ""}{tr(`${card.closed_dates.map((d) => d.slice(5)).join("、")} 不能訂`, `unavailable ${card.closed_dates.map((d) => d.slice(5)).join(", ")}`)}</span>}
+            {card.closed_dates.length > 0 && <span className="text-warning-text">{card.dietary_tags.length ? "・" : ""}{tr(`${card.closed_dates.map((d) => d.slice(5)).join("、")} 不能訂`, `unavailable ${card.closed_dates.map((d) => d.slice(5)).join(", ")}`)}</span>}
           </p>
         )}
       </div>

@@ -82,7 +82,7 @@ export default function RewardsPage() {
                   {byVendor.map((g) => {
                     const st = statusOf(g.vendorId);
                     return (
-                      <div key={g.vendorId} className="bg-card rounded-[1.75rem] border border-ink p-6 space-y-3">
+                      <div key={g.vendorId} className="bg-card rounded-card border border-ink p-6 space-y-3">
                         <p className="font-heading text-xl font-semibold">{g.name || st?.vendor_name}</p>
                         <p className="text-sm">
                           {g.drawable > 0
@@ -92,7 +92,7 @@ export default function RewardsPage() {
                         {st && !st.pool_open && (
                           <>
                             <div className="h-2.5 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(openProgress(st))} aria-label={tr("開獎進度", "Draw progress")}>
-                              <div className="h-full rounded-full bg-[#f29e0c] transition-[width] duration-700" style={{ width: `${openProgress(st)}%` }} />
+                              <div className="h-full rounded-full bg-brand transition-[width] duration-700" style={{ width: `${openProgress(st)}%` }} />
                             </div>
                             <p className="text-xs text-muted-foreground">
                               {st.paused ? tr("店家暫停參加本期", "Vendor paused this period") : st.amount_to_open <= 0 ? tr("全店已達標，下週一開獎", "Target reached — the draw opens next Monday") : tr(`全店再賣 ${st.amount_to_open} 元開獎`, `NT$${st.amount_to_open} more in sales to open`)}
@@ -119,7 +119,7 @@ export default function RewardsPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {ownedCoupons.map((c) => (
-                    <div key={c.id} className="rounded-[1.5rem] border-2 border-dashed border-ink bg-accent p-6">
+                    <div key={c.id} className="rounded-card border-2 border-dashed border-ink bg-accent p-6">
                       <p className="font-heading text-4xl font-semibold">{couponTitle(c.discount)}</p>
                       <p className="text-xs text-muted-foreground">{tierLabel(c.tier)}</p>
                       <p className="text-sm mt-1">{c.vendor_name}</p>

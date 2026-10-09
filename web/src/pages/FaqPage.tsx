@@ -76,7 +76,7 @@ export default function FaqPage() {
     >
       {/* 桌機兩欄：左邊 sticky 的「找不到答案？」，右邊問答 */}
       <div className="grid gap-10 lg:grid-cols-[320px_1fr] lg:gap-16 items-start py-4 md:py-8">
-        <aside className="lg:sticky lg:top-24 rounded-[1.75rem] border border-ink bg-accent p-7 space-y-3">
+        <aside className="lg:sticky lg:top-24 rounded-card border border-ink bg-accent p-7 space-y-3">
           <p className="font-heading text-2xl font-semibold">{tr("沒找到你想問的？", "Didn't find your answer?")}</p>
           <p className="text-sm text-muted-foreground">{tr("寫信給我們，通常 1～2 個工作天內回覆。", "Write to us — we usually reply within 1–2 business days.")}</p>
           <Link href="/contact" className="inline-flex items-center h-11 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover transition-colors">

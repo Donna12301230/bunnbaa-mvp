@@ -120,7 +120,7 @@ export default function CharityMealsSection() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[1.75rem] bg-accent border border-ink p-6 text-sm space-y-2">
+      <div className="rounded-card bg-accent border border-ink p-6 text-sm space-y-2">
         <p className="font-heading text-2xl font-semibold flex items-center gap-2"><HeartHandshake className="w-6 h-6 text-primary" aria-hidden="true" /> {tr("愛心餐", "Charity meals")}</p>
         <p className="text-xs leading-relaxed">
           {tr(`沒有被領取或訂購人主動捐出的便當，當天開放給需要的人。可以線上預約（手機驗證帳號；${policy.charityReserve()}），或直接到店現場領取（未被預約的份數先到先領、不需帳號）。取餐時段結束 ${closeHours()} 後截止。`,
@@ -129,7 +129,7 @@ export default function CharityMealsSection() {
       </div>
 
       {activeReservation && (
-        <div className="rounded-[1.5rem] bg-card border-2 border-ink p-5 max-w-sm">
+        <div className="rounded-card bg-card border-2 border-ink p-5 max-w-sm">
           <p className="font-semibold">{tr("你的愛心餐預約", "Your reservation")}：{activeReservation.vendor_name}</p>
           <p className="text-xs text-muted-foreground">
             {tr(`請在 ${new Date(millis(activeReservation.expires_at)).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })} 前到場`, `Arrive by ${new Date(millis(activeReservation.expires_at)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`)}
@@ -157,7 +157,7 @@ export default function CharityMealsSection() {
             const walk = Number.isFinite(g.distance) ? walkMinutes(g.distance) : null;
             const tooFar = walk !== null && walk > minutesLeft;
             return (
-              <article key={g.vendor_id} className="rounded-[1.75rem] bg-card border border-ink p-6 flex flex-col gap-2.5">
+              <article key={g.vendor_id} className="rounded-card bg-card border border-ink p-6 flex flex-col gap-2.5">
                 <h3 className="font-heading text-xl font-semibold">{g.name}</h3>
                 {g.address && <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {g.address}</p>}
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -166,7 +166,7 @@ export default function CharityMealsSection() {
                   {walk !== null && <span className="flex items-center gap-1"><Footprints className="w-3.5 h-3.5" /> {formatDistance(g.distance)}{tr("・", " · ")}{tr(`步行 ${walk} 分`, `${walk} min walk`)}</span>}
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2">{g.available.slice(0, 3).map((m) => m.item_name).join("、")}</p>
-                {tooFar && <span className="text-xs font-semibold text-red-700">{tr("來不及（步行時間超過剩餘時間）", "Too far to make it in time")}</span>}
+                {tooFar && <span className="text-xs font-semibold text-danger-text">{tr("來不及（步行時間超過剩餘時間）", "Too far to make it in time")}</span>}
                 <Button size="sm" className="mt-auto" disabled={!!activeReservation || busy === g.vendor_id || tooFar} onClick={() => reserve(g.vendor_id)}>
                   {busy === g.vendor_id ? tr("預約中…", "Reserving…") : tr("預約一份", "Reserve one")}
                 </Button>

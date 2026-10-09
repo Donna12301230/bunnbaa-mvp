@@ -202,7 +202,7 @@ export default function LoginPage() {
 
         {/* 右欄：登入/註冊 */}
         <div className="flex items-center">
-          <Card className="w-full rounded-[2rem] border border-ink shadow-none bg-card md:p-4">
+          <Card className="w-full rounded-card border border-ink shadow-none bg-card md:p-4">
             <CardHeader className="pb-2">
               <CardTitle className="text-center font-heading text-[clamp(32px,4vw,48px)] font-semibold">{tr("歡迎使用", "Welcome")}</CardTitle>
             </CardHeader>
@@ -323,7 +323,7 @@ export default function LoginPage() {
                   {memberStep === "notice" ? (
                     <div className="space-y-4">
                       {/* 會員須知內容 */}
-                      <div className="border rounded-lg p-4 bg-orange-50/50 space-y-3 max-h-80 overflow-y-auto text-sm text-gray-700 leading-relaxed">
+                      <div className="border rounded-lg p-4 bg-accent/50 space-y-3 max-h-80 overflow-y-auto text-sm text-foreground leading-relaxed">
                         <MemberNotice />
                       </div>
 
@@ -335,7 +335,7 @@ export default function LoginPage() {
                           onCheckedChange={(v) => setMemberAgreed(v === true)}
                           className="mt-0.5"
                         />
-                        <label htmlFor="member-agree" className="text-sm text-gray-700 cursor-pointer leading-snug">
+                        <label htmlFor="member-agree" className="text-sm text-foreground cursor-pointer leading-snug">
                           {tr("我已詳細閱讀並同意上述會員服務須知及相關條款", "I have read and agree to the member terms above")}
                         </label>
                       </div>
@@ -398,8 +398,8 @@ export default function LoginPage() {
                       </div>
 
                       {/* 學籍資料群組 */}
-                      <div className="border rounded-lg p-3 space-y-3 bg-orange-50/50">
-                        <p className="text-xs font-semibold text-orange-700">{tr("我是學生（選填）", "I'm a student (optional)")}</p>
+                      <div className="border rounded-lg p-3 space-y-3 bg-accent/50">
+                        <p className="text-xs font-semibold text-accent-foreground">{tr("我是學生（選填）", "I'm a student (optional)")}</p>
                         <div>
                           <Label>{tr("學校", "School")}</Label>
                           <Select value={school} onValueChange={v => { setSchool(v); setDepartment(""); }}>
@@ -443,7 +443,7 @@ export default function LoginPage() {
                   {vendorStep === "notice" ? (
                     <div className="space-y-4">
                       {/* 須知內容 */}
-                      <div className="border rounded-lg p-4 bg-amber-50/50 space-y-3 max-h-80 overflow-y-auto text-sm text-gray-700 leading-relaxed">
+                      <div className="border rounded-lg p-4 bg-warning-soft/50 space-y-3 max-h-80 overflow-y-auto text-sm text-foreground leading-relaxed">
                         <VendorNotice />
                       </div>
 
@@ -455,7 +455,7 @@ export default function LoginPage() {
                           onCheckedChange={(v) => setVendorAgreed(v === true)}
                           className="mt-0.5"
                         />
-                        <label htmlFor="vendor-agree" className="text-sm text-gray-700 cursor-pointer leading-snug">
+                        <label htmlFor="vendor-agree" className="text-sm text-foreground cursor-pointer leading-snug">
                           {tr("我已詳細閱讀並同意上述店家申請須知及相關服務條款", "I have read and agree to the vendor terms above")}
                         </label>
                       </div>
@@ -478,8 +478,8 @@ export default function LoginPage() {
                       >
                         {tr("← 返回申請須知", "← Back to terms")}
                       </Button>
-                      <div className="border rounded-lg p-3 space-y-3 bg-amber-50/50">
-                        <p className="text-xs font-semibold text-amber-700">{tr("店家資訊", "Store details")}</p>
+                      <div className="border rounded-lg p-3 space-y-3 bg-warning-soft/50">
+                        <p className="text-xs font-semibold text-warning-text">{tr("店家資訊", "Store details")}</p>
                         <div>
                           <Label>{tr("店家名稱 *", "Store name *")}</Label>
                           <Input placeholder={tr("例：王媽媽便當", "e.g. Mama Wang's Bento")} value={storeName} onChange={e => setStoreName(e.target.value)} required />

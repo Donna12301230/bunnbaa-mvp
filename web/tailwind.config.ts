@@ -193,11 +193,13 @@ export default {
         },
         // 語意色（tokens.css，含暗色版本）：bg-success-soft text-success-text、bg-danger-soft text-danger-text…
         // 2026-10-09 起頁面改用這組，不再直接寫 red-600／green-700 等色階
-        success: { DEFAULT: withAlpha("--success"), soft: withAlpha("--success-soft"), text: withAlpha("--success-text") },
+        success: { DEFAULT: withAlpha("--success"), soft: withAlpha("--success-soft"), text: withAlpha("--success-text"), strong: withAlpha("--success-strong") },
         warning: { DEFAULT: withAlpha("--warning"), soft: withAlpha("--warning-soft"), text: withAlpha("--warning-text") },
         danger: { DEFAULT: withAlpha("--danger"), soft: withAlpha("--danger-soft"), text: withAlpha("--danger-text") },
         info: { DEFAULT: withAlpha("--info"), soft: withAlpha("--info-soft"), text: withAlpha("--info-text") },
         brand: { DEFAULT: withAlpha("--brand-orange"), soft: withAlpha("--palette-orange-100"), tint: withAlpha("--palette-orange-50") },
+        // 愛心餐／贈送（index.css --status-*，含暗色版本）
+        charity: { DEFAULT: withAlpha("--status-charity"), soft: withAlpha("--status-charity-bg") },
         border: withAlpha("--border"),
         input: withAlpha("--input"),
         ring: withAlpha("--ring"),

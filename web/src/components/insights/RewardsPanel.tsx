@@ -33,10 +33,10 @@ interface Period {
 }
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 const STATUS: Record<string, { zh: string; en: string; cls: string }> = {
-  pooled: { zh: "開獎中", en: "Draw open", cls: "bg-orange-500" },
-  carried: { zh: "未達門檻，結轉", en: "Carried over", cls: "bg-stone-300" },
-  closed: { zh: "已結束", en: "Closed", cls: "bg-green-500" },
-  paused: { zh: "暫停", en: "Paused", cls: "bg-stone-200" },
+  pooled: { zh: "開獎中", en: "Draw open", cls: "bg-primary" },
+  carried: { zh: "未達門檻，結轉", en: "Carried over", cls: "bg-input" },
+  closed: { zh: "已結束", en: "Closed", cls: "bg-success-strong" },
+  paused: { zh: "暫停", en: "Paused", cls: "bg-border" },
 };
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString()}`;
 
@@ -134,9 +134,9 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
   const revenueSoFar = status?.revenue_so_far ?? Math.max(0, minRevenue - (status?.amount_to_open ?? minRevenue));
   const preview = allocatePool(Math.floor(100000 * (config?.rewardRate ?? 0.05)), 800);
   const flow = [
-    { key: "redeemed", label: tr("已兌現", "Redeemed"), v: m.redeemedAll, cls: "bg-green-500" },
-    { key: "owned", label: tr("還在客人手上", "Outstanding"), v: m.liability, cls: "bg-orange-400" },
-    { key: "returned", label: tr("回到店家", "Returned"), v: m.returned, cls: "bg-stone-300" },
+    { key: "redeemed", label: tr("已兌現", "Redeemed"), v: m.redeemedAll, cls: "bg-success-strong" },
+    { key: "owned", label: tr("還在客人手上", "Outstanding"), v: m.liability, cls: "bg-brand" },
+    { key: "returned", label: tr("回到店家", "Returned"), v: m.returned, cls: "bg-input" },
   ];
   const flowTotal = Math.max(1, flow.reduce((s, x) => s + x.v, 0));
   const tickets = status?.tickets_so_far ?? 0;
@@ -151,10 +151,10 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
       </p>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <Card className="border-2 border-orange-300 bg-orange-50/60">
+        <Card className="border-2 border-brand/40 bg-accent/60">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">{tr("還在客人手上的券（潛在成本）", "Outstanding coupons (liability)")}</p>
-            <p className="text-3xl font-bold text-orange-700 tabular-nums">{nt(m.liability)}</p>
+            <p className="text-3xl font-bold text-accent-foreground tabular-nums">{nt(m.liability)}</p>
             <p className="text-xs text-muted-foreground">{tr(`${m.ownedCount} 張`, `${m.ownedCount} coupons`)}{m.expiringCount > 0 ? tr(`・7 天內到期 ${nt(m.expiringSoon)}`, ` · ${nt(m.expiringSoon)} expiring in 7 d`) : ""}</p>
             {m.refundLiability > 0 && <p className="text-xs text-muted-foreground">{tr(`其中取消換券 ${nt(m.refundLiability)}（不屬於回饋池）`, `incl. ${nt(m.refundLiability)} from cancellations (not from the reward pool)`)}</p>}
           </CardContent>
@@ -169,10 +169,10 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
         <Card className="border-2">
           <CardContent className="p-4 space-y-2">
             <p className="text-xs text-muted-foreground">{tr("下一池", "Next pool")}</p>
-            {status?.pool_open ? <p className="text-3xl font-bold text-orange-600">🎉 {tr("開獎中", "Open")}</p> : (
+            {status?.pool_open ? <p className="text-3xl font-bold text-accent-foreground">🎉 {tr("開獎中", "Open")}</p> : (
               <>
                 <p className="text-3xl font-bold tabular-nums">{nt(revenueSoFar)}<span className="text-base font-normal text-muted-foreground"> / {nt(minRevenue)}</span></p>
-                <div className="h-3 rounded-full bg-stone-200 overflow-hidden"><div className="h-full rounded-full bg-orange-400" style={{ width: `${Math.min(100, (revenueSoFar / Math.max(1, minRevenue)) * 100)}%` }} /></div>
+                <div className="h-3 rounded-full bg-border overflow-hidden"><div className="h-full rounded-full bg-brand" style={{ width: `${Math.min(100, (revenueSoFar / Math.max(1, minRevenue)) * 100)}%` }} /></div>
                 <p className="text-xs text-muted-foreground">{status && status.amount_to_open <= 0 ? tr(`已達標，下週一結算時開池・已發 ${tickets} 張抽獎券`, `Target reached — opens at Monday's settlement · ${tickets} tickets out`) : tr(`再賣 ${status?.amount_to_open ?? "—"} 元開池・已發 ${tickets} 張抽獎券`, `NT$${status?.amount_to_open ?? "—"} to open · ${tickets} tickets out`)}</p>
               </>
             )}
@@ -184,7 +184,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
       <Card className="border-2">
         <CardContent className="p-4 space-y-2">
           <p className="font-semibold">{tr("發出去的券後來怎麼了", "Where issued coupons went")}</p>
-          <div className="flex h-6 overflow-hidden rounded-lg bg-stone-100" role="img" aria-label={flow.map((x) => `${x.label} ${nt(x.v)}`).join("，")}>
+          <div className="flex h-6 overflow-hidden rounded-lg bg-muted" role="img" aria-label={flow.map((x) => `${x.label} ${nt(x.v)}`).join("，")}>
             {flow.filter((x) => x.v > 0).map((x) => <div key={x.key} className={cn("h-full", x.cls)} style={{ width: `${(x.v / flowTotal) * 100}%` }} title={`${x.label} ${nt(x.v)}`} />)}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -203,8 +203,8 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
                 const left = current.remaining?.[t.code] ?? 0;
                 return (
                   <div key={t.code} className="grid grid-cols-[5.5rem_1fr_auto] items-center gap-2 text-sm">
-                    <span className="truncate"><Ticket className="inline w-3.5 h-3.5 mr-1 text-orange-500" />{tierLabel(t.code)}</span>
-                    <div className="h-3 rounded-full bg-stone-100 overflow-hidden"><div className="h-full rounded-full bg-orange-400" style={{ width: `${(left / Math.max(1, total)) * 100}%` }} /></div>
+                    <span className="truncate"><Ticket className="inline w-3.5 h-3.5 mr-1 text-accent-foreground" />{tierLabel(t.code)}</span>
+                    <div className="h-3 rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full bg-brand" style={{ width: `${(left / Math.max(1, total)) * 100}%` }} /></div>
                     <span className="w-16 text-right tabular-nums text-muted-foreground">{left}/{total}</span>
                   </div>
                 );
@@ -220,8 +220,8 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
                 <div className="flex items-end gap-1.5 h-32" role="img" aria-label={chart.map((p) => `${p.id} ${nt(p.pool || 0)}`).join("，")}>
                   {chart.map((p) => (
                     <div key={p.id} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${p.id}：${nt(p.pool || 0)}・${p.status ? tr(STATUS[p.status]?.zh ?? p.status, STATUS[p.status]?.en ?? p.status) : tr("累積中", "Accumulating")}`}>
-                      <div className="w-full flex flex-col justify-end h-24 rounded-sm bg-stone-100 overflow-hidden">
-                        <div className={cn("w-full", STATUS[p.status ?? ""]?.cls ?? "bg-orange-200")} style={{ height: `${((p.pool || 0) / chartMax) * 100}%` }} />
+                      <div className="w-full flex flex-col justify-end h-24 rounded-sm bg-muted overflow-hidden">
+                        <div className={cn("w-full", STATUS[p.status ?? ""]?.cls ?? "bg-brand/30")} style={{ height: `${((p.pool || 0) / chartMax) * 100}%` }} />
                       </div>
                       <span className="text-[10px] text-muted-foreground leading-none">{p.id.slice(5).replace("-", "/")}</span>
                     </div>
@@ -241,7 +241,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
         <CardContent className="p-0">
           <button type="button" className="w-full flex items-center gap-1.5 px-4 py-3 text-left text-sm font-semibold" onClick={() => setTools((v) => !v)} aria-expanded={tools}>
             {tools ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}{tr("查詢單張券・匯出 CSV・暫停參加", "Look up · Export CSV · Pause")}
-            {vendor?.rewards_paused_from && <span className="ml-2 rounded-full bg-stone-200 px-2 py-0.5 text-xs">{tr(`${vendor.rewards_paused_from} 起暫停`, `Paused from ${vendor.rewards_paused_from}`)}</span>}
+            {vendor?.rewards_paused_from && <span className="ml-2 rounded-full bg-border px-2 py-0.5 text-xs">{tr(`${vendor.rewards_paused_from} 起暫停`, `Paused from ${vendor.rewards_paused_from}`)}</span>}
           </button>
           {tools && (
             <div className="grid gap-4 px-4 pb-4 md:grid-cols-2">

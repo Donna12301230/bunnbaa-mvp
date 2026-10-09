@@ -45,10 +45,10 @@ export default function SlotsPanel({ vendor, locks, loading }: { vendor: Vendor 
   const heat = (n: number) => {
     const r = n / max;
     if (n === 0) return "bg-card";
-    if (r >= 1) return "bg-orange-500 text-white";
-    if (r >= 0.66) return "bg-orange-300";
-    if (r >= 0.33) return "bg-orange-200";
-    return "bg-orange-100";
+    if (r >= 1) return "bg-primary text-white";
+    if (r >= 0.66) return "bg-brand/50";
+    if (r >= 0.33) return "bg-brand/30";
+    return "bg-secondary";
   };
   const weekTotal = weekDates.reduce((s, d) => s + windows.reduce((t, w) => t + (counts.get(`${d}__${w}`)?.total ?? 0), 0), 0);
 
@@ -107,7 +107,7 @@ export default function SlotsPanel({ vendor, locks, loading }: { vendor: Vendor 
       )}
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span>{tr("少", "Few")}</span>
-        {["bg-orange-100", "bg-orange-200", "bg-orange-300", "bg-orange-500"].map((c) => <span key={c} className={cn("w-5 h-3 rounded-sm", c)} />)}
+        {["bg-secondary", "bg-brand/30", "bg-brand/50", "bg-primary"].map((c) => <span key={c} className={cn("w-5 h-3 rounded-sm", c)} />)}
         <span>{capacity ? tr("滿", "Full") : tr("多", "Many")}</span>
       </div>
     </div>

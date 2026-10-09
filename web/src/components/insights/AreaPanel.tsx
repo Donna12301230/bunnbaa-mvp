@@ -29,11 +29,11 @@ interface Insight {
 interface Tally { id: string; name: string; count: number; notified?: boolean; listed?: boolean }
 
 /** 一列長條：名稱、色條、數值 */
-function Bar({ label, value, max, text, cls = "bg-orange-400" }: { label: string; value: number; max: number; text: string; cls?: string }) {
+function Bar({ label, value, max, text, cls = "bg-brand" }: { label: string; value: number; max: number; text: string; cls?: string }) {
   return (
     <div className="grid grid-cols-[6rem_1fr_auto] items-center gap-2 text-sm">
       <span className="truncate">{label}</span>
-      <div className="h-3 rounded-full bg-stone-100 overflow-hidden"><div className={cn("h-full rounded-full", cls)} style={{ width: `${Math.min(100, (value / Math.max(1, max)) * 100)}%` }} /></div>
+      <div className="h-3 rounded-full bg-muted overflow-hidden"><div className={cn("h-full rounded-full", cls)} style={{ width: `${Math.min(100, (value / Math.max(1, max)) * 100)}%` }} /></div>
       <span className="w-14 text-right tabular-nums text-muted-foreground">{text}</span>
     </div>
   );
@@ -93,17 +93,17 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-        <MapPinned className="w-4 h-4 text-orange-500" />
+        <MapPinned className="w-4 h-4 text-accent-foreground" />
         {tr(`取餐點方圓 ${config?.insightRadiusMeters ?? 1000} 公尺・近 30 天`, `Within ${config?.insightRadiusMeters ?? 1000} m · 30 days`)}
         <InfoTip>{tr(`少於 ${config?.insightMinUsers ?? 20} 人不顯示。只有匿名彙總，看不到任何個人資料。每週一自動更新。`, `Hidden under ${config?.insightMinUsers ?? 20} people. Anonymous totals only. Updated every Monday.`)}</InfoTip>
-        {!vendor?.lat && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">{tr("還沒設定取餐點座標", "No pickup location")}</span>}
+        {!vendor?.lat && <span className="rounded-full bg-warning-soft px-2 py-0.5 text-warning-text">{tr("還沒設定取餐點座標", "No pickup location")}</span>}
         <Button variant="ghost" size="sm" className="ml-auto" onClick={rebuild} disabled={busy}><RefreshCw className={cn(busy && "animate-spin")} /> {tr("重新統計", "Refresh")}</Button>
       </div>
 
       {/* 你的店的許願：進度條到參考名單門檻 */}
       <Card className="border-2">
         <CardContent className="p-4 space-y-3">
-          <p className="font-semibold flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-orange-500" />{tr("客人想吃什麼（向你的店許願）", "What customers wish you'd make")}</p>
+          <p className="font-semibold flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-accent-foreground" />{tr("客人想吃什麼（向你的店許願）", "What customers wish you'd make")}</p>
           {tally.length === 0 ? <p className="text-sm text-muted-foreground">{tr("還沒有人許願。", "No wishes yet.")}</p> : tally.map((t) => {
             const hot = t.count >= threshold;
             return (
@@ -111,15 +111,15 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="font-medium">{t.name}</span>
                   <span className="inline-flex items-center gap-0.5 text-muted-foreground"><Users className="w-3.5 h-3.5" />{t.count}</span>
-                  {hot && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800">🔥 {tr("夠多人了", "Popular")}</span>}
+                  {hot && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-accent-foreground">🔥 {tr("夠多人了", "Popular")}</span>}
                   <span className="ml-auto">
-                    {t.listed ? <span className="text-xs text-green-700">✓ {tr("已通知", "Notified")}</span> : (
+                    {t.listed ? <span className="text-xs text-success-text">✓ {tr("已通知", "Notified")}</span> : (
                       <Button size="sm" variant="outline" onClick={() => notifyListed(t)} title={tr("上架後按這裡通知當初許願的人", "After listing it, notify wishers")}><Bell /> {tr("上架了，通知他們", "Listed — notify")}</Button>
                     )}
                   </span>
                 </div>
-                <div className="relative h-3 rounded-full bg-stone-100 overflow-hidden" role="img" aria-label={tr(`${t.count} 人，門檻 ${threshold}`, `${t.count} people, threshold ${threshold}`)}>
-                  <div className={cn("h-full rounded-full", hot ? "bg-orange-500" : "bg-orange-300")} style={{ width: `${(t.count / tallyMax) * 100}%` }} />
+                <div className="relative h-3 rounded-full bg-muted overflow-hidden" role="img" aria-label={tr(`${t.count} 人，門檻 ${threshold}`, `${t.count} people, threshold ${threshold}`)}>
+                  <div className={cn("h-full rounded-full", hot ? "bg-primary" : "bg-brand/50")} style={{ width: `${(t.count / tallyMax) * 100}%` }} />
                   <span className="absolute top-0 bottom-0 w-0.5 bg-foreground/60" style={{ left: `${(threshold / tallyMax) * 100}%` }} />
                 </div>
               </div>
@@ -144,9 +144,9 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
           {insight.gaps && insight.gaps.length > 0 && (
             <div className="grid sm:grid-cols-2 gap-3">
               {insight.gaps.map((g) => (
-                <Card key={g.tag} className="border-2 border-green-300 bg-green-50/60">
+                <Card key={g.tag} className="border-2 border-success/40 bg-success-soft/60">
                   <CardContent className="p-4 space-y-2">
-                    <p className="text-xs font-semibold text-green-800">💡 {tr("機會：想吃的人多、賣的店少", "Opportunity: high demand, few vendors")}</p>
+                    <p className="text-xs font-semibold text-success-text">💡 {tr("機會：想吃的人多、賣的店少", "Opportunity: high demand, few vendors")}</p>
                     <p className="text-xl font-bold">{g.tag}</p>
                     <div className="flex gap-4 text-sm">
                       <span>{tr("需求", "Demand")} <b className="text-lg">{g.share}%</b></span>
@@ -174,8 +174,8 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
             </Card>
             <Card className="border-2 md:col-span-2">
               <CardContent className="p-4 space-y-2">
-                <p className="font-semibold flex items-center gap-1.5"><ThumbsDown className="w-4 h-4 text-red-500" />{tr("常被點「不要」的配菜", "Most-removed sides")}</p>
-                {insight.removal_rates?.length ? insight.removal_rates.map((r) => <Bar key={r.dish} label={r.dish} value={r.rate} max={100} text={`${r.rate}%`} cls="bg-red-400" />) : <p className="text-sm text-muted-foreground">—</p>}
+                <p className="font-semibold flex items-center gap-1.5"><ThumbsDown className="w-4 h-4 text-danger-text" />{tr("常被點「不要」的配菜", "Most-removed sides")}</p>
+                {insight.removal_rates?.length ? insight.removal_rates.map((r) => <Bar key={r.dish} label={r.dish} value={r.rate} max={100} text={`${r.rate}%`} cls="bg-danger" />) : <p className="text-sm text-muted-foreground">—</p>}
               </CardContent>
             </Card>
           </div>

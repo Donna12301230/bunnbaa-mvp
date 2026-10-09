@@ -61,9 +61,9 @@ export default function VendorListPage() {
               <Link
                 key={vendor.id}
                 href={`/vendor/${vendor.id}`}
-                className="group block rounded-[1.75rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
+                className="group block rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
               >
-                <div className="relative aspect-[4/3] rounded-[1.75rem] overflow-hidden border border-ink bg-secondary">
+                <div className="relative aspect-[4/3] rounded-card overflow-hidden border border-ink bg-secondary">
                   {vendor.cover_image ? (
                     <img src={vendor.cover_image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.05] motion-reduce:transition-none" />
                   ) : (

@@ -65,7 +65,7 @@ export default function GiftClaimPage() {
             {(lock.slots?.length ?? 0) > 0 && (
               <ul className="text-xs text-muted-foreground">{lock.slots!.map((s, i) => <li key={i}>• {slotText(s)}</li>)}</ul>
             )}
-            <Button className="w-full h-12 rounded-full text-base" disabled={busy || lock.buyer_uid === user?.id} onClick={accept}>
+            <Button className="w-full h-12 text-base" disabled={busy || lock.buyer_uid === user?.id} onClick={accept}>
               {busy ? tr("處理中…", "Working…") : lock.buyer_uid === user?.id ? tr("這是你送出的", "You sent this") : tr("接受贈送", "Accept gift")}
             </Button>
           </div>

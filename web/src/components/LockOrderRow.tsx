@@ -18,7 +18,7 @@ import type { Lock } from "@/types";
 export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; showDate?: boolean }) {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
-  const status = LOCK_STATUS_STYLE[lock.status] ?? { label: lock.status, className: "bg-gray-100 text-gray-700" };
+  const status = LOCK_STATUS_STYLE[lock.status] ?? { label: lock.status, className: "bg-muted text-foreground" };
   const canRedeem = REDEEMABLE_STATUSES.has(lock.status) && lock.pickup_date === todayStr();
 
   async function confirm() {
@@ -34,10 +34,10 @@ export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; sh
   }
 
   return (
-    <div className="border border-border rounded-lg p-3 bg-white space-y-2">
+    <div className="border border-border rounded-lg p-3 bg-card space-y-2">
       <div className="flex items-start gap-3">
         {/* 第一欄：核銷碼，店家掃一眼就能對 */}
-        <div className="shrink-0 min-w-[4.5rem] rounded-md bg-stone-100 px-1.5 py-1 text-center" title={tr("取餐碼：取餐號＋手機末三碼", "Pickup code + last 3 phone digits")}>
+        <div className="shrink-0 min-w-[4.5rem] rounded-md bg-muted px-1.5 py-1 text-center" title={tr("取餐碼：取餐號＋手機末三碼", "Pickup code + last 3 phone digits")}>
           <p className="font-mono text-lg font-bold leading-tight tracking-wider">{pickupCode(lock)}</p>
           <p className="font-mono text-[11px] leading-tight text-muted-foreground">{lock.phone_last3 ? `${tr("手機末三碼", "Phone last 3")} ${lock.phone_last3}` : tr("取餐號", "Pickup no.")}</p>
         </div>
@@ -49,7 +49,7 @@ export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; sh
           {(lock.slots?.length ?? 0) > 0 && (
             <p className="text-xs text-muted-foreground">{[...lock.slots!.map(slotText), ...customOptionTexts(lock.custom_options)].join("／")}{riceLabel(lock.rice) ? `／${riceLabel(lock.rice)}` : ""}</p>
           )}
-          {lock.note && <p className="text-xs text-amber-700 mt-0.5">{tr("備註：", "Note: ")}{lock.note}</p>}
+          {lock.note && <p className="text-xs text-warning-text mt-0.5">{tr("備註：", "Note: ")}{lock.note}</p>}
         </div>
         <Badge variant="muted" className={`shrink-0 ${status.className}`}>{status.label}</Badge>
       </div>

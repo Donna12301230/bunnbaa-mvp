@@ -78,7 +78,7 @@ export default function TasteAndNotifySection({ user }: { user: UserProfile }) {
 
   return (
     <div className="grid md:grid-cols-2 gap-4">
-      <section className="bg-card rounded-[1.75rem] border border-ink p-6 md:p-8 space-y-4">
+      <section className="bg-card rounded-card border border-ink p-6 md:p-8 space-y-4">
         <h2 className="font-heading text-2xl font-semibold flex items-center gap-2"><Utensils className="w-5 h-5 text-primary" aria-hidden="true" /> {tr("我的口味", "My taste")}</h2>
         <div className="flex flex-wrap gap-2">
           {PREFS.map((p) => (
@@ -100,7 +100,7 @@ export default function TasteAndNotifySection({ user }: { user: UserProfile }) {
         </p>
       </section>
 
-      <section className="bg-card rounded-[1.75rem] border border-ink p-6 md:p-8 space-y-4">
+      <section className="bg-card rounded-card border border-ink p-6 md:p-8 space-y-4">
         <h2 className="font-heading text-2xl font-semibold flex items-center gap-2"><HeartHandshake className="w-5 h-5 text-primary" aria-hidden="true" /> {tr("愛心餐與通知", "Charity meals & notifications")}</h2>
         <p className="text-sm">{tr(`你主動捐出了 ${user.donatedCount ?? 0} 份愛心餐`, `You've donated ${user.donatedCount ?? 0} meal(s)`)}</p>
         <Switch

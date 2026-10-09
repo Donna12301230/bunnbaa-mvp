@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { selectClass } from "@/lib/fieldStyles";
 import { addDoc, collection, doc, setDoc } from "firebase/firestore";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,7 @@ export async function saveCatalogDoc(vendorId: string, kind: "ingredients" | "co
   return docId;
 }
 
-const SELECT = "w-full h-10 rounded-md border border-input bg-background px-2 text-sm";
+const SELECT = selectClass("md", "w-full");
 
 /**
  * 漲價影響（3.3(c)）：改單價時，列出用到這個原物料的品項，預設組合（一碗飯、第一道主菜、預設配菜）的成本與毛利前後變化。
@@ -95,13 +96,13 @@ function PriceImpact({ vendorId, draft }: { vendorId: string | undefined; draft:
   if (!original || original.unit_price === draft.unit_price || rows.length === 0) return null;
   const margin = (price: number, cost: number) => (price > 0 ? `${Math.round(((price - cost) / price) * 100)}%` : "—");
   return (
-    <div className="col-span-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs space-y-1">
+    <div className="col-span-2 rounded-md border border-warning/50 bg-warning-soft p-2 text-xs space-y-1">
       <p className="font-semibold">{tr(`單價 ${original.unit_price} → ${draft.unit_price}，影響 ${rows.length} 道菜（預設組合）：`, `Price ${original.unit_price} → ${draft.unit_price} affects ${rows.length} item(s):`)}</p>
       {rows.map((r) => (
         <p key={r.id} className="flex flex-wrap gap-x-2">
           <span className="font-medium">{r.name}</span>
           <span>{tr("成本", "cost")} {r.c0.toFixed(1)} → <b>{r.c1.toFixed(1)}</b></span>
-          <span className={r.price > 0 && (r.price - r.c1) / r.price < 0.4 ? "text-orange-700 font-semibold" : ""}>{tr("毛利", "margin")} {margin(r.price, r.c0)} → {margin(r.price, r.c1)}</span>
+          <span className={r.price > 0 && (r.price - r.c1) / r.price < 0.4 ? "text-accent-foreground font-semibold" : ""}>{tr("毛利", "margin")} {margin(r.price, r.c0)} → {margin(r.price, r.c1)}</span>
         </p>
       ))}
       <p className="text-muted-foreground">{tr("存檔後，未截單日期的候選菜份量級距會自動重算。", "After saving, portion levels for open dates are recalculated.")}</p>
@@ -153,7 +154,7 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
               <span className="text-micro text-muted-foreground">{tr("以片、顆計的熟成率填 1、損耗率填 0", "For pieces, set yield 1 and loss 0")}</span></div>
             <div><Label>{tr("採購單位名稱", "Purchase unit")}</Label><Input value={ing.purchase_unit_label} onChange={(e) => setIng({ ...ing, purchase_unit_label: e.target.value })} placeholder={tr("盒、公斤、袋", "box, kg, bag")} /></div>
             <div><Label>{tr(`每採購單位 = 幾 ${ing.unit}`, `Units per purchase unit (${ing.unit})`)}</Label><Input type="number" value={ing.purchase_unit_size} onChange={(e) => setIng({ ...ing, purchase_unit_size: Number(e.target.value) })} /></div>
-            <div><Label>{tr("最新單價（每採購單位）", "Latest price (per purchase unit)")}</Label><Input type="number" value={ing.unit_price} onChange={(e) => setIng({ ...ing, unit_price: Number(e.target.value) })} className={!(ing.unit_price > 0) ? "border-amber-500" : undefined} /></div>
+            <div><Label>{tr("最新單價（每採購單位）", "Latest price (per purchase unit)")}</Label><Input type="number" value={ing.unit_price} onChange={(e) => setIng({ ...ing, unit_price: Number(e.target.value) })} className={!(ing.unit_price > 0) ? "border-primary" : undefined} /></div>
             <div><Label>{tr("熟成率（熟重÷生重）", "Yield (cooked ÷ raw)")}</Label><Input type="number" step="0.05" value={ing.yield_rate} onChange={(e) => setIng({ ...ing, yield_rate: Number(e.target.value) })} /></div>
             <div><Label>{tr("損耗率（0–1）", "Loss rate (0–1)")}</Label><Input type="number" step="0.05" value={ing.loss_rate} onChange={(e) => setIng({ ...ing, loss_rate: Number(e.target.value) })} /></div>
             <div><Label>{tr("保存天數", "Shelf life (days)")}</Label><Input type="number" value={ing.shelf_days} onChange={(e) => setIng({ ...ing, shelf_days: Number(e.target.value) })} /></div>
@@ -252,7 +253,7 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{comp?.id ? tr("編輯配菜", "Edit dish") : tr("新增配菜", "Add dish")}</DialogTitle>
-            {comp?.ai_draft && <DialogDescription className="text-orange-700">{tr("這是 AI 估的草稿，份量照店裡實際做法改一改，按儲存就算確認。", "AI draft — adjust to how you actually cook it; saving confirms it.")}</DialogDescription>}
+            {comp?.ai_draft && <DialogDescription className="text-accent-foreground">{tr("這是 AI 估的草稿，份量照店裡實際做法改一改，按儲存就算確認。", "AI draft — adjust to how you actually cook it; saving confirms it.")}</DialogDescription>}
           </DialogHeader>
           {comp && (
             <div className="space-y-4">
@@ -278,7 +279,7 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
                     <div key={idx} className="space-y-0.5">
                       <div className="flex gap-2">
                         <select
-                          className="flex-1 h-10 rounded-md border border-input bg-background px-2 text-sm min-w-0"
+                          className={selectClass("md", "flex-1 min-w-0")}
                           value={line.ingredient_id}
                           onChange={(e) => {
                             if (e.target.value === NEW_ING) setNewIng({ draft: { ...EMPTY_ING }, lineIdx: idx });

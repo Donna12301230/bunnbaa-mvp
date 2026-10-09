@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { selectClass } from "@/lib/fieldStyles";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -119,7 +120,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
         {bento && mains.length > 1 && (
           <label className="block space-y-1">
             <span className="text-xs font-semibold text-muted-foreground">{tr("主菜", "Main")}</span>
-            <select className="w-full h-10 rounded-md border border-input bg-background px-2 text-sm" value={mainIndex ?? 0} onChange={(e) => setMainIndex(Number(e.target.value))}>
+            <select className={selectClass("md", "w-full")} value={mainIndex ?? 0} onChange={(e) => setMainIndex(Number(e.target.value))}>
               {mains.map((m, i) => <option key={i} value={i}>{m.name}（NT${m.price}）</option>)}
             </select>
           </label>
@@ -142,7 +143,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
           <label key={i} className="block space-y-1">
             <span className="text-xs font-semibold text-muted-foreground">{slot.category}</span>
             <select
-              className="w-full h-10 rounded-md border border-input bg-background px-2 text-sm"
+              className={selectClass("md", "w-full")}
               value={String(choices[i] ?? "default")}
               onChange={(e) => {
                 const v = e.target.value;
@@ -162,7 +163,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
             <span className="text-xs font-semibold text-muted-foreground">{tr("第四道", "4th side")}</span>
             <div className="flex gap-2">
               <select
-                className="flex-1 h-10 rounded-md border border-input bg-background px-2 text-sm"
+                className={selectClass("md", "flex-1")}
                 value={extra ? `${extra.slot}:${extra.candidate ?? "d"}` : ""}
                 onChange={(e) => {
                   if (!e.target.value) return setExtra(null);
@@ -174,7 +175,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
                 {options.filter((o) => !chosen.has(o.name)).map((o) => <option key={`${o.slot}:${o.candidate ?? "d"}`} value={`${o.slot}:${o.candidate ?? "d"}`}>{o.name}</option>)}
               </select>
               {extra && (
-                <select className="h-10 rounded-md border border-input bg-background px-2 text-sm" value={extra.mode} onChange={(e) => setExtra({ ...extra, mode: e.target.value as ExtraSideChoice["mode"] })}>
+                <select className={selectClass()} value={extra.mode} onChange={(e) => setExtra({ ...extra, mode: e.target.value as ExtraSideChoice["mode"] })}>
                   <option value="backup">{tr("備案（不加價）", "Backup (free)")}</option>
                   <option value="addon">{tr("加菜 +10", "Add-on +10")}</option>
                 </select>
@@ -184,7 +185,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
         )}
 
         {preview != null && lock && preview !== lock.locked_price && (
-          <p className={cn("text-sm", preview > lock.locked_price ? "text-red-600" : "text-green-700")}>
+          <p className={cn("text-sm", preview > lock.locked_price ? "text-danger-text" : "text-success-text")}>
             {preview > lock.locked_price
               ? tr(`這樣要多 NT$${preview - lock.locked_price}，目前還不能線上補差額，請保留原本的選項`, `This costs NT$${preview - lock.locked_price} more, and topping up isn't supported yet — please keep your current choices`)
               : tr(`新金額 NT$${preview}，差額 ${lock.locked_price - preview} 點會退到你的平台點數`, `New price NT$${preview}; ${lock.locked_price - preview} points come back to your balance`)}

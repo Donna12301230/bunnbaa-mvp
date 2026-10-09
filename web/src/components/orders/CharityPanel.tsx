@@ -13,11 +13,11 @@ import { cn } from "@/lib/utils";
 import type { CharityMeal } from "@/types";
 
 export const CHARITY_STATUS: Record<string, { zh: string; en: string; dot: string; tile: string }> = {
-  available: { zh: "等人領", en: "Open", dot: "bg-pink-400", tile: "border-pink-300 bg-pink-50" },
-  reserved: { zh: "有人預約", en: "Reserved", dot: "bg-amber-400", tile: "border-amber-300 bg-amber-50" },
-  claimed: { zh: "預約已領", en: "Claimed", dot: "bg-green-500", tile: "border-green-300 bg-green-50 opacity-70" },
-  given: { zh: "現場送出", en: "Given", dot: "bg-green-500", tile: "border-green-300 bg-green-50 opacity-70" },
-  wasted: { zh: "報廢", en: "Wasted", dot: "bg-stone-400", tile: "border-stone-300 bg-stone-100 opacity-60" },
+  available: { zh: "等人領", en: "Open", dot: "bg-charity", tile: "border-charity/40 bg-charity-soft" },
+  reserved: { zh: "有人預約", en: "Reserved", dot: "bg-warning", tile: "border-warning/50 bg-warning-soft" },
+  claimed: { zh: "預約已領", en: "Claimed", dot: "bg-success-strong", tile: "border-success/40 bg-success-soft opacity-70" },
+  given: { zh: "現場送出", en: "Given", dot: "bg-success-strong", tile: "border-success/40 bg-success-soft opacity-70" },
+  wasted: { zh: "報廢", en: "Wasted", dot: "bg-muted-foreground/50", tile: "border-input bg-muted opacity-60" },
 };
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 
@@ -75,10 +75,10 @@ export default function CharityPanel({ meals, result, onGoScan }: {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-        <HeartHandshake className="w-4 h-4 text-pink-500" />
+        <HeartHandshake className="w-4 h-4 text-charity" />
         {tr("沒人來拿的便當，今天送給需要的人", "Unclaimed meals, given away today")}
         <InfoTip>{tr("未取餐不退款，照常計入營業額。預約的人到場出示 QR，在「取餐」分頁掃；沒預約的先到先領，每人一份由店家判斷。看不到預約者個資。", "No-shows still count as revenue. Reserved pickups are scanned in the Pickup tab; walk-ins are first come, first served.")}</InfoTip>
-        {minsLeft !== null && <span className={cn("ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold", closed ? "bg-stone-200 text-stone-700" : "bg-pink-100 text-pink-800")}><Clock className="w-4 h-4" />{closed ? tr("已截止", "Closed") : tr(`還有 ${minsLeft} 分鐘截止`, `${minsLeft} min left`)}</span>}
+        {minsLeft !== null && <span className={cn("ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold", closed ? "bg-border text-foreground" : "bg-charity-soft text-charity")}><Clock className="w-4 h-4" />{closed ? tr("已截止", "Closed") : tr(`還有 ${minsLeft} 分鐘截止`, `${minsLeft} min left`)}</span>}
       </div>
 
       {/* 去向色條 */}
@@ -112,7 +112,7 @@ export default function CharityPanel({ meals, result, onGoScan }: {
               {canGive ? (
                 <Button size="sm" className="mt-1" disabled={busy === m.id} onClick={() => giveOnsite(m.id)}><Gift /> {tr("現場送出", "Give")}</Button>
               ) : (
-                <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold">{(m.status === "claimed" || m.status === "given") && <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />}{tr(s?.zh ?? m.status, s?.en ?? m.status)}</span>
+                <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold">{(m.status === "claimed" || m.status === "given") && <CheckCircle2 className="w-3.5 h-3.5 text-success-text" />}{tr(s?.zh ?? m.status, s?.en ?? m.status)}</span>
               )}
             </div>
           );
@@ -120,12 +120,12 @@ export default function CharityPanel({ meals, result, onGoScan }: {
       </div>
 
       {/* 截止後結算 */}
-      <Card className={cn("border-2", closed && !result && "border-pink-300")}>
+      <Card className={cn("border-2", closed && !result && "border-charity/40")}>
         <CardContent className="p-4 space-y-3">
           <p className="font-semibold">{tr("收攤：今天現場一共送出幾份？", "Closing: how many did you give on site?")}</p>
           {result ? (
             <div className="grid grid-cols-3 gap-2 text-center">
-              {[[tr("預約領走", "Reserved"), result.reserved_claimed, "bg-green-50"], [tr("現場送出", "Given"), result.given_onsite, "bg-green-50"], [tr("報廢", "Wasted"), result.wasted, "bg-stone-100"]].map(([l, n, c]) => (
+              {[[tr("預約領走", "Reserved"), result.reserved_claimed, "bg-success-soft"], [tr("現場送出", "Given"), result.given_onsite, "bg-success-soft"], [tr("報廢", "Wasted"), result.wasted, "bg-muted"]].map(([l, n, c]) => (
                 <div key={String(l)} className={cn("rounded-xl p-3", String(c))}><p className="text-2xl font-bold">{n}</p><p className="text-xs text-muted-foreground">{l}</p></div>
               ))}
               <p className="col-span-3 text-xs text-muted-foreground">{tr("報廢數會用來修正下週預測。", "Waste is used to correct next week's forecast.")}</p>

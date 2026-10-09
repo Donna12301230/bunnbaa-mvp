@@ -95,12 +95,12 @@ export default function MenuCatalogManager({ open, onClose, vendorId, listed, it
                 <span className="w-12 shrink-0 text-xs text-muted-foreground text-right">{tr(`${count} 道`, `${count}`)}</span>
                 <Button variant="ghost" size="icon" className="w-8 h-8 shrink-0" disabled={i === 0} aria-label={tr("往上移", "Move up")} onClick={() => move(i, -1)}><ArrowUp /></Button>
                 <Button variant="ghost" size="icon" className="w-8 h-8 shrink-0" disabled={i === rows.length - 1} aria-label={tr("往下移", "Move down")} onClick={() => move(i, 1)}><ArrowDown /></Button>
-                <Button variant="ghost" size="icon" className="w-8 h-8 shrink-0 text-red-500" aria-label={tr("刪除目錄", "Delete catalog")} onClick={() => setRows((prev) => prev.filter((_, k) => k !== i))}><Trash2 /></Button>
+                <Button variant="ghost" size="icon" className="w-8 h-8 shrink-0 text-danger-text" aria-label={tr("刪除目錄", "Delete catalog")} onClick={() => setRows((prev) => prev.filter((_, k) => k !== i))}><Trash2 /></Button>
               </div>
             );
           })}
           <Button size="sm" variant="outline" disabled={rows.length >= MAX_CATALOGS} onClick={() => setRows((prev) => [...prev, { name: "", original: null }])}><Plus /> {tr("新增目錄", "Add catalog")}</Button>
-          {problem && rows.length > 0 && <p className="text-xs text-red-600">{problem}</p>}
+          {problem && rows.length > 0 && <p className="text-xs text-danger-text">{problem}</p>}
           <p className="text-xs text-muted-foreground">{tr("刪除目錄不會刪品項，底下的品項會移到「未分目錄」。", "Deleting a catalog keeps its items; they move to “No catalog”.")}</p>
         </div>
         <DialogFooter>

@@ -54,7 +54,7 @@ function RealSignInForm({ title, description }: { title: string; description: st
           required
           aria-label={tr("密碼", "Password")}
         />
-        {error && <p role="alert" className="text-caption text-red-600">{error}</p>}
+        {error && <p role="alert" className="text-caption text-danger-text">{error}</p>}
         <Button type="submit" className="w-full" disabled={submitting}>
           {submitting ? tr("登入中…", "Signing in…") : tr("登入", "Sign in")}
         </Button>

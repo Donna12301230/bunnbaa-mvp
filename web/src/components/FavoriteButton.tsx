@@ -37,7 +37,7 @@ export default function FavoriteButton({ vendorId, vendorName, className }: { ve
       aria-label={on ? t(`從我的最愛移除 ${vendorName}`, `Remove ${vendorName} from favorites`) : t(`把 ${vendorName} 加入我的最愛`, `Save ${vendorName} to favorites`)}
       className={cn(
         "inline-flex items-center justify-center w-7 h-7 rounded-full border border-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        on ? "bg-red-50 text-red-500" : "bg-card text-muted-foreground hover:text-red-500",
+        on ? "bg-danger-soft text-danger-text" : "bg-card text-muted-foreground hover:text-danger-text",
         className
       )}
     >

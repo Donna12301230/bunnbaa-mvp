@@ -68,7 +68,7 @@ export default function AboutPage() {
 
         {/* 使命：深棕色帶大字引言 */}
         <Reveal>
-          <section className="rounded-[2rem] md:rounded-[3rem] bg-[var(--surface-inverse)] text-[var(--text-on-inverse)] px-6 py-14 md:px-16 md:py-24">
+          <section className="rounded-card md:rounded-[3rem] bg-[var(--surface-inverse)] text-[var(--text-on-inverse)] px-6 py-14 md:px-16 md:py-24">
             <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase opacity-80 mb-6">
               <HeartHandshake className="w-4 h-4" aria-hidden="true" /> {tr("我們的使命", "Our mission")}
             </p>

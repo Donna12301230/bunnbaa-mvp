@@ -8,7 +8,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export function MemberNotice() {
   return getLang() === "en" ? (
     <>
-      <p className="font-bold text-orange-800 text-base">Member Terms of Service</p>
+      <p className="font-bold text-accent-foreground text-base">Member Terms of Service</p>
       <p className="font-semibold">1. Membership</p>
       <p>Anyone who completes registration and agrees to these terms becomes a BunnBaa member and can browse menus and place orders online.</p>
       <p className="font-semibold">2. Account security</p>
@@ -41,7 +41,7 @@ export function MemberNotice() {
     </>
   ) : (
     <>
-      <p className="font-bold text-orange-800 text-base">會員服務須知</p>
+      <p className="font-bold text-accent-foreground text-base">會員服務須知</p>
       <p className="font-semibold">一、會員資格</p>
       <p>凡完成會員註冊程序並同意本須知者，即取得飯飽 BunnBaa 會員資格，享有線上瀏覽菜單、下單訂餐等服務。</p>
       <p className="font-semibold">二、帳號安全</p>
@@ -78,14 +78,14 @@ export function MemberNotice() {
 export function VendorNotice() {
   return getLang() === "en" ? (
     <>
-      <p className="font-bold text-amber-800 text-base">Vendor Application Terms</p>
+      <p className="font-bold text-warning-text text-base">Vendor Application Terms</p>
       <p className="font-semibold">1. Eligibility</p>
       <p>Any business legally permitted to sell food may apply to become a BunnBaa vendor. Applicants must provide valid contact details and store information for review.</p>
       <p className="font-semibold">2. Partner plan and fees</p>
-      <div className="bg-amber-100 rounded-lg p-3 space-y-1">
-        <p className="font-semibold text-amber-900">No monthly fee, no listing fee</p>
+      <div className="bg-warning-soft rounded-lg p-3 space-y-1">
+        <p className="font-semibold text-warning-text">No monthly fee, no listing fee</p>
         <p>The platform takes a {policy.commission().pct}% commission on each meal sold, calculated on the amount the customer actually pays and deducted when your sales are paid out.</p>
-        <p className="font-semibold text-amber-900 mt-1">Add the {policy.commission().pct}% when you price</p>
+        <p className="font-semibold text-warning-text mt-1">Add the {policy.commission().pct}% when you price</p>
         <p>Set your menu prices with the commission included (to net NT$100, list at NT${policy.commission().example}). The rate is announced in advance if it changes.</p>
       </div>
       <p className="font-semibold">3. Ending the partnership and account handling</p>
@@ -112,14 +112,14 @@ export function VendorNotice() {
     </>
   ) : (
     <>
-      <p className="font-bold text-amber-800 text-base">店家申請須知</p>
+      <p className="font-bold text-warning-text text-base">店家申請須知</p>
       <p className="font-semibold">一、申請資格</p>
       <p>凡具有合法食品販售資格之業者，均可申請成為飯飽 BunnBaa 平台店家。申請時須提供有效之聯絡方式及店家資訊，以供平台審核。</p>
       <p className="font-semibold">二、合作方案與收費</p>
-      <div className="bg-amber-100 rounded-lg p-3 space-y-1">
-        <p className="font-semibold text-amber-900">沒有月費、沒有上架費</p>
+      <div className="bg-warning-soft rounded-lg p-3 space-y-1">
+        <p className="font-semibold text-warning-text">沒有月費、沒有上架費</p>
         <p>平台從每份賣出的餐點抽成 {policy.commission().pct}%，以消費者實付金額計算，於撥款時直接扣除。</p>
-        <p className="font-semibold text-amber-900 mt-1">定價時請加上 {policy.commission().pct}%</p>
+        <p className="font-semibold text-warning-text mt-1">定價時請加上 {policy.commission().pct}%</p>
         <p>菜單售價請把抽成算進去（想實收 100 元，售價訂 {policy.commission().example} 元）。抽成比例如有調整，平台會提前公告。</p>
       </div>
       <p className="font-semibold">三、終止合作與帳號處理</p>

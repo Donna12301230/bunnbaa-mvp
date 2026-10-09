@@ -217,7 +217,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
                 {activeListings.map(item => {
                   const deadline = deadlineOf(item);
                   return (
-                    <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
+                    <article key={item.id} className="group rounded-card bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
                       <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
                         {imageOf(item) ? (
                         <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />
@@ -257,7 +257,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
 
             {freeCount > 0 && (
               <p className="text-sm text-muted-foreground">
-                <HeartHandshake className="inline w-4 h-4 mr-1 -mt-0.5 text-pink-600" aria-hidden="true" />
+                <HeartHandshake className="inline w-4 h-4 mr-1 -mt-0.5 text-charity" aria-hidden="true" />
                 {tr(`另有 ${freeCount} 份 $0 免費領取的餐點，放在`, `${freeCount} more meal(s) are free ($0) — see `)}
                 <button type="button" className="font-semibold text-primary underline underline-offset-2" onClick={onShowFree}>{tr("「附近愛心餐」", "Charity meals nearby")}</button>
                 {tr("分頁。", ".")}
@@ -280,14 +280,14 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {myListings.map(item => (
-                  <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
+                  <article key={item.id} className="group rounded-card bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
                     <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
                       {imageOf(item) ? (
                         <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />
                       ) : (
                         <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
                       )}
-                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-[#f29e0c] text-[#2b180d]">
+                      <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-brand text-[#2b180d]">
                         {tr("轉讓中", "Listed")}
                       </span>
                     </div>
@@ -304,7 +304,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-red-300 text-red-600 hover:bg-red-50"
+                          className="border-danger/40 text-danger-text hover:bg-danger-soft"
                           disabled={claimingId === item.id}
                           onClick={() => handleCancelListing(item.id)}
                         >
@@ -327,7 +327,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {handedOver.map(item => (
-                  <article key={item.id} className="group rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
+                  <article key={item.id} className="group rounded-card bg-card border border-ink overflow-hidden flex flex-col transition-transform duration-500 hover:-translate-y-1 motion-reduce:transform-none">
                     <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
                       {imageOf(item) ? (
                         <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none" />

@@ -196,7 +196,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           >
             <ShoppingCart />
             {cartCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-micro font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 bg-destructive text-white text-micro font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}
@@ -212,7 +212,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className="flex items-center gap-1.5 text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <img src={avatarUrl(user.id)} alt="" className="w-5 h-5 rounded-full bg-orange-100" />
+                  <img src={avatarUrl(user.id)} alt="" className="w-5 h-5 rounded-full bg-secondary" />
                   <span className="max-w-[80px] truncate hidden sm:inline">{user.displayName || user.username}</span>
                   <ChevronDown className="w-3 h-3" />
                 </button>
@@ -235,7 +235,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className="text-red-600"
+                  className="text-danger-text"
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
                 >
@@ -283,7 +283,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
                   onClick={() => go(href)}
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    active === tab ? "bg-orange-50 text-orange-600" : "text-foreground hover:bg-gray-50"
+                    active === tab ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-background"
                   )}
                 >
                   <Icon className="w-4 h-4" /> {label}
@@ -293,11 +293,11 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
             {!isVendor && <SheetClose asChild>
               <button
                 onClick={() => go("/cart")}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-foreground hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <ShoppingCart className="w-4 h-4" /> {t("購物車", "Cart")}
                 {cartCount > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center">
+                  <span className="ml-auto bg-destructive text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center">
                     {cartCount > 99 ? "99+" : cartCount}
                   </span>
                 )}

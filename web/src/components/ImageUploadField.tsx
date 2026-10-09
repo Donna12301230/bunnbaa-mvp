@@ -77,7 +77,7 @@ export function ImageUploadField({ label, vendorId, value, onChange }: Props) {
     <div className="space-y-1">
       <Label>{label}</Label>
       {value && (
-        <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-gray-50">
+        <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-background">
           <img src={value} alt={tr("圖片預覽", "Image preview")} className="w-full h-full object-cover" />
           <Button
             type="button"

@@ -61,7 +61,7 @@ export default function JoinUsPage() {
         </section>
 
         {/* 方案：大字價格 */}
-        <section className="grid gap-8 md:grid-cols-[1fr_1.1fr] items-center rounded-[2rem] md:rounded-[3rem] border border-ink bg-accent p-8 md:p-14">
+        <section className="grid gap-8 md:grid-cols-[1fr_1.1fr] items-center rounded-card md:rounded-[3rem] border border-ink bg-accent p-8 md:p-14">
           <div className="space-y-4">
             <h2 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-3">
               <PiggyBank className="w-8 h-8 text-primary" aria-hidden="true" /> {tr("合作方案", "Pricing")}
@@ -73,8 +73,8 @@ export default function JoinUsPage() {
               )}
             </p>
           </div>
-          <div className="rounded-[1.75rem] border border-ink bg-card p-8 md:p-10">
-            <span className="inline-block text-xs font-bold px-3 py-1 rounded-full bg-[#f29e0c] text-[#2b180d]">{tr("有賣才收", "Pay only when you sell")}</span>
+          <div className="rounded-card border border-ink bg-card p-8 md:p-10">
+            <span className="inline-block text-xs font-bold px-3 py-1 rounded-full bg-brand text-[#2b180d]">{tr("有賣才收", "Pay only when you sell")}</span>
             <p className="mt-5 font-heading font-semibold leading-none">
               <span className="text-[clamp(64px,9vw,112px)] tracking-[-0.04em]">{commissionPct()}%</span>
               <span className="text-lg text-muted-foreground font-normal ml-2">{tr("／每份餐點", "/ meal")}</span>

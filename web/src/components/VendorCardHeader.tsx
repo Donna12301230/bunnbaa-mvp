@@ -24,7 +24,7 @@ export default function VendorCardHeader({ vendor, subtitle, reward }: { vendor:
             </span>
           )}
           {vendor.reliability_tone === "stable" && (
-            <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-green-700 border border-ink">
+            <span className="flex items-center gap-1 text-caption font-bold px-2 py-0.5 rounded-full bg-secondary text-success-text border border-ink">
               <CheckCircle2 className="w-3 h-3" /> {t("履約穩定", "Stable")}
             </span>
           )}
@@ -38,7 +38,7 @@ export default function VendorCardHeader({ vendor, subtitle, reward }: { vendor:
             {reward.pool_open ? t("開獎中", "Draw open") : reward.amount_to_open <= 0 ? t("已達標，週一開獎", "Target reached — draw opens Monday") : t(`再 ${reward.amount_to_open} 元開獎`, `NT$${reward.amount_to_open} to the draw`)}
           </Link>
         )}
-        <Link href={`/vendor/${vendor.id}`} className="font-semibold text-blue-600 underline underline-offset-4 decoration-1 hover:decoration-2 hover:text-blue-700">
+        <Link href={`/vendor/${vendor.id}`} className="font-semibold text-info-text underline underline-offset-4 decoration-1 hover:decoration-2 hover:text-info-text">
           {t("看店家", "View vendor")}
         </Link>
       </div>

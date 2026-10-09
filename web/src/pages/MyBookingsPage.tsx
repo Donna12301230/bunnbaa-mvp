@@ -430,7 +430,7 @@ export default function MyBookingsPage() {
     const canReview = REVIEW_ELIGIBLE.has(lock.status) && !reviewedIds.has(lock.id);
 
     return (
-      <article key={lock.id} className="bg-card border border-ink rounded-[1.75rem] p-5 flex flex-col gap-2.5 max-w-md overflow-hidden">
+      <article key={lock.id} className="bg-card border border-ink rounded-card p-5 flex flex-col gap-2.5 max-w-md overflow-hidden">
                       {imageOf(lock) && (
                         <img src={imageOf(lock)} alt="" loading="lazy" className="-mx-5 -mt-5 mb-2 aspect-[16/9] w-[calc(100%+2.5rem)] max-w-none object-cover border-b border-ink" />
                       )}
@@ -452,7 +452,7 @@ export default function MyBookingsPage() {
                         </ul>
                       )}
                       {(lock.coupon_discount ?? 0) > 0 && (
-                        <p className="text-caption text-green-700">{tr(`已用折價券折抵 ${lock.coupon_discount} 元`, `Coupon: −NT$${lock.coupon_discount}`)}</p>
+                        <p className="text-caption text-success-text">{tr(`已用折價券折抵 ${lock.coupon_discount} 元`, `Coupon: −NT$${lock.coupon_discount}`)}</p>
                       )}
                       {lock.status === "cancelled" && ((lock.refund_coupon_amount ?? 0) > 0 || (lock.refunded_amount ?? 0) > 0) && (
                         <p className="text-caption text-muted-foreground">
@@ -464,7 +464,7 @@ export default function MyBookingsPage() {
                         </p>
                       )}
                       {lock.status === "charity" && (
-                        <p className="text-caption text-pink-700">
+                        <p className="text-caption text-charity">
                           {lock.charity_source === "donated"
                             ? tr("謝謝你的愛心，這份已開放給需要的人領取。", "Thank you — it's open for someone in need.")
                             : tr("這份沒有領到，已轉為愛心餐。抽獎券照常發放；下次來不了可以先按「捐為愛心餐」。", "Not picked up, so it became a charity meal. Draw tickets were still issued — next time, tap Donate before the window ends.")}
@@ -496,7 +496,7 @@ export default function MyBookingsPage() {
                                   <Pencil /> {lock.plan_id ? tr("改時段", "Change time") : tr("修改", "Change")}
                                 </Button>
                                 {isPayer && canCancel && (
-                                  <Button variant="outline" size="sm" className="flex-1 border-red-300 text-red-600 hover:bg-red-50" disabled={isBusy} onClick={() => handleCancel(lock)}>
+                                  <Button variant="outline" size="sm" className="flex-1 border-danger/40 text-danger-text hover:bg-danger-soft" disabled={isBusy} onClick={() => handleCancel(lock)}>
                                     <XCircle /> {tr("取消換券", "Cancel for a coupon")}
                                   </Button>
                                 )}
@@ -532,7 +532,7 @@ export default function MyBookingsPage() {
                               </Button>
                             ))}
                             {pickupDay && windowOpen && lock.status !== "for_gift" && (
-                              <Button variant="outline" size="sm" className="border-pink-300 text-pink-700 hover:bg-pink-50" disabled={isBusy} onClick={() => handleDonate(lock)}>
+                              <Button variant="outline" size="sm" className="border-charity/40 text-charity hover:bg-charity-soft" disabled={isBusy} onClick={() => handleDonate(lock)}>
                                 <HeartHandshake /> {tr("來不了？捐為愛心餐", "Can't make it? Donate it")}
                               </Button>
                             )}
@@ -562,7 +562,7 @@ export default function MyBookingsPage() {
                               <Copy />
                             </Button>
                           </div>
-                          <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-600" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
+                          <Button variant="outline" size="sm" className="border-danger/40 text-danger-text hover:bg-danger-soft hover:text-danger-text" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
                             {tr("取消贈送", "Cancel gift")}
                           </Button>
                         </div>
@@ -579,7 +579,7 @@ export default function MyBookingsPage() {
                                 `Listed at NT$${resalePrice(lock)}. Once someone pays, ${refundOnTakeover(lock)} points come back to you (use them or send them back to LINE Pay). If nobody takes it in time it becomes free to claim, with no refund.`)
                               : tr(`轉讓價 NT$${resalePrice(lock)}。`, `Listed at NT$${resalePrice(lock)}.`)}
                           </p>
-                          <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-600" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
+                          <Button variant="outline" size="sm" className="border-danger/40 text-danger-text hover:bg-danger-soft hover:text-danger-text" disabled={isBusy} onClick={() => handleCancelTransfer(lock)}>
                             {tr("取消轉讓", "Cancel transfer")}
                           </Button>
                         </div>
@@ -608,7 +608,7 @@ export default function MyBookingsPage() {
                                         onClick={() => setRatingDraft((prev) => ({ ...prev, [lock.id]: n }))}
                                         className="p-0.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                       >
-                                        <Star className={`w-5 h-5 ${n <= (ratingDraft[lock.id] ?? 0) ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
+                                        <Star className={`w-5 h-5 ${n <= (ratingDraft[lock.id] ?? 0) ? "fill-warning text-warning" : "text-muted-foreground"}`} />
                                       </button>
                                     ))}
                                   </div>
@@ -833,10 +833,10 @@ export default function MyBookingsPage() {
                   <Label htmlFor="resale-price">{tr(`或自訂金額（NT$0 ～ ${cap}，不能高於原價）`, `Or enter a price (NT$0 – ${cap}, no higher than the list price)`)}</Label>
                   <Input id="resale-price" type="number" inputMode="numeric" min={0} max={cap} step={1} value={resaleDraft} onChange={(e) => setResaleDraft(e.target.value)} />
                   {valid && price === 0 && (
-                    <p className="text-caption text-pink-700">{tr("$0 的餐點不會放在轉讓市集，會出現在「附近愛心餐」分頁，讓需要的人免費領取（先到先得）。", "$0 meals aren't shown in the transfer market — they appear under Charity meals nearby for anyone to claim, first come, first served.")}</p>
+                    <p className="text-caption text-charity">{tr("$0 的餐點不會放在轉讓市集，會出現在「附近愛心餐」分頁，讓需要的人免費領取（先到先得）。", "$0 meals aren't shown in the transfer market — they appear under Charity meals nearby for anyone to claim, first come, first served.")}</p>
                   )}
                   {!valid ? (
-                    <p className="text-caption text-red-600">{tr(`請填 0 ～ ${cap} 的整數`, `Enter a whole number from 0 to ${cap}`)}</p>
+                    <p className="text-caption text-danger-text">{tr(`請填 0 ～ ${cap} 的整數`, `Enter a whole number from 0 to ${cap}`)}</p>
                   ) : isPayer && back > 0 ? (
                     <p className="text-caption text-muted-foreground">
                       {tr(`有人付款接手後，會退 ${back} 點平台點數給你（可結帳折抵或到會員中心退回 LINE Pay）。`, `Once someone pays, ${back} points come back to you (use them at checkout or send them back to LINE Pay).`)}

@@ -83,7 +83,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   <Icon className="w-4 h-4" />
                   <span>{label}</span>
                   {href === "/admin/appeals" && pendingAppealsCount > 0 && (
-                    <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center shrink-0">
+                    <span className="ml-auto bg-destructive text-white text-xs rounded-full w-4 h-4 flex items-center justify-center shrink-0">
                       {pendingAppealsCount}
                     </span>
                   )}
@@ -104,7 +104,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 <Icon className="w-5 h-5 mb-0.5" />
                 {label}
                 {href === "/admin/appeals" && pendingAppealsCount > 0 && (
-                  <span className="absolute top-1 right-1/4 bg-red-500 text-white text-micro rounded-full w-4 h-4 flex items-center justify-center">
+                  <span className="absolute top-1 right-1/4 bg-destructive text-white text-micro rounded-full w-4 h-4 flex items-center justify-center">
                     {pendingAppealsCount}
                   </span>
                 )}

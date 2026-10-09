@@ -21,7 +21,7 @@ export default function DiscountExplanation({ vendorId, discountPercent }: { ven
   return (
     <div className="pt-2 border-t border-border space-y-0.5">
       <p className="flex gap-1.5 text-xs text-foreground">
-        <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5 text-orange-500" aria-hidden="true" />
+        <Sparkles className="w-3.5 h-3.5 shrink-0 mt-0.5 text-accent-foreground" aria-hidden="true" />
         <span>{data.explanation}</span>
       </p>
       <p className="text-[11px] text-muted-foreground pl-5">{tr("AI 產生的規則說明，不是購買建議", "AI-written explanation of the rules, not a recommendation to buy")}</p>

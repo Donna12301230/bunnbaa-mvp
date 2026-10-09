@@ -235,7 +235,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
 
   await test("C-ORD-02", "購物車：跨店被擋（一次只能一家）；同店 2 行各 1 份 → 2 筆、vendor_id 正確", async () => {
     const cross = expectCode(await cart([line(), { menu_item_id: ITEM2, pickup_date: OPEN_DAY, pickup_window: WINDOW, quantity: 1 }]), "invalid-argument");
-    assert(/一家商家/.test(cross.message), cross.message);
+    assert(/一家店家/.test(cross.message), cross.message);
     const lines = [];
     for (let i = 0; i < 2; i++) lines.push({ menu_item_id: ITEM2, pickup_date: OPEN_DAY, pickup_window: WINDOW, quantity: 1, coupon_id: await coupon(uids.A, V2, 100) });
     const conf = expectOk(await A.call("confirmLinePayPayment", { order_id: expectOk(await cart(lines)).order_id }));

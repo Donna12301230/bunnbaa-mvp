@@ -89,7 +89,7 @@ export default function OpenWishDialog({ open, onOpenChange, vendorId, vendorNam
               key={d.id}
               type="button"
               onClick={() => setPicked(d)}
-              className={cn("px-2.5 py-1 rounded-full border text-xs", picked?.id === d.id ? "border-orange-500 bg-orange-50 text-orange-700" : "border-border")}
+              className={cn("px-2.5 py-1 rounded-full border text-xs", picked?.id === d.id ? "border-primary bg-accent text-accent-foreground" : "border-border")}
             >
               {d.name}
             </button>

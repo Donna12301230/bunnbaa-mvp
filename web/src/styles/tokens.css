@@ -63,6 +63,7 @@
   --danger:  #d0604a;  --danger-soft:  #f8e3de;  --danger-text:  #af432e;
   --info:    #6b8fb3;  --info-soft:    #e6eef5;  --info-text:    #4a6d8f;
   /* 危險按鈕底：白字 on #D0604A 僅 3.85:1 → #C24E36（4.73:1） */
+  --success-strong: #467d57;  /* 實心成功色底（白字 4.85:1）、進度條 */
   --danger-strong: #c24e36;
   --danger-strong-hover: #a84030;
 

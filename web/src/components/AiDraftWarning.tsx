@@ -22,7 +22,7 @@ export default function AiDraftWarning({ vendorId, what }: { vendorId: string | 
   if (drafts.length === 0) return null;
   const names = drafts.map((d) => d.component.name);
   return (
-    <div role="alert" className="mb-5 rounded-xl border border-orange-300 bg-orange-50 p-4 text-sm text-orange-900">
+    <div role="alert" className="mb-5 rounded-xl border border-brand/40 bg-accent p-4 text-sm text-accent-foreground">
       <p className="flex items-center gap-1.5 font-semibold">
         <Sparkles className="w-4 h-4 shrink-0" aria-hidden="true" />
         {tr(`${drafts.length} 道半成品的份量還是 AI 估計，${what}可能不準`, `${drafts.length} recipe(s) still use AI-estimated portions — ${what} may be off`)}

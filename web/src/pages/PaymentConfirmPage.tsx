@@ -115,14 +115,14 @@ export default function PaymentConfirmPage() {
               {tr(`取餐前一天 ${vendorCutoffTime(null)} 截單並判定配菜許願，未成立會改預設菜並通知你。取餐時到「我的餐點」出示 QR Code。`,
                 `Orders close at ${vendorCutoffTime(null)} the day before; side-dish wishes are decided then. Show your QR code from My meals at pickup.`)}
             </p>
-            <Button asChild className="w-full h-12 rounded-full text-base"><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
+            <Button asChild className="w-full h-12 text-base"><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
           </div>
         )}
         {status === "error" && (
           <div className="bb-receipt space-y-3 text-center">
             <h1 className="font-heading text-3xl font-semibold">{tr("付款確認失敗", "Payment confirmation failed")}</h1>
             <p className="text-sm text-muted-foreground">{errorMessage}</p>
-            <Button asChild variant="outline" className="rounded-full"><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
+            <Button asChild variant="outline" className=""><Link href="/my-bookings">{tr("查看我的餐點", "View my meals")}</Link></Button>
           </div>
         )}
       </div>

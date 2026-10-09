@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { selectClass } from "@/lib/fieldStyles";
 import { AlertTriangle, Plus, Trash2, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,7 +87,7 @@ function formAsItem(value: BentoForm): MenuItem {
   } as unknown as MenuItem;
 }
 
-const SELECT_CLASS = "h-9 rounded-md border border-input bg-background px-2 text-sm min-w-0 flex-1";
+const SELECT_CLASS = selectClass("md", "min-w-0 flex-1");
 
 /**
  * 組合預覽（待修改.docx 第 4 列）：用下拉選單照著上面填的內容組一份（白飯、主菜、配菜、自訂欄位），
@@ -165,7 +166,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
   const margin = finalPrice > 0 ? (finalPrice - cost) / finalPrice : 0;
 
   return (
-    <div className="rounded-md border-2 border-dashed border-border bg-white p-2 space-y-2">
+    <div className="rounded-md border-2 border-dashed border-border bg-card p-2 space-y-2">
       <p className="text-xs font-semibold">{isBento ? tr("組合預覽（用下拉選單試組一份，下面算出全部材料；不會存）", "Preview (try a combination; materials below; not saved)") : tr("組合預覽（這一份要備的料）", "Preview (what goes into one)")}</p>
       {hasRice && (
         <label className="flex items-center gap-2 text-sm">
@@ -215,7 +216,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
         {chips.map((c, i) => (
           <span key={i} className="contents">
             {i > 0 && <span className="text-muted-foreground" aria-hidden="true">+</span>}
-            <span className="rounded border border-border bg-orange-50 px-2 py-0.5">{c}</span>
+            <span className="rounded border border-border bg-accent px-2 py-0.5">{c}</span>
           </span>
         ))}
         <span className="text-muted-foreground" aria-hidden="true">→</span>
@@ -240,12 +241,12 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
           compact
         />
         {unlinked.length > 0 && (
-          <p className="text-xs text-amber-800 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 shrink-0" />{tr(`${unlinked.join("、")} 未接配方，不會算進材料、備料和叫貨`, `${unlinked.join(", ")}: no recipe — not counted in prep or purchasing`)}</p>
+          <p className="text-xs text-warning-text flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 shrink-0" />{tr(`${unlinked.join("、")} 未接配方，不會算進材料、備料和叫貨`, `${unlinked.join(", ")}: no recipe — not counted in prep or purchasing`)}</p>
         )}
         <p className="text-sm flex flex-wrap gap-x-3">
-          <span>{tr("一份成本", "Cost/serving")} <b>NT${cost.toFixed(1)}</b>{incomplete && <span className="text-amber-700 text-xs">{tr("（不完整）", " (incomplete)")}</span>}</span>
+          <span>{tr("一份成本", "Cost/serving")} <b>NT${cost.toFixed(1)}</b>{incomplete && <span className="text-warning-text text-xs">{tr("（不完整）", " (incomplete)")}</span>}</span>
           <span>{tr("售價", "Price")} <b>NT${finalPrice}</b></span>
-          {finalPrice > 0 && cost > 0 && <span className={margin < LOW_MARGIN ? "text-orange-600 font-semibold" : "text-green-700"}>{tr("毛利", "Margin")} {Math.round(margin * 100)}%{margin < LOW_MARGIN ? tr("（偏低）", " (low)") : ""}</span>}
+          {finalPrice > 0 && cost > 0 && <span className={margin < LOW_MARGIN ? "text-accent-foreground font-semibold" : "text-success-text"}>{tr("毛利", "Margin")} {Math.round(margin * 100)}%{margin < LOW_MARGIN ? tr("（偏低）", " (low)") : ""}</span>}
         </p>
       </div>
       <p className="text-xs text-muted-foreground">{tr("價格未含早鳥折扣。", "Before early-bird discount.")}</p>
@@ -317,7 +318,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
     const issue = costIssue(componentId, byId, ingredientsById);
     if (issue) {
       return (
-        <button type="button" className="inline-flex items-center gap-0.5 rounded bg-amber-100 text-amber-900 px-1.5 py-0.5 text-[11px] font-medium shrink-0 hover:bg-amber-200" onClick={() => fixIssue(issue, name, assign)} title={tr("點我補上", "Click to fix")}>
+        <button type="button" className="inline-flex items-center gap-0.5 rounded bg-warning-soft text-warning-text px-1.5 py-0.5 text-[11px] font-medium shrink-0 hover:bg-warning/30" onClick={() => fixIssue(issue, name, assign)} title={tr("點我補上", "Click to fix")}>
           <AlertTriangle className="w-3 h-3" />{costIssueText(issue)}
         </button>
       );
@@ -345,7 +346,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
   // 備料組成：每一樣餐點都能拆成幾個半成品，每份各要幾份；店家每日備料、叫貨都照這裡算
   const setPart = (i: number, part: PrepPart) => onChange({ ...value, parts: value.parts.map((p, j) => (j === i ? part : p)) });
   const partsEditor = (
-    <div className="rounded-md border border-border bg-white p-2 space-y-2">
+    <div className="rounded-md border border-border bg-card p-2 space-y-2">
       <p className="text-xs font-semibold">
         {isBento
           ? tr("固定附餐（每份都有、不能換，例：滷蛋；備料會一起算）", "Fixed extras (in every box, e.g. braised egg; counted in prep)")
@@ -389,7 +390,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
   };
   const canAdd = !isBento || value.slots.filter((sl) => sl.default.name).length < liveConfig().maxSides;
   const bentoGrid = (
-    <div className="rounded-md border border-border bg-white p-2 space-y-2">
+    <div className="rounded-md border border-border bg-card p-2 space-y-2">
       <p className="text-xs font-semibold">{tr("便當格子：點格子改配菜和份量，按「加一格」新增配菜", "Bento cells: tap a cell to edit it, Add for a new dish")}</p>
       <BentoBox size="edit" cells={cells} onAdd={canAdd && !adding ? () => setAdding({ name: "", component_id: null }) : undefined} />
       {adding && (
@@ -404,7 +405,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
   const preview = <BentoPreview value={value} itemName={itemName} itemPrice={itemPrice} componentsById={byId} ingredientsById={ingredientsById} vendorId={vendorId} orderCount={orderCount} />;
 
   return (
-    <div className="border rounded-lg p-3 space-y-3 bg-orange-50/40">
+    <div className="border rounded-lg p-3 space-y-3 bg-accent/40">
       <div className="flex flex-wrap gap-4 text-sm">
         <fieldset className="flex items-center gap-3">
           <legend className="sr-only">{tr("品項類型", "Item type")}</legend>
@@ -441,14 +442,14 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
           ))}
         </fieldset>
       </div>
-      {value.mealPeriods.length === 0 && <p className="text-xs text-red-600">{tr("至少勾一個餐期；取餐時段到「店家設定」依餐期設定。", "Pick at least one meal period.")}</p>}
+      {value.mealPeriods.length === 0 && <p className="text-xs text-danger-text">{tr("至少勾一個餐期；取餐時段到「店家設定」依餐期設定。", "Pick at least one meal period.")}</p>}
 
       {bentoGrid}
 
       {partsEditor}
       {!isBento ? preview : (
         <>
-          <div className="rounded-md border border-border bg-white p-2 space-y-2">
+          <div className="rounded-md border border-border bg-card p-2 space-y-2">
             <p className="text-xs font-semibold">{tr(`主菜（消費者單選，各自定價，便當價以所選主菜為準；平台每份抽成 ${commissionPct()}%，定價請加上去）`, `Mains (customer picks one; each has its own price — add the ${commissionPct()}% platform commission when pricing)`)}</p>
             {value.mains.map((m, i) => (
               <div key={i} className="flex gap-2 items-start flex-wrap sm:flex-nowrap">
@@ -474,10 +475,10 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
           </div>
 
           {value.slots.map((slot, i) => (
-            <div key={i} className="rounded-md border border-border bg-white p-2 space-y-2">
+            <div key={i} className="rounded-md border border-border bg-card p-2 space-y-2">
               <div className="flex gap-2 items-center">
                 <span className="text-xs font-semibold shrink-0">{tr(`配菜 ${i + 1}`, `Side ${i + 1}`)}</span>
-                <select className="h-9 rounded-md border border-input px-2 text-sm" value={slot.category} onChange={(e) => setSlot(i, { ...slot, category: e.target.value })}>
+                <select className={selectClass()} value={slot.category} onChange={(e) => setSlot(i, { ...slot, category: e.target.value })}>
                   {CATEGORIES.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
                 </select>
                 <Button variant="ghost" size="icon" className="ml-auto h-8 w-8" aria-label={tr("刪除配菜", "Remove side")} onClick={() => onChange({ ...value, slots: value.slots.filter((_, j) => j !== i) })}><Trash2 className="w-3.5 h-3.5" /></Button>
@@ -496,7 +497,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
                     {candidateDetails && (
                       <>
                         <select
-                          className="h-9 rounded-md border border-input px-1 text-xs"
+                          className={selectClass("sm")}
                           value={c.portion_level < 1 ? 0.5 : 1}
                           title={tr("份量級距（系統依成本計算，可微調）", "Portion level")}
                           aria-label={tr("份量級距", "Portion level")}
@@ -509,7 +510,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
                       </>
                     )}
                     <span className="self-center">{costBadge(c.component_id, c.name, (id, n) => setCand({ component_id: id, name: c.name || n }))}</span>
-                    {c.disabled && <span className="text-xs text-red-600 shrink-0 self-center">{tr("成本過高，不得列為候選", "too costly")}</span>}
+                    {c.disabled && <span className="text-xs text-danger-text shrink-0 self-center">{tr("成本過高，不得列為候選", "too costly")}</span>}
                     <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={tr("刪除候選菜", "Remove candidate")} onClick={() => setSlot(i, { ...slot, candidates: slot.candidates.filter((_, k) => k !== ci) })}><Trash2 className="w-3.5 h-3.5" /></Button>
                   </div>
                 );
@@ -534,7 +535,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
         </>
       )}
 
-      <div className="rounded-md border border-border bg-white">
+      <div className="rounded-md border border-border bg-card">
         <button type="button" className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold" onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}>
           {isBento ? tr("進階（週菜單輪替、自訂欄位）", "Advanced (weekly rotation, custom fields)") : tr("進階（週菜單輪替）", "Advanced (weekly rotation)")}
           <span className="text-muted-foreground">{advanced ? "−" : "+"}</span>
@@ -555,7 +556,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
             {isBento && (
               <>
               {value.customFields.map((field, i) => (
-                <div key={i} className="rounded-md border border-border bg-white p-2 space-y-2">
+                <div key={i} className="rounded-md border border-border bg-card p-2 space-y-2">
                   <div className="flex gap-2 items-center">
                     <span className="text-xs font-semibold shrink-0">{tr("自訂欄位", "Custom field")}</span>
                     <Input className="h-9 w-40" placeholder={tr("欄位名稱（例：湯品）", "Name (e.g. Soup)")} value={field.label} onChange={(e) => setCustom(i, { ...field, label: e.target.value })} />

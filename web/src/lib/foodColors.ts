@@ -32,20 +32,20 @@ export function componentGroup(comp: Component | undefined, ingredientsById: Rec
 
 /** 格子底色、框線、字色 */
 export const GROUP_CELL: Record<FoodGroup, string> = {
-  rice: "bg-amber-100 border-amber-400 text-amber-950",
-  protein: "bg-rose-100 border-rose-400 text-rose-950",
-  veg: "bg-green-100 border-green-500 text-green-950",
+  rice: "bg-warning-soft border-warning text-warning-text",
+  protein: "bg-danger-soft border-danger text-danger-text",
+  veg: "bg-success-soft border-success text-success-text",
   pack: "bg-violet-100 border-violet-400 text-violet-950",
-  other: "bg-stone-100 border-stone-400 text-stone-900",
+  other: "bg-muted border-input text-foreground",
 };
 
 /** 色點（圖例、小標記） */
 export const GROUP_DOT: Record<FoodGroup, string> = {
-  rice: "bg-amber-400",
-  protein: "bg-rose-400",
-  veg: "bg-green-500",
+  rice: "bg-warning",
+  protein: "bg-danger",
+  veg: "bg-success-strong",
   pack: "bg-violet-400",
-  other: "bg-stone-400",
+  other: "bg-muted-foreground/50",
 };
 
 export const groupLabel = (g: FoodGroup) => ({

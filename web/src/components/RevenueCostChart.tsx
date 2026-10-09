@@ -59,7 +59,7 @@ export default function RevenueCostChart({ vendorId }: { vendorId: string | null
   });
 
   if (isLoading) return <div className="h-[240px] rounded-xl bg-muted animate-pulse" />;
-  if (error) return <p className="text-sm text-red-600">{tr("讀取失敗：", "Couldn't load: ")}{(error as Error).message}</p>;
+  if (error) return <p className="text-sm text-danger-text">{tr("讀取失敗：", "Couldn't load: ")}{(error as Error).message}</p>;
   const rows = (data || []).map((d) => ({ ...d, label: label(d.date) }));
   if (rows.every((d) => d.revenue === 0)) {
     return <EmptyState size="compact" icon={<TrendingUp size={32} />} title={tr("這段期間沒有營收紀錄", "No revenue in this period")} />;
@@ -98,7 +98,7 @@ export default function RevenueCostChart({ vendorId }: { vendorId: string | null
           " (materials at latest unit prices; net profit also deducts prep labor, LINE Pay fees, platform commission, and salaries/fixed costs spread evenly per day — set them in Settings)")}
       </p>
       {aiDrafts.length > 0 && (
-        <p className="text-xs text-orange-800">
+        <p className="text-xs text-accent-foreground">
           {tr(`注意：${aiDrafts.length} 道半成品的份量還是 AI 估計（${aiDrafts.slice(0, 3).map((d) => d.component.name).join("、")}${aiDrafts.length > 3 ? "…" : ""}），材料成本與淨利會跟著不準，確認配方後就會更新。`,
             `Note: ${aiDrafts.length} recipe(s) still use AI-estimated portions, so material cost and net profit may be off until you confirm them.`)}
         </p>

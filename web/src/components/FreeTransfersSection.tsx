@@ -79,20 +79,20 @@ export default function FreeTransfersSection() {
   return (
     <section className="space-y-3" aria-labelledby="free-transfers-title">
       <div className="flex items-center gap-2.5 flex-wrap">
-        <Gift className="w-5 h-5 text-pink-600" aria-hidden="true" />
+        <Gift className="w-5 h-5 text-charity" aria-hidden="true" />
         <h2 id="free-transfers-title" className="font-heading text-2xl font-semibold">{tr("$0 免費領取", "Free ($0) meals")}</h2>
         <span className="text-xs text-muted-foreground">{tr("同學免費轉出、或逾時沒人接手的餐點，先到先得；領到後在「我的餐點」出示取餐碼", "Given away for free or not taken in time — first come, first served. Show the pickup code from My meals.")}</span>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {free.map((item) => (
-          <article key={item.id} className="rounded-[1.75rem] bg-card border border-ink overflow-hidden flex flex-col">
+          <article key={item.id} className="rounded-card bg-card border border-ink overflow-hidden flex flex-col">
             <div className="relative aspect-[4/3] bg-secondary flex items-center justify-center border-b border-ink overflow-hidden">
               {imageOf(item) ? (
                 <img src={imageOf(item)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
               ) : (
                 <UtensilsCrossed className="h-10 w-10 text-secondary-foreground/50" strokeWidth={1.25} aria-hidden="true" />
               )}
-              <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-pink-600 text-white">$0</span>
+              <span className="absolute top-2.5 right-2.5 text-caption font-bold px-2.5 py-1 rounded-full bg-charity text-background">$0</span>
             </div>
             <div className="flex flex-col gap-2 p-4 flex-1">
               <h3 className="font-heading text-lg font-semibold leading-snug">{loc(item, "item_name")}</h3>
