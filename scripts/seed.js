@@ -776,33 +776,6 @@ const DEMO_ACCOUNTS = [
   { email: "applicant@bunnbaa.test", displayName: "早安三明治（申請中）", appliesAs: "早安三明治" },
 ];
 
-// Vendor subscriptions (web/src/lib/subscription.ts) — one vendor per state so
-// the vendor portal + /admin/vendors show each of them. Only fills vendors
-// that don't have a subscription yet, so re-running never undoes a renewal.
-// zaoan-sandwich is left unset on purpose: approving applicant@ binds it and
-// starts its free trial (AdminVendorsPage).
-const SUBSCRIPTIONS = {
-  "cafe-renheya-demo": { status: "active", endInDays: 20 },
-  "wang-mama-biandang": { status: "trial", endInDays: 5 },
-  "ajia-friedchicken": { status: "cancelled", endInDays: 3, cancelledFrom: "active" },
-};
-
-async function seedSubscriptions() {
-  for (const [vendorId, sub] of Object.entries(SUBSCRIPTIONS)) {
-    const ref = db.collection("vendors").doc(vendorId);
-    const snap = await ref.get();
-    if (!snap.exists || snap.data().subscription_status) continue;
-    await ref.update({
-      subscription_status: sub.status,
-      subscription_end_date: Timestamp.fromDate(daysFromNow(sub.endInDays)),
-      ...(sub.cancelledFrom
-        ? { cancelled_from: sub.cancelledFrom, cancel_requested_at: Timestamp.fromDate(daysAgo(2)) }
-        : {}),
-    });
-  }
-  console.log("Seeded vendor subscriptions (only where missing)");
-}
-
 async function seedDemoAccounts() {
   if (!process.env.FIREBASE_AUTH_EMULATOR_HOST) return;
   for (const acct of DEMO_ACCOUNTS) {
@@ -852,7 +825,6 @@ async function main() {
     await seedBanAppeals(writer);
     await seedPlatformConfig(writer);
     await writer.flush();
-    await seedSubscriptions();
     await seedDemoAccounts();
     console.log("\nCatalog-only seed complete.");
     process.exit(0);
@@ -897,7 +869,6 @@ async function main() {
   await seedPlatformConfig(writer);
 
   await writer.flush();
-  await seedSubscriptions();
   await seedDemoAccounts();
 
   console.log(`\nSeed complete: ${totalLocks} historical locks, ${totalPayouts} payouts, 4 vendors, ${writer.totalCommitted + 26} total writes (approx).`);

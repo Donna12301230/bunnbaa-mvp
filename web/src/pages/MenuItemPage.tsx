@@ -338,7 +338,9 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                     )}
                   >
                     <span className="text-xs text-muted-foreground mr-1">{mealPeriodLabel(mealPeriodOf(s.window))}</span>
-                    {slotLabel(s.window)}{s.remaining !== null && s.open ? tr(`（剩 ${s.remaining}）`, ` (${s.remaining} left)`) : ""}
+                    {slotLabel(s.window)}
+                    {/* 額滿的時段要寫出來，不能只是變淡——不然看不出是額滿還是沒開 */}
+                    {s.remaining !== null && s.open ? tr(`（剩 ${s.remaining}）`, ` (${s.remaining} left)`) : s.remaining !== null && s.remaining <= 0 ? tr("（已額滿）", " (full)") : ""}
                   </button>
                 ))}
               </div>

@@ -853,7 +853,6 @@ async function seedCatalog(writer) {
   }
 
   await writer.flush();
-  await seedNewVendorSubscriptions();
   const itemCount = Object.values(catalog).reduce((s, c) => s + c.items.length, 0);
   console.log(`Catalog: ${Object.keys(catalog).length} vendors, ${itemCount} menu_items (incl. seed.js item-1s), ${NEW_VENDORS.length * MEAL_PLAN_DEFS.length} new meal_plans`);
   return catalog;
@@ -868,20 +867,6 @@ async function writeMenuItem(writer, d, createdAt) {
     image: null,
     created_at: createdAt,
   }, { merge: true });
-}
-
-// Same "only where missing" rule as seed.js seedSubscriptions — never undoes a renewal.
-async function seedNewVendorSubscriptions() {
-  for (const [i, v] of NEW_VENDORS.entries()) {
-    const ref = db.collection("vendors").doc(v.id);
-    const snap = await ref.get();
-    if (snap.data()?.subscription_status) continue;
-    const trial = i % 4 === 3;
-    await ref.update({
-      subscription_status: trial ? "trial" : "active",
-      subscription_end_date: Timestamp.fromDate(daysAgo(-(trial ? 5 + i : 15 + i * 2))),
-    });
-  }
 }
 
 /* ------------------------------------------------------------------ *

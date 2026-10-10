@@ -578,6 +578,38 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     assert((l.transferred_from_uids || []).includes(uids.A), "transferred_from_uids 應含 A");
   });
 
+  await test("C-MKT-09", "自訂轉讓價：接手者付轉讓價；原付款人退「實付與轉讓價取小的」；超過原價夾在原價；接手後清掉轉讓價", async () => {
+    // A 實付 80（原價 100、早鳥折 20），原價上限＝100
+    const listed = async (resalePrice) => {
+      const { id, ref } = await lock(uids.A, { list_price: 100, early_bird_amount: 20, adjust_amount: 0, locked_price: 80, paid_amount: 80, transaction_id: "fake-seller-tx" });
+      await ref.update({ status: "for_resale", resale_price: resalePrice });
+      return id;
+    };
+    const cases = [
+      { price: 60, pay: 60, refund: 60, note: "賣得比實付低：差額由轉讓人吸收" },
+      { price: 100, pay: 100, refund: 80, note: "賣原價：只退實付，多的留在店家" },
+      { price: 999, pay: 100, refund: 80, note: "超過原價：夾在原價" },
+      { price: 0, pay: 0, refund: 0, note: "0 元送出：不經 LINE Pay、不退款" },
+    ];
+    for (const c of cases) {
+      const id = await listed(c.price);
+      const quote = expectOk(await B.call("createResaleLinePayReservation", { lock_id: id }), c.note);
+      eq([quote.amount, quote.free], [c.pay, c.pay === 0], `${c.note}：報價`);
+      expectOk(await B.call("confirmLinePayPayment", { order_id: quote.order_id }), c.note);
+      const l = await get(`locks/${id}`);
+      eq([l.buyer_uid, l.payer_uid, l.status], [uids.B, uids.B, "locked"], c.note);
+      eq([l.locked_price, l.paid_amount], [c.pay, c.pay], `${c.note}：接手者付的金額`);
+      eq([l.transfer_refund.amount, l.transfer_refund.status], [c.refund, c.refund > 0 ? "done" : "none"], `${c.note}：退給原付款人`);
+      const t = l.transfers[l.transfers.length - 1];
+      eq([t.price, t.refund_amount, t.refund_uid], [c.pay, c.refund, uids.A], `${c.note}：transfers 紀錄`);
+      assert(!("resale_price" in l), `${c.note}：接手後 resale_price 應清掉`);
+    }
+    // 沒填轉讓價：維持早鳥價（舊行為）
+    const { id, ref } = await lock(uids.A, { list_price: 100, early_bird_amount: 20, adjust_amount: 0, locked_price: 80, paid_amount: 80, transaction_id: "fake-seller-tx" });
+    await ref.update({ status: "for_resale" });
+    eq(expectOk(await B.call("createResaleLinePayReservation", { lock_id: id })).amount, 80, "沒填轉讓價用早鳥價");
+  });
+
   await test("C-MKT-03", "接手自己的被擋（failed-precondition）", async () => {
     const { id, ref } = await lock(uids.A);
     await ref.update({ status: "for_resale" });
