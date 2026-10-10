@@ -101,7 +101,7 @@ flowchart TB
 ✨ 標示的是呼叫 AI 的地方。五層分別是：
 
 1. **前端互動層**：顧客端、店家後台、管理後台共用一套 React 程式，放在 Firebase Hosting。畫面直接即時監聽 Firestore，每個人能看到什麼由 Security Rules 決定；牽涉金額或庫存的動作一律走 callable 函式。
-2. **服務運算層**：74 支 Cloud Functions（第二代，跑在 Cloud Run 上）分三種：使用者觸發的 callable、Firestore 寫入時觸發的事件函式，以及 Cloud Scheduler 定時執行的排程。
+2. **服務運算層**：79 支 Cloud Functions（第二代，跑在 Cloud Run 上）分三種：使用者觸發的 callable、Firestore 寫入時觸發的事件函式，以及 Cloud Scheduler 定時執行的排程。
 3. **AI 核心**：所有 Gemini 呼叫都經過同一個 wrapper（`functions/src/gemini.js`）送到 Vertex AI，用 functions 的服務帳號認證。預購助理跑 function calling 迴圈：Gemini 要求呼叫工具，函式到 Firestore 查詢，再把結果交回 Gemini。
 4. **數據持久層**：Firestore 存所有營運資料。轉讓媒合用的菜單向量存在同一份文件裡，搭配 Firestore 向量索引，不用另外架向量資料庫。菜單照片存在 Cloud Storage。
 5. **分析層**：官方擴充功能把每一筆 Firestore 寫入同步到 BigQuery。BigQuery AI 預測需求、把顧客分群；排程把預測寫回 Firestore 給店家後台；Looker Studio 呈現減少剩食的數字。
@@ -153,7 +153,7 @@ sequenceDiagram
 | 階段 | 功能 | 用到的 Gemini 能力 | Cloud Function |
 |---|---|---|---|
 | **上架** | **拍照上架**：拍一張紙本菜單，產生結構化的中英文品項草稿（價格、分類、飲食標籤、過敏原）。店家確認後才會上架。 | 多模態影像 → JSON | `extractMenuFromImage` |
-| **找餐** | **預購助理**：輸入「下週一到五的午餐，大安區，120 元以內，不吃牛」，回傳可以直接預訂的餐點卡片。 | 多輪 function calling | `askShoppingAssistant` |
+| **找餐** | **預購助理**：輸入「下週一到五的午餐，大安區，120 元以內，不吃牛」，回傳可以直接預訂的餐點卡片。也會讀 BigQuery 的需求預估與常一起買（`getVendorInsights`），把預估較不擁擠的店排前面、建議可以加點什麼。 | 多輪 function calling | `askShoppingAssistant` |
 | **救餐** | **轉讓媒合**：有人掛出轉讓時，找出附近吃過類似菜色的顧客並推播通知。 | `gemini-embedding-001`＋Firestore 向量搜尋 KNN | `matchResaleLock` |
 | **校準** | **預估取餐數**：店家看到「鎖定 42 份 → 預估 38–41 份會來取」這樣的區間，每晚另有一份白話報告，也可以追問「如果……會怎樣」。 | 結構化 JSON 生成 | `getPickupForecast`、`dailyCalibration`、`askCalibrationScenario` |
 
@@ -164,8 +164,8 @@ Gemini 也負責在品項頁說明早鳥折扣（`getDiscountExplanation`，依�
 | 分析 | 做法 | 產出 |
 |---|---|---|
 | **需求預測** | 對每家店每天的鎖定量跑 `AI.FORECAST`（TimesFM，不用訓練），預測未來 7 天 | 店家後台顯示「預估明天約 N 份（參考）」，寫回 `vendors/{v}/forecast` |
-| **常一起買** | 用 SQL self-join 找同一位顧客同一天在同一家店一起鎖的品項 | 店家可以拿來搭配套餐或推薦的品項組合 |
-| **顧客分群** | 用最近一次消費、頻率、金額，加上轉讓率、爽約率，跑 `ML.KMEANS` | 分成 4～5 群；再用 `AI.GENERATE` 請 Gemini 為每群寫一句說明，例如「平日午餐固定客、對價格敏感」 |
+| **常一起買** | 用 SQL self-join 找同一位顧客在同一家店都買過的品項（不限同一天，因為一筆訂單多半只有一個品項） | 店家可以拿來搭配套餐，預購助理也會參考 |
+| **顧客分群** | 用最近一次消費、頻率、金額，加上轉讓率、爽約率，跑 `ML.KMEANS` | 買過 2 份以上的會員分成 4 群，每週重新訓練；再用 `AI.GENERATE` 請 Gemini 為每群取中英文群名、寫一句說明，例如「高履約早鳥跨店客」 |
 | **成效儀表板** | Looker Studio 連 `bunnbaa_analytics`，嵌在平台管理後台 | 每日鎖定量、預測與實際對照、救回的餐數、送出的愛心餐數、客群分布 |
 
 ## 技術決策
@@ -230,16 +230,13 @@ cd ../scripts && npm install
 ### 2. 建立分析層
 
 ```bash
-# 每個 collection 各裝一個擴充功能實例：locks、menu_items、vendors、payment_intents
-# Dataset：bunnbaa_analytics，位置 asia-east1
-firebase ext:install firebase/firestore-bigquery-export
-
-# 把既有資料一次匯入 BigQuery，再產生有型別的 view（例如 locks_schema_latest）
-npx @firebaseextensions/fs-bq-import-collection
-npx @firebaseextensions/fs-bq-schema-views
+# transform function：資料寫進 BigQuery 前先拿掉個資與付款識別欄位
+firebase deploy --only functions:bqTransform
+# 4 個擴充功能實例（locks、menu_items、vendors、payment_intents），設定在 firebase.json 與 extensions/*.env
+firebase deploy --only extensions
 ```
 
-接著建立 `daily_demand` view，以及預測、購物籃、分群的查詢。SQL 在 [`doc/GoogleCloud改動建議.md`](doc/GoogleCloud改動建議.md)。
+接著回填既有資料、產生有型別的 view，再執行 `bigquery/sql/01_demand_forecast.sql` 和 `02_dashboard.sql`。完整指令與 IAM 權限見 [`bigquery/README.md`](bigquery/README.md)。購物籃與分群的 SQL（`functions/src/customerInsights.sql`）由排程函式每週執行。
 
 ### 3. 用 emulator 在本機執行
 
@@ -272,6 +269,8 @@ npm run test:functions && npm run test:functions:more
 
 2026-10-09 的結果：商業邏輯測試 61 項、Cloud Functions 測試 141 項全部通過（有 2 項跟日期有關的測試，在隔天不營業時會跳過）。Firestore 安全規則測試也全部通過。
 
+預購助理回答品質（`node scripts/eval/assistantEval.js`，24 題，涵蓋預算、過敏、素食、餐期、多日方案與英文提問，2026-10-10）：規則檢查（預算、過敏原、不吃的食材、餐期、星期、不催促）24/24 通過；**Vertex AI Gen AI Evaluation Service** 評分需求符合度 4.96/5、有據性 4.92/5。報告：[`doc/評估/預購助理回答品質評估.md`](doc/評估/預購助理回答品質評估.md)。
+
 ---
 
 ## 專案結構
@@ -290,7 +289,9 @@ BunnBaa/
 │   ├── pages/              # 顧客端
 │   ├── pages/vendor-portal/
 │   └── pages/admin/        # 包含嵌入的 Looker Studio 儀表板
-├── scripts/                # 種子資料＋自動化測試
+├── bigquery/               # 分析用 SQL、schema view、建置步驟
+├── extensions/             # Stream Firestore to BigQuery 實例設定
+├── scripts/                # 種子資料、自動化測試、預購助理評估（eval/）
 ├── firestore.rules / firestore.indexes.json / storage.rules
 └── doc/                    # 規格、測試文件、開發指南
 ```
@@ -299,8 +300,6 @@ BunnBaa/
 
 ## 後續規劃
 
-- **預購助理讀取預測**：替助理多加一個工具，讓它推薦還有餘量的店家，以及常一起買的品項
-- **回答品質評估**：用 **Vertex AI Gen AI Evaluation Service** 替 20～30 題測試問句（過敏原、預算、用餐時段）評分
 - **Vertex AI Search**：品項語意搜尋（「清淡、有湯、不要牛」）
 - 用 Gemini 為店家整理評論與爽約情況的摘要
 - 詐騙訊號（早鳥囤貨轉賣、多重帳號、互相贈送洗單），並用 Gemini 為管理員整理案件摘要

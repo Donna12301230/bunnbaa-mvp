@@ -101,7 +101,7 @@ flowchart TB
 ✨ marks the points where AI is called. The five layers:
 
 1. **Presentation.** Three web apps (diner, vendor, admin) share one React codebase on Firebase Hosting. They read Firestore directly through realtime listeners, and Security Rules decide what each user can see. Anything that changes money or stock goes through a callable function.
-2. **Compute.** 74 Cloud Functions (2nd gen, running on Cloud Run) handle three kinds of work: callables that users trigger, triggers that react to Firestore writes, and jobs that Cloud Scheduler starts on a timer.
+2. **Compute.** 79 Cloud Functions (2nd gen, running on Cloud Run) handle three kinds of work: callables that users trigger, triggers that react to Firestore writes, and jobs that Cloud Scheduler starts on a timer.
 3. **AI core.** Every Gemini call goes through one wrapper (`functions/src/gemini.js`) to Vertex AI, authenticated with the functions' service account. The assistant runs a function-calling loop: Gemini asks for a tool, the function runs it against Firestore, and the result goes back to Gemini.
 4. **Data.** Firestore holds all operational data. The menu vectors used for resale matching live in the same documents, with a Firestore vector index, so there is no separate vector database. Menu photos are in Cloud Storage.
 5. **Analytics.** The official extension copies every Firestore write into BigQuery. BigQuery AI forecasts demand and groups diners into segments. A scheduled job writes the forecasts back to Firestore for the vendor portal, and Looker Studio reports the waste-reduction numbers.
@@ -153,7 +153,7 @@ sequenceDiagram
 | Stage | Feature | Gemini capability | Cloud Function |
 |---|---|---|---|
 | **List** | **Photo-to-menu.** A photo of a paper menu becomes structured, bilingual menu drafts (price, category, dietary tags, allergens). The owner confirms them before they go live. | Multimodal vision → JSON | `extractMenuFromImage` |
-| **Find** | **Pre-order assistant.** A request like "Lunch next Mon–Fri, Da'an district, under NT$120, no beef" returns meal cards the diner can book. | Multi-turn function calling | `askShoppingAssistant` |
+| **Find** | **Pre-order assistant.** A request like "Lunch next Mon–Fri, Da'an district, under NT$120, no beef" returns meal cards the diner can book. It also reads the BigQuery demand forecast and frequently-bought-together pairs (`getVendorInsights`) to put quieter vendors first and suggest add-ons. | Multi-turn function calling | `askShoppingAssistant` |
 | **Rescue** | **Resale matching.** When a meal is listed for resale, BunnBaa finds nearby diners who have eaten similar dishes and sends them a push notification. | `gemini-embedding-001` + Firestore Vector Search KNN | `matchResaleLock` |
 | **Calibrate** | **Pickup forecast.** The vendor sees a range like "42 locked → 38–41 expected", plus a nightly report in plain language and answers to what-if questions. | Structured JSON generation | `getPickupForecast`, `dailyCalibration`, `askCalibrationScenario` |
 
@@ -164,8 +164,8 @@ Gemini also explains the early-bird discount on the item page (`getDiscountExpla
 | Analysis | How | What it gives |
 |---|---|---|
 | **Demand forecast** | `AI.FORECAST` (TimesFM, no training needed) on the daily lock count for each vendor, 7 days ahead | "About N meals expected tomorrow (for reference)" in the vendor portal, written back to `vendors/{v}/forecast` |
-| **Frequently bought together** | SQL self-join on items the same diner locked from the same vendor on the same day | Item pairs the vendor can bundle or recommend |
-| **Diner segments** | `ML.KMEANS` on recency, frequency and spend, plus resale rate and no-show rate | 4–5 segments; `AI.GENERATE` asks Gemini for a one-line description of each, e.g. "weekday lunch regulars, price-sensitive" |
+| **Frequently bought together** | SQL self-join on items the same diner has bought from the same vendor (on any day; most orders hold a single item) | Item pairs the vendor can bundle, also used by the pre-order assistant |
+| **Diner segments** | `ML.KMEANS` on recency, frequency and spend, plus resale rate and no-show rate | 4 segments of members with 2+ orders, retrained weekly; `AI.GENERATE` asks Gemini for a bilingual name and one-line description of each, e.g. "reliable early-bird multi-store regulars" |
 | **Impact dashboard** | Looker Studio on `bunnbaa_analytics`, embedded in the admin console | Daily locks, forecast vs. actual, meals rescued, charity meals served, segment mix |
 
 ## Technical decisions
@@ -230,16 +230,13 @@ cd ../scripts && npm install
 ### 2. Set up the analytics layer
 
 ```bash
-# One extension instance for each collection: locks, menu_items, vendors, payment_intents
-# Dataset: bunnbaa_analytics, location asia-east1
-firebase ext:install firebase/firestore-bigquery-export
-
-# Copy the existing documents into BigQuery once, then generate the typed views (e.g. locks_schema_latest)
-npx @firebaseextensions/fs-bq-import-collection
-npx @firebaseextensions/fs-bq-schema-views
+# The transform function strips personal and payment fields before rows reach BigQuery
+firebase deploy --only functions:bqTransform
+# Four extension instances (locks, menu_items, vendors, payment_intents), declared in firebase.json + extensions/*.env
+firebase deploy --only extensions
 ```
 
-Then create the `daily_demand` view and the forecast, basket and segment queries. The SQL is in [`doc/GoogleCloud改動建議.md`](doc/GoogleCloud改動建議.md).
+Then backfill the existing documents, generate the typed views, and run `bigquery/sql/01_demand_forecast.sql` and `02_dashboard.sql`. The exact commands and IAM roles are in [`bigquery/README.md`](bigquery/README.md). The basket and segment SQL (`functions/src/customerInsights.sql`) runs weekly from a scheduled function.
 
 ### 3. Run locally with the emulators
 
@@ -272,6 +269,8 @@ npm run test:functions && npm run test:functions:more
 
 Results as of 9 Oct 2026: all 61 business-logic tests and all 141 Cloud Functions tests pass (2 tests that depend on the date are skipped when the next day is not a business day). The Firestore security-rule tests also pass.
 
+Pre-order assistant quality (`node scripts/eval/assistantEval.js`, 24 questions covering budgets, allergies, vegetarian, meal times, multi-day plans and English, 10 Oct 2026): 24/24 pass the rule checks (budget, allergens, excluded ingredients, meal period, weekday, no urgency wording) and the **Vertex AI Gen AI Evaluation Service** scores fulfillment 4.96/5 and groundedness 4.92/5. Report: [`doc/評估/預購助理回答品質評估.md`](doc/評估/預購助理回答品質評估.md).
+
 ---
 
 ## Project structure
@@ -290,7 +289,9 @@ BunnBaa/
 │   ├── pages/              # diner app
 │   ├── pages/vendor-portal/
 │   └── pages/admin/        # includes the embedded Looker Studio dashboard
-├── scripts/                # seed data + automated tests
+├── bigquery/               # analytics SQL, schema views, setup steps
+├── extensions/             # Stream Firestore to BigQuery instance configs
+├── scripts/                # seed data, automated tests, assistant evaluation (eval/)
 ├── firestore.rules / firestore.indexes.json / storage.rules
 └── doc/                    # specs, test plan, developer guide (Chinese)
 ```
@@ -299,8 +300,6 @@ Detailed developer notes (in Chinese), covering the data model, the full list of
 
 ## Roadmap
 
-- **Assistant reads the forecast:** add one more tool to the pre-order assistant so it can recommend vendors with spare capacity and items that are often bought together
-- **Answer-quality evaluation:** score 20–30 test questions (allergens, budget, meal time) with the **Vertex AI Gen AI Evaluation Service**
 - **Vertex AI Search** for semantic menu search ("light, with soup, no beef")
 - Gemini-written summaries of reviews and no-shows for vendors
 - Fraud signals (early-bird scalping, multiple accounts, gift loops), with Gemini case summaries for admins
