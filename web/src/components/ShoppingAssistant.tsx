@@ -33,6 +33,8 @@ interface ItemCard {
   early_bird_percent: number;
   open_dates: string[];
   closed_dates: string[];
+  // 推薦理由（選填，後端依需求預測或購物籃分析給的一句短語，例：「這家明天還有餘量」「常跟滷雞腿便當一起買」）
+  reason?: string | null;
 }
 
 interface PlanCard {
@@ -207,6 +209,11 @@ function CandidateCard({ card, onOpen }: { card: Card; onOpen: () => void }) {
           )}
           {card.date && <span className="text-muted-foreground">・{card.date.slice(5)}{card.window ? ` ${slotLabel(card.window)}` : ""}</span>}
         </p>
+        {card.reason && (
+          <p className="mt-0.5 inline-flex max-w-full items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium">
+            <Sparkles className="h-3 w-3 shrink-0 text-brand" aria-hidden="true" /><span className="truncate">{card.reason}</span>
+          </p>
+        )}
         {(card.dietary_tags.length > 0 || card.closed_dates.length > 0) && (
           <p className="text-[11px] text-muted-foreground truncate">
             {card.dietary_tags.map((tag) => tr(tag, tagEn(tag))).join(" · ")}

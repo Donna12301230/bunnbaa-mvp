@@ -52,6 +52,8 @@ export interface MenuItem {
   // 目錄（分類的上一層，選填）：名稱存這裡，順序存 vendors.menu_catalogs，見 lib/menuCatalog.ts
   catalog?: string | null;
   catalog_en?: string;
+  // 常一起買的同店品項 id（BigQuery 購物籃分析，後端寫入，最多取前 3 個顯示在品項頁）
+  often_with?: string[];
   description: string;
   price: number;
   category: string;

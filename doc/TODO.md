@@ -24,6 +24,7 @@
 - [ ] 10/11 補 60～90 天模擬鎖定 → `daily_demand` view ＋ `AI.FORECAST` → 排程函式寫回 `vendors/{v}/forecast`、店家後台顯示「預估明天約 N 份（參考）」
 - [ ] 10/12 購物籃（self-join）、`ML.KMEANS` 分群、`AI.GENERATE` 分群說明
 - [ ] 10/13 Looker Studio 儀表板（每日鎖定、預測 vs. 實際、救回份數、愛心餐、客群），嵌進管理後台
+- [x] 10/10 **前端先做好**（SU）：需求預測卡、客群卡、品項頁「常一起買」、助理卡片推薦理由、管理後台「平台儀表板」（Looker Studio 嵌入）。資料格式見 [GoogleCloud改動建議.md](GoogleCloud改動建議.md) 的「前端資料格式」；後端寫入後就會顯示，沒有資料時是空狀態
 - [ ] 10/14 部署正式站、全流程測試；更新 `doc/ISMS_管理制度文件.md` 的資料流（BigQuery、Vertex 區域）
 
 ### GitHub 門面（10/15–10/17，評審會看 repo）

@@ -126,6 +126,26 @@ FROM AI.FORECAST(
 - 準備 20～30 題測試問句（含過敏原、預算、時段等限制），用 **Vertex AI Gen AI Evaluation Service** 評分回答是否正確、是否違反過敏原限制。
 - 主要用途是簡報上證明系統穩定，結果截圖放進投稿文件。
 
+## 前端資料格式（2026-10-10 前端已先做好，等後端寫入）
+
+分析結果寫回 Firestore 後前端怎麼讀。畫面都已經做好，沒有資料時顯示空狀態或不顯示，後端照這個格式寫入就會出現。型別定義在 `web/src/lib/analytics.ts`，要改欄位請兩邊一起改。這些文件都由後端用 Admin SDK 寫，不需要新的安全規則。
+
+| 用途 | 路徑 | 欄位 | 顯示位置 |
+|---|---|---|---|
+| 需求預測 | `vendors/{v}/forecast/{YYYY-MM-DD}`（一天一筆） | `date`（同文件 id）、`predicted`（預估份數）、`lower`／`upper`（預測區間，選填）、`generated_at` | 商家後台「報表與洞察」營收分頁最上方：大數字＋未來 7 天長條（`ForecastCard`） |
+| 客群 | `vendors/{v}/segments/{id}`（一群一筆） | `name`、`description`（Gemini 的一句話）、`customers`（人數）、選填 `name_en`、`description_en`、`share`（0–1）、`avg_spend`、`orders_per_month`、`generated_at` | 商家後台「報表與洞察」區域分頁最下方（`SegmentsCard`） |
+| 常一起買 | `menu_items/{id}.often_with`（同店品項 id 陣列，依配對次數排序） | 字串陣列，前端取前 3 個還在上架的 | 消費者品項頁「常一起買」，排在「同一家店的其他品項」前面 |
+| 助理推薦理由 | 預購助理回傳的品項卡片多一個 `reason`（選填字串） | 例：「這家明天還有餘量」「常跟滷雞腿便當一起買」 | 預購助理的品項卡片上多一個小標籤 |
+| Looker Studio 儀表板 | `platformConfig/analytics.lookerStudioEmbedUrl` | 嵌入網址（`https://lookerstudio.google.com/embed/…`），在管理後台頁面上貼上存檔即可，不用改程式 | 管理後台「平台儀表板」（`/admin/analytics`） |
+
+注意：
+
+- 預測讀的是「今天起、依日期排序的前 7 筆」，公休日可以不寫。每天重跑時直接覆寫同一個文件 id。
+- 預測只當參考：畫面固定標示「僅供參考，不是備料指令」。
+- 客群只放彙總數字，不要把 `buyer_uid` 寫進 `segments`。
+- `often_with` 寫在 `menu_items` 上會觸發既有的翻譯與向量觸發器，兩者都只在名稱等內容變動時才重算，不會多花額度；但建議只在內容真的有變時才寫。
+- `firebase.json` 的 CSP `frame-src` 已加上 `https://lookerstudio.google.com`。
+
 ## 不需要改，簡報上講清楚就好
 
 - **Cloud Run**：Functions 第二代底層就是 Cloud Run。

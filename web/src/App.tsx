@@ -43,6 +43,7 @@ const AdminLocksPage = lazy(() => import("./pages/admin/AdminLocksPage"));
 const AdminPayoutsPage = lazy(() => import("./pages/admin/AdminPayoutsPage"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
 const AdminPlatformPage = lazy(() => import("./pages/admin/AdminPlatformPage"));
+const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminDishesPage = lazy(() => import("./pages/admin/AdminDishesPage"));
 const AdminAnomaliesPage = lazy(() => import("./pages/admin/AdminEventsPage").then((m) => ({ default: m.AdminAnomaliesPage })));
 const AdminDisastersPage = lazy(() => import("./pages/admin/AdminEventsPage").then((m) => ({ default: m.AdminDisastersPage })));
@@ -280,6 +281,9 @@ export default function App() {
           </Route>
           <Route path="/admin/payouts">
             <BackOfficePage><AdminPayoutsPage /></BackOfficePage>
+          </Route>
+          <Route path="/admin/analytics">
+            <BackOfficePage><AdminAnalyticsPage /></BackOfficePage>
           </Route>
           <Route path="/admin/settings">
             <BackOfficePage><AdminSettingsPage /></BackOfficePage>

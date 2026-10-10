@@ -126,6 +126,10 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     if (pref?.window) setWindow(pref.window);
   }, [vendor]);
 
+  // 常一起買的排前面另成一區（照後端給的順序、最多 3 個、只列還在上架的），其餘留在「同一家店的其他品項」
+  const oftenWith = (item?.often_with ?? []).map((id) => relatedItems.find((r) => r.id === id)).filter((r): r is MenuItem => !!r).slice(0, 3);
+  const otherItems = relatedItems.filter((r) => !oftenWith.includes(r));
+
   // 換品項（點「同一家店的其他品項」）元件不會重掛，數量、備註、飯量要重設；日期與時段沿用
   useEffect(() => {
     setQty(1);
@@ -527,12 +531,32 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
         </div>
       </div>
 
+      {/* 常一起買（BigQuery 購物籃分析寫在 menu_items.often_with）；沒有資料就不顯示 */}
+      {!dialog && oftenWith.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-heading text-xl font-semibold">{tr("常一起買", "Often bought together")}</h2>
+          <ul className="flex gap-4 overflow-x-auto pb-2">
+            {oftenWith.map((r) => (
+              <li key={r.id} className="shrink-0 w-40">
+                <Link href={`/item/${r.id}`} className="block group">
+                  <span className="block aspect-[4/3] rounded-2xl overflow-hidden border border-ink bg-secondary">
+                    {r.image && <img src={r.image} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" />}
+                  </span>
+                  <span className="block mt-2 text-sm font-semibold truncate">{loc(r, "name")}</span>
+                  <span className="block text-sm text-muted-foreground">NT${r.price}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* 同一商店的其他品項（頁面模式才顯示；彈窗模式不另外跳頁） */}
-      {!dialog && relatedItems.length > 0 && (
+      {!dialog && otherItems.length > 0 && (
         <section className="space-y-3">
           <h2 className="font-heading text-xl font-semibold">{tr("同一家店的其他品項", "More from this vendor")}</h2>
           <ul className="flex gap-4 overflow-x-auto pb-2">
-            {relatedItems.map((r) => (
+            {otherItems.map((r) => (
               <li key={r.id} className="shrink-0 w-40">
                 <Link href={`/item/${r.id}`} className="block group">
                   <span className="block aspect-[4/3] rounded-2xl overflow-hidden border border-ink bg-secondary">

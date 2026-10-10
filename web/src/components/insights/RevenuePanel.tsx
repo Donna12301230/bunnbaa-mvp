@@ -1,3 +1,4 @@
+import ForecastCard from "@/components/insights/ForecastCard";
 import { useEffect, useState } from "react";
 import { collection, limit, onSnapshot, query, where } from "firebase/firestore";
 import { Banknote, CheckCircle2, MessageCircleQuestion, ShoppingBag, Sparkles, TrendingUp } from "lucide-react";
@@ -112,6 +113,7 @@ export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: strin
 
   return (
     <div className="space-y-4">
+      <ForecastCard vendorId={vendorId} />
       {!stats ? (
         <EmptyState icon={<TrendingUp size={32} />} title={tr(`最近 ${REPORT_DAYS} 天沒有訂單`, `No orders in the last ${REPORT_DAYS} days`)} />
       ) : (

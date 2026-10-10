@@ -1,7 +1,7 @@
 import { tr } from "@/lib/i18n";
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings, SlidersHorizontal, BookMarked, CloudLightning, AlertOctagon } from "lucide-react";
+import { AreaChart, Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings, SlidersHorizontal, BookMarked, CloudLightning, AlertOctagon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ const navItems = () => [
   { href: "/admin/appeals", label: tr("解封申訴", "Appeals"), icon: ShieldAlert },
   { href: "/admin/locks", label: tr("訂單總覽", "Orders"), icon: ClipboardList },
   { href: "/admin/payouts", label: tr("撥款總覽", "Payouts"), icon: Wallet },
+  { href: "/admin/analytics", label: tr("平台儀表板", "Dashboard"), icon: AreaChart },
   { href: "/admin/settings", label: tr("系統設定", "Settings"), icon: Settings },
 ];
 
