@@ -39,8 +39,8 @@ async function runDemandForecast(runDate = taipeiToday()) {
   const [rows] = await bq().query({
     query: FORECAST_SQL,
     location: BQ_LOCATION,
-    params: { run_date: runDate },
-    types: { run_date: "DATE" },
+    // 要用 BigQuery.date()：純字串配 types DATE 會被當成 null 送出，INSERT 就變成 0 筆
+    params: { run_date: BigQuery.date(runDate) },
   });
   const writer = new BatchWriter();
   const vendors = new Set();

@@ -3,5 +3,14 @@
     "default": "bunnbaa-mvp-5474"
   },
   "targets": {},
-  "etags": {}
+  "etags": {
+    "bunnbaa-mvp-5474": {
+      "extensionInstances": {
+        "bq-locks": "ac206cb92bf8beff520aa2fb3f7f42b9fbaf10586120979974fbe66cd26a8f60",
+        "bq-menu-items": "3f04743c37b05611305a0a92767fbcbbaf2518723eec0ce9489e0db8d6d61bec",
+        "bq-payment-intents": "5cf8adb9e7df80845dc3fe06529a241973de97d3d14f41a36487e820637c1b44",
+        "bq-vendors": "4a518a5b97ac166e89a312a9e45a0faad05447d6601fbeec5212fde65d74907e"
+      }
+    }
+  }
 }
