@@ -39,6 +39,8 @@ export interface CustomerSegment {
 /** 管理後台嵌入的 Looker Studio 儀表板網址：platformConfig/analytics（管理員可寫、公開可讀） */
 export interface AnalyticsConfig {
   lookerStudioEmbedUrl?: string;
+  /** 舊欄位名（合併前另一版寫的），只讀不寫 */
+  looker_embed_url?: string | null;
 }
 
 /** Looker Studio 的嵌入網址長這樣；只收這個網域，避免管理頁被塞進別的網站 */

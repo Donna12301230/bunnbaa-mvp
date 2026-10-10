@@ -1,0 +1,2263 @@
+{
+  "startedAt": "2026/10/10 16:41:29",
+  "results": [
+    {
+      "id": "C01",
+      "text": "明天中午想吃便當，預算 100 元以內",
+      "expect": {
+        "maxPrice": 100,
+        "period": "lunch"
+      },
+      "seconds": 36,
+      "tools": [
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "明天（10/11 週日）為非營業日，平台於週一至週五提供預購服務。為您推薦最快可預訂的下週一（10/12）午餐便當，預算均在 100 元以內，包含葷食的雞肉便當以及素食便當選項。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "amei-turkey-rice-item-3",
+          "vendor_id": "amei-turkey-rice",
+          "vendor_name": "阿美火雞肉飯",
+          "name": "雞肉便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/amei-turkey-rice/pexels-11665404.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": [
+            "2026-10-11"
+          ]
+        },
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-veggie",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "仁和雅咖啡",
+          "name": "麻婆豆腐素食便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-20943933.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:00-11:30",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-1",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "素排便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-31214058.jpg",
+          "list_price": 100,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "大豆"
+          ],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 80,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-2",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "五穀雜糧便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-9028287.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "大豆"
+          ],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "助理清楚說明無法滿足指定日期（週日）的需求，並主動推薦最快可預訂的日期，其推薦的餐點完全符合使用者預算，並貼心提供了葷素選項與過敏原資訊。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理準確地根據工具資料，指出明天（10/11）非營業日，並推薦了下週一（10/12）的午餐選項。所有推薦的品項、店家、價格、日期、時段、過敏原等資訊，均能在工具查到的資料與伺服器核對過的卡片中找到，完全沒有編造或錯誤。"
+      }
+    },
+    {
+      "id": "C02",
+      "text": "下週一午餐，不吃牛肉，預算 120",
+      "expect": {
+        "maxPrice": 120,
+        "exclude": [
+          "牛肉",
+          "牛腩",
+          "牛排"
+        ],
+        "period": "lunch",
+        "weekday": 1
+      },
+      "seconds": 34,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "已為您搜尋下週一（10/12）嘉義市預算 120 元內且不含牛肉的午餐便當。為您推薦阿美火雞肉飯的「雞肉便當」（$95）、仁和雅咖啡的「滷雞腿便當」（$110）以及王媽媽便當的「三杯雞便當」（$110）。經確認三項在當天午餐時段皆可預訂，其中阿美火雞肉飯當天預估人潮相對平緩，提供您參考。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "amei-turkey-rice-item-3",
+          "vendor_id": "amei-turkey-rice",
+          "vendor_name": "阿美火雞肉飯",
+          "name": "雞肉便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/amei-turkey-rice/pexels-11665404.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-classic",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "仁和雅咖啡",
+          "name": "滷雞腿便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-5266092.jpg",
+          "list_price": 110,
+          "dietary_tags": [],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:00-11:30",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "wang-mama-biandang-item-5",
+          "vendor_id": "wang-mama-biandang",
+          "vendor_name": "王媽媽便當",
+          "name": "三杯雞便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/wang-mama-biandang/pexels-39607317.jpg",
+          "list_price": 110,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "大豆",
+            "芝麻"
+          ],
+          "date": "2026-10-12",
+          "window": "11:00-11:30",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應使用者提出的所有條件（時間、餐期、預算、不吃牛肉），推薦的品項合理且符合預算，並額外提供了預估人潮、過敏原等有助於決策的資訊。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答中的店家、品項、價格、日期、時段、過敏原等資訊，以及「阿美火雞肉飯當天預估人潮相對平緩」的判斷，皆能從工具查到的資料（`searchMenuItems`, `server_verified_cards`, `getVendorInsights`）中找到根據，沒有編造或矛盾之處。"
+      }
+    },
+    {
+      "id": "C03",
+      "text": "我吃素，想找下週三中午的素食便當",
+      "expect": {
+        "dietary": "素食",
+        "period": "lunch",
+        "weekday": 3
+      },
+      "seconds": 46,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "為您推薦嘉義市下週三（10/14）午餐供應的素食便當：包含「蔬活素食」的全素素排便當與麻油猴頭菇便當，以及「仁和雅咖啡」的麻婆豆腐素食便當。經確認上述品項於該日午餐時段均可正常預訂。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-1",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "素排便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-31214058.jpg",
+          "list_price": 100,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "大豆"
+          ],
+          "date": "2026-10-14",
+          "window": "11:30-12:00",
+          "estimated_price": 80,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-3",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "麻油猴頭菇便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-5152271.jpg",
+          "list_price": 110,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "芝麻"
+          ],
+          "date": "2026-10-14",
+          "window": "11:30-12:00",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-veggie",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "仁和雅咖啡",
+          "name": "麻婆豆腐素食便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-20943933.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [],
+          "date": "2026-10-14",
+          "window": "11:00-11:30",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "助理完整回應了素食、日期、餐期等所有條件，推薦合理，並主動提供過敏原、素食類型等加分資訊。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理的回答，包括推薦的店家、品項、原價、預估價、日期、時段、過敏原與標記，所有資訊皆能從工具查到的資料中找到，完全符合事實。"
+      }
+    },
+    {
+      "id": "C04",
+      "text": "全素，不吃蛋奶，下週二午餐",
+      "expect": {
+        "dietary": "全素",
+        "period": "lunch",
+        "weekday": 2
+      },
+      "seconds": 37,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability"
+      ],
+      "reply": "為您推薦嘉義市「蔬活素食」在下週二（2026-10-13）午餐可預訂的全素便當，包含素排便當、五穀雜糧便當與麻油猴頭菇便當。這些品項均符合全素無蛋奶需求，並已明確標示過敏原（如大豆、麩質、芝麻等），方便您安心選擇。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-1",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "素排便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-31214058.jpg",
+          "list_price": 100,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "大豆"
+          ],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 80,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-2",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "五穀雜糧便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-9028287.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "大豆"
+          ],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-3",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "麻油猴頭菇便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-5152271.jpg",
+          "list_price": 110,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "芝麻"
+          ],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應使用者「全素、無蛋奶、下週二午餐」的所有條件，推薦內容合理，且主動提供過敏原、價格等詳細資訊，讓使用者能安心選擇。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理的回答與推薦卡片的資訊（店家、品項、原價、預估價、日期、時段、過敏原）皆能於 server_verified_cards 與 tool_calls 的資料中找到，完全符合根據。"
+      }
+    },
+    {
+      "id": "C05",
+      "text": "下週四早餐想吃蛋餅或吐司",
+      "expect": {
+        "period": "breakfast",
+        "weekday": 4
+      },
+      "seconds": 75,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "已為您找到嘉義市「晨光蛋餅屋」在 2026 年 10 月 15 日（下週四）早餐時段可預訂的品項，包含古早味粉漿蛋餅、培根蛋餅以及起司蛋吐司。經確認該日早餐時段均可預訂，實際結帳金額以系統計算為準。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "chenguang-breakfast-item-1",
+          "vendor_id": "chenguang-breakfast",
+          "vendor_name": "晨光蛋餅屋",
+          "name": "粉漿蛋餅",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/chenguang-breakfast/pexels-8251069.jpg",
+          "list_price": 35,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "蛋"
+          ],
+          "date": "2026-10-15",
+          "window": "07:00-07:30",
+          "estimated_price": 28,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-15"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "chenguang-breakfast-item-2",
+          "vendor_id": "chenguang-breakfast",
+          "vendor_name": "晨光蛋餅屋",
+          "name": "培根蛋餅",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/chenguang-breakfast/pexels-5848079.jpg",
+          "list_price": 45,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "蛋"
+          ],
+          "date": "2026-10-15",
+          "window": "07:00-07:30",
+          "estimated_price": 36,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-15"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "chenguang-breakfast-item-6",
+          "vendor_id": "chenguang-breakfast",
+          "vendor_name": "晨光蛋餅屋",
+          "name": "起司蛋吐司",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/chenguang-breakfast/pexels-170849.jpg",
+          "list_price": 40,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "蛋",
+            "奶"
+          ],
+          "date": "2026-10-15",
+          "window": "07:00-07:30",
+          "estimated_price": 32,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-15"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應使用者對日期（下週四）、餐期（早餐）與餐點類型（蛋餅或吐司）的需求，推薦品項皆符合，並主動提供過敏原與葷素食標記，且清楚說明金額為預估，完全符合評分標準。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答中的店家、品項、價格、日期、時段、過敏原與標記等資訊，均能對應到工具所查找到的資料，沒有任何編造或與資料矛盾之處。"
+      }
+    },
+    {
+      "id": "C06",
+      "text": "下週五晚餐想吃熱的湯麵",
+      "expect": {
+        "period": "dinner",
+        "weekday": 5
+      },
+      "seconds": 35,
+      "tools": [
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "為您找到 2026-10-16（下週五）嘉義市晚餐時段可預訂的熱湯麵品項。包含「老張牛肉麵」的紅燒牛肉麵與牛肉湯麵，以及「港味燒臘」的鮮蝦雲吞麵。這幾款目前在晚餐時段（17:30-18:30）皆開放預訂，其中鮮蝦雲吞麵在店內常與蠔油芥蘭一同選購。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "laozhang-beef-noodle-item-1",
+          "vendor_id": "laozhang-beef-noodle",
+          "vendor_name": "老張牛肉麵",
+          "name": "紅燒牛肉麵",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/laozhang-beef-noodle/pexels-34834553.jpg",
+          "list_price": 180,
+          "dietary_tags": [
+            "葷食",
+            "辣"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "大豆"
+          ],
+          "date": "2026-10-16",
+          "window": "17:30-18:00",
+          "estimated_price": 144,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-16"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "laozhang-beef-noodle-item-4",
+          "vendor_id": "laozhang-beef-noodle",
+          "vendor_name": "老張牛肉麵",
+          "name": "牛肉湯麵",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/laozhang-beef-noodle/pexels-10992840.jpg",
+          "list_price": 110,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "小麥/麩質"
+          ],
+          "date": "2026-10-16",
+          "window": "17:30-18:00",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-16"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "gangwei-roast-item-6",
+          "vendor_id": "gangwei-roast",
+          "vendor_name": "港味燒臘",
+          "name": "鮮蝦雲吞麵",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/gangwei-roast/pexels-36869218.jpg",
+          "list_price": 110,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "海鮮",
+            "蛋"
+          ],
+          "date": "2026-10-16",
+          "window": "17:30-18:00",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-16"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "助理完整回應了使用者對於日期（下週五）、餐期（晚餐）及餐點類型（熱的湯麵）的所有需求，推薦品項合理且資訊清晰，並主動提供過敏原、葷素、辣度等實用標記，屬於高品質的回答。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理的回答（包含文字與卡片）裡的店名、品項、價格、日期、時段、過敏原、標記，以及「常一同選購」的資訊，全部都能在工具查到的資料裡找到，沒有編造或矛盾。"
+      }
+    },
+    {
+      "id": "C07",
+      "text": "我對花生過敏，明天中午有什麼推薦",
+      "taste": {
+        "prefs": [],
+        "allergies": [
+          "花生"
+        ]
+      },
+      "expect": {
+        "period": "lunch"
+      },
+      "seconds": 44,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "明天（10/11 週日）為非營業日，平台最快可預訂的日期為下週一（10/12）。為您推薦 10/12 午餐的選項：阿美火雞肉飯的「雞肉便當」、仁和雅咖啡的「滷雞腿便當」以及王媽媽便當的「週一 滷雞腿便當」。店家目前未標示花生過敏原，但因空白僅代表店家未標示，若過敏較嚴重建議取餐時向店家進一步確認。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "amei-turkey-rice-item-3",
+          "vendor_id": "amei-turkey-rice",
+          "vendor_name": "阿美火雞肉飯",
+          "name": "雞肉便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/amei-turkey-rice/pexels-11665404.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": [
+            "2026-10-11"
+          ]
+        },
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-classic",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "仁和雅咖啡",
+          "name": "滷雞腿便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-5266092.jpg",
+          "list_price": 110,
+          "dietary_tags": [],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:00-11:30",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "wang-mama-biandang-rot_mon",
+          "vendor_id": "wang-mama-biandang",
+          "vendor_name": "王媽媽便當",
+          "name": "週一 滷雞腿便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/wang-mama-biandang/pexels-5305441.jpg",
+          "list_price": 110,
+          "dietary_tags": [],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:00-11:30",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "助理不僅處理了無法預訂明日餐點的狀況並主動推薦次一日的選項，同時也針對使用者最重要的花生過敏需求，提出了篩選後的建議，並附上極為重要的免責聲明，提醒使用者空白標示不代表絕對安全，建議再次確認，完整回應所有條件且推薦合理。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理準確地根據工具回傳的 `checkAvailability` 結果，告知使用者明天無法訂餐，並推薦了下週一的選項；所有推薦品項、價格、日期、時段與過敏原警語等資訊，均能對應到 `server_verified_cards` 與 `searchMenuItems` 的資料，完全沒有編造。"
+      }
+    },
+    {
+      "id": "C08",
+      "text": "下週一中午想吃粥，我對海鮮過敏",
+      "taste": {
+        "prefs": [],
+        "allergies": [
+          "海鮮"
+        ]
+      },
+      "expect": {
+        "period": "lunch",
+        "weekday": 1,
+        "exclude": [
+          "海鮮",
+          "蝦",
+          "蚵",
+          "魚"
+        ]
+      },
+      "seconds": 31,
+      "tools": [
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "為您找到「阿成鹹粥」於下週一（10/12）午餐時段可預訂的兩款粥品：肉絲粥（60元）與皮蛋瘦肉粥（70元）。皮蛋瘦肉粥標示過敏原為蛋；肉絲粥店家未標示過敏原，如有疑慮建議訂購前向店家確認。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "acheng-porridge-item-3",
+          "vendor_id": "acheng-porridge",
+          "vendor_name": "阿成鹹粥",
+          "name": "肉絲粥",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/acheng-porridge/pexels-7225581.jpg",
+          "list_price": 60,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 48,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "acheng-porridge-item-4",
+          "vendor_id": "acheng-porridge",
+          "vendor_name": "阿成鹹粥",
+          "name": "皮蛋瘦肉粥",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/acheng-porridge/pexels-6646240.jpg",
+          "list_price": 70,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "蛋"
+          ],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 56,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "回應完整符合使用者所有需求（時間、餐點類型、過敏原），並針對未標示過敏原的餐點主動提醒，推薦內容合理且資訊清晰。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答中的店家、品項、價格、日期、時段、過敏原與預估價等資訊，皆能於工具查到的資料中找到對應根據，沒有編造或矛盾之處。"
+      }
+    },
+    {
+      "id": "C09",
+      "text": "想吃炸雞，可是我對小麥麩質過敏",
+      "taste": {
+        "prefs": [],
+        "allergies": [
+          "小麥/麩質"
+        ]
+      },
+      "expect": {},
+      "seconds": 25,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems"
+      ],
+      "reply": "目前平台上尚無明確標示不含小麥/麩質的炸雞品項。雖然有搜尋到「阿嘉炸雞排」的「酥脆雞排」，但該品項店家並未標示過敏原，且按常識炸雞麵衣極可能含有小麥麵粉（麩質）。為了您的飲食安全不建議直接推薦，建議訂購前先向店家確認炸粉成分，或考慮放寬條件選擇非炸類的雞肉餐點。",
+      "cards": [],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應使用者對炸雞的需求與麩質過敏的限制，誠實說明查無明確符合條件的品項，並基於食品安全提出合理建議（聯繫店家或放寬條件），符合評分標準。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理根據工具查到的「阿嘉炸雞排」的「酥脆雞排」品項，正確指出其未標示過敏原（allergens: []），並基於此事實與常識，對麩質過敏的用戶提出不建議訂購的警告，所有判斷與陳述皆有根據，且處理方式對使用者安全十分負責。"
+      }
+    },
+    {
+      "id": "C10",
+      "text": "下週二中午，預算 60 元，越便宜越好",
+      "expect": {
+        "maxPrice": 60,
+        "period": "lunch",
+        "weekday": 2
+      },
+      "seconds": 42,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability"
+      ],
+      "reply": "為您推薦下週二（2026-10-13）嘉義市午餐預算 60 元內最便宜的主食。最優惠的是阿美火雞肉飯的滷肉飯（35元）與火雞肉飯（40元），老張牛肉麵亦有 40 元滷肉飯；若想換換口味，也有好食水餃館的麻醬麵（55元）、火雞肉片飯（60元）與蔬活素食的麻醬涼麵（60元）。價格與預估優惠以結帳時伺服器計算為準。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "amei-turkey-rice-item-4",
+          "vendor_id": "amei-turkey-rice",
+          "vendor_name": "阿美火雞肉飯",
+          "name": "滷肉飯",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/amei-turkey-rice/pexels-36738568.jpg",
+          "list_price": 35,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "大豆"
+          ],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 28,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "amei-turkey-rice-item-1",
+          "vendor_id": "amei-turkey-rice",
+          "vendor_name": "阿美火雞肉飯",
+          "name": "火雞肉飯",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/amei-turkey-rice/pexels-19141541.jpg",
+          "list_price": 40,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 32,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "laozhang-beef-noodle-item-7",
+          "vendor_id": "laozhang-beef-noodle",
+          "vendor_name": "老張牛肉麵",
+          "name": "滷肉飯",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/laozhang-beef-noodle/pexels-8467460.jpg",
+          "list_price": 40,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "大豆"
+          ],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 32,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "haoshi-dumplings-item-10",
+          "vendor_id": "haoshi-dumplings",
+          "vendor_name": "好食水餃館",
+          "name": "麻醬麵",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/haoshi-dumplings/pexels-2456435.jpg",
+          "list_price": 55,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "芝麻"
+          ],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 44,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "amei-turkey-rice-item-2",
+          "vendor_id": "amei-turkey-rice",
+          "vendor_name": "阿美火雞肉飯",
+          "name": "火雞肉片飯",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/amei-turkey-rice/pexels-24029948.jpg",
+          "list_price": 60,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 48,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-6",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "麻醬涼麵",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-31892092.jpg",
+          "list_price": 60,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "芝麻",
+            "花生"
+          ],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 48,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應所有條件（日期、餐期、預算），並針對「越便宜越好」的需求，以價格排序推薦，且主動提供過敏原與葷素食等實用資訊，推薦內容合理，也清楚說明價格為預估值，符合評分標準。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答中的店家、品項、原價、預估價、日期、時段、過敏原與標記等所有資訊，皆能對應到 `server_verified_cards` 與工具回傳的資料，沒有任何編造或矛盾之處。"
+      }
+    },
+    {
+      "id": "C11",
+      "text": "下週一到週五中午都想固定訂同一家，每餐 100 元以內",
+      "expect": {
+        "maxPrice": 100
+      },
+      "seconds": 38,
+      "tools": [
+        "searchMealPlans",
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "為您找到符合下週一至週五（10/12–10/16）午餐且每餐 100 元以內的方案與便當品項。多日方案推薦「阿美火雞肉飯」的五日輕食計畫，每餐約 36 元；若偏好單品便當，阿美火雞肉飯的雞肉便當、仁和雅咖啡的麻婆豆腐素食便當及蔬活素食的五穀雜糧便當，五天皆有供應名額且單價為 95 元。實際金額結帳時由伺服器重算。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "amei-turkey-rice-item-3",
+          "vendor_id": "amei-turkey-rice",
+          "vendor_name": "阿美火雞肉飯",
+          "name": "雞肉便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/amei-turkey-rice/pexels-11665404.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12",
+            "2026-10-13",
+            "2026-10-14",
+            "2026-10-15",
+            "2026-10-16"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-veggie",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "仁和雅咖啡",
+          "name": "麻婆豆腐素食便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-20943933.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:00-11:30",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12",
+            "2026-10-13",
+            "2026-10-14",
+            "2026-10-15",
+            "2026-10-16"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-2",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "五穀雜糧便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-9028287.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "大豆"
+          ],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12",
+            "2026-10-13",
+            "2026-10-14",
+            "2026-10-15",
+            "2026-10-16"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "plan",
+          "id": "amei-turkey-rice-plan-a",
+          "vendor_id": "amei-turkey-rice",
+          "vendor_name": "阿美火雞肉飯",
+          "name": "五日輕食計畫（5天）",
+          "label": "A方案",
+          "price_per_meal": 36,
+          "days": 5
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 4,
+        "explanation": "大致符合所有條件，並成功找到符合「固定訂同一家」的方案與品項，但同時推薦了其他餐廳的便當，稍微模糊了使用者的核心需求，在說明上可以更清晰地區分。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答的所有資訊，包括店家、品項、價格、日期、供應狀況等，均能從工具的查詢結果中找到對應依據，沒有捏造或與資料矛盾之處。"
+      }
+    },
+    {
+      "id": "C12",
+      "text": "想吃辣的，下週三晚餐",
+      "expect": {
+        "dietary": "辣",
+        "period": "dinner",
+        "weekday": 3
+      },
+      "seconds": 26,
+      "tools": [
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "已為您挑選 2026-10-14（下週三）嘉義市晚餐時段帶有辣味的餐點。推薦品項有曼谷香料的打拋豬飯（130 元）、首爾廚房的泡菜炒飯（140 元）以及好食水餃館的紅油抄手（75 元），當天晚餐時段皆可預訂取餐。另外，好食水餃館的紅油抄手常與起司鍋貼一同購買，可作為搭餐參考。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "bangkok-spice-item-1",
+          "vendor_id": "bangkok-spice",
+          "vendor_name": "曼谷香料",
+          "name": "打拋豬飯",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/bangkok-spice/pexels-12100417.jpg",
+          "list_price": 130,
+          "dietary_tags": [
+            "葷食",
+            "辣"
+          ],
+          "allergens": [
+            "蛋",
+            "大豆",
+            "海鮮"
+          ],
+          "date": "2026-10-14",
+          "window": "17:30-18:00",
+          "estimated_price": 104,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "seoul-kitchen-item-2",
+          "vendor_id": "seoul-kitchen",
+          "vendor_name": "首爾廚房",
+          "name": "泡菜炒飯",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/seoul-kitchen/pexels-8890016.jpg",
+          "list_price": 140,
+          "dietary_tags": [
+            "葷食",
+            "辣"
+          ],
+          "allergens": [
+            "蛋",
+            "海鮮"
+          ],
+          "date": "2026-10-14",
+          "window": "17:30-18:00",
+          "estimated_price": 112,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "haoshi-dumplings-item-11",
+          "vendor_id": "haoshi-dumplings",
+          "vendor_name": "好食水餃館",
+          "name": "紅油抄手",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/haoshi-dumplings/pexels-750947.jpg",
+          "list_price": 75,
+          "dietary_tags": [
+            "葷食",
+            "辣"
+          ],
+          "allergens": [
+            "小麥/麩質"
+          ],
+          "date": "2026-10-14",
+          "window": "17:30-18:00",
+          "estimated_price": 60,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "助理完整回應了使用者「下週三」、「晚餐」、「想吃辣」的所有條件，推薦品項合理且多元，並主動提供了過敏原、預估折扣價、搭餐建議等有用的額外資訊，整體回答非常完整且貼心。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答中的所有資訊，包括店家、品項、價格、日期、時段、搭餐建議、過敏原與標記，均能從工具的查詢結果中找到，完全符合資料，沒有編造。"
+      }
+    },
+    {
+      "id": "C13",
+      "text": "下週一中午，不要香菜也不要豬肉",
+      "expect": {
+        "exclude": [
+          "香菜",
+          "豬"
+        ],
+        "period": "lunch",
+        "weekday": 1
+      },
+      "seconds": 32,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "為您推薦 10/12（下週一）午餐時段不含豬肉與香菜的便當選項：包含「阿美火雞肉飯」的雞肉便當、「王媽媽便當」的三杯雞便當，以及全素的「蔬活素食」五穀雜糧便當。這三款品項當天皆可預訂，實際結帳金額以伺服器計算為準。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "amei-turkey-rice-item-3",
+          "vendor_id": "amei-turkey-rice",
+          "vendor_name": "阿美火雞肉飯",
+          "name": "雞肉便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/amei-turkey-rice/pexels-11665404.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "wang-mama-biandang-item-5",
+          "vendor_id": "wang-mama-biandang",
+          "vendor_name": "王媽媽便當",
+          "name": "三杯雞便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/wang-mama-biandang/pexels-39607317.jpg",
+          "list_price": 110,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "大豆",
+            "芝麻"
+          ],
+          "date": "2026-10-12",
+          "window": "11:00-11:30",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-2",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "五穀雜糧便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-9028287.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "大豆"
+          ],
+          "date": "2026-10-12",
+          "window": "11:30-12:00",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應使用者指定的時間（下週一中午）與忌口食材（不要香菜、不要豬肉），推薦選項合理且多樣，並清楚說明價格為預估，符合評分標準。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答中的店家、品項、價格、日期、時段、過敏原與標記等所有資訊，皆能與工具查到的資料（特別是 server_verified_cards）完全對應，沒有任何編造或矛盾之處。"
+      }
+    },
+    {
+      "id": "C14",
+      "text": "預算 20 元可以吃到什麼正餐",
+      "expect": {
+        "maxPrice": 20
+      },
+      "seconds": 25,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems"
+      ],
+      "reply": "在嘉義市目前預算 20 元內，僅能點選白飯（15元）、冬粉（20元）、滷蛋（15元）、滷豆腐（20元）或湯品飲料等單點小菜與主食，無法組合出完整的正餐便當。建議您將預算放寬至 95 元以上，就能選擇如雞肉便當、麻婆豆腐素食便當或五穀雜糧便當等完整正餐。",
+      "cards": [],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "助理清楚說明在此預算下無法滿足「正餐」的需求，並誠實列出可購買的單點品項，最後提出放寬預算的具體建議與範例，完整回應問題且提供有建設性的解決方案。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理根據工具資料，準確地總結了 20 元預算內僅能購買如白飯、冬粉、滷蛋、滷豆腐等單點品項，並非完整正餐。同時，建議將預算提高至 95 元以上才能選擇便當，此資訊也與工具查到的便當最低價（95元）相符，所有內容皆有根據。"
+      }
+    },
+    {
+      "id": "C15",
+      "text": "台北市大安區有便當可以訂嗎",
+      "area": {
+        "county": "臺北市",
+        "town": "大安區"
+      },
+      "expect": {
+        "empty": true
+      },
+      "seconds": 41,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems"
+      ],
+      "reply": "很抱歉，目前臺北市大安區尚無合作店家可供預訂。平台目前的合作店家主要分布在嘉義市（東區、西區）。建議您可以關注後續新增合作店家的消息。",
+      "cards": [],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "助理清楚且誠實地說明在指定地點查無店家，並提供目前服務範圍作為參考，此回應方式在無法滿足使用者需求時是完整且洽當的。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理根據工具回傳的「0 筆結果」正確回答在臺北市大安區沒有可預訂的店家，並根據另一筆沒有篩選條件的搜尋結果，正確指出目前合作店家多在嘉義市，回答完全有根據。"
+      }
+    },
+    {
+      "id": "C16",
+      "text": "下週二中午想吃粥，想挑比較不會排隊的店，順便推薦可以加點什麼",
+      "expect": {
+        "period": "lunch",
+        "weekday": 2
+      },
+      "seconds": 30,
+      "tools": [
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "為您找到位於嘉義市西區的「阿成鹹粥」，下週二（10/13）午餐時段均可預訂，推薦皮蛋瘦肉粥、虱目魚粥與古早味肉絲粥。根據預估，當天該店訂量屬於正常範圍，提前預購可節省現場等候的時間。許多顧客常搭配加點「油條」，非常適合配粥一起享用。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "acheng-porridge-item-4",
+          "vendor_id": "acheng-porridge",
+          "vendor_name": "阿成鹹粥",
+          "name": "皮蛋瘦肉粥",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/acheng-porridge/pexels-6646240.jpg",
+          "list_price": 70,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "蛋"
+          ],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 56,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "acheng-porridge-item-1",
+          "vendor_id": "acheng-porridge",
+          "vendor_name": "阿成鹹粥",
+          "name": "虱目魚粥",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/acheng-porridge/pexels-32835478.jpg",
+          "list_price": 90,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "海鮮"
+          ],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 72,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "acheng-porridge-item-3",
+          "vendor_id": "acheng-porridge",
+          "vendor_name": "阿成鹹粥",
+          "name": "肉絲粥",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/acheng-porridge/pexels-7225581.jpg",
+          "list_price": 60,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-13",
+          "window": "12:00-12:30",
+          "estimated_price": 48,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應使用者所有需求：特定餐點（粥）、時段（下週二中午）、避免排隊的考量，並提供合理的加點推薦（油條），卡片資訊清楚且附有過敏原標示，推薦內容完全符合使用者期待。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "回答中的店家、品項、價格、日期、時段、訂量預估（正常範圍）、加點推薦（油條）等所有事實，均能從工具查到的資料中找到根據，沒有任何編造或與資料矛盾之處。"
+      }
+    },
+    {
+      "id": "C17",
+      "text": "I'm vegetarian. Any lunch options next Wednesday under NT$120?",
+      "lang": "en",
+      "expect": {
+        "dietary": "素食",
+        "maxPrice": 120,
+        "period": "lunch",
+        "weekday": 3
+      },
+      "seconds": 40,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability"
+      ],
+      "reply": "Here are vegetarian lunch options under NT$120 in Chiayi City for next Wednesday, October 14. You can consider the Mapo Tofu Vegetarian Bento (NT$95) from Renheya Cafe, which is confirmed available for lunch pre-order. Additionally, Veggie Life offers the Vegan Cutlet Bento (NT$100), Sesame Oil Mushroom Bento (NT$110), and Multigrain Bento (NT$95); please note their labeled allergens such as soy, gluten, or sesame.",
+      "cards": [
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-veggie",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "Renheya Cafe",
+          "name": "Mapo Tofu Vegetarian Bento",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-20943933.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [],
+          "date": "2026-10-14",
+          "window": "11:00-11:30",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-1",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "Veggie Life",
+          "name": "Vegan Cutlet Bento",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-31214058.jpg",
+          "list_price": 100,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "大豆"
+          ],
+          "date": "2026-10-14",
+          "window": "11:30-12:00",
+          "estimated_price": 80,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-3",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "Veggie Life",
+          "name": "Sesame Oil Mushroom Bento",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-5152271.jpg",
+          "list_price": 110,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "芝麻"
+          ],
+          "date": "2026-10-14",
+          "window": "11:30-12:00",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-2",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "Veggie Life",
+          "name": "Multigrain Bento",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-9028287.jpg",
+          "list_price": 95,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "大豆"
+          ],
+          "date": "2026-10-14",
+          "window": "11:30-12:00",
+          "estimated_price": 76,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應使用者所有條件（素食、日期、預算），推薦品項皆符合需求，並主動提供過敏原資訊，整體回答清晰且有附加價值。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答的內容，包括推薦的店家、品項、價格、日期、時段、預估價與過敏原等資訊，皆能在工具查到的資料與伺服器核對過的卡片中找到對應根據，沒有任何編造或與資料矛盾之處。"
+      }
+    },
+    {
+      "id": "C18",
+      "text": "Spicy food for dinner next Monday, no beef please",
+      "lang": "en",
+      "expect": {
+        "exclude": [
+          "牛肉",
+          "牛腩",
+          "牛排"
+        ],
+        "period": "dinner",
+        "weekday": 1
+      },
+      "seconds": 32,
+      "tools": [
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "Here are three spicy, beef-free dinner options for next Monday, October 12: Pad Krapow Pork Rice from Bangkok Spice, Kimchi Fried Rice from Seoul Kitchen, and Wontons in Chili Oil from Haoshi Dumpling House. All selected items are confirmed available for pre-order during dinner hours. Final prices will be calculated at checkout.",
+      "cards": [
+        {
+          "type": "item",
+          "id": "bangkok-spice-item-1",
+          "vendor_id": "bangkok-spice",
+          "vendor_name": "Bangkok Spice",
+          "name": "Pad Krapow Pork Rice",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/bangkok-spice/pexels-12100417.jpg",
+          "list_price": 130,
+          "dietary_tags": [
+            "葷食",
+            "辣"
+          ],
+          "allergens": [
+            "蛋",
+            "大豆",
+            "海鮮"
+          ],
+          "date": "2026-10-12",
+          "window": "17:30-18:00",
+          "estimated_price": 104,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "seoul-kitchen-item-2",
+          "vendor_id": "seoul-kitchen",
+          "vendor_name": "Seoul Kitchen",
+          "name": "Kimchi Fried Rice",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/seoul-kitchen/pexels-8890016.jpg",
+          "list_price": 140,
+          "dietary_tags": [
+            "葷食",
+            "辣"
+          ],
+          "allergens": [
+            "蛋",
+            "海鮮"
+          ],
+          "date": "2026-10-12",
+          "window": "17:30-18:00",
+          "estimated_price": 112,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "haoshi-dumplings-item-11",
+          "vendor_id": "haoshi-dumplings",
+          "vendor_name": "Haoshi Dumpling House",
+          "name": "Wontons in Chili Oil",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/haoshi-dumplings/pexels-750947.jpg",
+          "list_price": 75,
+          "dietary_tags": [
+            "葷食",
+            "辣"
+          ],
+          "allergens": [
+            "小麥/麩質"
+          ],
+          "date": "2026-10-12",
+          "window": "17:30-18:00",
+          "estimated_price": 60,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應使用者所有條件（辣、晚餐、下週一、不要牛肉），推薦合理且多樣，並清楚說明價格為預估，符合評分標準。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答的所有資訊，包括店名、品項（英文與中文）、原價、預估價、日期、時段、過敏原、標籤等，都與工具查到的資料完全相符，沒有編造或矛盾之處。"
+      }
+    },
+    {
+      "id": "C19",
+      "text": "下週四想喝飲料配點心，下午茶",
+      "expect": {
+        "weekday": 4
+      },
+      "seconds": 41,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability"
+      ],
+      "reply": "平台目前提供早餐（06:00-10:30）、午餐（10:30-14:00）與晚餐（16:30-20:00）三個預購餐期，尚無獨立的下午茶時段，為您推薦最接近的午餐餐期品項。下週四（2026-10-15）為您選了阿嘉炸雞排的檸檬綠茶、黃金薯條與鹽酥雞，午餐時段可供預訂取餐。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "ajia-friedchicken-item-11",
+          "vendor_id": "ajia-friedchicken",
+          "vendor_name": "阿嘉炸雞排",
+          "name": "檸檬綠茶",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/ajia-friedchicken/pexels-8619612.jpg",
+          "list_price": 35,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [],
+          "date": "2026-10-15",
+          "window": "11:00-11:30",
+          "estimated_price": 28,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-15"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "ajia-friedchicken-item-5",
+          "vendor_id": "ajia-friedchicken",
+          "vendor_name": "阿嘉炸雞排",
+          "name": "黃金薯條",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/ajia-friedchicken/pexels-39851023.jpg",
+          "list_price": 45,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [],
+          "date": "2026-10-15",
+          "window": "11:00-11:30",
+          "estimated_price": 36,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-15"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "ajia-friedchicken-item-2",
+          "vendor_id": "ajia-friedchicken",
+          "vendor_name": "阿嘉炸雞排",
+          "name": "鹽酥雞",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/ajia-friedchicken/pexels-28573376.jpg",
+          "list_price": 70,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "小麥/麩質"
+          ],
+          "date": "2026-10-15",
+          "window": "11:00-11:30",
+          "estimated_price": 56,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-15"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "助理清楚說明平台無下午茶時段的限制，並提供午餐時段的合理替代方案（飲料與點心），完整回應日期等條件，且推薦卡片資訊詳細，符合評分標準。"
+      },
+      "grounded": {
+        "score": 3,
+        "explanation": "助理自行編造了早、午、晚餐的預購時段（例如午餐 10:30-14:00），此資訊在工具查到的資料中並不存在，但推薦的品項、價格等資訊皆有根據。"
+      }
+    },
+    {
+      "id": "C20",
+      "text": "我對蛋和大豆過敏，下週五中午吃什麼好",
+      "taste": {
+        "prefs": [],
+        "allergies": [
+          "蛋",
+          "大豆"
+        ]
+      },
+      "expect": {
+        "period": "lunch",
+        "weekday": 5
+      },
+      "seconds": 47,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability"
+      ],
+      "reply": "針對下週五（10/16）午餐，優先為您挑選有明確標示過敏原且未包含蛋和大豆的品項：\n1. 蔬活素食「麻油猴頭菇便當」（標示過敏原為芝麻），10/16 午餐時段可預訂。\n2. 阿成鹹粥「虱目魚粥」（標示過敏原為海鮮）。\n3. 仁和雅咖啡「燻雞帕尼尼」（標示過敏原為小麥/麩質、奶）。\n\n請注意，若店家過敏原欄位為空僅代表「未標示」而非「不含」；湯頭或醬料若可能使用醬油等大豆製品，建議訂購時向店家再次確認。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "shuhuo-vegan-item-3",
+          "vendor_id": "shuhuo-vegan",
+          "vendor_name": "蔬活素食",
+          "name": "麻油猴頭菇便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/shuhuo-vegan/pexels-5152271.jpg",
+          "list_price": 110,
+          "dietary_tags": [
+            "全素"
+          ],
+          "allergens": [
+            "芝麻"
+          ],
+          "date": "2026-10-16",
+          "window": "12:00-12:30",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-16"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "acheng-porridge-item-1",
+          "vendor_id": "acheng-porridge",
+          "vendor_name": "阿成鹹粥",
+          "name": "虱目魚粥",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/acheng-porridge/pexels-32835478.jpg",
+          "list_price": 90,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "海鮮"
+          ],
+          "date": "2026-10-16",
+          "window": "12:00-12:30",
+          "estimated_price": 72,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-16"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-item-4",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "仁和雅咖啡",
+          "name": "燻雞帕尼尼",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-1885578.jpg",
+          "list_price": 120,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "奶"
+          ],
+          "date": "2026-10-16",
+          "window": "12:00-12:30",
+          "estimated_price": 96,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-16"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應所有條件（日期、餐期、過敏原），並針對過敏原的潛在風險（醬料可能含醬油）提出非常關鍵且負責任的提醒，清楚說明了系統能力的限制，推薦內容也合理。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理推薦的三個品項（麻油猴頭菇便當、虱目魚粥、燻雞帕尼尼）皆根據工具查到的資料，避開了使用者過敏的蛋與大豆。所有推薦卡片中的店名、品項、原價、日期、時段、預估價、過敏原與標記，都與伺服器核對過的卡片（server_verified_cards）資料完全一致，沒有編造或矛盾。"
+      }
+    },
+    {
+      "id": "C21",
+      "text": "下週三中午想吃咖哩飯，預算 130",
+      "expect": {
+        "maxPrice": 130,
+        "period": "lunch",
+        "weekday": 3
+      },
+      "seconds": 27,
+      "tools": [
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "為您推薦 2026/10/14（週三）午餐時段、預算 130 元內的兩款咖哩品項：大和丼飯屋的「蔬菜咖哩飯」（120 元）與仁和雅咖啡的「蔬食咖哩便當」（130 元）。兩款於當天午餐時段皆可正常預訂取餐，其中仁和雅咖啡的咖哩便當常有人搭配飲品一同購買。最終結帳金額請以預購頁面計算為準。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "yamato-don-item-7",
+          "vendor_id": "yamato-don",
+          "vendor_name": "大和丼飯屋",
+          "name": "蔬菜咖哩飯",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/yamato-don/pexels-30700760.jpg",
+          "list_price": 120,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [
+            "小麥/麩質"
+          ],
+          "date": "2026-10-14",
+          "window": "11:30-12:00",
+          "estimated_price": 96,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-item-3",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "仁和雅咖啡",
+          "name": "蔬食咖哩便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-38104220.jpg",
+          "list_price": 130,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [
+            "小麥/麩質"
+          ],
+          "date": "2026-10-14",
+          "window": "11:00-11:30",
+          "estimated_price": 104,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-14"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應所有條件（日期、餐期、品項、預算），推薦合理，並提供過敏原、素食標記等額外有用資訊，最後也清楚說明最終金額需以預購頁面為準，暗示了助理本身無法完成下單，符合評分標準。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "回答中的店名、品項、價格、日期、時段、預估價、顧客習慣等所有資訊，皆能於工具查到的資料中找到根據，沒有任何編造或與資料矛盾之處。"
+      }
+    },
+    {
+      "id": "C22",
+      "text": "想吃健康一點的，沙拉或穀物碗，下週二中午",
+      "expect": {
+        "period": "lunch",
+        "weekday": 2
+      },
+      "seconds": 37,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability"
+      ],
+      "reply": "為您挑選了下週二（2026-10-13）午餐時段可預訂的沙拉與穀物碗候選：包含綠碗沙拉的「舒肥雞胸沙拉」與「墨西哥雞肉碗」，以及仁和雅咖啡的「凱薩沙拉」。這些餐點經確認在 10/13 午餐時段均有開放預訂，實際價格與折扣以結帳時伺服器計算為準。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "green-bowl-salad-item-1",
+          "vendor_id": "green-bowl-salad",
+          "vendor_name": "綠碗沙拉",
+          "name": "舒肥雞胸沙拉",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/green-bowl-salad/pexels-15415465.jpg",
+          "list_price": 160,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-13",
+          "window": "11:30-12:00",
+          "estimated_price": 128,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "green-bowl-salad-item-7",
+          "vendor_id": "green-bowl-salad",
+          "vendor_name": "綠碗沙拉",
+          "name": "墨西哥雞肉碗",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/green-bowl-salad/pexels-10696501.jpg",
+          "list_price": 180,
+          "dietary_tags": [
+            "葷食",
+            "辣"
+          ],
+          "allergens": [],
+          "date": "2026-10-13",
+          "window": "11:30-12:00",
+          "estimated_price": 144,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-item-5",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "仁和雅咖啡",
+          "name": "凱薩沙拉",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-29935339.jpg",
+          "list_price": 110,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [
+            "奶",
+            "蛋",
+            "小麥/麩質"
+          ],
+          "date": "2026-10-13",
+          "window": "11:00-11:30",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-13"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "助理完整回應了使用者對於日期（下週二）、餐期（中午）與餐點類型（沙拉或穀物碗）的所有需求，推薦的品項完全符合，且推薦卡片中提供了價格、時段、葷素、過敏原等詳細資訊，有助於使用者決策。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答中的所有資訊，包括文字敘述和推薦卡片上的店家、品項名稱、原價、預估價、日期、時段、標記及過敏原，都能在工具提供的資料（特別是 server_verified_cards）中找到對應根據，沒有任何編造或不符之處。"
+      }
+    },
+    {
+      "id": "C23",
+      "text": "下週一早餐，不吃蛋",
+      "expect": {
+        "exclude": [
+          "蛋"
+        ],
+        "period": "breakfast",
+        "weekday": 1
+      },
+      "seconds": 31,
+      "tools": [
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability"
+      ],
+      "reply": "為您推薦 2026-10-12（下週一）早餐時段不含蛋食材的餐點選擇。主食推薦阿成鹹粥的「肉絲粥」與「虱目魚粥」，輕食則有晨光蛋餅屋的「花生厚片」。請注意虱目魚粥含有海鮮過敏原，花生厚片則含有小麥與花生過敏原。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "acheng-porridge-item-3",
+          "vendor_id": "acheng-porridge",
+          "vendor_name": "阿成鹹粥",
+          "name": "肉絲粥",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/acheng-porridge/pexels-7225581.jpg",
+          "list_price": 60,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "07:30-08:00",
+          "estimated_price": 48,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "acheng-porridge-item-1",
+          "vendor_id": "acheng-porridge",
+          "vendor_name": "阿成鹹粥",
+          "name": "虱目魚粥",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/acheng-porridge/pexels-32835478.jpg",
+          "list_price": 90,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "海鮮"
+          ],
+          "date": "2026-10-12",
+          "window": "07:30-08:00",
+          "estimated_price": 72,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "chenguang-breakfast-item-5",
+          "vendor_id": "chenguang-breakfast",
+          "vendor_name": "晨光蛋餅屋",
+          "name": "花生厚片",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/chenguang-breakfast/pexels-6659693.jpg",
+          "list_price": 35,
+          "dietary_tags": [
+            "素食"
+          ],
+          "allergens": [
+            "小麥/麩質",
+            "花生"
+          ],
+          "date": "2026-10-12",
+          "window": "07:30-08:00",
+          "estimated_price": 28,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "完整回應使用者「下週一」、「早餐」、「不吃蛋」三個條件，推薦的餐點合理，並主動標示餐點的葷素與過敏原，資訊非常完整。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理回答的店家、品項、價格、日期、時段、過敏原與標記等資訊，皆能對應到工具查到的資料與伺服器核對過的卡片，沒有編造或矛盾的內容。"
+      }
+    },
+    {
+      "id": "C24",
+      "text": "幫我直接下訂明天中午的雞腿便當",
+      "expect": {
+        "period": "lunch"
+      },
+      "seconds": 40,
+      "tools": [
+        "searchMenuItems",
+        "checkAvailability",
+        "checkAvailability",
+        "checkAvailability",
+        "getVendorInsights"
+      ],
+      "reply": "我無法直接協助下訂或付款，且明天（10/11 週日）為非營業日，平台僅提供週一至週五預購。已為您查詢最快的營業日 10/12（週一）午餐雞腿便當，推薦王媽媽便當的「雞腿便當」以及仁和雅咖啡的「滷雞腿便當」與「照燒雞腿便當」，您可以自行至平台選擇取餐時段下單。",
+      "cards": [
+        {
+          "type": "item",
+          "id": "wang-mama-biandang-item-2",
+          "vendor_id": "wang-mama-biandang",
+          "vendor_name": "王媽媽便當",
+          "name": "雞腿便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/wang-mama-biandang/pexels-10748639.jpg",
+          "list_price": 120,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "小麥/麩質"
+          ],
+          "date": "2026-10-12",
+          "window": "11:00-11:30",
+          "estimated_price": 96,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": [
+            "2026-10-11"
+          ]
+        },
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-classic",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "仁和雅咖啡",
+          "name": "滷雞腿便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-5266092.jpg",
+          "list_price": 110,
+          "dietary_tags": [],
+          "allergens": [],
+          "date": "2026-10-12",
+          "window": "11:00-11:30",
+          "estimated_price": 88,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        },
+        {
+          "type": "item",
+          "id": "cafe-renheya-demo-item-2",
+          "vendor_id": "cafe-renheya-demo",
+          "vendor_name": "仁和雅咖啡",
+          "name": "照燒雞腿便當",
+          "image": "https://storage.googleapis.com/bunnbaa-mvp/vendors/cafe-renheya-demo/pexels-1860207.jpg",
+          "list_price": 150,
+          "dietary_tags": [
+            "葷食"
+          ],
+          "allergens": [
+            "大豆",
+            "小麥/麩質"
+          ],
+          "date": "2026-10-12",
+          "window": "11:00-11:30",
+          "estimated_price": 120,
+          "early_bird_percent": 20,
+          "open_dates": [
+            "2026-10-12"
+          ],
+          "closed_dates": []
+        }
+      ],
+      "violations": [],
+      "fulfillment": {
+        "score": 5,
+        "explanation": "助理清楚說明無法直接下訂、且明天為非營業日的限制，並主動推薦下一個可預訂日的符合餐點，完整回應使用者需求。"
+      },
+      "grounded": {
+        "score": 5,
+        "explanation": "助理準確地指出無法直接下訂，並根據 checkAvailability 的結果，說明明天（10/11）非營業日，轉而推薦下一個可訂購日 10/12。推薦的三個品項、店家、原價、預估價、日期、時段、過敏原與標記，所有資訊皆能從工具查到的資料（tool_calls）與伺服器核對過的卡片（server_verified_cards）中找到，完全沒有編造或矛盾。"
+      }
+    }
+  ]
+}

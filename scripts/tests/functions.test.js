@@ -41,7 +41,7 @@ async function test(id, name, fn) {
 function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
 function eq(a, b, msg) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg || ""} expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// emulator 的觸發器排隊執行，前面的 onLockCreated（沒設 GEMINI_API_KEY 會當掉重啟）會拖慢，等久一點
+// emulator 的觸發器排隊執行，前面的 onLockCreated（設了 GEMINI_DISABLED 會當掉重啟）會拖慢，等久一點
 async function waitFor(fn, ms = 180000) {
   const end = Date.now() + ms;
   for (;;) {

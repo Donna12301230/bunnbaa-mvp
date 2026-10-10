@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { doc, setDoc } from "firebase/firestore";
+import { deleteField, doc, setDoc } from "firebase/firestore";
 import { AreaChart, ExternalLink } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
 import RequireRealAdmin from "@/components/RequireRealAdmin";
@@ -15,6 +15,35 @@ import { queryClient } from "@/lib/queryClient";
 import { tr } from "@/lib/i18n";
 import { LOOKER_EMBED_PREFIX, analyticsConfigKey, isLookerEmbedUrl, useAnalyticsConfig } from "@/lib/analytics";
 
+const PROJECT = "bunnbaa-mvp-5474";
+const DATASET = "bunnbaa_analytics";
+// bigquery/sql/02_dashboard.sql 的 view，第一個由連結自動接上，其餘在 Looker Studio「新增資料」加入
+const VIEWS = [
+  ["dash_daily_ops", "每日營運"],
+  ["dash_forecast_vs_actual", "預測 vs 實際"],
+  ["dash_forecast_next", "未來 7 天預估"],
+  ["dash_segments", "客群分布"],
+] as const;
+
+/**
+ * Looker Studio Linking API：開一份空白報表並接好第一個 BigQuery 資料來源。
+ * 沒有範本報表時官方文件只保證「不帶別名」的單一資料來源，所以其餘 view 在報表裡手動加入。
+ */
+function createReportUrl() {
+  const [table, name] = VIEWS[0];
+  const p = new URLSearchParams({
+    "c.mode": "edit",
+    "r.reportName": "BunnBaa 平台儀表板",
+    "ds.connector": "bigQuery",
+    "ds.type": "TABLE",
+    "ds.projectId": PROJECT,
+    "ds.datasetId": DATASET,
+    "ds.tableId": table,
+    "ds.datasourceName": `BunnBaa ${name}`,
+  });
+  return `https://lookerstudio.google.com/reporting/create?${p}`;
+}
+
 /**
  * 平台儀表板：嵌入 Looker Studio 報表（資料來源是 BigQuery 的 bunnbaa_analytics，見 doc/GoogleCloud改動建議.md）。
  * 報表在 Looker Studio 建好後，把「檔案 → 嵌入報表」給的網址貼進來存檔即可；網址存在 platformConfig/analytics。
@@ -23,7 +52,8 @@ import { LOOKER_EMBED_PREFIX, analyticsConfigKey, isLookerEmbedUrl, useAnalytics
 function AnalyticsContent() {
   const { toast } = useToast();
   const { data: config, isLoading } = useAnalyticsConfig();
-  const saved = config?.lookerStudioEmbedUrl ?? "";
+  // looker_embed_url 是合併前另一版用的欄位名，讀得到就沿用，存檔時改寫成 lookerStudioEmbedUrl
+  const saved = config?.lookerStudioEmbedUrl || config?.looker_embed_url || "";
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -36,7 +66,7 @@ function AnalyticsContent() {
     if (!valid) return;
     setBusy(true);
     try {
-      await setDoc(doc(db, "platformConfig", "analytics"), { lookerStudioEmbedUrl: url, updated_at: new Date() }, { merge: true });
+      await setDoc(doc(db, "platformConfig", "analytics"), { lookerStudioEmbedUrl: url, looker_embed_url: deleteField(), updated_at: new Date() }, { merge: true });
       await queryClient.invalidateQueries({ queryKey: analyticsConfigKey });
       setEditing(false);
       toast({ title: url ? tr("已儲存儀表板網址", "Dashboard link saved") : tr("已移除儀表板", "Dashboard removed") });
@@ -51,6 +81,17 @@ function AnalyticsContent() {
 
   const form = (
     <div className="max-w-2xl space-y-2">
+      <ol className="list-decimal pl-5 space-y-1 text-sm text-muted-foreground">
+        <li>
+          {tr("按這個連結，Looker Studio 會開一份新報表，已接好「每日營運」（BigQuery）：", "Open a new report with the daily-ops BigQuery view connected: ")}
+          <a href={createReportUrl()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-primary underline">
+            {tr("在 Looker Studio 建立報表", "Create the report in Looker Studio")}<ExternalLink className="w-4 h-4" />
+          </a>
+        </li>
+        <li>{tr(`再用「新增資料 → BigQuery → ${PROJECT} → ${DATASET}」加入：${VIEWS.slice(1).map(([t, n]) => `${n}（${t}）`).join("、")}。`, `Then add the other views via Add data → BigQuery: ${VIEWS.slice(1).map(([t]) => t).join(", ")}.`)}</li>
+        <li>{tr("排好圖表：每日份數與救回份數（折線）、預測 vs 實際（折線＋區間）、客群分布（長條）。", "Add the charts: daily and saved meals (line), forecast vs. actual (line + band), segments (bar).")}</li>
+        <li>{tr("檔案 → 嵌入報表 → 啟用嵌入，複製「嵌入網址」貼到下面。", "File → Embed report → enable embedding, then paste the embed URL below.")}</li>
+      </ol>
       <Label htmlFor="looker-url">{tr("Looker Studio 嵌入網址", "Looker Studio embed URL")}</Label>
       <div className="flex flex-wrap gap-2">
         <Input id="looker-url" className="flex-1 min-w-[16rem]" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`${LOOKER_EMBED_PREFIX}reporting/…`} />

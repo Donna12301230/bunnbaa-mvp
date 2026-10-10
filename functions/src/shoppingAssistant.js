@@ -100,6 +100,18 @@ const FUNCTION_DECLARATIONS = [
     },
   },
   {
+    name: "getVendorInsights",
+    description: "查店家的需求預估與常一起買的品項（BigQuery 每天的預測與每週的購物籃分析）。預估份數是參考值，可以用來把預估較不擁擠的店排前面、或補一句「這家常一起點 X」；不要用來催促。",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        vendorIds: LIST("searchMenuItems 回傳的 vendor_id，最多 5 家"),
+        dates: LIST("要看預估的日期 YYYY-MM-DD，最多 5 天"),
+      },
+      required: ["vendorIds"],
+    },
+  },
+  {
     name: "presentCandidates",
     description: "查完之後呼叫這個工具，把要給使用者看的候選交回去，結束這一輪。",
     parameters: {
@@ -127,10 +139,16 @@ function systemInstruction({ lang, today, dates, area, taste, config }) {
 - 語氣平實，不催促、不使用行銷語句（例如「手刀」「快搶」「限時」）。
 - 有指定日期時，用 checkAvailability 確認推薦的品項那幾天能訂（最多查 3 個品項）；額滿、公休或已截單的要避開或說明。
 - 「不吃牛」之類的需求用 excludeKeywords 帶具體詞（牛肉、牛腩、牛排）；素食用 dietaryTags。
-- 「一週／連續幾天」的需求，也查 searchMealPlans。
+- searchMenuItems 一次把已知條件帶齊（地區、預算、餐期、星期、不吃的食材），換關鍵字最多再查 3 次，不要一個條件查一次。
+- 「一週／連續幾天」的需求，也查 searchMealPlans；方案也要符合使用者要的餐期（看方案內容與 vendor_focus，例如早餐店、飲料店的方案不適合當午餐正餐）。
+- 「常一起買」是兩個特定品項的配對，只能套用在配對裡的那兩個品項，不要套到同店的其他品項。
+- 候選來自好幾家店、而且有指定日期時，可以用 getVendorInsights 看各店當天的預估份數與常一起買的品項：差不多的候選可以把預估份數相對平常較少的店排前面，或補一句常一起點的品項。預估只是參考，不要說成一定，也不要用「很多人訂」來催促。
 - 使用者說早餐、午餐、晚餐（或「明天晚上」「早上」）時，searchMenuItems、checkAvailability、presentCandidates 都要帶 mealPeriod；沒說就不要帶。
 - 使用者在對話裡提到的過敏或不吃的東西，要用 excludeKeywords 帶具體食材詞；查到的 allergens 欄位跟他說的過敏原相符就不要推薦。
-- 最後一定要呼叫 presentCandidates，reply 用${lang === "en" ? "英文" : "繁體中文"}回答。
+- allergens 是空陣列代表「店家沒有標示」，不是「不含」：不能說某品項不含某過敏原。使用者有過敏時，優先推薦有標示過敏原、而且不含他的過敏原的品項；按常識很可能含有的不要推薦（例如麩質過敏不推麵衣炸物、麵、麵包，大豆過敏不推醬油滷味、豆製品，蛋過敏不推蛋餅、滷蛋）；沒有把握的選項要說清楚需向店家確認，找不到確定安全的就老實說。
+- 使用者指定的地區查不到任何店家時，老實說這個地區目前沒有合作店家，並說明平台目前有店家的地區（從查詢結果的 address 判斷），不要建議他跨區訂餐。
+- 使用者要的時段不在平台的三個餐期內（例如下午茶、宵夜）時，先說明平台只有早、中、晚三個餐期，再推薦最接近的餐期並講明是哪一個。
+- 最後一定要呼叫 presentCandidates，reply 用${lang === "en" ? "英文" : "繁體中文"}回答${lang === "en" ? "；店名與品名用工具回傳的 vendor_en／name_en（沒有才自己翻譯），跟卡片一致" : ""}。
 背景：
 - 今天 ${today}（台北時間）。平台是預購自取，營業日是週${businessDays}，分 ${periods} 三個餐期（各店家供應的餐期不同），取餐日前一天晚上截單，最遠可以訂到 ${dates[dates.length - 1]?.date ?? today}。
 - 可預訂的日期：${dates.map((d) => `${d.date}(週${WEEKDAY_ZH[d.weekday]})`).join("、") || "無"}
@@ -195,8 +213,10 @@ function summarizeItem(item, vendor, config) {
     id: item.id,
     vendor_id: item.vendor_id,
     vendor: vendor.name,
+    vendor_en: vendor.name_en || null,
     address: vendor.address || "",
     name: item.name,
+    name_en: item.name_en || null,
     price: basePrice(item),
     category: item.category,
     dietary_tags: item.dietary_tags || [],
@@ -308,6 +328,50 @@ function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set
       return { menuItemId: item.id, list_price: basePrice(item), results: out };
     },
 
+    async getVendorInsights(args) {
+      const { vendors, items } = await loadCatalog();
+      const vendorIds = [...new Set(Array.isArray(args.vendorIds) ? args.vendorIds.map(String) : [])].filter((id) => vendors.has(id)).slice(0, 5);
+      const dates = (Array.isArray(args.dates) ? args.dates : []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 5);
+      const out = [];
+      for (const vendorId of vendorIds) {
+        const vendorRef = db().collection("vendors").doc(vendorId);
+        const [forecastSnap, basketSnap] = await Promise.all([
+          vendorRef.collection("forecast").where("day", ">=", taipeiToday()).orderBy("day").limit(7).get(),
+          vendorRef.collection("analytics").doc("basket").get(),
+        ]);
+        const forecast = forecastSnap.docs.map((d) => d.data());
+        // 「相對平常」：跟這家店未來 7 天預估的平均比，模型不用自己算
+        const avg = forecast.length ? forecast.reduce((sum, f) => sum + (f.forecast || 0), 0) / forecast.length : null;
+        const byName = new Map();
+        for (const item of items.values()) {
+          if (item.vendor_id !== vendorId) continue;
+          if ((item.allergens || []).some((a) => taste.allergies.includes(a))) continue;
+          byName.set(normalize(item.name), item);
+        }
+        // 只給這一輪 searchMenuItems 回傳過的 id（已套用使用者不吃的食材等條件）；其他只給品名，卡片不會收
+        const idOf = (name) => {
+          const item = byName.get(normalize(name));
+          return item && seen.has(item.id) ? item.id : null;
+        };
+        out.push({
+          vendor_id: vendorId,
+          vendor: vendors.get(vendorId).name,
+          forecast: (dates.length ? forecast.filter((f) => dates.includes(f.day)) : forecast).map((f) => ({
+            date: f.day,
+            estimated_meals: f.forecast,
+            range: `${f.lower}-${f.upper}`,
+            vs_usual: avg ? (f.forecast > avg * 1.15 ? "busier" : f.forecast < avg * 0.85 ? "quieter" : "typical") : null,
+          })),
+          often_bought_together: (basketSnap.data()?.pairs || []).slice(0, 3).map((p) => ({
+            items: [p.item_a, p.item_b],
+            menu_item_ids: [idOf(p.item_a), idOf(p.item_b)],
+            customers: p.buyers,
+          })),
+        });
+      }
+      return { note: "預估份數是 BigQuery AI.FORECAST 的參考值，不是名額；名額以 checkAvailability 為準", vendors: out };
+    },
+
     async searchMealPlans(args) {
       const { vendors, plans } = await loadCatalog();
       const maxPrice = Number(args.maxPricePerMeal) > 0 ? Number(args.maxPricePerMeal) : null;
@@ -325,6 +389,7 @@ function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set
           id: p.id,
           vendor_id: p.vendor_id,
           vendor: vendors.get(p.vendor_id)?.name,
+          vendor_focus: vendors.get(p.vendor_id)?.item_focus || null,
           label: p.label,
           name: p.name,
           price_per_meal: p.price_per_meal,
@@ -440,6 +505,49 @@ async function refundUsage(uid, today) {
 }
 
 /**
+ * 助理本體（不含登入、次數與快取）：askShoppingAssistant 與回答品質評估（scripts/eval/assistantEval.js）共用。
+ * onToolCall(name, args, result) 可以記下工具呼叫，評估時當作「有據性」的參考資料。
+ */
+async function runAssistant({ messages, lang, area, taste, now = new Date(), onToolCall = null }) {
+  const today = taipeiToday(now);
+  const config = await loadPlatformConfig(db());
+  const last = lastBookableDate(today, config.bookingRangeDays);
+  const dates = [];
+  for (let d = today; d <= last; d = addDays(d, 1)) {
+    if (config.businessWeekdays.includes(weekdayOf(d))) dates.push({ date: d, weekday: weekdayOf(d) });
+  }
+  const loadCatalog = catalogLoader();
+  const availability = new Map();
+  const seen = new Set(); // 這一輪搜尋工具回傳過的品項 id
+  const handlers = toolHandlers({ loadCatalog, taste, config, availability, seen });
+  if (onToolCall) {
+    for (const [name, fn] of Object.entries(handlers)) {
+      handlers[name] = async (args) => {
+        const result = await fn(args);
+        onToolCall(name, args, result);
+        return result;
+      };
+    }
+  }
+
+  const result = await runWithTools({
+    systemInstruction: systemInstruction({ lang, today, dates, area, taste, config }),
+    contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] })),
+    functionDeclarations: FUNCTION_DECLARATIONS,
+    handlers,
+    finishTool: "presentCandidates",
+    maxRounds: 7,
+    finalNudge: "（系統）查詢次數已到上限，請根據目前已查到的結果呼叫 presentCandidates：有合適的就推薦，沒有就老實說明並建議放寬哪個條件。",
+  });
+
+  const finish = result.finish || { reply: result.text, menuItemIds: [], mealPlanIds: [] };
+  const cards = await buildCards(finish, loadCatalog, availability, lang, config, now, { seen, taste });
+  const reply = String(finish.reply || "").trim().slice(0, 1200)
+    || t("抱歉，這次沒找到合適的選項，可以換個條件再問一次。", "Sorry, I couldn't find a good match. Try different conditions.");
+  return { reply, cards, config, loadCatalog };
+}
+
+/**
  * data: { messages: [{ role: "user"|"assistant", text }], area?: { county, town } }
  * 回傳 { reply, cards[], disclaimer }。
  */
@@ -469,35 +577,15 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
 
   await takeUsage(uid, today);
 
-  const config = await loadPlatformConfig(db());
-  const last = lastBookableDate(today, config.bookingRangeDays);
-  const dates = [];
-  for (let d = today; d <= last; d = addDays(d, 1)) {
-    if (config.businessWeekdays.includes(weekdayOf(d))) dates.push({ date: d, weekday: weekdayOf(d) });
-  }
-  const loadCatalog = catalogLoader();
-  const availability = new Map();
-  const seen = new Set(); // 這一輪搜尋工具回傳過的品項 id
-
-  let result;
+  let reply;
+  let cards;
   try {
-    result = await runWithTools({
-      systemInstruction: systemInstruction({ lang, today, dates, area, taste, config }),
-      contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] })),
-      functionDeclarations: FUNCTION_DECLARATIONS,
-      handlers: toolHandlers({ loadCatalog, taste, config, availability, seen }),
-      finishTool: "presentCandidates",
-    });
+    ({ reply, cards } = await runAssistant({ messages, lang, area, taste }));
   } catch (err) {
     logger.warn("askShoppingAssistant failed", err);
     await refundUsage(uid, today);
     throw new HttpsError("unavailable", t("助理暫時忙不過來，請稍後再試", "The assistant is busy right now. Please try again shortly."));
   }
-
-  const finish = result.finish || { reply: result.text, menuItemIds: [], mealPlanIds: [] };
-  const cards = await buildCards(finish, loadCatalog, availability, lang, config, new Date(), { seen, taste });
-  const reply = String(finish.reply || "").trim().slice(0, 1200)
-    || t("抱歉，這次沒找到合適的選項，可以換個條件再問一次。", "Sorry, I couldn't find a good match. Try different conditions.");
 
   if (cacheRef) {
     await cacheRef.set({ reply, cards, created_at: FieldValue.serverTimestamp() }).catch(() => undefined);
@@ -505,4 +593,4 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
   return { reply, cards, disclaimer };
 });
 
-module.exports.helpers = { toolHandlers, buildCards, checkDates, basePrice };
+module.exports.helpers = { toolHandlers, buildCards, checkDates, basePrice, catalogLoader, runAssistant, loadTaste, itemText };
