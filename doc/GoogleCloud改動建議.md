@@ -136,6 +136,8 @@ FROM AI.FORECAST(
 
 `shoppingAssistant.js` 已經是 function calling 架構，不需要另外導入 ADK（Agent Development Kit）。只要多加一個工具，讓助理讀 `vendors/{v}/forecast` 與購物籃結果，就能展示「AI 依預測調整推薦」（例如推薦預估還有餘量的店家、常一起買的品項）。簡報上以「代理式工作流程（Agentic Workflow）」說明即可。
 
+- **已完成（10/10）**：新增工具 `getVendorInsights`（讀 `vendors/{v}/forecast` 與 `analytics/basket`，回傳各店預估份數、相對平常 busier／typical／quieter、常一起買）。常一起買的品項只有這一輪搜尋回傳過的才給 id（已套用不吃的食材等條件），過敏原照樣伺服器端過濾。`runWithTools` 最後一輪限定只能呼叫 `presentCandidates`，輪數上限 5 → 7，避免查太多輪交白卷。已用 Vertex 實測：「想挑比較不會排隊的店，順便推薦加點」會查預估並建議加點油條，語氣不催促。
+
 ### 預購助理回答品質評估（約 0.5 天）
 
 - 準備 20～30 題測試問句（含過敏原、預算、時段等限制），用 **Vertex AI Gen AI Evaluation Service** 評分回答是否正確、是否違反過敏原限制。

@@ -100,6 +100,18 @@ const FUNCTION_DECLARATIONS = [
     },
   },
   {
+    name: "getVendorInsights",
+    description: "查店家的需求預估與常一起買的品項（BigQuery 每天的預測與每週的購物籃分析）。預估份數是參考值，可以用來把預估較不擁擠的店排前面、或補一句「這家常一起點 X」；不要用來催促。",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        vendorIds: LIST("searchMenuItems 回傳的 vendor_id，最多 5 家"),
+        dates: LIST("要看預估的日期 YYYY-MM-DD，最多 5 天"),
+      },
+      required: ["vendorIds"],
+    },
+  },
+  {
     name: "presentCandidates",
     description: "查完之後呼叫這個工具，把要給使用者看的候選交回去，結束這一輪。",
     parameters: {
@@ -128,6 +140,7 @@ function systemInstruction({ lang, today, dates, area, taste, config }) {
 - 有指定日期時，用 checkAvailability 確認推薦的品項那幾天能訂（最多查 3 個品項）；額滿、公休或已截單的要避開或說明。
 - 「不吃牛」之類的需求用 excludeKeywords 帶具體詞（牛肉、牛腩、牛排）；素食用 dietaryTags。
 - 「一週／連續幾天」的需求，也查 searchMealPlans。
+- 候選來自好幾家店、而且有指定日期時，可以用 getVendorInsights 看各店當天的預估份數與常一起買的品項：差不多的候選可以把預估份數相對平常較少的店排前面，或補一句常一起點的品項。預估只是參考，不要說成一定，也不要用「很多人訂」來催促。
 - 使用者說早餐、午餐、晚餐（或「明天晚上」「早上」）時，searchMenuItems、checkAvailability、presentCandidates 都要帶 mealPeriod；沒說就不要帶。
 - 使用者在對話裡提到的過敏或不吃的東西，要用 excludeKeywords 帶具體食材詞；查到的 allergens 欄位跟他說的過敏原相符就不要推薦。
 - 最後一定要呼叫 presentCandidates，reply 用${lang === "en" ? "英文" : "繁體中文"}回答。
@@ -306,6 +319,50 @@ function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set
       const out = await checkDates(item, vendor, dates, config, new Date(), periodArg(args.mealPeriod));
       availability.set(item.id, out);
       return { menuItemId: item.id, list_price: basePrice(item), results: out };
+    },
+
+    async getVendorInsights(args) {
+      const { vendors, items } = await loadCatalog();
+      const vendorIds = [...new Set(Array.isArray(args.vendorIds) ? args.vendorIds.map(String) : [])].filter((id) => vendors.has(id)).slice(0, 5);
+      const dates = (Array.isArray(args.dates) ? args.dates : []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 5);
+      const out = [];
+      for (const vendorId of vendorIds) {
+        const vendorRef = db().collection("vendors").doc(vendorId);
+        const [forecastSnap, basketSnap] = await Promise.all([
+          vendorRef.collection("forecast").where("day", ">=", taipeiToday()).orderBy("day").limit(7).get(),
+          vendorRef.collection("analytics").doc("basket").get(),
+        ]);
+        const forecast = forecastSnap.docs.map((d) => d.data());
+        // 「相對平常」：跟這家店未來 7 天預估的平均比，模型不用自己算
+        const avg = forecast.length ? forecast.reduce((sum, f) => sum + (f.forecast || 0), 0) / forecast.length : null;
+        const byName = new Map();
+        for (const item of items.values()) {
+          if (item.vendor_id !== vendorId) continue;
+          if ((item.allergens || []).some((a) => taste.allergies.includes(a))) continue;
+          byName.set(normalize(item.name), item);
+        }
+        // 只給這一輪 searchMenuItems 回傳過的 id（已套用使用者不吃的食材等條件）；其他只給品名，卡片不會收
+        const idOf = (name) => {
+          const item = byName.get(normalize(name));
+          return item && seen.has(item.id) ? item.id : null;
+        };
+        out.push({
+          vendor_id: vendorId,
+          vendor: vendors.get(vendorId).name,
+          forecast: (dates.length ? forecast.filter((f) => dates.includes(f.day)) : forecast).map((f) => ({
+            date: f.day,
+            estimated_meals: f.forecast,
+            range: `${f.lower}-${f.upper}`,
+            vs_usual: avg ? (f.forecast > avg * 1.15 ? "busier" : f.forecast < avg * 0.85 ? "quieter" : "typical") : null,
+          })),
+          often_bought_together: (basketSnap.data()?.pairs || []).slice(0, 3).map((p) => ({
+            items: [p.item_a, p.item_b],
+            menu_item_ids: [idOf(p.item_a), idOf(p.item_b)],
+            customers: p.buyers,
+          })),
+        });
+      }
+      return { note: "預估份數是 BigQuery AI.FORECAST 的參考值，不是名額；名額以 checkAvailability 為準", vendors: out };
     },
 
     async searchMealPlans(args) {
@@ -487,6 +544,7 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
       functionDeclarations: FUNCTION_DECLARATIONS,
       handlers: toolHandlers({ loadCatalog, taste, config, availability, seen }),
       finishTool: "presentCandidates",
+      maxRounds: 7,
     });
   } catch (err) {
     logger.warn("askShoppingAssistant failed", err);
@@ -505,4 +563,4 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
   return { reply, cards, disclaimer };
 });
 
-module.exports.helpers = { toolHandlers, buildCards, checkDates, basePrice };
+module.exports.helpers = { toolHandlers, buildCards, checkDates, basePrice, catalogLoader, systemInstruction, FUNCTION_DECLARATIONS };

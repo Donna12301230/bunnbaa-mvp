@@ -98,6 +98,7 @@ async function generateJSONFromImage({ systemInstruction, userPrompt, imageBase6
  * Function calling 迴圈：Gemini 要求呼叫工具時，由 handlers[name](args) 在伺服器端執行
  * （Gemini 不直接碰資料庫），結果送回去，直到它回文字或呼叫 finishTool 為止。
  * 回傳 { text, finish }：finish 是 finishTool 的參數（沒呼叫就是 null）。
+ * 最後一輪限定只能呼叫 finishTool，工具查太多輪也一定會交出結果。
  */
 async function runWithTools({ systemInstruction, contents, functionDeclarations, handlers, finishTool, maxRounds = 5, temperature = 0.3 }) {
   const config = {
@@ -107,10 +108,13 @@ async function runWithTools({ systemInstruction, contents, functionDeclarations,
   };
   const history = [...contents];
   for (let round = 0; round < maxRounds; round++) {
+    const lastRound = finishTool && round === maxRounds - 1;
     const response = await withRetry(() => getClient().models.generateContent({
       model: MODEL_NAME,
       contents: history,
-      config,
+      config: lastRound
+        ? { ...config, toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: [finishTool] } } }
+        : config,
     }));
     const calls = response.functionCalls || [];
     if (calls.length === 0) return { text: response.text ?? "", finish: null };
