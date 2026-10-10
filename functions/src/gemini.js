@@ -1,27 +1,37 @@
 /**
- * Thin wrapper around the Gemini API.
- * Reads the API key from Cloud Functions config / environment.
+ * Thin wrapper around Gemini on Vertex AI (@google/genai, Vertex mode).
+ * Authenticates with the functions' service account (Application Default
+ * Credentials) — no API key.
  *
- * Set the key before deploying:
- *   firebase functions:config:set gemini.key="YOUR_KEY"
- * or, for 2nd-gen functions with dotenv:
- *   echo "GEMINI_API_KEY=YOUR_KEY" >> functions/.env
+ * One-time GCP setup:
+ *   - enable the Vertex AI API (aiplatform.googleapis.com)
+ *   - grant the functions' service account roles/aiplatform.user
+ * Local emulator: run `gcloud auth application-default login` with an account
+ * that has access to the project, or set GEMINI_DISABLED=1 in functions/.env.local.
  */
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
 
 const MODEL_NAME = "gemini-3.6-flash";
 // 轉讓媒合用的向量；Firestore 向量索引上限 2048 維，這裡固定 768（firestore.indexes.json 要一致）
 const EMBEDDING_MODEL = "gemini-embedding-001";
 const EMBEDDING_DIMENSIONS = 768;
+// 新模型不一定在 asia-east1 上架，預設走 global 端點；要指定區域就設 VERTEX_LOCATION
+const LOCATION = process.env.VERTEX_LOCATION || "global";
+
+let client;
 
 function getClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "GEMINI_API_KEY is not set. Add it to functions/.env or your deploy environment."
-    );
+  if (process.env.GEMINI_DISABLED) {
+    throw new Error("Gemini is disabled (GEMINI_DISABLED is set).");
   }
-  return new GoogleGenerativeAI(apiKey);
+  if (!client) {
+    const project = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
+    if (!project) {
+      throw new Error("GCLOUD_PROJECT is not set; cannot reach Vertex AI.");
+    }
+    client = new GoogleGenAI({ vertexai: true, project, location: LOCATION });
+  }
+  return client;
 }
 
 const MAX_ATTEMPTS = 3;
@@ -52,15 +62,16 @@ function parseJSON(text) {
   }
 }
 
-function jsonModel(systemInstruction, temperature) {
-  return getClient().getGenerativeModel({
+function generateJSONContent(contents, systemInstruction, temperature) {
+  return withRetry(() => getClient().models.generateContent({
     model: MODEL_NAME,
-    systemInstruction,
-    generationConfig: {
+    contents,
+    config: {
+      systemInstruction,
       temperature,
       responseMimeType: "application/json",
     },
-  });
+  }));
 }
 
 /**
@@ -68,27 +79,19 @@ function jsonModel(systemInstruction, temperature) {
  * strict JSON back. Throws if the model does not return parseable JSON.
  */
 async function generateJSON({ systemInstruction, userPrompt, temperature = 0.4 }) {
-  const model = jsonModel(systemInstruction, temperature);
-  const result = await withRetry(() => model.generateContent(userPrompt));
-  return parseJSON(result.response.text());
+  const response = await generateJSONContent(userPrompt, systemInstruction, temperature);
+  return parseJSON(response.text ?? "");
 }
 
 /** 同 generateJSON，但附一張圖片（base64，不含 data: 前綴） */
 async function generateJSONFromImage({ systemInstruction, userPrompt, imageBase64, mimeType, temperature = 0.2 }) {
-  const model = jsonModel(systemInstruction, temperature);
-  const result = await withRetry(() => model.generateContent([
-    { inlineData: { data: imageBase64, mimeType } },
-    { text: userPrompt },
-  ]));
-  return parseJSON(result.response.text());
-}
-
-function safeText(response) {
-  try {
-    return response.text();
-  } catch {
-    return "";
-  }
+  const response = await generateJSONContent([
+    { role: "user", parts: [
+      { inlineData: { data: imageBase64, mimeType } },
+      { text: userPrompt },
+    ] },
+  ], systemInstruction, temperature);
+  return parseJSON(response.text ?? "");
 }
 
 /**
@@ -97,32 +100,35 @@ function safeText(response) {
  * 回傳 { text, finish }：finish 是 finishTool 的參數（沒呼叫就是 null）。
  */
 async function runWithTools({ systemInstruction, contents, functionDeclarations, handlers, finishTool, maxRounds = 5, temperature = 0.3 }) {
-  const model = getClient().getGenerativeModel({
-    model: MODEL_NAME,
+  const config = {
     systemInstruction,
     tools: [{ functionDeclarations }],
-    generationConfig: { temperature },
-  });
+    temperature,
+  };
   const history = [...contents];
   for (let round = 0; round < maxRounds; round++) {
-    const result = await withRetry(() => model.generateContent({ contents: history }));
-    const calls = result.response.functionCalls() || [];
-    if (calls.length === 0) return { text: safeText(result.response), finish: null };
+    const response = await withRetry(() => getClient().models.generateContent({
+      model: MODEL_NAME,
+      contents: history,
+      config,
+    }));
+    const calls = response.functionCalls || [];
+    if (calls.length === 0) return { text: response.text ?? "", finish: null };
     const finish = calls.find((c) => c.name === finishTool);
     if (finish) return { text: "", finish: finish.args || {} };
-    history.push(result.response.candidates[0].content);
+    history.push(response.candidates[0].content);
     const parts = [];
     for (const call of calls) {
       const handler = handlers[call.name];
-      let response;
+      let result;
       try {
-        response = handler ? await handler(call.args || {}) : { error: `unknown tool ${call.name}` };
+        result = handler ? await handler(call.args || {}) : { error: `unknown tool ${call.name}` };
       } catch (err) {
-        response = { error: err.message };
+        result = { error: err.message };
       }
-      parts.push({ functionResponse: { name: call.name, response: { result: response } } });
+      parts.push({ functionResponse: { id: call.id, name: call.name, response: { result } } });
     }
-    // 工具結果放在 user 回合（新版 API 不接受 role "function"）
+    // 工具結果放在 user 回合（API 不接受 role "function"）
     history.push({ role: "user", parts });
   }
   return { text: "", finish: null };
@@ -130,13 +136,12 @@ async function runWithTools({ systemInstruction, contents, functionDeclarations,
 
 /** 文字轉向量（EMBEDDING_DIMENSIONS 維） */
 async function embedText(text, taskType = "SEMANTIC_SIMILARITY") {
-  const model = getClient().getGenerativeModel({ model: EMBEDDING_MODEL });
-  const result = await withRetry(() => model.embedContent({
-    content: { role: "user", parts: [{ text }] },
-    taskType,
-    outputDimensionality: EMBEDDING_DIMENSIONS,
+  const response = await withRetry(() => getClient().models.embedContent({
+    model: EMBEDDING_MODEL,
+    contents: text,
+    config: { taskType, outputDimensionality: EMBEDDING_DIMENSIONS },
   }));
-  const values = result?.embedding?.values;
+  const values = response?.embeddings?.[0]?.values;
   if (!Array.isArray(values) || values.length !== EMBEDDING_DIMENSIONS) {
     throw new Error(`Unexpected embedding size: ${values?.length}`);
   }

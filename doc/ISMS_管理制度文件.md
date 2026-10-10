@@ -47,7 +47,7 @@
 | R10 | SU 的 GCP 擁有者帳號（`s991207@gmail.com`）遭盜用 | 1 | 3 | 3 | 2026-09-25 已開 2FA | 已緩解 |
 | R5 | Firestore 沒有排程備份，人為誤刪或誤寫大量資料無法復原 | 2 | 3 | 6 | 尚無 | **暫時接受**：試營運階段資料量小、可用 `scripts/seed.js` 重建 demo 資料；正式營運前必須補 Firestore 排程匯出（需 Blaze，已解除，純粹是還沒設定） |
 | R6 | 第三方依賴套件已知弱點（`npm audit` 現有 9 個 moderate、1 個 high，見落差分析） | 2 | 1 | 2 | 已盤點，high 是 Node 端套件、瀏覽器不會用到 | 暫時接受，等上游套件釋出修正版本再升級 |
-| R7 | Gemini API Key／LINE Pay 憑證外洩（目前放在 `functions/.env`，未進版控但也未用 Secret Manager） | 1 | 3 | 3 | `.env` 已 `.gitignore` | **待辦**：正式營運前改用 Secret Manager |
+| R7 | LINE Pay 憑證外洩（目前放在 `functions/.env`，未進版控但也未用 Secret Manager；Gemini 已改走 Vertex AI 服務帳號，沒有 API Key） | 1 | 3 | 3 | `.env` 已 `.gitignore` | **待辦**：正式營運前改用 Secret Manager |
 | R8 | 消費者個資（手機、學校、科系）外洩 | 1 | 3 | 3 | `users/{uid}` 僅本人與管理員可讀 | 已緩解；尚缺正式的隱私權政策公開頁面 |
 | R9 | 手機門號 OTP 濫用（有人狂發簡訊耗盡額度或騷擾他人號碼） | 2 | 2 | 4 | 2026-09-25 剛上線，Firebase 內建有基本流量防護 | 上線後觀察 Firebase Auth 用量，異常再加強（例如限制單 IP 送碼頻率） |
 
@@ -96,7 +96,8 @@
 |---|---|---|---|
 | Google Cloud / Firebase | 資料庫、驗證、後端運算、託管 | 幾乎所有使用者與交易資料 | 具 ISO 27001 認證；帳單／專案擁有者為 Donna 的帳號 |
 | LINE Pay | 消費端金流 | 訂單金額、交易編號（不經手信用卡卡號，卡號在 LINE Pay 端輸入） | 目前為 Sandbox，正式上線需走特約商店審核（TODO §1） |
-| Google Gemini API | 商家校準報告、消費者折扣說明文字生成 | 訂單歷史統計數據（不含個資姓名/電話），生成文字 | API Key 存 `functions/.env`，見風險 R7 |
+| Google Gemini（Vertex AI） | 商家校準報告、消費者折扣說明、預購助理、拍照上架、轉讓媒合向量 | 訂單歷史統計數據（不含個資姓名/電話）、菜單照片，生成文字 | 用 functions 服務帳號認證（`roles/aiplatform.user`），無 API Key；走 global 端點，資料處理位置不限台灣 |
+| Google BigQuery | 需求預測、購物籃與客群分析（`bunnbaa_analytics`，asia-east1） | `locks`、`menu_items`、`vendors`、`payment_intents` 的變更紀錄；寫入前由 `bqTransform` 拿掉手機、備註、交易序號、取餐碼，`payment_intents` 只留金額、狀態與時間 | dataset 只開給管理員，見 `bigquery/README.md` |
 | Firebase Storage（Google Cloud） | 商家封面圖/菜單圖片上傳（`ImageUploadField.tsx`，規則見 `storage.rules`） | 圖片檔案 | 公開可讀；僅該店店主或管理員可寫，限 image/* 且 ≤ 5MB |
 
 供應商清單由新增第三方服務的人（通常是動到 `functions/.env` 或新增 npm 套件呼叫外部 API 的人）順手更新這裡。

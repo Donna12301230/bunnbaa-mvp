@@ -41,6 +41,8 @@ BunnBaa 的 AI 功能已經涵蓋大部分賽題方向，弱點在「Google Clou
 
 ## P0：必做
 
+> **進度（10/10）**：程式與設定已完成，剩下部署步驟（需專案擁有者帳號），見下方各節的「待部署」。
+
 ### Gemini 改走 Vertex AI（約 0.5 天）
 
 只改 `functions/src/gemini.js` 一個檔，其他模組都透過它呼叫，不用動。
@@ -61,6 +63,8 @@ BunnBaa 的 AI 功能已經涵蓋大部分賽題方向，弱點在「Google Clou
 - 移除 `GEMINI_API_KEY`（`.env.example`、`.env.local`、`doc/開發指南.md` 都要更新）。
 - 好處：服務帳號認證、不怕 API key 外洩、沒有免費層 429（`withRetry` 留著當保險）。
 - **驗證**：emulator 跑一次預購助理、拍照上架、轉讓媒合；embedding 維度必須仍是 768，否則 `firestore.indexes.json` 的向量索引會失效、`menu_embeddings` 要重算。
+- **已完成**：`gemini.js` 改用 `@google/genai`（Vertex 模式），預設 `global` 端點（`VERTEX_LOCATION` 可覆蓋）；本機 emulator 用 `GEMINI_DISABLED=1` 取代原本「把 key 設空白」。已用假 fetch 確認請求打到 `aiplatform.googleapis.com`、function calling 迴圈與 768 維 embedding 格式正確。
+- **待部署**：啟用 Vertex AI API、服務帳號加 `roles/aiplatform.user`（指令見 `doc/開發指南.md`），部署後實測一次；`functions/.env` 裡的 `GEMINI_API_KEY` 可刪除。
 
 ### Firestore → BigQuery 同步（約 0.5 天）
 
@@ -69,8 +73,10 @@ BunnBaa 的 AI 功能已經涵蓋大部分賽題方向，弱點在「Google Clou
 - 每個 collection 裝一個實例：`locks`、`menu_items`、`vendors`、`payment_intents`（`payment_intents` 只同步金額、狀態、時間，不同步付款識別資料）。
 - Dataset：`bunnbaa_analytics`，location `asia-east1`。
 - 既有資料用 extension 附的 `fs-bq-import-collection` 腳本一次回填。
-- 用 extension 的 `fs-bq-schema-views` 產生有型別的 view（`locks_schema_latest`），後面的 SQL 都查 view。
-- 個資：`buyer_uid` 保留（分群需要）；`phone_last3`、`note` 不放進 schema view。
+- 用 extension 的 `fs-bq-schema-views` 產生有型別的 view（`locks_schema_locks_latest`，命名規則是 `{表}_schema_{schema 檔名}_latest`），後面的 SQL 都查 view。
+- 個資：`buyer_uid` 保留（分群需要）；手機、備註、交易序號、取餐碼等由 transform function `bqTransform`（`functions/src/bigqueryExport.js`）在寫入前拿掉，原始 changelog 裡也沒有。
+- **已完成**：`firebase.json` 的 `extensions` 與 `extensions/bq-*.env`（`firebase deploy --only extensions --dry-run` 已通過）、`bigquery/schemas/*.json`。
+- **待部署**：依 `bigquery/README.md` 先部署 `bqTransform`，再 `firebase deploy --only extensions`、回填、產生 view。
 
 ## P1：建議做
 
@@ -82,7 +88,7 @@ BunnBaa 的 AI 功能已經涵蓋大部分賽題方向，弱點在「Google Clou
 -- 每店每日鎖定量
 CREATE OR REPLACE VIEW bunnbaa_analytics.daily_demand AS
 SELECT vendor_id, DATE(pickup_date) AS day, COUNT(*) AS locks
-FROM bunnbaa_analytics.locks_schema_latest
+FROM bunnbaa_analytics.locks_schema_locks_latest
 -- 每筆鎖定都是一份需求（轉讓、愛心餐也算），不用過濾 status
 GROUP BY vendor_id, day;
 

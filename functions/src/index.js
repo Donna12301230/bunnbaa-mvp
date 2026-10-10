@@ -376,7 +376,7 @@ exports.translateAllContent = onCall({ region: "asia-east1", timeoutSeconds: 540
  * ------------------------------------------------------------------ */
 for (const mod of [
   "./orders", "./charity", "./rewardsFns", "./purchasing", "./insights", "./disaster",
-  "./finance", "./menuVision", "./resaleMatch", "./shoppingAssistant", "./pickupForecast", "./consumerExplanation", "./wallet",
+  "./finance", "./menuVision", "./resaleMatch", "./shoppingAssistant", "./pickupForecast", "./consumerExplanation", "./wallet", "./bigqueryExport",
 ]) {
   for (const [name, fn] of Object.entries(require(mod))) {
     // 只掛 Cloud Functions（helpers 等模組內部共用的東西不是函式或沒有 __trigger/run）

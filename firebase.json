@@ -1,4 +1,10 @@
 {
+  "extensions": {
+    "bq-locks": "firebase/firestore-bigquery-export@0.3.3",
+    "bq-menu-items": "firebase/firestore-bigquery-export@0.3.3",
+    "bq-vendors": "firebase/firestore-bigquery-export@0.3.3",
+    "bq-payment-intents": "firebase/firestore-bigquery-export@0.3.3"
+  },
   "storage": {
     "rules": "storage.rules"
   },
