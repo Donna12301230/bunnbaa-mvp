@@ -100,7 +100,7 @@ async function generateJSONFromImage({ systemInstruction, userPrompt, imageBase6
  * 回傳 { text, finish }：finish 是 finishTool 的參數（沒呼叫就是 null）。
  * 最後一輪限定只能呼叫 finishTool，工具查太多輪也一定會交出結果。
  */
-async function runWithTools({ systemInstruction, contents, functionDeclarations, handlers, finishTool, maxRounds = 5, temperature = 0.3 }) {
+async function runWithTools({ systemInstruction, contents, functionDeclarations, handlers, finishTool, maxRounds = 5, temperature = 0.3, finalNudge = null }) {
   const config = {
     systemInstruction,
     tools: [{ functionDeclarations }],
@@ -132,6 +132,9 @@ async function runWithTools({ systemInstruction, contents, functionDeclarations,
       }
       parts.push({ functionResponse: { id: call.id, name: call.name, response: { result } } });
     }
+    // 下一輪就是限定收尾的最後一輪：附一句說明，不然模型可能交出「系統有誤」之類的空話。
+    // 放進工具結果裡；同一個回合混放 text 與 functionResponse 會被 API 拒絕
+    if (finalNudge && round === maxRounds - 2) parts[parts.length - 1].functionResponse.response.note = finalNudge;
     // 工具結果放在 user 回合（API 不接受 role "function"）
     history.push({ role: "user", parts });
   }
