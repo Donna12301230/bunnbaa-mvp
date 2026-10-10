@@ -63,6 +63,10 @@ done
 
 SQL 在 `functions/src/customerInsights.sql`（函式部署時一起打包），由 `customerInsights` 每週一 04:00 執行，產生 `basket_pairs`、`buyer_features`、`buyer_segments_model`（K-means）、`buyer_segments`、`segment_profiles`（含 `AI.GENERATE` 群組描述）、`vendor_segment_mix`。也可以直接貼到 BigQuery 主控台跑。
 
+## Looker Studio 儀表板（P1）
+
+執行 `sql/02_dashboard.sql` 建立儀表板用的 view（已於 2026-10-10 執行）。報表從管理後台「數據儀表板」的連結建立，嵌入網址貼回同一頁。
+
 ## 權限
 
 `bunnbaa_analytics` 只開給管理員（BigQuery Data Viewer），Looker Studio 用管理員帳號連線。資料流描述同步寫在 `doc/ISMS_管理制度文件.md`。

@@ -123,6 +123,8 @@ FROM AI.FORECAST(
 - 連 `bunnbaa_analytics`，做一頁平台儀表板：每日鎖定量、預測 vs. 實際、轉讓救回份數（`resale_matches.claimed_by_match`）、愛心餐份數、客群分布。
 - 「預測 vs. 實際」和「救回份數」是展示影片的核心畫面，直接講減少浪費的成效，也是評審判斷專案是否「落地」的關鍵。
 - 嵌入管理後台（`web/src/pages/admin/`）一個 iframe 頁即可，不必做進商家後台。
+- **已完成（10/10）**：`bigquery/sql/02_dashboard.sql` 已在 BigQuery 建好 `dash_daily_ops`、`dash_forecast_vs_actual`、`dash_forecast_next`、`dash_segments`；管理後台新增「數據儀表板」（`/admin/analytics`），有「在 Looker Studio 建立報表」連結（Linking API，自動接好每日營運），報表嵌入網址存在 `platformConfig/analytics`。目前數字：3,659 份裡救回 408 份（轉讓 296＋愛心餐 112），近幾天全平台預測誤差（WAPE）6～15%。
+- **待辦（需在 Looker Studio 手動操作）**：建立報表、加入其餘 3 個 view、排圖表、開啟嵌入，把嵌入網址貼回管理後台；部署 Hosting。
 
 ## P2：選做（時間不夠就放 Roadmap）
 

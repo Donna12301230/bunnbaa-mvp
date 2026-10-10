@@ -1,7 +1,7 @@
 import { tr } from "@/lib/i18n";
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings, SlidersHorizontal, BookMarked, CloudLightning, AlertOctagon } from "lucide-react";
+import { Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings, SlidersHorizontal, BookMarked, CloudLightning, AlertOctagon, LineChart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 // 用函式包起來，每次 render 依目前語言組標籤
 const navItems = () => [
   { href: "/admin/vendors", label: tr("店家管理", "Vendors"), icon: Store },
+  { href: "/admin/analytics", label: tr("數據儀表板", "Analytics"), icon: LineChart },
   { href: "/admin/platform", label: tr("平台參數", "Platform parameters"), icon: SlidersHorizontal },
   { href: "/admin/dishes", label: tr("菜色庫與模板", "Dishes & templates"), icon: BookMarked },
   { href: "/admin/anomalies", label: tr("異常審核", "Anomalies"), icon: AlertOctagon },
