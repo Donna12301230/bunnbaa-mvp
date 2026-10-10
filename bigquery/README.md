@@ -43,6 +43,19 @@ done
 
 新增分析需要的欄位時，改 `schemas/*.json` 再跑一次即可。被 `bqTransform` 拿掉的欄位不要加進 schema，因為那些欄位不會出現在資料裡。
 
+## 需求預測（P1）
+
+1. 在 BigQuery 主控台執行 `sql/01_demand_forecast.sql`：建立模擬背景需求 `demand_history_sim`、每店每日需求 view `daily_demand`、預測結果表 `demand_forecast`、Looker 用的 `forecast_vs_actual`，最後一段回測會補上過去 14 天的預測（要跑幾分鐘）。
+2. 給 functions 服務帳號 BigQuery 權限，讓排程函式能查詢和寫入：
+   ```bash
+   SA=<PROJECT_NUMBER>-compute@developer.gserviceaccount.com
+   gcloud projects add-iam-policy-binding bunnbaa-mvp-5474 --member="serviceAccount:$SA" --role="roles/bigquery.jobUser"
+   ```
+   再到 BigQuery 主控台 → `bunnbaa_analytics` → 共用 → 權限，把同一個服務帳號加成「BigQuery 資料編輯者」（只給這個 dataset，不開整個專案）。
+3. 部署 `demandForecast`（每天 05:00）與 `triggerDemandForecastNow`（管理員手動重跑），跑一次後商家後台「報表與洞察 → 營收」會出現「未來 7 天預估份數」。
+
+模擬資料只是展示用：真實資料夠長後執行 `DROP TABLE bunnbaa_analytics.demand_history_sim`，`daily_demand` 就只剩真實份數。
+
 ## 權限
 
 `bunnbaa_analytics` 只開給管理員（BigQuery Data Viewer），Looker Studio 用管理員帳號連線。資料流描述同步寫在 `doc/ISMS_管理制度文件.md`。

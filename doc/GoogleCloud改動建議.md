@@ -102,7 +102,9 @@ FROM AI.FORECAST(
   horizon => 7);
 ```
 
-- 種子資料歷史不夠長，預測會很平。展示前先用 `scripts/seed.js` 補 60～90 天的模擬鎖定（星期效應、雨天）。
+- 種子資料歷史不夠長，預測會很平。改成在 BigQuery 直接產生 90 天模擬背景需求（`demand_history_sim`，星期效應、雨天、成長、雜訊），疊加在真實份數上；不寫進正式 Firestore，不會觸發觸發器與 Gemini。
+- **已完成（10/10）**：`bigquery/sql/01_demand_forecast.sql`（模擬資料、`daily_demand`、`demand_forecast`、`forecast_vs_actual`、14 天回測）、`functions/src/demandForecast.js`（每天 05:00 跑 `AI.FORECAST` 寫回 `vendors/{v}/forecast/{日期}`）、商家後台營收頁的「未來 7 天預估份數」卡片。取消的鎖定不算需求（不用備料）。
+- **待部署**：見 `bigquery/README.md`「需求預測」；SQL 還沒在 BigQuery 實際跑過。
 - 呈現：排程函式每天把預測結果寫回 Firestore `vendors/{v}/forecast`，商家後台報表頁顯示「預估明天 N 份（參考）」。沿用 `vendorCalibration` 的原則：**只給參考，不下備料指令**。
 
 ### BigQuery AI：購物籃與客戶分群（約 0.5 天）
