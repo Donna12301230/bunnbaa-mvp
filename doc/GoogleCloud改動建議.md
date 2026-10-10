@@ -41,7 +41,7 @@ BunnBaa 的 AI 功能已經涵蓋大部分賽題方向，弱點在「Google Clou
 
 ## P0：必做
 
-> **進度（10/10）**：程式與設定已完成，剩下部署步驟（需專案擁有者帳號），見下方各節的「待部署」。
+> **進度（10/10）**：P0 與 P1 需求預測都已部署到正式環境。
 
 ### Gemini 改走 Vertex AI（約 0.5 天）
 
@@ -64,7 +64,7 @@ BunnBaa 的 AI 功能已經涵蓋大部分賽題方向，弱點在「Google Clou
 - 好處：服務帳號認證、不怕 API key 外洩、沒有免費層 429（`withRetry` 留著當保險）。
 - **驗證**：emulator 跑一次預購助理、拍照上架、轉讓媒合；embedding 維度必須仍是 768，否則 `firestore.indexes.json` 的向量索引會失效、`menu_embeddings` 要重算。
 - **已完成**：`gemini.js` 改用 `@google/genai`（Vertex 模式），預設 `global` 端點（`VERTEX_LOCATION` 可覆蓋）；本機 emulator 用 `GEMINI_DISABLED=1` 取代原本「把 key 設空白」。已用假 fetch 確認請求打到 `aiplatform.googleapis.com`、function calling 迴圈與 768 維 embedding 格式正確。
-- **待部署**：啟用 Vertex AI API、服務帳號加 `roles/aiplatform.user`（指令見 `doc/開發指南.md`），部署後實測一次；`functions/.env` 裡的 `GEMINI_API_KEY` 可刪除。
+- **已部署**：Vertex AI API 已啟用、服務帳號已加 `roles/aiplatform.user`，`gemini-3.6-flash`（global）與 768 維 embedding 實測可用，全部 functions 已重新部署。待辦：在正式站實際問一次預購助理；`functions/.env` 裡的 `GEMINI_API_KEY` 可刪除。
 
 ### Firestore → BigQuery 同步（約 0.5 天）
 
@@ -76,7 +76,7 @@ BunnBaa 的 AI 功能已經涵蓋大部分賽題方向，弱點在「Google Clou
 - 用 extension 的 `fs-bq-schema-views` 產生有型別的 view（`locks_schema_locks_latest`，命名規則是 `{表}_schema_{schema 檔名}_latest`），後面的 SQL 都查 view。
 - 個資：`buyer_uid` 保留（分群需要）；手機、備註、交易序號、取餐碼等由 transform function `bqTransform`（`functions/src/bigqueryExport.js`）在寫入前拿掉，原始 changelog 裡也沒有。
 - **已完成**：`firebase.json` 的 `extensions` 與 `extensions/bq-*.env`（`firebase deploy --only extensions --dry-run` 已通過）、`bigquery/schemas/*.json`。
-- **待部署**：依 `bigquery/README.md` 先部署 `bqTransform`，再 `firebase deploy --only extensions`、回填、產生 view。
+- **已部署**：`bqTransform`、四個 extension、回填（locks 3,659 筆等，已查核無個資欄位）、schema view。
 
 ## P1：建議做
 
@@ -104,7 +104,7 @@ FROM AI.FORECAST(
 
 - 種子資料歷史不夠長，預測會很平。改成在 BigQuery 直接產生 90 天模擬背景需求（`demand_history_sim`，星期效應、雨天、成長、雜訊），疊加在真實份數上；不寫進正式 Firestore，不會觸發觸發器與 Gemini。
 - **已完成（10/10）**：`bigquery/sql/01_demand_forecast.sql`（模擬資料、`daily_demand`、`demand_forecast`、`forecast_vs_actual`、14 天回測）、`functions/src/demandForecast.js`（每天 05:00 跑 `AI.FORECAST` 寫回 `vendors/{v}/forecast/{日期}`）、商家後台營收頁的「未來 7 天預估份數」卡片。取消的鎖定不算需求（不用備料）。
-- **待部署**：見 `bigquery/README.md`「需求預測」；SQL 還沒在 BigQuery 實際跑過。
+- **已部署**：SQL 已執行（回測 14 天，平均誤差 11%）；`demandForecast` 以服務帳號在正式環境跑過，`vendors/{v}/forecast` 已寫入 7 天預測。
 - 呈現：排程函式每天把預測結果寫回 Firestore `vendors/{v}/forecast`，商家後台報表頁顯示「預估明天 N 份（參考）」。沿用 `vendorCalibration` 的原則：**只給參考，不下備料指令**。
 
 ### BigQuery AI：購物籃與客戶分群（約 0.5 天）

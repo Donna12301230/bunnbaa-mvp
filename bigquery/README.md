@@ -9,6 +9,8 @@ Firestore 用官方 extension **Stream Firestore to BigQuery** 同步到 BigQuer
 
 ## 部署（用專案擁有者帳號，一次性）
 
+> 2026-10-10 已全部完成：四個 extension 實例、回填（vendors 21、menu_items 261、payment_intents 608、locks 3,659 筆，已查核沒有個資欄位）、schema view、需求預測 SQL 與回測、`demandForecast` 排程。
+
 ```bash
 # 1. 先部署 transform function：extension 安裝時就會開始呼叫它
 firebase deploy --only functions:bqTransform
@@ -24,7 +26,8 @@ extension 只同步安裝之後的寫入。舊資料要用匯入腳本回填，�
 ```bash
 for c in locks menu_items vendors payment_intents; do
   npx @firebaseextensions/fs-bq-import-collection --non-interactive \
-    -P bunnbaa-mvp-5474 -s "$c" -d bunnbaa_analytics -t "$c" -l asia-east1 \
+    -P bunnbaa-mvp-5474 -B bunnbaa-mvp-5474 -q false -m false -u false -e false \
+    -s "$c" -d bunnbaa_analytics -t "$c" -l asia-east1 \
     --transform-function-url https://asia-east1-bunnbaa-mvp-5474.cloudfunctions.net/bqTransform
 done
 ```
