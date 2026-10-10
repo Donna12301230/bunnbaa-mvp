@@ -97,7 +97,7 @@
 | Google Cloud / Firebase | 資料庫、驗證、後端運算、託管 | 幾乎所有使用者與交易資料 | 具 ISO 27001 認證；帳單／專案擁有者為 Donna 的帳號 |
 | LINE Pay | 消費端金流 | 訂單金額、交易編號（不經手信用卡卡號，卡號在 LINE Pay 端輸入） | 目前為 Sandbox，正式上線需走特約商店審核（TODO §1） |
 | Google Gemini（Vertex AI） | 商家校準報告、消費者折扣說明、預購助理、拍照上架、轉讓媒合向量 | 訂單歷史統計數據（不含個資姓名/電話）、菜單照片，生成文字 | 用 functions 服務帳號認證（`roles/aiplatform.user`），無 API Key；走 global 端點，資料處理位置不限台灣 |
-| Google BigQuery | 需求預測、購物籃與客群分析（`bunnbaa_analytics`，asia-east1） | `locks`、`menu_items`、`vendors`、`payment_intents` 的變更紀錄；寫入前由 `bqTransform` 拿掉手機、備註、交易序號、取餐碼，`payment_intents` 只留金額、狀態與時間 | dataset 只開給管理員，見 `bigquery/README.md` |
+| Google BigQuery | 需求預測、購物籃與客群分析（`bunnbaa_analytics`，asia-east1） | `locks`、`menu_items`、`vendors`、`payment_intents` 的變更紀錄；寫入前由 `bqTransform` 拿掉手機、備註、交易序號、取餐碼，`payment_intents` 只留金額、狀態與時間 | dataset 只開給管理員，見 `bigquery/README.md`；客戶分群的群組描述用 `AI.GENERATE` 產生，只送各群平均數字給 Gemini，不送會員資料；商家只看得到群名與人數 |
 | Firebase Storage（Google Cloud） | 商家封面圖/菜單圖片上傳（`ImageUploadField.tsx`，規則見 `storage.rules`） | 圖片檔案 | 公開可讀；僅該店店主或管理員可寫，限 image/* 且 ≤ 5MB |
 
 供應商清單由新增第三方服務的人（通常是動到 `functions/.env` 或新增 npm 套件呼叫外部 API 的人）順手更新這裡。

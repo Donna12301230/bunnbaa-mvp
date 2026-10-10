@@ -112,6 +112,11 @@ FROM AI.FORECAST(
 - 購物籃：同一個 `buyer_uid` 同一天、同一家店一起鎖的品項配對次數（純 SQL self-join），找出「常一起買」。可餵給預購助理當推薦依據。
 - 分群：`ML.KMEANS` 用每位會員的 RFM（最近一次鎖定、頻率、金額）＋轉讓率＋爽約率分 4～5 群。
 - 用 `AI.GENERATE` 讓 Gemini 對每一群產生一句中文描述（例如「平日午餐固定客、對價格敏感」），商家看得懂。
+- **已部署（10/10）**：`functions/src/customerInsights.sql`＋`customerInsights.js`（每週一 04:00，管理員可用 `triggerCustomerInsightsNow` 重跑），結果寫回 `vendors/{v}/analytics/basket`、`segments`，商家後台營收頁新增「你的熟客是哪些人／常一起買」卡片。
+  - 購物籃改成「同一位客人在同一家店都買過」：一筆訂單幾乎只有一個品項，同一天的配對只有 1 組。
+  - 分群只納入過去 90 天買過 2 份以上的會員（約 100 人）；2,544 個 `demo-user-*` 一次性帳號不納入。
+  - `AI.GENERATE` 偶爾會重複輸出到被截斷，SQL 最後會對欄位不完整的群組重試一次。
+  - K-means 每週重新訓練，群組編號與名稱每週可能不同（同一次產生的群名與人數一致）。
 
 ### Looker Studio 儀表板（約 0.5 天）
 

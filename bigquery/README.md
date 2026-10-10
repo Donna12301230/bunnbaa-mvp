@@ -59,6 +59,10 @@ done
 
 模擬資料只是展示用：真實資料夠長後執行 `DROP TABLE bunnbaa_analytics.demand_history_sim`，`daily_demand` 就只剩真實份數。
 
+## 購物籃與客戶分群（P1）
+
+SQL 在 `functions/src/customerInsights.sql`（函式部署時一起打包），由 `customerInsights` 每週一 04:00 執行，產生 `basket_pairs`、`buyer_features`、`buyer_segments_model`（K-means）、`buyer_segments`、`segment_profiles`（含 `AI.GENERATE` 群組描述）、`vendor_segment_mix`。也可以直接貼到 BigQuery 主控台跑。
+
 ## 權限
 
 `bunnbaa_analytics` 只開給管理員（BigQuery Data Viewer），Looker Studio 用管理員帳號連線。資料流描述同步寫在 `doc/ISMS_管理制度文件.md`。

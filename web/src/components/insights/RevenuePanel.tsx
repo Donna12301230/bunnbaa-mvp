@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ds";
 import InfoTip from "@/components/InfoTip";
 import RevenueCostChart from "@/components/RevenueCostChart";
 import DemandForecastCard from "@/components/insights/DemandForecastCard";
+import CustomerInsightsCard from "@/components/insights/CustomerInsightsCard";
 
 export const REPORT_DAYS = 15;
 
@@ -164,6 +165,7 @@ export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: strin
       )}
 
       <DemandForecastCard vendorId={vendorId} />
+      <CustomerInsightsCard vendorId={vendorId} />
 
       {/* 預測準確率：量表；說明與追問收起來 */}
       <Card className="border-2">
