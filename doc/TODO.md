@@ -131,6 +131,62 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 
 ---
 
+## 📦 投稿交付清單（10/18 截止，對照官方規格）
+
+所有正式文件（簡報、影片旁白與字幕、README、表單文字、程式碼註解）一律英文。規格逐項對照見 [Submission_EN.md](Submission_EN.md) 第 3 節。
+
+### 表單上要交的 5 項
+- [ ] **英文簡報 PDF**（`BunnBaa_Proposal.pdf`，10–12 頁）：從 Slides artifact 補完後匯出，見下方「簡報素材」
+- [ ] **原型網址** `https://bunnbaa-mvp-5474.web.app/?lang=en`：`claude/amazing-dijkstra-uv5zcu`（英文預設語言）合併進 `master` 後才會上線
+- [ ] **3 分鐘影片**：MP4 1080p，上傳 YouTube（公開或不公開但有連結），長度 ≤ 3:00
+- [ ] **類別**：表單只勾 **Sustainability**
+- [ ] **GitHub repo 網址**：公開前先做完下方「repo 公開前」
+
+### 簡報素材
+- [ ] 團隊頁：三位成員英文拼音姓名＋角色（照片可選）
+- [ ] 架構圖 `assets/architecture.png`：Google Cloud 官方圖示，標明「Cloud Functions 2nd gen on Cloud Run」
+- [ ] 剩食數據：UNEP *Food Waste Index Report 2024*（10.5 億噸、19%、餐飲服務業 2.9 億噸）核對原文；要加台灣數據的話附出處
+- [ ] Feasibility、Scalability 兩頁：內容照 `Submission_EN.md` 第 1 節
+- [ ] 截圖（下方清單）
+
+### 截圖清單（簡報與 README 共用，存 `assets/`）
+- [ ] 消費者：首頁、品項頁（早鳥價）、預購助理對話與卡片（含推薦理由）、我的餐點 QR、轉讓上架
+- [ ] 商家：拍照建菜單草稿、今日備料清單、未來 7 天預估卡、客群卡、掃碼取餐
+- [ ] 管理後台：Looker Studio「預測 vs. 實際」「救回份數」
+- [ ] 助理評估結果表（24/24、4.96/5、4.92/5）
+- [ ] `assets/demo.gif`（約 10 秒）
+
+### 影片
+- [ ] 英文旁白（自錄或 TTS）＋英文字幕 `.srt`（從腳本旁白改）
+- [ ] 錄影前準備：紙本／手寫菜單一張（拍照建菜單用）、兩支手機（QR 掃碼、轉讓推播）
+- [ ] 帳號：消費者 A、消費者 B（先鎖一份類似的菜，轉讓媒合才會觸發）、商家
+- [ ] 至少一筆「明天」的已鎖定訂單（備料清單才有東西）、LINE Pay Sandbox 付款帳號
+- [ ] Looker Studio 報表先建好（兩張圖要入鏡）
+- [ ] 上傳後登出 YouTube 測一次連結
+
+### 評審用 demo 帳號（正式站）
+- [ ] 建 Demo Diner（消費者）、Demo Vendor（商家，綁一家有菜單與訂單的店），英文名稱；**不給管理員帳號**（可改平台參數、觸發退款）
+- [ ] 帳密寫進表單備註或 README 的「Try it」段落
+- [ ] 無痕視窗、未登入狀態把三個角色流程各走一次
+
+### repo 公開前
+- [ ] git 歷史已掃過：沒有服務帳號金鑰或 LINE Pay secret；`AIza…` 是 Firebase Web API key（設計上公開），到 GCP Console 加 HTTP referrer 限制只允許 `bunnbaa-mvp-5474.web.app`
+- [ ] 個資與內部文件：本檔有管理員 Email、成員本名與分工，`ISMS_管理制度文件.md`、`ISO27001_落差分析.md` 也是內部文件——公開前移出 repo 或至少拿掉 Email
+- [ ] `doc/` 的中文規格書、開發指南、`.docx`：移到私人位置，或在 README 註明 "internal notes, in Chinese"
+- [ ] 程式碼註解翻成英文（`claude/amazing-dijkstra-uv5zcu`；只動註解，去掉註解後的程式碼逐 token 比對相同）
+- [ ] README 方括號：影片連結、PDF 連結、repo 網址；Functions 數量（README 寫 74，10/12 實數 79）、測試數字
+- [ ] 設成 public
+
+### 送出前最後確認
+- [ ] PDF 打得開、文字可選取、10–12 頁
+- [ ] 原型網址在無痕視窗打開是英文介面
+- [ ] 影片登出 YouTube 仍可播放，≤ 3:00
+- [ ] repo 連結登出 GitHub 可以看到
+- [ ] 表單只勾 Sustainability
+- [ ] GitHub Actions 最後一次部署（Hosting、Functions）成功
+
+---
+
 ## ❓ 要跟雅婷確認的事（不分人，誰先遇到誰問）
 
 - [ ] **退款折價券能不能疊加**：目前跟一般折價券一樣——每份餐點限用一張券、早鳥折扣照算
