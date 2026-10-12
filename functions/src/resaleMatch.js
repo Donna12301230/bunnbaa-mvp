@@ -179,10 +179,15 @@ async function matchResale(lockId, lock) {
   const county = countyOf(vendor.address);
 
   const similar = lock.menu_item_id ? await similarItems(lock.menu_item_id, county) : new Map();
-  const pastQuery = similar.size > 0
-    ? db().collection("locks").where("menu_item_id", "in", [...similar.keys()].slice(0, 30)).limit(400)
-    : db().collection("locks").where("vendor_id", "==", lock.vendor_id).orderBy("created_at", "desc").limit(400);
-  const pastLocks = (await pastQuery.get()).docs.filter((d) => d.id !== lockId).map((d) => d.data());
+  // 同店的近期訂單一定查；有相似品項再加查訂過相似品項的。2026-10-12 前是二選一，
+  // 但舊訂單（含種子資料）沒有 menu_item_id，補完向量後反而只剩幾筆可比、候選人變 0
+  const queries = [db().collection("locks").where("vendor_id", "==", lock.vendor_id).orderBy("created_at", "desc").limit(400)];
+  if (similar.size > 0) queries.push(db().collection("locks").where("menu_item_id", "in", [...similar.keys()].slice(0, 30)).limit(400));
+  const pastById = new Map();
+  for (const snap of await Promise.all(queries.map((q) => q.get()))) {
+    for (const d of snap.docs) if (d.id !== lockId) pastById.set(d.id, d.data());
+  }
+  const pastLocks = [...pastById.values()];
 
   const excluded = new Set([lock.buyer_uid, lock.payer_uid, ...(lock.transferred_from_uids || [])].filter(Boolean));
   const ranked = [...scoreCandidates(pastLocks, similar, lock)]
