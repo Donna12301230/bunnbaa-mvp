@@ -505,6 +505,12 @@ test("C-AST-20", "推薦理由：只收有 getVendorInsights 資料的店、20 �
   assert.equal(cardReason("Often ordered with braised egg", "v1", grounded, "en"), "Often ordered with braised egg");
   assert.equal(cardReason("", "v1", grounded, "zh"), null);
 });
+test("C-AST-21", "回覆是純文字：模型用的 Markdown 粗體、標題、項目符號被拿掉", () => {
+  const { plainText } = assistant;
+  assert.equal(plainText("1. **麻婆豆腐素食便當**（仁和雅咖啡）"), "1. 麻婆豆腐素食便當（仁和雅咖啡）");
+  assert.equal(plainText("## 推薦\n* 素排便當\n- 五穀雜糧便當"), "推薦\n・素排便當\n・五穀雜糧便當");
+  assert.equal(plainText("預算 120 元以內"), "預算 120 元以內");
+});
 
 (async () => {
   for (const [id, name, fn] of asyncTests) {

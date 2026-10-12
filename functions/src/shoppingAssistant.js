@@ -58,12 +58,19 @@ const LIST = (description) => ({ type: "ARRAY", items: { type: "STRING" }, descr
 const REASON_MAX = { zh: 20, en: 40 };
 const PRESSURE = /手刀|快搶|搶購|限時|趕快|錯過|售完|最後機會|很多人訂|熱銷|爆單|hurry|don't miss|limited|selling fast|popular/i;
 
+/** 對話框是純文字：模型偶爾會用 Markdown（**粗體**、# 標題），把符號拿掉 */
+const plainText = (text) => String(text || "")
+  .replace(/\*\*(.+?)\*\*/g, "$1")
+  .replace(/__(.+?)__/g, "$1")
+  .replace(/^#{1,6}\s+/gm, "")
+  .replace(/^\s*[*-]\s+/gm, "・");
+
 /**
  * 模型給的推薦理由。只有這一輪 getVendorInsights 真的查到資料（預估或常一起買）的店才收，
  * 其他店的理由沒有工具資料根據，丟掉；太長或有催促字眼也丟掉，卡片就不顯示理由。
  */
 function cardReason(text, vendorId, insightVendors, lang) {
-  const reason = String(text || "").trim();
+  const reason = plainText(text).trim();
   if (!reason || !insightVendors?.has(vendorId)) return null;
   if ([...reason].length > (REASON_MAX[lang] || REASON_MAX.zh) || PRESSURE.test(reason)) return null;
   return reason;
@@ -164,6 +171,7 @@ function systemInstruction({ lang, today, dates, area, taste, config }) {
 - 只推薦工具查到的品項與方案，不要編造店名、價格、id；查不到就老實說，並建議放寬哪個條件。
 - 你不能幫使用者下單或付款，只提供候選；價格以結帳時伺服器計算為準。
 - 語氣平實，不催促、不使用行銷語句（例如「手刀」「快搶」「限時」）。
+- reply 是純文字，畫面不支援 Markdown：不要用 **粗體**、# 標題；要列點就用「・」或「1.」。
 - 有指定日期時，用 checkAvailability 確認推薦的品項那幾天能訂（最多查 3 個品項）；額滿、公休或已截單的要避開或說明。
 - 「不吃牛」之類的需求用 excludeKeywords 帶具體詞（牛肉、牛腩、牛排）；素食用 dietaryTags。
 - searchMenuItems 一次把已知條件帶齊（地區、預算、餐期、星期、不吃的食材），換關鍵字最多再查 3 次，不要一個條件查一次。
@@ -574,7 +582,7 @@ async function runAssistant({ messages, lang, area, taste, now = new Date(), onT
 
   const finish = result.finish || { reply: result.text, menuItemIds: [], mealPlanIds: [] };
   const cards = await buildCards(finish, loadCatalog, availability, lang, config, now, { seen, taste, insightVendors });
-  const reply = String(finish.reply || "").trim().slice(0, 1200)
+  const reply = plainText(finish.reply).trim().slice(0, 1200)
     || t("抱歉，這次沒找到合適的選項，可以換個條件再問一次。", "Sorry, I couldn't find a good match. Try different conditions.");
   return { reply, cards, config, loadCatalog };
 }
@@ -625,4 +633,4 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
   return { reply, cards, disclaimer };
 });
 
-module.exports.helpers = { toolHandlers, buildCards, cardReason, checkDates, basePrice, catalogLoader, runAssistant, loadTaste, itemText };
+module.exports.helpers = { toolHandlers, buildCards, cardReason, plainText, checkDates, basePrice, catalogLoader, runAssistant, loadTaste, itemText };
