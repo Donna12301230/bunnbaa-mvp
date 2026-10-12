@@ -10,11 +10,11 @@ import { tr } from "@/lib/i18n";
 import { catalogOf, catalogOrder } from "@/lib/menuCatalog";
 import type { MenuItem } from "@/types";
 
-const MAX_CATALOGS = 30; // 跟 firestore.rules 的 menu_catalogs 上限一致
+const MAX_CATALOGS = 30; // Matches the menu_catalogs limit in firestore.rules
 
 /**
- * 管理菜單目錄（目錄 > 分類 的上層）：新增、改名、排序、刪除。
- * 順序存 vendors.menu_catalogs；改名會一起改底下品項的 catalog，刪除則把品項移回「未分目錄」（品項不會被刪）。
+ * Manage menu catalogs (the level above categories): add, rename, reorder, delete.
+ * Order is stored in vendors.menu_catalogs; renaming also updates the catalog of items underneath, and deleting moves items back to "Uncatalogued" (items are not deleted).
  */
 export default function MenuCatalogManager({ open, onClose, vendorId, listed, items, onSaved }: {
   open: boolean;
@@ -25,7 +25,7 @@ export default function MenuCatalogManager({ open, onClose, vendorId, listed, it
   onSaved: () => void;
 }) {
   const { toast } = useToast();
-  // original：這一列原本的目錄名稱（新加的是 null），存檔時用來判斷改名
+  // original: this row's original catalog name (null for new rows); used on save to detect renames
   const [rows, setRows] = useState<{ name: string; original: string | null }[]>([]);
   const [busy, setBusy] = useState(false);
 

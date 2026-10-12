@@ -7,14 +7,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** 解出的原始字串（LockQRCode／MyBookingsPage 產生的是 JSON { lockId, vendorId }） */
+  /** The raw decoded string (LockQRCode / MyBookingsPage produce JSON { lockId, vendorId }) */
   onScan: (text: string) => void;
 }
 
 /**
- * 商家端相機掃碼：getUserMedia 取後鏡頭畫面，每一幀畫到隱藏 canvas 用 jsQR 解。
- * 不用瀏覽器原生 BarcodeDetector，因為 iOS Safari 不支援，店員手機大多是 iPhone。
- * 需要 HTTPS（localhost 例外）＋ firebase.json 的 Permissions-Policy 允許 camera=(self)。
+ * Vendor-side camera scanning: getUserMedia grabs the rear camera, and each frame is drawn to a hidden canvas and decoded with jsQR.
+ * The browser's native BarcodeDetector isn't used because iOS Safari doesn't support it, and most staff phones are iPhones.
+ * Requires HTTPS (except localhost) + a Permissions-Policy in firebase.json allowing camera=(self).
  */
 export default function QrScannerDialog({ open, onOpenChange, onScan }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);

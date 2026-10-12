@@ -10,12 +10,12 @@ import { getLang, loc, tr } from "@/lib/i18n";
 
 type Target = { code: string } | { lockId: string; token: string };
 
-/** 8 碼代領碼，顯示時切成兩段比較好念：ABCD-EFGH */
+/** 8-character proxy pickup code, displayed in two halves so it's easier to read out: ABCD-EFGH */
 export function formatProxyCode(code: string): string {
   return code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
 }
 
-/** 使用者貼上的可能是代領碼，也可能是整段代領連結（新：/?tab=proxy&code=…#/my-bookings，舊：#/pickup/{lockId}/{token}） */
+/** What the user pastes may be a proxy pickup code or a whole proxy pickup link (new: /?tab=proxy&code=…#/my-bookings, old: #/pickup/{lockId}/{token}) */
 export function parseProxyInput(raw: string): Target | null {
   const text = raw.trim();
   const link = /#\/pickup\/([^/\s?#]+)\/([0-9a-f]{8,})/i.exec(text);
@@ -26,8 +26,8 @@ export function parseProxyInput(raw: string): Target | null {
 }
 
 /**
- * 代領取餐（2026-10-09）：朋友把「代領碼」或代領連結傳給你，在「我的餐點 → 代領取餐」輸入或貼上，
- * 就會出現取餐 QR。不用登入，也不會被導去別頁。舊的 #/pickup/:lockId/:token 連結（PickupProxyPage）也用這個畫面。
+ * Proxy pickup (2026-10-09): a friend sends you a proxy pickup code or link; enter or paste it under "My meals → Proxy pickup"
+ * and the pickup QR appears. No sign-in, no redirect. Old #/pickup/:lockId/:token links (PickupProxyPage) use this screen too.
  */
 export default function ProxyPickupPanel({ initial }: { initial?: string }) {
   const [draft, setDraft] = useState(initial ?? "");

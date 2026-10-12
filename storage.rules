@@ -1,8 +1,8 @@
 rules_version = '2';
 
-// 店家封面圖、菜單品項圖（web/src/components/ImageUploadField.tsx）。
-// 公開可讀（店家頁/菜單頁要顯示）；只有該店店主或管理員能寫入，
-// 店主身分以 Firestore vendors/{vendorId}.owner_uid 為準（跨服務規則）。
+// Vendor cover images and menu item images (web/src/components/ImageUploadField.tsx).
+// Publicly readable (shown on vendor and menu pages); only that vendor's owner or an admin can write.
+// Vendor ownership comes from Firestore vendors/{vendorId}.owner_uid (cross-service rules).
 service firebase.storage {
   match /b/{bucket}/o {
 

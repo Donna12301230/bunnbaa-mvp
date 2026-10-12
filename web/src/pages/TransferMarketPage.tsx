@@ -21,19 +21,19 @@ import { EmptyState, Tag } from "@/components/ds";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { Link, useLocation } from "wouter";
 
-// 對應 UI草圖 Marketplace.dc.html「轉讓市集」。接上真實 Firestore,沿用
-// ConsumerLockPage.tsx 已驗證過的模式:
-//   - 「我要接手」＝付費接手（規格 §4.1）：createResaleLinePayReservation 保留 15 分鐘並導去
-//     LINE Pay，付款確認（confirmLinePayPayment）後換人，原付款人自動退款（functions/src/orders.js）
-//   - $0 的轉讓（自訂 0 元，或逾時開放免費領取）2026-10-09 起不放在這裡，
-//     改列在「附近愛心餐」分頁（components/FreeTransfersSection.tsx）
-//   - 列出所有商家的轉讓，只用 status 單一等值查詢（自動索引），排序交給前端，
-//     避免另外要求新的複合索引
-// 「取消轉讓」2026-09-22 補上 firestore.rules 規則（owner 可以把還沒被接手的
-// for_resale 改回 locked），「我的轉讓」現在是真的可以取消。已被接手的項目靠
-// locks.transferred_from_uids（接手時由 confirmLinePayPayment／firestore.rules 強制寫入
-// 原持有人）查回來，原持有人也保有讀取權限。
-// 卡片顯示接手價（早鳥價、折價券前，lib/transfers.ts resalePrice），接手者實際付這個金額。
+// Matches the "Resale market" screen in the UI mockup Marketplace.dc.html. Wired to real Firestore, following
+// the pattern already proven in ConsumerLockPage.tsx:
+//   - "Take over" = paid takeover (spec §4.1): createResaleLinePayReservation holds it for 15 minutes and redirects to
+//     LINE Pay; after payment confirmation (confirmLinePayPayment) ownership changes and the original payer is refunded automatically (functions/src/orders.js)
+//   - $0 resales (custom price 0, or opened up for free claim after the timeout) are no longer listed here since 2026-10-09;
+//     they're on the "Nearby charity meals" tab instead (components/FreeTransfersSection.tsx)
+//   - Lists resales from all vendors with a single status equality query (automatic index); sorting is done client-side
+//     to avoid needing a new composite index
+// "Cancel resale": firestore.rules was updated on 2026-09-22 (the owner can turn a for_resale that hasn't been taken over
+// back into locked), so "My resales" can now really be cancelled. Items already taken over are found via
+// locks.transferred_from_uids (written with the original holder on takeover, enforced by confirmLinePayPayment / firestore.rules),
+// and the original holder keeps read access.
+// Cards show the takeover price (before early-bird and coupons, lib/transfers.ts resalePrice); this is what the taker actually pays.
 
 function millisOf(ts: unknown): number {
   return (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
@@ -46,8 +46,8 @@ function formatCountdown(deadline: Date, now: number): string {
   return tr(`${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`, `Ends in ${Math.floor(diffMin / 60)} h ${diffMin % 60} min`);
 }
 
-// 1002 規格：導覽列的「轉讓・愛心餐」併入「我的餐點」，頁上方「轉讓市集」「附近愛心餐」分頁。
-// 放在我的餐點頁的「轉讓市集」分頁裡（1002 規格 §4.5）；愛心餐由我的餐點自己的分頁顯示。
+// 1002 spec: the nav bar's "Resale · Charity meals" is merged into "My meals", with "Resale market" and "Nearby charity meals" tabs at the top.
+// Lives in the "Resale market" tab of the My meals page (1002 spec §4.5); charity meals are shown on My meals' own tab.
 export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => void }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -72,9 +72,9 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
   }, []);
 
   useEffect(() => {
-    // 只查轉賣中的：locks 只有 for_resale／for_gift 是公開可讀（firestore.rules），
-    // 查詢條件要讓規則能證明每一筆都符合，不然整個查詢會被拒絕
-    // 所有商家一起列；只用 status 單一等值（自動索引），排序交給前端
+    // Only query items for resale: of locks, only for_resale / for_gift are publicly readable (firestore.rules),
+    // and the query must let the rules prove every document matches, or the whole query is rejected
+    // List all vendors together; single status equality only (automatic index), sorting done client-side
     const q = query(collection(db, "locks"), where("status", "==", "for_resale"), limit(200));
     const unsub = onSnapshot(
       q,
@@ -91,8 +91,8 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
     return () => unsub();
   }, []);
 
-  // 已被接手的：只用 array-contains 單一條件（自動單欄位索引），店家篩選和排序
-  // 交給前端，避免新的複合索引。
+  // Already taken over: a single array-contains condition only (automatic single-field index); vendor filtering and sorting
+  // are done client-side to avoid a new composite index.
   useEffect(() => {
     if (!uid) {
       setHandedOver([]);
@@ -104,7 +104,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
       (snap) => {
         const rows = snap.docs
           .map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock)
-          // 接手後又轉回自己手上的，算在自己的項目，不算已被接手
+          // Items that came back to me after a takeover count as my own items, not as taken over
           .filter((l) => l.buyer_uid !== uid)
           .sort((a, b) => millisOf(b.created_at) - millisOf(a.created_at));
         setHandedOver(rows);
@@ -114,8 +114,8 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
     return () => unsub();
   }, [uid]);
 
-  // 逾時判斷是純前端算的（沒有排程 Function 幫忙轉狀態），要固定重算才會即時從
-  // 「我要接手」變成「免費領取」。
+  // The timeout is computed purely client-side (no scheduled Function to flip the status), so it must be recomputed regularly to switch
+  // live from "Take over" to "Claim for free".
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(interval);
@@ -123,7 +123,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
 
   const deadlineOf = resaleDeadlineOf;
 
-  // 不雅字詞當作沒輸入搜尋字串處理，不特別跳錯誤訊息。
+  // Profane search terms are treated as an empty search, without showing an error.
   const searchLower = isClean(search) ? search.trim().toLowerCase() : "";
   const area = useSelectedArea();
   const forResale = useMemo(
@@ -137,7 +137,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
       ),
     [locks, uid, searchLower, area, vendors]
   );
-  // $0（自訂 0 元或逾時開放免費）的不放市集，改列在「附近愛心餐」分頁（FreeTransfersSection）
+  // $0 items (custom 0 or opened up for free after the timeout) aren't listed in the market; they're on the "Nearby charity meals" tab (FreeTransfersSection)
   const activeListings = forResale.filter((l) => !isFreeTransfer(l, now));
   const freeCount = forResale.length - activeListings.length;
   const myListings = useMemo(
@@ -152,7 +152,7 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
       const fn = httpsCallable(functions, "createResaleLinePayReservation");
       const result = await fn({ lock_id: lockId, use_points: usePoints && pointBalance > 0 });
       const { order_id: orderId, payment_url: paymentUrl, free } = result.data as { order_id: string; payment_url: string; free?: boolean };
-      // 付款完成後由確認頁（/payment/confirm）換人、退款給原付款人
+      // After payment, the confirmation page (/payment/confirm) changes the owner and refunds the original payer
       if (free) navigate(`/payment/confirm/${orderId}`);
       else window.location.href = paymentUrl;
     } catch (err) {

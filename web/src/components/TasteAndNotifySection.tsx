@@ -25,9 +25,9 @@ const PREFS = [
 ];
 
 /**
- * 會員中心：口味偏好（規格 §10.1，僅本人可讀）與通知設定（§7.3、§7.4）。
- * 主動設定寫 tasteProfiles/{uid}.prefs／allergies；行為推算的分數由後端算（30 天半衰期）。
- * 過敏資訊只用於自己的篩選。常用地點只存粗略 geohash（約 150 公尺），不存定位軌跡。
+ * Member center: taste preferences (spec §10.1, readable only by the owner) and notification settings (§7.3, §7.4).
+ * Explicit settings write tasteProfiles/{uid}.prefs / allergies; behavior-derived scores are computed on the backend (30-day half-life).
+ * Allergy info is only used for the user's own filtering. Frequent locations store only a coarse geohash (about 150 m), never location history.
  */
 export default function TasteAndNotifySection({ user }: { user: UserProfile }) {
   const { toast } = useToast();
@@ -109,7 +109,7 @@ export default function TasteAndNotifySection({ user }: { user: UserProfile }) {
           label={tr("愛心餐相關通知", "Charity meal notifications")}
           description={tr("捐出、未取餐轉愛心餐、預約提醒", "Donations, unclaimed meals, reservation reminders")}
         />
-        {/* AI 轉讓媒合（functions/src/resaleMatch.js）：有人轉讓你常訂的類似便當時通知 */}
+        {/* AI resale matching (functions/src/resaleMatch.js): notifies you when someone lists a bento similar to ones you often order */}
         <Switch
           checked={!muted.includes("resale_match")}
           onCheckedChange={(on) => toggleMuted("resale_match", on)}

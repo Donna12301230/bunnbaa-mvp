@@ -46,7 +46,7 @@ import { PENDING_STATUSES } from "@/lib/lockOutcome";
 import type { Lock } from "@/types";
 import { Link } from "wouter";
 
-// 拍照上架（functions/src/menuVision.js）回傳的草稿，店主按「填入表單」確認後才寫進 menu_items
+// Draft returned by photo listing (functions/src/menuVision.js); only written to menu_items after the vendor owner presses "Fill in form" to confirm
 interface MenuDraft {
   name: string;
   name_en: string;
@@ -59,10 +59,10 @@ interface MenuDraft {
 
 const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", catalog: "", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
 
-// 英文名稱／說明：Functions 會自動翻（translateMenuItem），商家也可以手動改。
-// 手動改過的欄位把 i18n_src 設成目前的中文，觸發器就認定「已翻過」不會蓋掉；
-// 清空＝交回自動翻譯（刪掉英文與 i18n_src，觸發器會重翻）；
-// 英文沒動、只改中文＝照常由觸發器重新自動翻譯。
+// English name / description: Functions translate them automatically (translateMenuItem), and vendors can also edit them by hand.
+// A manually edited field sets i18n_src to the current Chinese, so the trigger treats it as "already translated" and won't overwrite it;
+// clearing it = hand it back to auto translation (deletes the English and i18n_src, and the trigger re-translates);
+// leaving the English alone and changing only the Chinese = the trigger re-translates automatically as usual.
 function englishOverrides(
   form: { name: string; description: string; nameEn: string; descriptionEn: string },
   original: MenuItem | null
@@ -96,34 +96,34 @@ export default function VendorPortalMenu() {
   const [draftNote, setDraftNote] = useState("");
   const [activeDraft, setActiveDraft] = useState<number | null>(null);
   const [catalogsOpen, setCatalogsOpen] = useState(false);
-  // 品項表單的「更多設定」：AI 草稿（帶飲食標記）或已填過說明／英文／目錄／飲食標記時預設展開
+  // "More settings" in the item form: expanded by default for an AI draft (which carries dietary tags) or when description / English / catalog / dietary tags are already filled
   const [moreOpen, setMoreOpen] = useState(false);
   const { data: platformConfig } = usePlatformConfig();
   const commissionRate = platformConfig?.commissionRate ?? 0.05;
   const commissionPct = Math.round(commissionRate * 1000) / 10;
 
-  // 登入店主綁定（vendors/{id}.owner_uid）的商家；寫入權限由 firestore.rules 的
-  // isVendorOwner 把關，這裡不另外檢查。
+  // The vendor bound to the signed-in vendor owner (vendors/{id}.owner_uid); write access is enforced by
+  // isVendorOwner in firestore.rules, so it isn't checked again here.
   const { data: myVendor } = useMyVendor();
   const VENDOR_ID = myVendor?.id;
   const { data: catalog } = useVendorCatalog(VENDOR_ID);
-  // 週六 12:00 產生下週叫貨單後，下週主菜鎖定，只能等值替換配菜（§16 暫定）
+  // After next week's supplier order is generated on Saturday 12:00, next week's mains are locked and only like-for-like side swaps are allowed (§16, provisional)
   const nextWeekLocked = !!myVendor?.menu_locked_week && myVendor.menu_locked_week >= mondayOf(addDaysStr(todayStr(), 7));
 
   const { data: items = [], isLoading } = useVendorMenu(VENDOR_ID);
   const gaps = useRecipeGaps();
   const catalogNames = useMemo(() => catalogOrder(myVendor?.menu_catalogs, items), [myVendor?.menu_catalogs, items]);
-  /** 品項裡有 AI 產生、店家還沒確認過的配方 */
+  /** Items with an AI-generated recipe the vendor hasn't confirmed yet */
   const hasAiDraft = (item: MenuItem) => !!catalog && [item.rice_component_id, item.main?.component_id, ...(item.mains ?? []).map((m) => m.component_id), ...(item.fixed ?? []).map((f) => f.component_id), ...(item.slots ?? []).map((sl) => sl.default?.component_id)]
     .some((id) => !!id && !!catalog.componentsById[id]?.ai_draft);
 
-  // 每個品項的配方缺漏（未接配方、配方沒原物料、原物料沒單價）
+  // Recipe gaps per item (no recipe linked, recipe has no ingredients, ingredient has no unit price)
   const issuesById = useMemo(() => {
     if (!catalog) return {} as Record<string, ReturnType<typeof itemIssues>>;
     return Object.fromEntries(items.map((i) => [i.id, itemIssues(i, catalog.componentsById, catalog.ingredientsById)]));
   }, [items, catalog]);
 
-  // 預覽份數的快捷鍵：下一個營業日已訂份數（依品項）
+  // Shortcut for preview servings: servings already ordered for the next business day (per item)
   const nextDay = bookableDateRange().find((d) => d > todayStr());
   const { data: nextDayCounts } = useQuery({
     queryKey: ["menuNextDayCounts", VENDOR_ID, nextDay],
@@ -136,7 +136,7 @@ export default function VendorPortalMenu() {
     enabled: !!VENDOR_ID && !!nextDay && dialogOpen,
   });
 
-  // 從配方頁「用在：」或進度條跳過來：直接打開那個品項
+  // Coming from the recipe page's "Used in:" or the progress bar: open that item directly
   useEffect(() => {
     if (!catalog || items.length === 0) return;
     const id = takePendingEdit("menu_item");
@@ -159,7 +159,7 @@ export default function VendorPortalMenu() {
         vendor_id: myVendor.id,
         name: form.name,
         description: form.description,
-        // 便當有多道主菜時，price 存最低主菜價（卡片「$50 起」、舊程式相容）
+        // When a bento has several mains, price stores the lowest main price (card shows "From $50", legacy code compatibility)
         price: bento.itemType === "bento" && mains.length > 0 ? Math.min(...mains.map((m) => m.price)) : Number(form.price),
         category: form.category,
         catalog: form.catalog.trim() || null,
@@ -167,7 +167,7 @@ export default function VendorPortalMenu() {
         image: form.image || null, // Firestore SDK throws on `undefined` field values
         allergens: form.allergens,
         dietary_tags: form.dietaryTags,
-        // 品項結構（1002 規格 §3.2）：類型、供應餐期、主菜（各自定價）、配菜，每道菜有照片與份量文字
+        // Item structure (1002 spec §3.2): type, meal periods served, mains (each priced separately), sides; each dish has a photo and portion text
         item_type: bento.itemType,
         meal_periods: bento.mealPeriods,
         mains: bento.itemType === "bento" ? mains : [],
@@ -180,14 +180,14 @@ export default function VendorPortalMenu() {
             candidates: sl.candidates.filter((c) => c.name).map((c) => ({ ...c, image_url: c.image_url || null, portion_text: withPortion(c.component_id, c.name) })),
           }))
           : [],
-        // 配菜下方的自訂下拉欄位：沒填名稱的欄位、沒填名稱的選項都不存
+        // Custom dropdown fields below the sides: fields without a name and options without a name aren't saved
         custom_fields: bento.itemType === "bento"
           ? bento.customFields
             .map((f) => ({ label: f.label.trim(), options: f.options.filter((o) => o.name.trim()).map((o) => ({ name: o.name.trim(), price: Math.round(Number(o.price) || 0) })) }))
             .filter((f) => f.label && f.options.length > 0)
           : [],
         weekdays: bento.weekdays,
-        // 備料組成一律存在 fixed（單品也是），舊的單一 component_id 清掉，免得備料重複計算
+        // Prep components are always stored in fixed (single items too); the old single component_id is cleared so prep isn't double-counted
         fixed: bento.parts.filter((p) => p.component_id).map((p) => {
           const name = p.name || comps[p.component_id!]?.name || "";
           return { name, component_id: p.component_id, portions: p.portions > 0 ? p.portions : 1, portion_text: withPortion(p.component_id, name) };
@@ -199,7 +199,7 @@ export default function VendorPortalMenu() {
       if (editId) {
         await updateDoc(doc(db, "menu_items", editId), { ...data, ...english });
       } else {
-        // 新品項：updateDoc 的「i18n_src.name」點路徑寫法在 addDoc 不適用，改成巢狀物件
+        // New item: the dotted-path "i18n_src.name" syntax of updateDoc doesn't work with addDoc, so use a nested object
         const src: Record<string, string> = {};
         const extra: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(english)) {
@@ -208,7 +208,7 @@ export default function VendorPortalMenu() {
         }
         await addDoc(collection(db, "menu_items"), { ...data, ...extra, ...(Object.keys(src).length ? { i18n_src: src } : {}), created_at: new Date() });
       }
-      // 表單裡打了新的目錄名稱：接在店家目錄清單最後面（順序之後可在「管理目錄」調整）
+      // A new catalog name typed in the form: appended to the end of the vendor's catalog list (order can be changed later under "Catalogs")
       if (data.catalog && !catalogNames.includes(data.catalog)) {
         await updateDoc(doc(db, "vendors", myVendor.id), { menu_catalogs: [...catalogNames, data.catalog] });
       }
@@ -285,7 +285,7 @@ export default function VendorPortalMenu() {
       nameEn: d.name_en,
     });
     setBento(EMPTY_BENTO);
-    setMoreOpen(true); // AI 草稿要請店家確認飲食標記
+    setMoreOpen(true); // An AI draft needs the vendor to confirm dietary tags
     setDialogOpen(true);
   }
 
@@ -359,7 +359,7 @@ export default function VendorPortalMenu() {
         </>}
       />
 
-      {/* 菜單完成度：只回答「哪些菜可以算成本」 */}
+      {/* Menu completeness: only answers "which dishes can be costed" */}
       {gaps.stats && gaps.listed.length > 0 && (
         <Card className="mb-5">
           <CardContent className="p-4 flex flex-wrap items-center gap-4">
@@ -431,7 +431,7 @@ export default function VendorPortalMenu() {
       ) : items.length === 0 ? (
         <EmptyState icon={<UtensilsCrossed size={32} />} title={tr("尚無菜單品項", "No menu items yet")} description={tr("拍一張菜單照片，AI 幫你一次上架。", "Snap your menu and AI lists it for you.")} action={<Button onClick={() => photoInput.current?.click()} disabled={reading || !VENDOR_ID}><Camera /> {tr("拍照上架", "From a photo")}</Button>} />
       ) : (() => {
-        // 目錄 > 分類 兩層；店家沒用目錄時就只有分類一層
+        // Catalog > category, two levels; when the vendor doesn't use catalogs there's only the category level
         const groups = groupByCatalog(items, myVendor?.menu_catalogs, (i) => i.category);
         const hasCatalogs = groups.some((g) => g.catalog);
         const sections = groups.flatMap((g) => g.categories.map((c, idx) => ({ key: `${g.catalog}/${c.category}`, catalog: g.catalog, first: idx === 0, cat: c.category, items: c.items })));
@@ -520,7 +520,7 @@ export default function VendorPortalMenu() {
           {activeDraft !== null && (
             <p className="text-xs text-warning-text bg-warning-soft rounded p-2">{tr("這是 AI 從照片讀出的草稿，請確認價格、飲食標記與過敏原（食安法規定）正確再儲存。", "This is an AI draft from your photo. Check price, dietary tags and allergens (required by law) before saving.")}</p>
           )}
-          {/* 2026-10-09 簡化：①必填的基本資料 ②便當內容與價格 ③過敏原（法規），說明、英文、目錄、飲食標記收進「更多設定」 */}
+          {/* 2026-10-09 simplification: ① required basics ② bento contents and price ③ allergens (legal requirement); description, English, catalog and dietary tags moved into "More settings" */}
           <div className="space-y-4 py-2">
             <section className="space-y-3" aria-labelledby="menu-step-basic">
               <h3 id="menu-step-basic" className="text-sm font-semibold">{tr("① 基本資料", "① Basics")}</h3>
@@ -542,7 +542,7 @@ export default function VendorPortalMenu() {
                       </div>
                     )}
                   </div>
-                  {/* 合作方案：每份抽成，定價時加上去 */}
+                  {/* Partnership plan: per-serving commission, added on top when pricing */}
                   {bento.itemType !== "bento" && Number(form.price) > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {tr(`平台抽成 ${commissionPct}%，原價賣出實收約 NT$${netOfCommission(Number(form.price), commissionRate)}。`, `After the ${commissionPct}% commission you net about NT$${netOfCommission(Number(form.price), commissionRate)} at full price.`)}{" "}
@@ -551,7 +551,7 @@ export default function VendorPortalMenu() {
                       </button>
                     </p>
                   )}
-                  {/* 上架與否是即時生效的開關設定 → 設計系統用 Switch */}
+                  {/* Listing on/off is a toggle that takes effect immediately → the design system uses Switch */}
                   <Switch
                     checked={form.isAvailable}
                     onCheckedChange={(checked) => setForm(f => ({ ...f, isAvailable: checked }))}
@@ -573,7 +573,7 @@ export default function VendorPortalMenu() {
               <BentoEditor itemName={form.name} itemPrice={Number(form.price) || 0} value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} orderCount={editId && nextDay && nextDayCounts?.[editId] ? { label: tr(`${nextDay.slice(5)} 已訂`, `${nextDay.slice(5)} booked`), n: nextDayCounts[editId] } : undefined} />
             </section>
 
-            {/* 過敏原標示（食安法要求）：唯一必看的標示，留在外面 */}
+            {/* Allergen labeling (required by food safety law): the only label that must be seen, so it stays outside */}
             <section aria-labelledby="menu-step-allergens">
               <h3 id="menu-step-allergens" className="text-sm font-semibold mb-1.5">{tr("③ 過敏原標示", "③ Allergens")} <span className="text-xs text-danger-text font-normal">{tr("（食安法規定）", "(required by food safety law)")}</span></h3>
               <div className="flex flex-wrap gap-2">
@@ -605,7 +605,7 @@ export default function VendorPortalMenu() {
                     ))}
                   </div>
                 </div>
-                {/* 英文版（給英文介面的顧客看） */}
+                {/* English version (for customers using the English UI) */}
                 <div className="border rounded-lg p-3 space-y-2 bg-background">
                   <p className="text-xs font-semibold text-muted-foreground">
                     {tr("英文版（自動翻譯，可修改）", "English (auto-translated, editable)")}

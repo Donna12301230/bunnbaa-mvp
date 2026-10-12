@@ -39,38 +39,38 @@ import { Link } from "wouter";
 import { lockStatus } from "@/lib/lockOutcome";
 import { policy } from "@/lib/policy";
 
-// 對應 UI草圖 MyBookings.dc.html「我的商品」（2026-09-21 改名「我的餐點」，只給
-// 一般使用者看；廠商端這個 nav 分頁換成接受端的核對取餐，見 MarketplaceHeader.tsx）。
+// Matches the "My items" screen in the UI mockup MyBookings.dc.html (renamed "My meals" on 2026-09-21, shown only
+// to regular users; on the vendor side this nav tab becomes the receiving-side pickup check, see MarketplaceHeader.tsx).
 //
-// 2026-09-22 接上真實 Firestore（前次盤點發現整頁完全是寫死 mock，比想像中大的
-// 工程，這次做完）：
-//   - 依 buyer_uid 查真實 locks（單一 equality，不加 orderBy，避免要求新複合
-//     索引，同 MyLocksPage/TransferMarketPage 的慣例），依 pickup_date /
-//     pickup_window 即時分組——真實資料筆數不固定，改成「每天一區塊」的清單，
-//     不是原本假資料那種固定 7×3 週曆格
-//   - 「使用」：只顯示 QR／取餐編號（真正核銷是商家端 markLockOutcome，消費者
-//     這邊不能自己按「完成核銷」，原本 mock 的 confirmUse 是假的）
-//   - 「贈送」：沒有「指名」欄位——真實機制是把 lock 轉成 for_gift 再把連結
-//     私下傳給朋友，同 ConsumerLockPage.tsx 的 handleGift()
-//   - 「交易」：轉成 for_resale + resale_deadline，同 handleResell()，上架後
-//     會出現在 /marketplace；沒有價格輸入欄位——轉賣價由雙方私下議定，平台
-//     不經手（同 TransferMarketPage.tsx 的設計）
-//   - 「留下回饋」：沿用既有 Lock.consumer_feedback 欄位，one-shot，同
+// 2026-09-22: wired to real Firestore (the previous audit found the whole page was hard-coded mock data, a bigger
+// job than expected; done this time):
+//   - Query real locks by buyer_uid (single equality, no orderBy, to avoid needing a new composite
+//     index, same convention as MyLocksPage/TransferMarketPage), grouped live by pickup_date /
+//     pickup_window. Real data has no fixed row count, so it's a "one block per day" list,
+//     not the fixed 7×3 weekly calendar grid of the old mock data
+//   - "Use": only shows the QR / pickup number (actual redemption is the vendor-side markLockOutcome; diners
+//     can't press "Complete redemption" themselves; the old mock confirmUse was fake)
+//   - "Gift": there's no "recipient" field; the real mechanism turns the lock into for_gift and the link is
+//     sent privately to a friend, same as handleGift() in ConsumerLockPage.tsx
+//   - "Trade": turns it into for_resale + resale_deadline, same as handleResell(); once listed it
+//     appears on /marketplace. No price input field: the resale price is agreed privately and the platform
+//     isn't involved (same design as TransferMarketPage.tsx)
+//   - "Leave feedback": reuses the existing Lock.consumer_feedback field, one-shot, same as
 //     handleSubmitFeedback()
-//   - 「取消轉讓／取消贈送」：2026-09-22 補上 firestore.rules 規則後可以把
-//     for_resale/for_gift 改回 locked，同 TransferMarketPage「我的轉讓」
-//   - 「計畫型」（訂閱制多日方案）完全沒有真實資料模型（Firestore 沒有 plan
-//     collection），這次不補假資料，只顯示單點型的真實紀錄
+//   - "Cancel resale / cancel gift": after the firestore.rules change on 2026-09-22 these can turn
+//     for_resale/for_gift back into locked, same as "My resales" in TransferMarketPage
+//   - "Meal plan" (multi-day subscription plans) has no real data model at all (Firestore has no plan
+//     collection); no mock data is added this time, only real single-order records are shown
 
-// 狀態文字與顏色：全站共用 lib/lockOutcome.ts（2026-10-09 統一）
+// Status text and colors: shared site-wide via lib/lockOutcome.ts (unified 2026-10-09)
 const statusStyle = (status: string) => lockStatus(status);
 
 const ACTIVE_STATUSES = new Set(["locked", "for_resale", "for_gift"]);
 const FEEDBACK_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled", "no_show", "charity"]);
-// 有實際拿到餐的才能評分（reviews，公開）；no_show 只能留私下回饋給商家校準
+// Only meals actually picked up can be rated (reviews, public); no_show can only leave private feedback for vendor calibration
 const REVIEW_ELIGIBLE = new Set(["fulfilled", "resold_and_fulfilled"]);
 
-const formatDateLabel = (dateStr: string) => formatPickupDate(dateStr); // 全站同一種日期格式（lib/format.ts）
+const formatDateLabel = (dateStr: string) => formatPickupDate(dateStr); // Same date format site-wide (lib/format.ts)
 // Mirrors ConsumerLockPage.tsx's pickupWindowEnd — used as the resale_deadline
 // after which anyone may free-claim (see firestore.rules).
 function pickupWindowEnd(pickupDate: string, pickupWindow: string): Date | null {
@@ -107,7 +107,7 @@ function addDays(d: Date, n: number): Date {
   return copy;
 }
 
-// 月曆格子很窄：餐期用一個字（早／午／晚），左邊色條區分；括號是取餐開始時間
+// Calendar cells are narrow: meal period as one letter (B/L/D), with a color bar on the left; parentheses show the pickup start time
 const PERIOD_SHORT: Record<MealPeriod, () => string> = {
   breakfast: () => tr("早", "B"),
   lunch: () => tr("午", "L"),
@@ -145,28 +145,28 @@ export default function MyBookingsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Lock | null>(null);
   const [proxyCodes, setProxyCodes] = useState<Record<string, string>>({});
-  // ?tab=market｜charity｜proxy（通知、首頁、代領連結帶進來）；讀完就清掉，之後重新整理停在使用者點的分頁。
-  // 代領連結 /?tab=proxy&code=XXXXXXXX#/my-bookings（hash 路由的 query 放在真正的 ?search，wouter 也是這樣）：直接帶入代領碼
+  // ?tab=market|charity|proxy (passed in from notifications, the home page and proxy pickup links); cleared after reading so a refresh stays on the tab the user clicked.
+  // Proxy pickup link /?tab=proxy&code=XXXXXXXX#/my-bookings (hash-route query lives in the real ?search, as wouter does too): prefill the proxy pickup code
   const [proxyInitial] = useState(() => /[?&]code=([A-Za-z0-9-]+)/.exec(`${window.location.search}${window.location.hash}`)?.[1]);
   const [pageTab, setPageTab] = useState<PageTab>(() => {
     const m = /tab=(market|charity|proxy)/.exec(`${window.location.search}${window.location.hash}`);
     return (m?.[1] as PageTab | undefined) ?? "meals";
   });
-  // 清 query 放在 effect：useState 初始化函式在 StrictMode 會跑兩次，在裡面清掉第二次就讀不到了
+  // Clear the query in an effect: useState initializers run twice in StrictMode, so clearing there means the second run can't read it
   useEffect(() => {
     if (window.location.search) history.replaceState(history.state, "", window.location.pathname + window.location.hash);
   }, []);
   function switchTab(tab: PageTab) {
     setPageTab(tab);
   }
-  // 多數人期待「我的訂單」先看到清單，不是先找日期；月曆改成次要、可切換的檢視
+  // Most people expect "My orders" to open on a list, not a date picker; the calendar is a secondary, switchable view
   const [view, setView] = useState<"list" | "calendar">("list");
   const confirm = useConfirm();
   const { data: config } = usePlatformConfig();
   const cancelHours = config?.cancelHoursBefore ?? 48;
   const cancelRate = config?.cancelCouponRate ?? 0.3;
   const couponDays = config?.couponValidDays ?? 30;
-  // 上架轉讓前先讓轉讓人填轉讓價（0 ～ 原價）
+  // Before listing for resale, let the seller enter a resale price (0 to the original price)
   const [reselling, setReselling] = useState<Lock | null>(null);
   const [resaleDraft, setResaleDraft] = useState("");
 
@@ -184,7 +184,7 @@ export default function MyBookingsPage() {
     return () => unsub();
   }, [uid]);
 
-  // 哪些已取餐的鎖定已經評過分（reviews 的 doc id＝lock id），documentId in 一次最多 30 筆
+  // Which picked-up locks have already been rated (reviews doc id = lock id); documentId in allows at most 30 per query
   const reviewableIds = useMemo(
     () => locks.filter((l) => REVIEW_ELIGIBLE.has(l.status)).map((l) => l.id).sort().join(","),
     [locks]
@@ -206,14 +206,14 @@ export default function MyBookingsPage() {
     };
   }, [reviewableIds]);
 
-  // 轉賣逾時倒數是前端算的，固定重算才會即時更新顯示。
+  // The resale timeout countdown is computed client-side, so it must be recomputed regularly to update the display live.
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(interval);
   }, []);
 
-  // 列表預設排序：還能操作的（鎖定中／轉讓中／贈送中）依取餐日由近到遠排最前面；
-  // 已經結束的（取餐完成／取消／愛心餐等）依取餐日由新到舊排在後面。
+  // Default list order: still-actionable items (locked / for resale / for gift) first, by pickup date nearest first;
+  // finished items (picked up / cancelled / charity meal, etc.) after them, by pickup date newest first.
   const sortedLocks = useMemo(() => {
     const active = locks
       .filter((l) => ACTIVE_STATUSES.has(l.status))
@@ -309,8 +309,8 @@ export default function MyBookingsPage() {
     }
   }
 
-  // 心得（consumer_feedback，只給商家校準用）跟星等（reviews，公開）一起送；
-  // 勾選「公開心得」才會把心得文字一起寫進 reviews。
+  // Feedback (consumer_feedback, for vendor calibration only) is sent together with the stars (reviews, public);
+  // only when "Make feedback public" is checked is the feedback text also written to reviews.
   async function handleSubmitFeedback(lock: Lock) {
     const text = (feedbackDraft[lock.id] || "").trim();
     const rating = ratingDraft[lock.id];
@@ -346,7 +346,7 @@ export default function MyBookingsPage() {
     return `${window.location.origin}${window.location.pathname}#/gift/${lockId}`;
   }
 
-  // 代領：伺服器產生（或拿回）8 碼代領碼。連結直接開到「代領取餐」分頁並帶入代領碼，不用登入
+  // Proxy pickup: the server generates (or returns) an 8-character proxy pickup code. The link opens straight on the "Proxy pickup" tab with the code prefilled, no sign-in needed
   function proxyMessageFor(lock: Lock, code: string): string {
     const link = `${window.location.origin}${window.location.pathname}?tab=proxy&code=${code}#/my-bookings`;
     return tr(
@@ -392,7 +392,7 @@ export default function MyBookingsPage() {
         `取消不退現金${coupon > 0 ? `，改發一張這家店的折價券：折 ${coupon} 元（原價的 ${pct}%），${couponDays} 天內有效` : ""}。${lock.coupon_id ? "下單時用的折價券會退回並保留原到期日。" : ""}想拿回較多金額可以改用「轉讓」。`,
         `No cash refund${coupon > 0 ? ` — you'll get a NT$${coupon} coupon for this vendor (${pct}% of the list price), valid for ${couponDays} days` : ""}.${lock.coupon_id ? " The coupon you used is returned." : ""} To recover more, transfer it instead.`),
       confirmLabel: coupon > 0 ? tr("取消並換折價券", "Cancel for a coupon") : tr("確定取消", "Cancel meal"),
-      // 這個視窗是在問要不要「取消餐點」，放棄鈕不能也叫「取消」
+      // This dialog asks whether to "cancel the meal", so the dismiss button can't also be labeled "Cancel"
       cancelLabel: tr("保留餐點", "Keep the meal"),
       destructive: true,
     });
@@ -659,7 +659,7 @@ export default function MyBookingsPage() {
       <PageHero eyebrow={tr("訂單與取餐", "Orders & pickup")} title={tr("我的餐點", "My meals")} description={tr(`查看訂單詳情、出示取餐碼、截單前修改、${policy.cancelShort()}，或轉讓／贈送／請朋友代領／捐為愛心餐。`, `See order details, show your pickup code, change before cutoff, ${policy.cancelShort()}, or transfer / gift / send a friend / donate a meal.`)} />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
-        {/* 頁上方分頁：我的餐點｜轉讓市集｜附近愛心餐（§4.5：「轉讓・愛心餐」併入我的餐點） */}
+        {/* Tabs at the top: My meals | Resale market | Nearby charity meals (§4.5: "Resale · Charity meals" merged into My meals) */}
         <div className="overflow-x-auto bb-thin-scroll">
           <Tabs
             aria-label={tr("我的餐點分頁", "My meals tabs")}
@@ -701,8 +701,8 @@ export default function MyBookingsPage() {
           />
         ) : (
           <>
-            {/* 檢視切換：預設列表（多數人找訂單想看清單，不是先想「我哪天訂的」）；
-                月曆當作次要、找特定日期時才需要的檢視方式。 */}
+            {/* View toggle: list by default (most people looking for an order want a list, not "which day did I order"); the
+                calendar is a secondary view, only needed when looking for a specific date. */}
             <div className="inline-flex rounded-full border border-ink p-1 bg-card">
               <button
                 type="button"
@@ -759,7 +759,7 @@ export default function MyBookingsPage() {
                             }`}
                           >
                             <span className={`font-heading text-sm font-semibold ${isToday ? "text-foreground" : "text-muted-foreground"}`}>{day.getDate()}{isToday && <span className="sr-only">{tr("（今天）", " (today)")}</span>}</span>
-                            {/* 依早／午／晚分開，每份標「午（12:00）」取餐時間（2026-10-09） */}
+                            {/* Split by breakfast / lunch / dinner, each labeled with its pickup time like "L (12:00)" (2026-10-09) */}
                             {MEAL_PERIODS.map((period) => dayLocks.filter((l) => periodOfLock(l) === period)).map((periodLocks) => periodLocks.map((lock) => {
                               const statusInfo = statusStyle(lock.status);
                               const period = periodOfLock(lock);
@@ -819,7 +819,7 @@ export default function MyBookingsPage() {
                   <DialogDescription>{loc(reselling, "item_name")}・{formatDateLabel(reselling.pickup_date)} {reselling.pickup_window}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2">
-                  {/* 常用金額一鍵帶入，也可以直接打任何 0 ～ 原價的金額 */}
+                  {/* One-tap common amounts, or type any amount from 0 to the original price */}
                   <div className="flex flex-wrap gap-2" role="group" aria-label={tr("常用轉讓價", "Quick prices")}>
                     {[
                       { label: tr(`原價 NT$${cap}`, `Full NT$${cap}`), v: cap },

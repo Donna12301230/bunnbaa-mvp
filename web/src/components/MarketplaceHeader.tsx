@@ -25,27 +25,27 @@ import { setSearchQuery, useSearchQuery } from "@/lib/searchQuery";
 import { isClean } from "@/lib/searchFilter";
 import { rememberReturnPath } from "@/lib/returnPath";
 
-// 抽自 HomePage 的共用頂部列——依 UI草圖(Main/Marketplace/MyBookings 三頁共用同一組
-// 導覽)統一給三頁用:預購餐點(計畫方案首頁)／轉讓市集／我的餐點。也給
-// CustomerLayout(/vendors、/vendor/:id、/item/:id)用,取代原本另一套 Navbar.tsx,
-// 讓商家瀏覽動線跟其他分頁共用同一顆導覽列。
-// 搜尋框目前仍是靜態外觀。地區選單(AreaPicker)2026-09-28 改成台灣縣市＋鄉鎮市區篩選,
-// 選擇存在 lib/location.ts,首頁／商家列表／轉讓市集依店家地址過濾。
+// Shared top bar extracted from HomePage — per the UI sketch (Main/Marketplace/MyBookings share one
+// nav), used by three pages: Pre-order meals (meal plan home) / Resale market / My meals. Also used by
+// CustomerLayout (/vendors, /vendor/:id, /item/:id), replacing the separate Navbar.tsx,
+// so the vendor browsing flow shares the same nav bar as the other tabs.
+// The search box is still static. The area menu (AreaPicker) became a Taiwan city/county + district filter on 2026-09-28;
+// the choice is stored in lib/location.ts, and home / vendor list / resale market filter by vendor address.
 //
-// 2026-09-21:「我的餐點」(原「我的商品」)這個分頁只給一般使用者看,是消費端
-// 查看自己鎖定紀錄的地方(/my-bookings);廠商登入時這個分頁位置換成「接受端」
-// ——核對取餐(/lock/vendor/redeem,真的接 Firestore 核銷 locks 的商家頁,對應
-// MyBookingsPage「使用」面板的核銷碼)。
+// 2026-09-21: the "My meals" tab (formerly "My items") is only for regular users; it is where diners
+// view their own locks (/my-bookings). When a vendor signs in, this tab slot becomes the "receiving side"
+// — pickup verification (/lock/vendor/redeem, the vendor page that really redeems locks in Firestore, matching
+// the redemption code in MyBookingsPage's "Use" panel).
 //
-// UIUX 檢視後補上:桌機以下(<md)原本整組主導覽會被 `hidden md:flex` 藏起來,
-// 手機沒有任何入替(沒有漢堡選單也沒有底部 tab bar),等於手機使用者看不到
-// 「預購餐點/轉讓市集/我的餐點/商家」這幾個分頁。這裡加一顆漢堡按鈕,用 Sheet
-// 抽屜補齊手機導覽;同時補上購物車圖示(MenuItemPage 加入購物車後,原本整站
-// 沒有任何地方能查看/結帳購物車,是斷掉的動線),見 CartPage.tsx。
+// Added after the UI/UX review: below desktop (<md) the whole main nav was hidden by `hidden md:flex`,
+// and phones had no alternative (no hamburger menu, no bottom tab bar), so mobile users never saw
+// the "Pre-order meals / Resale market / My meals / Vendors" tabs. This adds a hamburger button with a Sheet
+// drawer for mobile nav, plus a cart icon (after MenuItemPage added items to the cart, there was
+// nowhere on the site to view or check out the cart — a broken flow); see CartPage.tsx.
 //
-// 2026-09-28:最前面加「首頁」分頁,連到品牌形象頁(/landing,LandingPage.tsx)。
-// 2026-10-02(1002 規格 §4.5):導覽列只留 4 個——預購餐點、我的餐點、我的最愛、成長獎勵。
-// 「商家」拿掉(跟預購餐點重複);「轉讓・愛心餐」併入我的餐點的分頁。搜尋框接上預購餐點頁的搜尋。
+// 2026-09-28: added a "Home" tab at the front, linking to the brand page (/landing, LandingPage.tsx).
+// 2026-10-02 (1002 spec §4.5): the nav keeps only 4 tabs — Pre-order meals, My meals, Favorites, Growth rewards.
+// "Vendors" removed (duplicates Pre-order meals); "Resale · Charity meals" merged into a My meals tab. The search box now drives the Pre-order meals page search.
 export type MarketplaceTab = "landing" | "plans" | "transfer" | "bookings" | "vendors" | "rewards" | "favorites" | "portal";
 
 interface NavItem {
@@ -72,8 +72,8 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
     },
   });
 
-  // 2026-10-09：廠商帳號不需要會員功能（我的餐點、我的最愛、成長獎勵、購物車、會員中心），只留
-  // 「上架顯示」（看自己的品項在前台長什麼樣子）與「廠商後台」；核對取餐在廠商後台裡
+  // 2026-10-09: vendor accounts don't need member features (My meals, Favorites, Growth rewards, cart, member center); they only keep
+  // "Public listing" (see how their items look on the storefront) and "Vendor portal"; pickup verification lives in the vendor portal
   const navItems: NavItem[] = isVendor
     ? [
         { tab: "plans", href: "/home", label: t("上架顯示", "Storefront"), icon: ClipboardList },
@@ -86,7 +86,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
         { tab: "rewards", href: "/rewards", label: t("成長獎勵", "Rewards"), icon: Trophy },
       ];
 
-  // 搜尋店家名稱、菜名、料理類型；結果顯示在預購餐點頁（分單點／方案兩組）
+  // Search vendor names, dish names and cuisine types; results show on the Pre-order meals page (split into Single / Meal plan groups)
   function submitSearch(value: string) {
     const q = value.trim().slice(0, 30);
     if (q && !isClean(q)) {
@@ -102,7 +102,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
     navigate(href);
   }
 
-  // 表單送出（Enter 或放大鏡按鈕，桌機、手機兩個搜尋框共用）
+  // Form submit (Enter or the magnifier button; shared by the desktop and mobile search boxes)
   function onSearchSubmit(e: FormEvent) {
     e.preventDefault();
     setMobileNavOpen(false);
@@ -122,7 +122,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
           <Menu />
         </Button>
 
-        {/* 真正的連結（原本是 img role=button）：可中鍵開新分頁、螢幕閱讀器讀成連結 */}
+        {/* A real link (formerly img role=button): middle-click opens a new tab, screen readers read it as a link */}
         <Link href="/landing" className="shrink-0 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           <img src="/飯飽wordR.png" alt={t("飯飽 BunnBaa 首頁", "BunnBaa home")} className="h-8" />
         </Link>
@@ -144,13 +144,13 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
 
         <form onSubmit={onSearchSubmit} className="flex-1 relative max-w-md hidden sm:flex items-center">
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-          {/* 設計系統 Input：淡灰底無框，hover 出現細框，focus 轉白底 + 品牌橘 ring */}
+          {/* Design-system Input: light grey fill, no border; thin border on hover, white fill + brand orange ring on focus */}
           <Input
             type="search"
             value={searchInput}
             onChange={(e) => {
               setSearchInput(e.target.value);
-              // 在預購餐點頁直接邊打邊篩；清空也立即恢復
+              // On the Pre-order meals page, filter as you type; clearing restores immediately
               if (active === "plans" || !e.target.value) submitSearch(e.target.value);
             }}
             placeholder={t("搜尋店家、菜名或料理類型", "Search vendors, dishes or cuisines")}
@@ -204,7 +204,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
 
           {!user ? (
             <Button size="sm" className="shrink-0 whitespace-nowrap" onClick={() => { rememberReturnPath(); navigate("/login"); }}>
-              {/* 窄螢幕英文「Sign in / Sign up」會被切掉，只留「Sign in」 */}
+              {/* On narrow screens the English "Sign in / Sign up" gets cut off, so only "Sign in" is shown */}
               <span className="sm:hidden">{t("登入", "Sign in")}</span>
               <span className="hidden sm:inline">{t("登入 / 註冊", "Sign in / Sign up")}</span>
             </Button>
@@ -247,8 +247,8 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
         </div>
       </div>
 
-      {/* 手機版搜尋——桌機版用 sm:flex 的那份擠不進窄螢幕，之前整個被 hidden sm:block
-          藏掉，手機完全沒有搜尋入口；改成獨立一排，寬度跟著 header 滿版。 */}
+      {/* Mobile search — the desktop one (sm:flex) doesn't fit narrow screens and used to be hidden entirely by hidden sm:block,
+          leaving phones with no search at all; now it's its own row, full header width. */}
       <form onSubmit={onSearchSubmit} className="sm:hidden relative px-4 pb-3">
         <Search className="pointer-events-none absolute left-7 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
         <Input

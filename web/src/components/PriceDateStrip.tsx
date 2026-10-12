@@ -8,7 +8,7 @@ import type { Vendor } from "@/types";
 const WEEKDAYS_ZH = ["日", "一", "二", "三", "四", "五", "六"];
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// 折扣顏色：95 折淡、8 折主色（之後加 7 折再加一色）
+// Discount colors: 5% off light, 20% off primary (add another color when 30% off is added)
 function tierClasses(discountPercent: number, selected: boolean) {
   if (selected) return "bg-ink text-[var(--text-on-inverse)] border-ink";
   if (discountPercent >= 20) return "bg-brand/15 text-foreground border-brand/60 hover:bg-brand/25";
@@ -19,20 +19,20 @@ function tierClasses(discountPercent: number, selected: boolean) {
 interface Props {
   value: string;
   onChange: (date: string) => void;
-  /** 有傳就依這家店的公休、截單把日期變灰 */
+  /** When given, grey out dates by this vendor's closed days and cut-off */
   vendor?: Vendor | null;
-  /** 有傳就在每天標出當天價格（早鳥折後） */
+  /** When given, show each day's price (after early-bird discount) */
   basePrice?: number | null;
   className?: string;
   label?: string;
-  /** 額外的不能訂原因（例如品項這天沒供應） */
+  /** Extra reasons a date can't be ordered (e.g. the item isn't served that day) */
   extraProblem?: (date: string) => string | null;
 }
 
 /**
- * 價格日期列（§4.5）：全站選日期只用這一種方式。
- * 最上方折扣按鈕「95 折｜8 折」點了跳到該折扣的第一天；下方橫向排列明天起 30 天，
- * 每天標出當天價格，顏色區分折扣，公休日灰色；點日期即選定。
+ * Price date strip (§4.5): the only way to pick a date anywhere on the site.
+ * The discount buttons at the top ("5% off | 20% off") jump to the first day with that discount; below, 30 days from tomorrow run horizontally,
+ * each showing that day's price, colored by discount, with closed days greyed out; tapping a date selects it.
  */
 export default function PriceDateStrip({ value, onChange, vendor, basePrice, className, label, extraProblem }: Props) {
   const { t, lang } = useI18n();
@@ -43,7 +43,7 @@ export default function PriceDateStrip({ value, onChange, vendor, basePrice, cla
   const scroller = useRef<HTMLDivElement>(null);
   const weekdays = lang === "en" ? WEEKDAYS_EN : WEEKDAYS_ZH;
 
-  // 選到的日期捲進畫面
+  // Scroll the selected date into view
   useEffect(() => {
     const el = scroller.current?.querySelector<HTMLElement>(`[data-date="${value}"]`);
     el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });

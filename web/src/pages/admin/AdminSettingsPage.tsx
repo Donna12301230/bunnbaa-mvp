@@ -16,10 +16,10 @@ import { Settings, Store } from "lucide-react";
 import PortalPageHeader from "@/components/PortalPageHeader";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
-// 認證商家徽章：vendors collection 原本只有 reliability_tone（履約穩定度，系統
-// 自動算），沒有「認證商家」欄位——這是平台審核後手動認證的標記，所以放在管理員
-// 才能寫的 vendors（firestore.rules 已經是 allow write: if isAdmin()，不用
-// 另外改規則），不是商家自己能勾選的。
+// Certified vendor badge: the vendors collection only had reliability_tone (fulfillment reliability, computed
+// automatically by the system) and no "certified vendor" field. This is a manual mark set after platform review, so it lives in
+// vendors, which only admins can write (firestore.rules already has allow write: if isAdmin(), so no
+// rules change needed), and isn't something vendors can tick themselves.
 function VendorVerificationCard() {
   const { toast } = useToast();
   const [vendors, setVendors] = useState<Vendor[] | null>(null);
@@ -75,15 +75,15 @@ function VendorVerificationCard() {
   );
 }
 
-// 店家、菜單、計畫方案新增或修改時，Functions 會自動用 Gemini 翻成英文（*_en 欄位）；
-// 這個功能上線前就存在的資料要按一次補翻，既有訂單的品名也會一起補上英文。
+// When vendors, menus or meal plans are created or edited, Functions translate them to English with Gemini (*_en fields);
+// data that existed before this feature launched needs a one-time backfill, which also adds English names to existing orders.
 function TranslationBackfillCard() {
   const { toast } = useToast();
   const [running, setRunning] = useState(false);
   async function run() {
     setRunning(true);
     try {
-      // 伺服器最多跑 9 分鐘，前端別在預設的 70 秒就放棄
+      // The server runs for up to 9 minutes; don't let the client give up at the default 70 seconds
       const fn = httpsCallable(functions, "translateAllContent", { timeout: 540_000 });
       const res = await fn({});
       const c = res.data as { vendors: number; menu_items: number; meal_plans: number; reviews: number; draws: number; locks: number; failed: number };

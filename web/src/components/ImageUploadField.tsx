@@ -8,8 +8,8 @@ import { toast } from "@/hooks/use-toast";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 
-// 圖片存 Firebase Storage 的 vendors/{vendorId}/ 底下；storage.rules 依
-// vendors/{vendorId}.owner_uid 限定只有店主能寫，並限制 image/* 且 ≤ 5MB。
+// Images are stored in Firebase Storage under vendors/{vendorId}/; storage.rules uses
+// vendors/{vendorId}.owner_uid to allow writes only by the vendor owner, limited to image/* and ≤ 5MB.
 const MAX_BYTES = 5 * 1024 * 1024;
 
 interface Props {
@@ -45,7 +45,7 @@ function useImageUpload(vendorId: string | undefined, onChange: (url: string) =>
   return { fileInputRef, uploading, handleFile };
 }
 
-/** 菜單編輯的每道菜照片（§3.2「每道菜都要有照片」）：小縮圖，點了上傳，右上角可移除 */
+/** Photo for each dish in the menu editor (§3.2 "every dish needs a photo"): small thumbnail, click to upload, remove at top right */
 export function ImageThumbUpload({ vendorId, value, onChange, label }: { vendorId: string | undefined; value: string | null | undefined; onChange: (url: string) => void; label: string }) {
   const { fileInputRef, uploading, handleFile } = useImageUpload(vendorId, onChange);
   return (

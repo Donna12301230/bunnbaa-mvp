@@ -6,25 +6,25 @@ import { cn } from "@/lib/utils";
 export interface CraftItem {
   id: string;
   name: string;
-  /** 需要量（原物料單位） */
+  /** Quantity needed (in ingredient units) */
   need: number;
   unit: string;
-  /** 現有量；undefined＝不顯示（現有／需要） */
+  /** Quantity on hand; undefined = not shown (on hand / needed) */
   have?: number;
-  /** 調味、包材等次要材料，預設收合 */
+  /** Minor materials such as seasonings and packaging, collapsed by default */
   minor?: boolean;
 }
 
 /**
- * 合成格子（待修改.docx 第 4 列附圖）：「B + C + D → A」，每格材料下面寫（現有／需要），不夠的變紅。
- * 菜單的材料總和、今日備料的領料單、採購的缺料共用這個元件。
+ * Crafting grid (image in 待修改.docx row 4): "B + C + D → A", each material showing (on hand / needed), red when short.
+ * Shared by the menu's materials total, today's prep pick list, and purchasing shortages.
  */
 export default function RecipeCraft({ items, target, onItemClick, haveNote, compact }: {
   items: CraftItem[];
-  /** 合成結果；沒有就不畫箭頭（例如領料單） */
+  /** Crafting result; without one no arrow is drawn (e.g. pick list) */
   target?: { name: string; sub?: string };
   onItemClick?: (id: string) => void;
-  /** 現有量的說明，例：「理論庫存」 */
+  /** Label for the on-hand quantity, e.g. "Theoretical stock" */
   haveNote?: string;
   compact?: boolean;
 }) {

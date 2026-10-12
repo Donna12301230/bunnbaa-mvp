@@ -6,8 +6,8 @@ import { httpsCallable } from "@/lib/callable";
 import { functions } from "@/lib/firebase";
 
 /**
- * LINE Pay 取消付款會導回這裡（cancelUrl）。2026-10-09：通知伺服器取消這筆付款意圖，
- * 結帳時扣住的平台點數馬上還回去、轉讓接手的 15 分鐘保留也放掉（functions/src/wallet.js cancelPaymentIntent）。
+ * LINE Pay redirects here when payment is cancelled (cancelUrl). 2026-10-09: tell the server to cancel this payment intent,
+ * so platform points held at checkout are returned immediately and the 15-minute hold on a resale takeover is released (functions/src/wallet.js cancelPaymentIntent).
  */
 export default function PaymentCancelPage() {
   const { orderId } = useParams<{ orderId: string }>();

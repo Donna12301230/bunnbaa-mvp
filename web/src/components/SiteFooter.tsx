@@ -23,8 +23,8 @@ const FOOTER_COLUMNS: { title: Bi; links: { href: string; label: Bi }[] }[] = [
   },
 ];
 
-// 全站共用頁尾（原本只有品牌形象頁 LandingPage.tsx 有，2026-09-30 抽成共用元件，
-// 讓其他頁面也能直接掛用；樣式跟 tokens.css 走全域變數，不依賴 LandingPage.css）。
+// Site-wide shared footer (originally only on the brand page LandingPage.tsx; extracted into a shared component on 2026-09-30
+// so other pages can mount it directly; styles use global variables from tokens.css, not LandingPage.css).
 export default function SiteFooter() {
   const { t, lang } = useI18n();
   return (
@@ -55,7 +55,7 @@ export default function SiteFooter() {
           {t("回到頂端", "Back to top")} <span aria-hidden="true">↑</span>
         </a>
       </div>
-      {/* 大字標誌：純裝飾 */}
+      {/* Large wordmark: purely decorative */}
       <p className="site-footer__wordmark" aria-hidden="true">
         <span className="site-footer__logo-bunn">Bunn</span><span className="site-footer__logo-baa">Baa</span>
       </p>

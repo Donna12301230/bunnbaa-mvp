@@ -18,8 +18,8 @@ import PortalPageHeader from "@/components/PortalPageHeader";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 /**
- * 平台全域參數（規格 §2）：存於 platformConfig/global，平台統一設定；第一階段店家只能在
- * 「店家可調」的範圍內調整。Functions 與前端都讀同一份（缺的欄位用預設值）。
+ * Global platform settings (spec §2): stored in platformConfig/global and set platform-wide; in phase one vendors can only adjust
+ * within the "vendor-adjustable" range. Functions and the frontend read the same document (missing fields use defaults).
  */
 function PlatformContent() {
   const { data: config, isLoading } = usePlatformConfig();

@@ -11,19 +11,19 @@ import PageHero, { HeroSearch } from "@/components/PageHero";
 import { useVendors } from "@/hooks/useVendors";
 import { areaLabel, setSelectedArea, useSelectedArea, vendorInArea } from "@/lib/location";
 
-// 商家清單頁 — 消費者瀏覽所有上架商家。真實 vendors collection 沒有
-// isApproved/isActive 這兩個欄位，用 status !== 'disabled' 頂替。
+// Vendor list page: diners browse all listed vendors. The real vendors collection has no
+// isApproved/isActive fields, so status !== 'disabled' is used instead.
 export default function VendorListPage() {
-  // 導覽列搜尋框送出會帶 ?q= 過來（見 MarketplaceHeader.tsx submitSearch）。
-  // 已經在 /vendors 時再從導覽列搜尋一次，路由不會重新掛載這個元件，所以要用
-  // effect 跟著網址同步，不能只在初始化讀一次。
+  // Submitting the nav bar search box passes ?q= here (see MarketplaceHeader.tsx submitSearch).
+  // Searching again from the nav bar while already on /vendors doesn't remount this component, so an
+  // effect has to keep it in sync with the URL instead of reading it only on init.
   const qParam = new URLSearchParams(useSearch()).get("q") ?? "";
   const [search, setSearch] = useState(qParam);
   useEffect(() => setSearch(qParam), [qParam]);
 
   const { data: vendors = [], isLoading } = useVendors();
 
-  // 不雅字詞當作沒輸入搜尋字串處理，不特別跳錯誤訊息。
+  // Profane search terms are treated as an empty search, without showing an error.
   const effectiveSearch = isClean(search) ? search : "";
   const area = useSelectedArea();
   const filtered = vendors.filter(

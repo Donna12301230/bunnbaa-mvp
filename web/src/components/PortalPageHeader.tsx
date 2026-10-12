@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
-// 後台（admin）與店家後台（vendor portal）共用的頁首：標題＋可選說明＋右側動作按鈕。
+// Page header shared by the admin console and the vendor portal: title + optional description + action buttons on the right.
 export default function PortalPageHeader({
   icon: Icon,
   title,

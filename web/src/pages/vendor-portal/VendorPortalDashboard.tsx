@@ -19,14 +19,14 @@ import { cn } from "@/lib/utils";
 import type { Lock } from "@/types";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/dashboard.tsx.
-// 2026-09-28 改讀真實資料：統計跟今日時段都從這家店的 locks 算（vendor_id + created_at 索引、最近 200 筆）。
-// 2026-10-06 圖像化（簡化提案 §4）：今天的取餐進度圈、各時段進度條、接下來 7 天長條圖、四張捷徑卡（帶即時狀態）。
+// 2026-09-28: switched to real data; stats and today's pickup slots are computed from this vendor's locks (vendor_id + created_at index, latest 200).
+// 2026-10-06 visual redesign (simplification proposal §4): today's pickup progress ring, per-slot progress bars, a 7-day bar chart, four shortcut cards (with live status).
 
 const PENDING_STATUSES = new Set(["locked", "for_resale", "for_gift"]);
 const DONE_STATUSES = new Set(["fulfilled", "resold_and_fulfilled"]);
 const WD = ["日", "一", "二", "三", "四", "五", "六"];
 
-/** 進度圈：已取／全部 */
+/** Progress ring: picked up / total */
 function Ring({ done, total }: { done: number; total: number }) {
   const r = 52;
   const c = 2 * Math.PI * r;
@@ -41,7 +41,7 @@ function Ring({ done, total }: { done: number; total: number }) {
   );
 }
 
-/** 捷徑卡：大圖示＋一個狀態數字，點了就去那一頁 */
+/** Shortcut card: large icon plus one status number; tapping it goes to that page */
 function Shortcut({ href, icon, title, children, tone }: { href: string; icon: ReactNode; title: string; children: ReactNode; tone?: "warn" | "ok" }) {
   return (
     <Link href={href} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -82,7 +82,7 @@ export default function VendorPortalDashboard() {
     return () => unsub();
   }, [VENDOR_ID]);
 
-  // 今天的備料進度（截單後才有）
+  // Today's prep progress (only available after cut-off)
   useEffect(() => {
     if (!VENDOR_ID) return;
     return onSnapshot(doc(db, "vendors", VENDOR_ID, "prepPlans", today), (s) => setPlan(s.exists() && s.data().locked_at ? s.data() : null), () => setPlan(null));
@@ -93,7 +93,7 @@ export default function VendorPortalDashboard() {
   const todayDone = todayLocks.filter((l) => DONE_STATUSES.has(l.status)).length;
   const todayTotal = todayPending + todayDone;
 
-  // 今日取餐時段：依 pickup_window 分組
+  // Today's pickup slots: grouped by pickup_window
   const todayWindows = useMemo(() => {
     const byWindow = new Map<string, { total: number; done: number }>();
     for (const l of todayLocks) {
@@ -106,7 +106,7 @@ export default function VendorPortalDashboard() {
     return [...byWindow.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [todayLocks]);
 
-  // 接下來 7 天（含今天）的訂單份數
+  // Order servings for the next 7 days (including today)
   const week = useMemo(() => {
     const days = Array.from({ length: 7 }, (_, i) => addDaysStr(today, i));
     const counts = new Map(days.map((d) => [d, 0]));
@@ -118,11 +118,11 @@ export default function VendorPortalDashboard() {
   const weekMax = Math.max(1, ...week.map((d) => d.n));
   const weekTotal = week.reduce((s, d) => s + d.n, 0);
 
-  // 備料進度：有配方用半成品數，沒有就用品項數（跟今日備料頁同一套）
+  // Prep progress: count of semi-finished components when there's a recipe, otherwise count of items (same logic as the today's prep page)
   const prepTotal = plan ? (plan.components?.length || new Set((plan.labels ?? []).map((l) => l.item)).size) : 0;
   const prepDone = plan ? Object.values(plan.done ?? {}).filter(Boolean).length : 0;
 
-  // 叫貨截止：這週六 12:00，過了就看下週六
+  // Supplier order deadline: this Saturday 12:00; once past, use next Saturday
   let deadline = new Date(`${addDaysStr(mondayOf(today), 5)}T12:00:00`);
   if (deadline.getTime() < Date.now()) deadline = new Date(deadline.getTime() + 7 * 86_400_000);
   const daysLeft = Math.floor((deadline.getTime() - Date.now()) / 86_400_000);
@@ -139,7 +139,7 @@ export default function VendorPortalDashboard() {
         <SkeletonBlocks count={2} height={180} className="grid md:grid-cols-3 gap-4 mb-6" />
       ) : (
         <div className="grid gap-4 md:grid-cols-3 mb-4">
-          {/* 今天：取餐進度圈＋各時段進度條 */}
+          {/* Today: pickup progress ring + per-slot progress bars */}
           <Card className="md:col-span-2 border-2">
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-3">
@@ -176,7 +176,7 @@ export default function VendorPortalDashboard() {
             </CardContent>
           </Card>
 
-          {/* 接下來 7 天的訂單 */}
+          {/* Orders for the next 7 days */}
           <Card className="border-2">
             <CardContent className="p-5 h-full flex flex-col">
               <p className="font-semibold">{tr("接下來 7 天", "Next 7 days")}</p>
@@ -200,7 +200,7 @@ export default function VendorPortalDashboard() {
         </div>
       )}
 
-      {/* 捷徑卡：每張只有一個狀態 */}
+      {/* Shortcut cards: one status each */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         <Shortcut href="/vendor-portal/prep" icon={<ChefHat className="w-6 h-6" />} title={tr("今日備料", "Today's prep")} tone={plan && prepTotal > 0 && prepDone === prepTotal ? "ok" : undefined}>
           {plan ? (
@@ -228,7 +228,7 @@ export default function VendorPortalDashboard() {
         </Shortcut>
       </div>
 
-      {/* 本月收益看板（§9.3） */}
+      {/* This month's earnings board (§9.3) */}
       <RevenueDashboardCard vendor={myVendor} />
     </VendorPortalLayout>
   );

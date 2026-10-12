@@ -12,20 +12,20 @@ interface PickupPickerProps {
   window: string;
   onDateChange: (date: string) => void;
   onWindowChange: (window: string) => void;
-  /** 登入者 uid；有的話會提醒「這個時段你已經有訂單」 */
+  /** Signed-in user's uid; when given, warns "You already have an order in this slot" */
   uid?: string | null;
-  /** 有傳就照這家店的取餐時段／公休／份數上限；沒傳（首頁還沒選店）用預設時段 */
+  /** When given, use this vendor's pickup slots / closed days / quantity caps; otherwise (no vendor chosen yet on the home page) use the default slots */
   vendor?: Vendor | null;
-  /** 只列這個品項供應餐期的時段 */
+  /** Only list slots for the meal periods this item is served in */
   item?: Pick<MenuItem, "meal_periods"> | null;
   period?: MealPeriod | null;
-  /** 有傳就在日期列標出每天價格 */
+  /** When given, show each day's price on the date strip */
   basePrice?: number | null;
   dateLabel?: string;
 }
 
-// 取餐日期（價格日期列）＋時段選擇。品項頁、加入計畫共用。
-// 已開始、額滿、店休的時段不能選；選到的時段失效時自動跳到當天第一個還能選的。
+// Pickup date (price date strip) + slot picker. Shared by the item page and add-to-meal-plan.
+// Slots that have started, are full, or fall on a closed day can't be picked; if the chosen slot becomes invalid, jump to that day's first available one.
 export default function PickupPicker({ date, window, onDateChange, onWindowChange, uid, vendor, item, period, basePrice, dateLabel }: PickupPickerProps) {
   const conflicts = useSlotConflicts(uid, date, window);
   const { closedReason, slots } = useSlotAvailability(vendor, date, item, period);

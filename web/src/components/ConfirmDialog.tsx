@@ -11,8 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
-// 取代瀏覽器原生 confirm()：設計系統規範危險操作要用 Modal，
-// 標題直接說問題、確認鈕寫清楚動作（「確定刪除」而非「確定」）
+// Replaces the browser's native confirm(): the design system requires a Modal for destructive actions,
+// with a title that states the question and a confirm button that names the action ("Delete" rather than "OK")
 export type ConfirmOptions = {
   title: string;
   description?: ReactNode;
@@ -23,7 +23,7 @@ export type ConfirmOptions = {
 
 type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
 
-// 取代瀏覽器原生 prompt()（2026-10-09）：同一個對話框加一個文字欄；按取消回傳 null
+// Replaces the browser's native prompt() (2026-10-09): same dialog plus a text field; Cancel returns null
 export type PromptOptions = ConfirmOptions & { inputLabel: string; placeholder?: string; defaultValue?: string };
 type PromptFn = (options: PromptOptions) => Promise<string | null>;
 

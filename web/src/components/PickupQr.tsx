@@ -17,18 +17,18 @@ export interface PickupQrInfo {
 interface Props {
   lockId?: string;
   shareToken?: string;
-  /** 代領碼（8 碼，不用登入）；伺服器查出是哪一份 */
+  /** Proxy pickup code (8 characters, no sign-in needed); the server looks up which order it is */
   proxyCode?: string;
   reservationId?: string;
   size?: number;
-  /** 拿到 QR 時一併回傳的餐點資訊（代領畫面顯示是哪一份用） */
+  /** Meal info returned along with the QR (shown on the proxy pickup screen to identify the order) */
   onInfo?: (info: PickupQrInfo) => void;
 }
 
 /**
- * 取餐 QR（規格 §6.2）：伺服器簽章的一次性憑證（id＋到期＋nonce＋HMAC），每次產生都換 nonce，
- * 截圖重複使用或偽造皆無效。10 分鐘到期，畫面每 9 分鐘自動換一張。
- * 備援：店家也可以用 4 碼取餐號＋手機末三碼核對。
+ * Pickup QR (spec §6.2): a one-time, server-signed credential (id + expiry + nonce + HMAC); every generation uses a new nonce,
+ * so reused screenshots or forgeries are rejected. Expires in 10 minutes; the screen refreshes it every 9 minutes.
+ * Fallback: the vendor can also verify with the 4-digit pickup number + last three phone digits.
  */
 export default function PickupQr({ lockId, shareToken, proxyCode, reservationId, size = 180, onInfo }: Props) {
   const [token, setToken] = useState<string | null>(null);

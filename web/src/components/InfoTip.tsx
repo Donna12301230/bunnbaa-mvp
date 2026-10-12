@@ -4,7 +4,7 @@ import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
- * 說明收進 ⓘ（簡化提案 §4）：頁面只留標題，點 ⓘ 才看說明。用點的而不是 hover，手機也能看。
+ * Help text tucked behind ⓘ (simplification proposal §4): the page shows only the title, and the help appears on tapping ⓘ. Click rather than hover so it works on phones.
  */
 export default function InfoTip({ children, className }: { children: ReactNode; className?: string }) {
   const [open, setOpen] = useState(false);

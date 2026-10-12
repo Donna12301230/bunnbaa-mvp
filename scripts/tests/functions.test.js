@@ -1,16 +1,17 @@
-// doc/測試文件.md 中要真的呼叫 Cloud Functions 的案例（第 3、4、6 章）。
-// 跑在「獨立的測試 emulator」上，自己建測試店（zz-*）與會員 A/B/C，不依賴種子資料的日期。
+// Cases from doc/測試文件.md that actually call Cloud Functions (chapters 3, 4 and 6).
+// Runs on a separate test emulator and creates its own test vendors (zz-*) and members A/B/C, so it
+// doesn't depend on the dates in the seed data.
 //
-// 執行：
-//   1. 起一個測試 emulator（專案 demo-bunnbaa-test；埠號見 repo 根目錄 firebase.test.json，避開開發用 emulator）
+// Run:
+//   1. Start a test emulator (project demo-bunnbaa-test; ports are in firebase.test.json at the repo root, clear of the dev emulator)
 //        cd scripts/tests && npm run emulator
-//      第一次要等 Functions 載入（約 30 秒）。
+//      The first time, wait for Functions to load (about 30 seconds).
 //   2. cd scripts/tests && npm run test:functions
 //
-// 注意：
-//   - emulator 裡 assertAdminOrVendorOwner／assertAdminOrEmulator 直接放行，跨店權限只能在正式站測。
-//   - 不會呼叫 LINE Pay：下單一律用「零元券全額折抵」走免付款路徑（C-RWD-12），取消的訂單沒有 transaction_id 所以不會退款。
-//   - 會用到 Gemini 的（預購助理實際回答、拍照上架辨識）只測參數檢查，不送出真的請求。
+// Notes:
+//   - In the emulator assertAdminOrVendorOwner/assertAdminOrEmulator always pass, so cross-vendor permissions can only be tested on production.
+//   - LINE Pay is never called: every order uses a NT$0 coupon covering the full amount to take the no-payment path (C-RWD-12), and cancelled orders have no transaction_id, so nothing is refunded.
+//   - Anything that uses Gemini (real pre-order assistant answers, photo-to-menu recognition) only has its argument checks tested; no real requests are sent.
 const path = require("node:path");
 const admin = require("firebase-admin");
 const { initializeApp } = require("firebase/app");
@@ -41,7 +42,7 @@ async function test(id, name, fn) {
 function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
 function eq(a, b, msg) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg || ""} expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// emulator 的觸發器排隊執行，前面的 onLockCreated（設了 GEMINI_DISABLED 會當掉重啟）會拖慢，等久一點
+// Emulator triggers run in a queue, and earlier onLockCreated runs (which crash and restart with GEMINI_DISABLED set) slow things down, so wait longer
 async function waitFor(fn, ms = 180000) {
   const end = Date.now() + ms;
   for (;;) {
@@ -52,7 +53,7 @@ async function waitFor(fn, ms = 180000) {
   }
 }
 
-// ── 身分 ──
+// ── Identities ──
 const PASSWORD = "test1234";
 async function ensureUser(email, extra = {}) {
   try { return (await admin.auth().getUserByEmail(email)).uid; }
@@ -77,33 +78,33 @@ function expectCode(r, code, msg) {
   if (r.code !== code) throw new Error(`${msg || ""} expected ${code}, got ${r.code}: ${r.message}`);
   return r;
 }
-/** 轉讓市集付費接手（§4.1）：保留＋請款 → 確認付款。emulator 沒有 LINE Pay 金鑰，走假金流 */
+/** Paid takeover on the resale market (§4.1): reserve + request payment → confirm payment. The emulator has no LINE Pay keys, so this uses a fake payment flow */
 async function takeOver(user, lockId) {
   const r = await user.call("createResaleLinePayReservation", { lock_id: lockId });
   if (!r.ok) return r;
   return user.call("confirmLinePayPayment", { order_id: r.data.order_id });
 }
 
-// ── 日期 ──
+// ── Dates ──
 const TODAY = taipeiToday();
 function nextBusinessDay(from) {
   let d = addDays(from, 1);
   while (!CFG.businessWeekdays.includes(weekdayOf(d))) d = addDays(d, 1);
   return d;
 }
-// 還沒截單的最近營業日（預設 20:00 截單；晚上跑會跳到後天）
+// Nearest business day not yet past cut-off (default cut-off 20:00; running in the evening skips to the day after tomorrow)
 let OPEN_DAY = nextBusinessDay(TODAY);
 while (isPastCutoff(OPEN_DAY, {}, CFG)) OPEN_DAY = nextBusinessDay(OPEN_DAY);
 const TODAY_IS_BUSINESS = CFG.businessWeekdays.includes(weekdayOf(TODAY));
-// 還能取消的最近營業日：取餐時段開始前 48 小時才能取消（WINDOW 從 00:00 開始，所以至少要大後天）
+// Nearest business day that can still be cancelled: cancellation closes 48 hours before the pickup slot starts (WINDOW starts at 00:00, so at least 3 days out)
 const CANCEL_DAY = nextBusinessDay(addDays(TODAY, 2));
 
-// ── 測試資料 ──
+// ── Test data ──
 const V1 = "zz-test-vendor";
 const V2 = "zz-test-vendor-2";
 const ITEM = "zz-bento";
 const ITEM2 = "zz-onigiri";
-const WINDOW = "00:00-23:59"; // 整天都在取餐時段內，捐出、核銷不受跑測試的時間影響
+const WINDOW = "00:00-23:59"; // the whole day is inside the pickup slot, so donating and redeeming don't depend on when the tests run
 let seq = 0;
 const uniq = (p) => `${p}-${Date.now().toString(36)}-${++seq}`;
 
@@ -130,7 +131,7 @@ async function coupon(uid, vendorId, discount = 100, extra = {}) {
   await ref.set({ user_id: uid, vendor_id: vendorId, discount, tier: "free", status: "owned", expires_at: Timestamp.fromMillis(Date.now() + 30 * 86400000), created_at: Timestamp.now(), ...extra });
   return ref.id;
 }
-/** 直接寫一筆鎖定（略過付款），給取消／核銷／捐出等案例用 */
+/** Writes a lock directly (skipping payment), for the cancel/redeem/donate cases */
 async function lock(buyer, extra = {}) {
   const ref = db.collection("locks").doc(uniq("zzl"));
   const code = String(1000 + Math.floor(Math.random() * 9000));
@@ -145,7 +146,7 @@ async function lock(buyer, extra = {}) {
   });
   return { id: ref.id, ref, code };
 }
-/** 已開池的一期：rewardPeriods.remaining 與對應張數的 issued 券 */
+/** A period with an open pool: rewardPeriods.remaining plus the matching number of issued tickets */
 async function issuePool(period, remaining) {
   await db.doc(`vendors/${V1}/rewardPeriods/${period}`).set({ period_id: period, status: "pooled", remaining, draw_deadline: Timestamp.fromMillis(Date.now() + 7 * 86400000) });
   const discount = { free: 100, t50: 50, t95: 5 };
@@ -159,12 +160,12 @@ const get = async (p) => (await db.doc(p).get()).data();
 const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
 
 (async () => {
-  // 確認 emulator 開著
+  // make sure the emulator is running
   try { await db.doc("_ping/x").get(); } catch (e) { console.error(`連不到 Firestore emulator ${HOST}:${PORTS.firestore}，請先 npm run emulator`); process.exit(2); }
 
   const uids = {
     A: await ensureUser("zz-a@bunnbaa.test"), B: await ensureUser("zz-b@bunnbaa.test"), C: await ensureUser("zz-c@bunnbaa.test"),
-    E: await ensureUser("zz-e@bunnbaa.test"), // 只給 C-RWD-01 用，消費累計從 0 開始
+    E: await ensureUser("zz-e@bunnbaa.test"), // only for C-RWD-01; cumulative spend starts at 0
     owner: await ensureUser("zz-owner@bunnbaa.test"),
   };
   await setupFixtures(uids);
@@ -176,7 +177,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   const ANON = await client("anon", null);
   console.log(`TODAY=${TODAY} OPEN_DAY=${OPEN_DAY}\n`);
 
-  // ════ 3.5 下單（零元券免付款路徑）＋ 3.4 伺服器算價 ════
+  // ════ 3.5 Ordering (NT$0 coupon, no-payment path) + 3.4 server-side pricing ════
   const cart = (lines) => A.call("createCartLinePayReservation", { lines });
   const line = (extra = {}) => ({ menu_item_id: ITEM, pickup_date: OPEN_DAY, pickup_window: WINDOW, quantity: 1, rice: "normal", slots: [{ choice: "default" }, { choice: "default" }], ...extra });
 
@@ -194,7 +195,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   });
 
   await test("C-PRC-10", "加飯＋一格不要：list 100、早鳥、adjust、locked_price 由伺服器算", async () => {
-    const c = await coupon(uids.A, V1, 1000); // 全額券：免付款路徑，折抵金額＝小計
+    const c = await coupon(uids.A, V1, 1000); // full-amount coupon: no-payment path, discount = subtotal
     const r = expectOk(await cart([line({ rice: "add", slots: [{ choice: "none" }, { choice: "default" }], coupon_id: c })]));
     const d = (await get(`payment_intents/${r.order_id}`)).lock_drafts[0];
     const early = 100 - d.early_bird_amount;
@@ -324,7 +325,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     } finally { await db.doc(`users/${uids.C}`).set({ orderBanned: false }, { merge: true }); }
   });
 
-  // ════ 3.7 我的餐點：取消、修改、捐出、QR ════
+  // ════ 3.7 My meals: cancel, edit, donate, QR ════
   await test("C-MY-14", "取餐 48 小時前取消：cancelled、customer、不退現金改發原價 30% 折價券、份數與原本用的券退回", async () => {
     const c = await coupon(uids.A, V1, 10);
     const r = expectOk(await cart([line({ coupon_id: c, pickup_date: CANCEL_DAY })]));
@@ -347,7 +348,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     eq((await get(counterId(V1, CANCEL_DAY, WINDOW))).count, before - 1, "slot_counters");
     const cp = await get(`coupons/${c}`);
     eq(cp.status, "owned"); assert(!cp.lock_id, "lock_id 應清掉");
-    // 退的券可以拿來下一筆訂單折抵
+    // the refunded coupon can be used on the next order
     const again = expectOk(await cart([line({ coupon_id: l.refund_coupon_id, pickup_date: CANCEL_DAY })]));
     assert(again.order_id, "退款券可用於下單");
   });
@@ -393,7 +394,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   });
 
   await test("C-MY-18", "截單前改成「不要」：變便宜 → 金額 −5、回傳退差額", async () => {
-    // 早鳥 8 折的便當（100 → 80）；沒有 transaction_id 所以不會真的呼叫 LINE Pay 退款
+    // A bento with the 20%-off early-bird price (100 → 80); no transaction_id, so no real LINE Pay refund is called
     const { id } = await lock(uids.A, { discount_percent: 20, early_bird_amount: 20, adjust_amount: 0 });
     const r = expectOk(await A.call("updateLockChoices", { lock_id: id, slots: [{ choice: "none" }, { choice: "default" }] }));
     eq([r.locked_price, r.refunded], [75, 5]);
@@ -434,7 +435,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     const q = expectOk(await ANON.call("issuePickupQr", { proxy_code: `${code.slice(0, 4)}-${code.slice(4).toLowerCase()}` }));
     assert(/^BB1\.L\./.test(q.token), q.token);
     expectCode(await ANON.call("issuePickupQr", { proxy_code: "AAAA-AAAA" }), "not-found");
-    // 轉讓中（lock 公開可讀、share_token 看得到）不能代領
+    // Listed for resale (lock is publicly readable, share_token visible): no proxy pickup
     await ref.update({ status: "for_resale" });
     expectCode(await ANON.call("issuePickupQr", { proxy_code: code }), "not-found", "轉讓中");
     expectCode(await ANON.call("issuePickupQr", { lock_id: id, share_token: "tok-code" }), "permission-denied", "轉讓中（連結）");
@@ -478,7 +479,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     assert(r.explanation === null || typeof r.explanation === "string", JSON.stringify(r));
   });
 
-  // ════ 平台點數（wallet.js）════
+  // ════ Platform points (wallet.js) ════
   const wallet = async (uid) => (await get(`wallets/${uid}`))?.balance ?? 0;
   await test("W-01", "截單前改便宜：差額退成點數（批次記原交易），不再退 LINE Pay", async () => {
     const before = await wallet(uids.C);
@@ -493,7 +494,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   await test("W-02", "用點數結帳：折抵後剩下的才走 LINE Pay；確認後每份記下點數與資金來源", async () => {
     const start = await wallet(uids.C);
     assert(start >= 5, `C 應有點數（W-01），現在 ${start}`);
-    const c = await coupon(uids.C, V1, 30); // 讓金額小一點，點數只折一部分
+    const c = await coupon(uids.C, V1, 30); // keep the amount small so points cover only part of it
     const r = expectOk(await C.call("createCartLinePayReservation", { lines: [line({ coupon_id: c })], use_points: true }));
     assert(r.points_used === start || r.points_used > 0, JSON.stringify(r));
     eq(await wallet(uids.C), start - r.points_used, "結帳時先扣住");
@@ -507,7 +508,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   await test("W-03", "付款取消：扣住的點數還回去；取消後不能再確認", async () => {
     const before = await wallet(uids.C);
     if (before <= 0) await db.doc(`wallets/${uids.C}`).set({ balance: 0 }, { merge: true });
-    // 先給 C 一批點數
+    // give C some points first
     await db.collection(`wallets/${uids.C}/lots`).add({ source_tx: null, amount: 20, remaining: 20, reason: "test", created_at: Timestamp.now() });
     await db.doc(`wallets/${uids.C}`).set({ balance: FieldValue.increment(20) }, { merge: true });
     const has = await wallet(uids.C);
@@ -560,7 +561,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     assert(/取餐當天/.test(r.message), r.message);
   });
 
-  // ════ 3.8 轉讓市集 ════
+  // ════ 3.8 Resale market ════
   await test("C-MKT-02/08", "B 付款接手：buyer=B、locked、付款人換成 B、付接手價、原付款人退款、換新 share_token", async () => {
     const { id, ref } = await lock(uids.A, { share_token: "old", list_price: 100, early_bird_amount: 20, adjust_amount: 0, coupon_id: "c-old", coupon_discount: 30, locked_price: 50, paid_amount: 50, transaction_id: "fake-seller-tx" });
     await ref.update({ status: "for_resale" });
@@ -579,7 +580,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   });
 
   await test("C-MKT-09", "自訂轉讓價：接手者付轉讓價；原付款人退「實付與轉讓價取小的」；超過原價夾在原價；接手後清掉轉讓價", async () => {
-    // A 實付 80（原價 100、早鳥折 20），原價上限＝100
+    // A paid 80 (list price 100, early-bird discount 20); the cap is the list price, 100
     const listed = async (resalePrice) => {
       const { id, ref } = await lock(uids.A, { list_price: 100, early_bird_amount: 20, adjust_amount: 0, locked_price: 80, paid_amount: 80, transaction_id: "fake-seller-tx" });
       await ref.update({ status: "for_resale", resale_price: resalePrice });
@@ -604,7 +605,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
       eq([t.price, t.refund_amount, t.refund_uid], [c.pay, c.refund, uids.A], `${c.note}：transfers 紀錄`);
       assert(!("resale_price" in l), `${c.note}：接手後 resale_price 應清掉`);
     }
-    // 沒填轉讓價：維持早鳥價（舊行為）
+    // No resale price set: keeps the early-bird price (old behavior)
     const { id, ref } = await lock(uids.A, { list_price: 100, early_bird_amount: 20, adjust_amount: 0, locked_price: 80, paid_amount: 80, transaction_id: "fake-seller-tx" });
     await ref.update({ status: "for_resale" });
     eq(expectOk(await B.call("createResaleLinePayReservation", { lock_id: id })).amount, 80, "沒填轉讓價用早鳥價");
@@ -633,13 +634,13 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     const { id, ref } = await lock(uids.A);
     await ref.update({ status: "for_resale" });
     const r = expectOk(await B.call("createResaleLinePayReservation", { lock_id: id }));
-    await ref.update({ status: "locked", buyer_uid: uids.C, locked_price: 0, transferred_from_uids: [uids.A] }); // 模擬逾時被 C 免費領取
+    await ref.update({ status: "locked", buyer_uid: uids.C, locked_price: 0, transferred_from_uids: [uids.A] }); // simulate C taking it for free after the timeout
     expectCode(await B.call("confirmLinePayPayment", { order_id: r.order_id }), "failed-precondition");
     eq((await get(`payment_intents/${r.order_id}`)).status, "gone");
     eq((await get(`locks/${id}`)).buyer_uid, uids.C, "還是 C 的");
   });
 
-  // ════ 4.2 核對取餐 ════
+  // ════ 4.2 Pickup verification ════
   const V = (data) => OWNER.call("completePickup", { vendor_id: V1, ...data });
   await test("V-RDM-02/03", "取餐號＋末三碼查到、不顯示姓名；末三碼錯查不到", async () => {
     if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
@@ -700,7 +701,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   await test("V-RDM-11", "改過內容的 QR、非 BunnBaa QR 被擋", async () => {
     const { id } = await lock(uids.A, { pickup_date: TODAY });
     const { token } = expectOk(await A.call("issuePickupQr", { lock_id: id }));
-    const parts = token.split("."); parts[3] = String(Number(parts[3]) + 3600000); // 竄改到期時間
+    const parts = token.split("."); parts[3] = String(Number(parts[3]) + 3600000); // tamper with the expiry time
     expectCode(await V({ token: parts.join(".") }), "invalid-argument", "竄改");
     const r = expectCode(await V({ token: "https://example.com" }), "invalid-argument", "非 BunnBaa");
     assert(/不是有效的 BunnBaa/.test(r.message), r.message);
@@ -720,7 +721,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     expectCode(await V({ lock_id: id }), "failed-precondition");
   });
 
-  // ════ 3.15 愛心餐 ════
+  // ════ 3.15 Charity meals ════
   let meal = null;
   await test("C-CHR-05", "預約愛心餐：reserved、10 分內到期、那份變 reserved", async () => {
     if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
@@ -775,7 +776,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     eq((await get(`charityMeals/${m}`)).status, "given");
   });
 
-  // ════ 3.14 抽獎 ════
+  // ════ 3.14 Draws ════
   await test("C-RWD-06", "抽獎：coupons 一筆 owned、30 天到期、剩餘 −1", async () => {
     const period = mondayOf(addDays(TODAY, -7));
     const pRef = db.doc(`vendors/${V1}/rewardPeriods/${period}`);
@@ -807,10 +808,10 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     assert(Object.values(rem).every((n) => n >= 0), `剩餘出現負數 ${JSON.stringify(rem)}`);
   });
 
-  // ════ 4.3 截單、許願、備料 ════
+  // ════ 4.3 Cut-off, wishes, prep ════
   await test("C-BNT-07/08 V-PRP-09", "截單：達 10 份的許願成立、3 份的改預設菜並通知；產生 prepPlans", async () => {
     const date = OPEN_DAY;
-    // 清掉前面案例在這天留下的有效訂單，只留這個案例建立的
+    // Clear active orders left on this day by earlier cases, keeping only the ones this case creates
     const olds = await db.collection("locks").where("vendor_id", "==", V1).where("pickup_date", "==", date).get();
     await Promise.all(olds.docs.map((d) => d.ref.update({ status: "cancelled" })));
     await db.doc(`vendors/${V1}/prepPlans/${date}`).delete();
@@ -836,9 +837,9 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     assert(r.skipped === true, JSON.stringify(r));
   });
 
-  // ════ AI 與其他 callable 的參數檢查 ════
+  // ════ Argument checks for AI and other callables ════
   await test("V-PRP-02/03", "預估取餐區間：過去 5 天取餐率都是 75% → 平均 ± 1.28sd，a ≤ b ≤ N", async () => {
-    // V2 的歷史：過去 5 個營業日，每天 4 份（3 份取餐、1 份轉愛心餐）
+    // V2's history: the past 5 business days, 4 meals a day (3 picked up, 1 turned into a charity meal)
     let d = TODAY;
     for (let day = 0; day < 5; day++) {
       do { d = addDays(d, -1); } while (!CFG.businessWeekdays.includes(weekdayOf(d)));
@@ -883,7 +884,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
   });
   await test("C-BRW-10", "同一天同品項瀏覽只算一次", async () => {
     await db.doc(`users/${uids.A}`).set({ viewed_items: FieldValue.delete() }, { merge: true });
-    const CAFE_ITEM = "cafe-renheya-demo-classic"; // 有配方，瀏覽會加口味標籤
+    const CAFE_ITEM = "cafe-renheya-demo-classic"; // has a recipe, so a view adds taste tags
     expectOk(await A.call("recordItemView", { menu_item_id: CAFE_ITEM }));
     const s1 = JSON.stringify((await get(`tasteProfiles/${uids.A}`))?.scores || {});
     assert(s1 !== "{}", "第一次瀏覽應加分");
@@ -901,7 +902,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
     eq(w.docs.filter((d) => d.data().dish_id === dish.id).length, 1);
   });
 
-  // ════ 6. 停班停課（最後跑：會取消 V1 在那天的訂單）════
+  // ════ 6. Work/school suspension (runs last: cancels V1's orders on that day) ════
   await test("A-DIS-01", "臺北市停班：該日訂單 cancelled/disaster、券退回；外縣市不受影響（A-DIS-03）", async () => {
     const c = await coupon(uids.A, V1, 100);
     const r = expectOk(await cart([line({ coupon_id: c })]));

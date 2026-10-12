@@ -19,9 +19,9 @@ import { tr } from "@/lib/i18n";
 import type { RewardStatus } from "@/types";
 
 /**
- * 成長獎勵（規格 §8、§9）：店家累積淨營業額滿 1 萬元時，以其中 5% 生成回饋池，拆成折價券供消費者抽獎，人人有獎。
- * 每累計實付 100 元一張抽獎券（只能抽該店家的回饋池）；營業額未達 1 萬元不開池，持續累積。
- * 抽中後 30 天有效，結帳時自動可選用，每筆限用一張。
+ * Growth rewards (spec §8, §9): when a vendor's cumulative net revenue reaches 10,000 NTD, 5% of it funds a reward pool, split into coupons that diners draw; every draw wins.
+ * One draw ticket per 100 NTD actually paid (only valid for that vendor's reward pool); below 10,000 NTD in revenue the pool doesn't open and keeps accumulating.
+ * A drawn coupon is valid for 30 days, offered automatically at checkout, one per order.
  */
 export default function RewardsPage() {
   const { user } = useAuth();
