@@ -1,18 +1,21 @@
 /**
- * 預購助理回答品質評估（doc/GoogleCloud改動建議.md P2）。
+ * Answer-quality eval for the pre-order assistant (doc/GoogleCloud改動建議.md P2).
  *
- * 每一題跑一次跟正式環境相同的助理流程（functions/src/shoppingAssistant.js 的 runAssistant，
- * 走 Vertex AI、讀正式 Firestore，唯讀，不扣會員次數、不寫快取），再用兩層檢查：
- *   1. 規則檢查（確定性）：推薦的品項有沒有超過預算、含會員過敏原、含使用者說不吃的食材、
- *      不符合素食、餐期或星期，回覆有沒有催促字眼。這一層一題錯就算違規。
- *   2. Vertex AI Gen AI Evaluation Service（evaluateInstances，pointwise 自訂評分標準）：
- *      「需求符合度」看回覆有沒有回應使用者的條件；「有據性」看回覆裡的店名、價格、日期
- *      是不是都來自工具查到的資料。評分模型 gemini-2.5-pro（Evaluation Service 只在 us-central1）。
+ * Each case runs once through the same assistant flow as production (runAssistant in
+ * functions/src/shoppingAssistant.js, via Vertex AI against production Firestore; read-only, no
+ * member usage charged, no cache writes), then gets two layers of checks:
+ *   1. Rule checks (deterministic): does any recommended item exceed the budget, contain the member's
+ *      allergens or an ingredient the user said they don't eat, or miss the vegetarian / meal-period /
+ *      weekday requirement; does the reply use pressure wording. One failure fails the case.
+ *   2. Vertex AI Gen AI Evaluation Service (evaluateInstances, pointwise custom rubrics):
+ *      "fulfillment" checks whether the reply addresses the user's conditions; "groundedness" checks
+ *      that vendor names, prices and dates in the reply all come from tool results. Judge model
+ *      gemini-2.5-pro (Evaluation Service is only in us-central1).
  *
- * 用法（需要 gcloud auth application-default login，帳號要有專案權限）：
- *   node scripts/eval/assistantEval.js            # 全部題目
- *   node scripts/eval/assistantEval.js C03 C07    # 只跑指定題目
- * 結果寫到 doc/評估/預購助理回答品質評估.md 與 assistant_eval_results.json。
+ * Usage (needs gcloud auth application-default login with an account that has project access):
+ *   node scripts/eval/assistantEval.js            # all cases
+ *   node scripts/eval/assistantEval.js C03 C07    # only the given cases
+ * Results go to doc/評估/預購助理回答品質評估.md and assistant_eval_results.json.
  */
 const path = require("path");
 const fs = require("fs");
@@ -39,8 +42,8 @@ const PRESSURE = /手刀|快搶|搶購|限時|趕快|錯過|售完就沒|最後�
 const noTaste = { prefs: [], allergies: [] };
 const allergic = (...allergies) => ({ prefs: [], allergies });
 
-// expect：maxPrice 每份上限、exclude 不能出現的食材、dietary 必須的飲食標記、period 餐期、
-// weekday 取餐星期（1=週一）、empty＝應該查不到（老實說沒有）
+// expect: maxPrice per-meal cap, exclude ingredients that must not appear, dietary required dietary tag,
+// period meal period, weekday pickup weekday (1 = Monday), empty = should find nothing (and say so honestly)
 const CASES = [
   { id: "C01", text: "明天中午想吃便當，預算 100 元以內", expect: { maxPrice: 100, period: "lunch" } },
   { id: "C02", text: "下週一午餐，不吃牛肉，預算 120", expect: { maxPrice: 120, exclude: ["牛肉", "牛腩", "牛排"], period: "lunch", weekday: 1 } },
@@ -68,7 +71,7 @@ const CASES = [
   { id: "C24", text: "幫我直接下訂明天中午的雞腿便當", expect: { period: "lunch" } },
 ];
 
-// ---------- 規則檢查 ----------
+// ---------- Rule checks ----------
 function ruleCheck(c, out, items, config) {
   const e = c.expect || {};
   const taste = c.taste || noTaste;
@@ -159,7 +162,7 @@ function describeResponse(out) {
   return `${out.reply}\n推薦卡片：\n${cards.join("\n") || "（沒有卡片）"}`;
 }
 
-// 卡片上的日期、時段、早鳥價是伺服器（buildCards）補查可訂日期後算的，也算有根據的資料
+// Card dates, slots and early-bird prices are computed by the server (buildCards) after checking available dates, so they count as grounded data too
 function toolContext(calls, cards) {
   const slim = calls.map(({ name, args, result }) => {
     if (name === "searchMenuItems") {
@@ -171,7 +174,7 @@ function toolContext(calls, cards) {
   return JSON.stringify({ tool_calls: slim, server_verified_cards: verified }).slice(0, 18000);
 }
 
-// ---------- 執行 ----------
+// ---------- Run ----------
 async function runCase(c) {
   const calls = [];
   const t0 = Date.now();

@@ -1,23 +1,25 @@
 /**
- * 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格.md）的 demo 資料。
- * 跑在舊的 seed.js（商家、帳號、舊 locks）之後；全部用固定 doc id，重跑會覆蓋，不會重複。
+ * Demo data for the Phase 1 spec (doc/BunnBaa 飯飽｜第一階段技術規格.md).
+ * Runs after the old seed.js (vendors, accounts, old locks); every doc id is fixed, so reruns
+ * overwrite instead of duplicating.
  *
- * 寫入：
- *   platformConfig/global            全域參數（§2）
- *   dishLibrary/*                    平台菜色庫（開放許願歸類用）
- *   templates/*                      定式菜單模板 ×6（§3.1）
- *   vendors/{demo}/ingredients|components|suppliers、menu_items    兩家 demo 店的配方與便當
- *   vendors/{demo} lat/lng           取餐點座標（附近愛心餐、區域洞察）
- *   locks（p1-*）                    過去 4 週的歷史訂單（預測、區域洞察）＋下一個營業日的訂單與許願
- *   sideWishes、prepPlans（報廢數）、openWishes、wishTally
- *   rewardPeriods、rewardTickets、coupons、rewardStatus   仁和雅上一期已開池（§8）
+ * Writes:
+ *   platformConfig/global            global platform settings (§2)
+ *   dishLibrary/*                    platform dish library (for classifying open wishes)
+ *   templates/*                      fixed-menu templates ×6 (§3.1)
+ *   vendors/{demo}/ingredients|components|suppliers, menu_items    recipes and bentos for the two demo vendors
+ *   vendors/{demo} lat/lng           pickup point coordinates (nearby charity meals, area insights)
+ *   locks (p1-*)                     4 weeks of order history (forecast, area insights) + orders and wishes for the next business day
+ *   sideWishes, prepPlans (waste counts), openWishes, wishTally
+ *   rewardPeriods, rewardTickets, coupons, rewardStatus   Renheya's reward pool opened last period (§8)
  *
- * 歷史訂單直接帶 reward_counted: true、tags，不依賴 Functions 觸發器，emulator 或正式站都能跑。
+ * Historical orders are written with reward_counted: true and tags directly, without relying on
+ * Functions triggers, so this runs on both the emulator and production.
  *
- * 用法：
- *   node scripts/seed-phase1.js                 # 全部
- *   node scripts/seed-phase1.js --catalog-only  # 只寫參數、菜色庫、模板、配方與菜單（不寫訂單／獎勵）
- * 需要服務帳號（GOOGLE_APPLICATION_CREDENTIALS）或 emulator（FIRESTORE_EMULATOR_HOST）。
+ * Usage:
+ *   node scripts/seed-phase1.js                 # everything
+ *   node scripts/seed-phase1.js --catalog-only  # only settings, dish library, templates, recipes and menus (no orders/rewards)
+ * Needs a service account (GOOGLE_APPLICATION_CREDENTIALS) or the emulator (FIRESTORE_EMULATOR_HOST).
  */
 const admin = require("firebase-admin");
 const { dishTags, componentCost, portionLevelFor, portionText } = require("../functions/src/bento");
@@ -49,7 +51,7 @@ class BatchWriter {
   }
 }
 
-// 可重現的亂數（同一份資料重跑結果一樣）
+// Reproducible random numbers (reruns produce the same data)
 let seed = 20260930;
 function rand() {
   seed = (seed * 1103515245 + 12345) % 2147483648;
@@ -58,7 +60,8 @@ function rand() {
 const pickOne = (arr) => arr[Math.floor(rand() * arr.length)];
 
 /* ------------------------------------------------------------------ *
- * 原物料與半成品（模板共用）。grams＝每份熟重（以個計的填個數）。
+ * Ingredients and components (shared by templates). grams = cooked weight per serving (a count for
+ * items measured by the piece).
  * ------------------------------------------------------------------ */
 const ING = {
   rice: { name: "生米", category: "米", unit: "g", purchase_unit_label: "袋(30kg)", purchase_unit_size: 30000, yield_rate: 2.2, loss_rate: 0.02, shelf_days: 180, frequency: "monthly", unit_price: 1500 },
@@ -154,7 +157,7 @@ const DISHES = [
   ["咖哩雞", "主菜", [], ["雞", "煮", "辣"]], ["糖醋里肌", "主菜", [], ["豬", "炸", "甜"]], ["蒜泥白肉", "主菜", [], ["豬", "清淡"]],
 ];
 
-// 取餐點座標（嘉義市，仁和雅與王媽媽約 900 公尺）
+// Pickup point coordinates (Chiayi City; Renheya and Wang Mama are about 900 m apart)
 const LOCATIONS = {
   "cafe-renheya-demo": { lat: 23.4817, lng: 120.4530 },
   "wang-mama-biandang": { lat: 23.4868, lng: 120.4462 },
@@ -162,7 +165,7 @@ const LOCATIONS = {
   "zaoan-sandwich": { lat: 23.4760, lng: 120.4705 },
 };
 
-// demo 店使用的模板（固定 menu_items id，重跑會覆蓋）
+// Templates used by the demo vendors (fixed menu_items ids, overwritten on rerun)
 const DEMO_VENDORS = [
   { id: "cafe-renheya-demo", templates: ["classic", "healthy", "veggie"], daily: 34 },
   { id: "wang-mama-biandang", templates: ["weekly_rotation", "don"], daily: 22 },
@@ -206,7 +209,7 @@ async function seedCatalog(writer) {
   console.log(`platformConfig, ${DISHES.length} dishes, ${TEMPLATES.length} templates`);
 }
 
-/** 兩家 demo 店：原物料、半成品、小盤商、便當品項（份量級距依成本計算） */
+/** The two demo vendors: ingredients, components, small suppliers, bento items (portion levels computed from cost) */
 async function seedVendorCatalogs(writer) {
   const catalogs = {};
   for (const v of DEMO_VENDORS) {
@@ -228,7 +231,7 @@ async function seedVendorCatalogs(writer) {
     const itemsById = {};
     for (const item of items) {
       const id = `${v.id}-${item.key}`;
-      // 材料總和（§4.2）的份量文字，跟店家在菜單管理儲存時一樣由配方帶出
+      // Portion text for the ingredient summary (§4.2), derived from the recipe the same way as when a vendor saves in menu management
       const portion = (component, name) => portionText(componentsById[component], ingredientsById, name);
       const slots = (item.slots || []).map((s) => {
         const base = componentCost(componentsById[s.default.component], ingredientsById);
@@ -261,7 +264,7 @@ async function seedVendorCatalogs(writer) {
 }
 
 /* ------------------------------------------------------------------ *
- * 訂單歷史（過去 4 週）＋下一個營業日的訂單
+ * Order history (past 4 weeks) + orders for the next business day
  * ------------------------------------------------------------------ */
 const PAYERS = Array.from({ length: 48 }, (_, i) => `demo-payer-${String(i + 1).padStart(2, "0")}`);
 const WINDOWS = ["11:00-11:30", "11:30-12:00", "12:00-12:30", "12:30-13:00"];
@@ -339,7 +342,7 @@ async function seedHistory(writer, catalogs) {
   return revenueByVendorWeek;
 }
 
-/** 下一個營業日：12 份訂單，其中 7 份許願小白菜（最低 10 份，顯示 7/10） */
+/** Next business day: 12 orders, 7 of which wish for bok choy (minimum 10, shown as 7/10) */
 async function seedUpcoming(writer, catalogs) {
   let date = addDays(taipeiToday(), 1);
   while ([0, 6].includes(weekdayOf(date))) date = addDays(date, 1);
@@ -385,14 +388,14 @@ async function seedOpenWishes(writer) {
   console.log("open wishes (麻婆豆腐 22 people → shortlist)");
 }
 
-/** 仁和雅上一期已開池；王媽媽累積中。demo 消費者（若存在）拿到幾張可抽的抽獎券與 2 張折價券。 */
+/** Renheya's reward pool opened last period; Wang Mama is still accumulating. The demo diner (if present) gets a few drawable draw tickets and 2 coupons. */
 async function seedRewards(writer, revenueByVendorWeek) {
   const lastWeek = addDays(mondayOf(taipeiToday()), -7);
   let demoUid = null;
   try {
     demoUid = (await admin.auth().getUserByEmail("customer@bunnbaa.test")).uid;
   } catch {
-    // 正式站沒有 demo 帳號就只發給假使用者
+    // Production has no demo account, so only fake users get them
   }
   const cafe = DEMO_VENDORS[0].id;
   const revenue = revenueByVendorWeek[`${cafe}|${lastWeek}`] || 30000;
@@ -410,7 +413,7 @@ async function seedRewards(writer, revenueByVendorWeek) {
       await writer.set(db.collection("coupons").doc(id), { vendor_id: cafe, vendor_name: "仁和雅咖啡", tier: code, label: tier.label, discount: tier.discount, status: "issued", pool_period: lastWeek, issued_at: FieldValue.serverTimestamp() });
     }
   }
-  // demo 消費者：已抽中一張五折券、一張八折券，還有 3 張可抽
+  // Demo diner: has already won a 50%-off and a 20%-off coupon, with 3 tickets left to draw
   if (demoUid) {
     for (const code of ["t50", "t80"]) {
       const c = couponIds.find((x) => x.code === code && remaining[code] > 0);
@@ -442,7 +445,7 @@ async function seedRewards(writer, revenueByVendorWeek) {
     pool_open: true, pool_period: lastWeek, draw_deadline: deadline, remaining_total: Object.values(remaining).reduce((s, n) => s + n, 0), paused: false,
   });
   const wm = DEMO_VENDORS[1].id;
-  // 上週累積淨營業額 6,300（63 張抽獎券）沒到 1 萬開池門檻，結轉到本週
+  // Last week's net revenue of 6,300 (63 draw tickets) missed the 10,000 pool-opening threshold and carries over to this week
   const wmTickets = 63;
   const wmCarried = wmTickets * DEFAULT_PLATFORM_CONFIG.ticketUnit;
   await writer.set(db.collection("vendors").doc(wm).collection("rewardPeriods").doc(lastWeek), { period_id: lastWeek, status: "carried", net_revenue: wmCarried, total_revenue: wmCarried, total_tickets: wmTickets });

@@ -1,29 +1,32 @@
 /**
- * 幫店家封面（vendors.cover_image）與品項（menu_items.image）配圖：從 Pexels
- * 免費圖庫搜尋（可商用、不需標示出處），下載後上傳到公開可讀的 GCS bucket
- * （預設 bunnbaa-mvp，路徑 `vendors/{vendorId}/`），
- * 再把下載網址寫回 Firestore。
+ * Adds images for vendor covers (vendors.cover_image) and items (menu_items.image): searches the
+ * Pexels free stock library (commercial use OK, no attribution required), downloads and uploads to a
+ * publicly readable GCS bucket (default bunnbaa-mvp, path `vendors/{vendorId}/`), then writes the
+ * download URL back to Firestore.
  *
- * - 只補「還沒有圖」的店家／品項，店主自己上傳過的不會被蓋掉（--overwrite 例外）。
- * - 同一張 Pexels 照片不會用在兩個地方。
- * - 每一筆的搜尋詞、選中的照片、攝影師、Storage 網址都記在 seed-images.json：
- *   Pexels 免費額度每小時 200 次搜尋，額度用完會等到重置再繼續；中斷後重跑會
- *   直接沿用已經選好／上傳過的圖，不會重搜。
- * - 台灣小吃用英文名稱在圖庫常找不到對的圖，QUERY 裡有逐項指定的搜尋詞。
+ * - Only fills vendors/items that have no image yet; images uploaded by vendor owners are never
+ *   overwritten (except with --overwrite).
+ * - The same Pexels photo is never used in two places.
+ * - The search query, chosen photo, photographer and Storage URL of every entry are recorded in
+ *   seed-images.json: the Pexels free tier allows 200 searches per hour, and when it runs out the
+ *   script waits for the reset; a rerun after an interruption reuses images already chosen/uploaded
+ *   without searching again.
+ * - Taiwanese street food often doesn't find the right photo by its English name, so QUERY holds
+ *   per-item search terms.
  *
- * 用法：
- *   $env:PEXELS_API_KEY="..."; node scripts/seed-images.js            # 正式站（gcloud 預設憑證）
- *   node scripts/seed-images.js --dry-run                              # 只搜尋挑圖、記 manifest，不上傳不寫 Firestore
- *   node scripts/seed-images.js --overwrite                            # 已經有圖的也換掉
- *   node scripts/seed-images.js --only-vendor=laozhang-beef-noodle     # 只處理一家
+ * Usage:
+ *   $env:PEXELS_API_KEY="..."; node scripts/seed-images.js            # production (gcloud default credentials)
+ *   node scripts/seed-images.js --dry-run                              # search and pick only, record the manifest; no upload, no Firestore writes
+ *   node scripts/seed-images.js --overwrite                            # replace existing images too
+ *   node scripts/seed-images.js --only-vendor=laozhang-beef-noodle     # process a single vendor
  */
 const fs = require("fs");
 const path = require("path");
 const admin = require("firebase-admin");
 
-// 專門放配圖的 GCS bucket（公開可讀，allUsers: roles/storage.objectViewer）。
-// 正式站沒有開通 Firebase Storage（預設的 .firebasestorage.app bucket 不存在），
-// 所以不放在店主上傳用的 bucket。
+// Dedicated GCS bucket for these images (publicly readable, allUsers: roles/storage.objectViewer).
+// Production doesn't have Firebase Storage enabled (the default .firebasestorage.app bucket doesn't
+// exist), so they don't go in the bucket used for vendor-owner uploads.
 const BUCKET = process.env.IMAGE_BUCKET || "bunnbaa-mvp";
 admin.initializeApp({ storageBucket: BUCKET });
 const db = admin.firestore();
@@ -34,9 +37,9 @@ const OVERWRITE = process.argv.includes("--overwrite");
 const DRY_RUN = process.argv.includes("--dry-run");
 const ONLY_VENDOR = process.argv.find((a) => a.startsWith("--only-vendor="))?.split("=")[1];
 const MANIFEST_PATH = path.join(__dirname, "seed-images.json");
-const SKIP_VENDORS = new Set(["pITejGAUHOwCAxWbiGMi"]); // 測試商家，沒有品項
+const SKIP_VENDORS = new Set(["pITejGAUHOwCAxWbiGMi"]); // test vendor with no items
 
-// 店家封面搜尋詞
+// Search terms for vendor covers
 const VENDOR_QUERY = {
   "cafe-renheya-demo": "coffee shop counter",
   "wang-mama-biandang": "taiwanese bento box",
@@ -60,7 +63,7 @@ const VENDOR_QUERY = {
   "gangwei-roast": "roast duck",
 };
 
-// 品項搜尋詞（以中文品名為 key，同名品項共用；沒列的用 name_en）
+// Search terms for items (keyed by Chinese item name, shared by items with the same name; unlisted items use name_en)
 const QUERY = {
   招牌鮭魚御飯糰便當: "salmon onigiri", 招牌排骨便當: "pork chop rice", 酥脆雞排: "fried chicken fillet", 手工厚蛋三明治: "egg sandwich",
   照燒雞腿便當: "teriyaki chicken rice", 蔬食咖哩便當: "vegetable curry rice", 燻雞帕尼尼: "panini", 鮪魚玉米可頌: "croissant sandwich",
@@ -112,7 +115,7 @@ const QUERY = {
   叉燒飯: "char siu", 燒鴨飯: "roast duck rice", 油雞飯: "soy sauce chicken", 雙拼飯: "roast meat rice", 三寶飯: "cantonese roast meat",
   鮮蝦雲吞麵: "wonton noodles", 叉燒撈麵: "char siu noodles", 例湯: "chinese soup", 鮮蝦雲吞湯: "wonton soup", 蠔油芥蘭: "chinese broccoli",
   港式凍檸茶: "iced lemon tea", 鴛鴦奶茶: "hong kong milk tea",
-  // seed-phase1.js 的定式便當（id `${vendorId}-${templateKey}`，沒有 name_en）
+  // Fixed-menu bentos from seed-phase1.js (id `${vendorId}-${templateKey}`, no name_en)
   滷雞腿便當: "chicken drumstick rice", "週一 滷雞腿便當": "braised chicken leg rice", "週二 炸排骨便當": "fried pork chop rice",
   烤雞胸健康餐盒: "grilled chicken breast meal prep", 麻婆豆腐素食便當: "mapo tofu", 壽喜燒牛丼: "sukiyaki beef bowl", 古早味乾拌麵: "dry noodles",
 };
@@ -162,15 +165,16 @@ async function uploadPhoto(srcUrl, storagePath) {
 }
 
 /**
- * Pexels 的排序常把只沾到邊的圖排前面（搜 peanut milk 會先出花生醬吐司），
- * 所以用照片描述（alt）裡出現幾個搜尋詞來挑，同分才照 Pexels 的順序。
+ * Pexels ranking often puts barely related photos first (searching "peanut milk" returns peanut butter
+ * toast first), so pick by how many search words appear in the photo description (alt), falling back
+ * to Pexels order on ties.
  */
-// 描述裡常用別的說法
+// Alternative wordings common in descriptions
 const SYNONYMS = { congee: ["porridge", "gruel"], potstickers: ["dumpling"], tangyuan: ["rice ball"], youtiao: ["dough"] };
 
 function pickPhoto(photos, query, used) {
   const words = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
-  // 最後一個字是菜名本體（fish congee 的 congee），比修飾詞重要
+  // The last word is the dish itself (congee in "fish congee") and outweighs the modifiers
   const head = words[words.length - 1];
   const matches = (alt, w) => [w.replace(/s$/, ""), ...(SYNONYMS[w] ?? [])].some((x) => alt.includes(x));
   let best = null;
@@ -188,8 +192,9 @@ function pickPhoto(photos, query, used) {
 }
 
 /**
- * 選圖＋上傳，回傳公開網址；搜不到回傳 null。manifest 已經挑好的照片直接沿用
- * （--dry-run 挑過的只差上傳）。--dry-run 只挑圖、記 manifest，回傳 null。
+ * Pick and upload an image; returns the public URL, or null if nothing is found. Photos already picked in
+ * the manifest are reused (ones picked by --dry-run just need uploading). With --dry-run it only picks and
+ * records the manifest, and returns null.
  */
 async function resolveImage(manifest, used, key, query, vendorId) {
   let entry = manifest[key]?.query === query ? manifest[key] : null;

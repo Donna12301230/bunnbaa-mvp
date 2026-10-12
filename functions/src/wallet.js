@@ -1,24 +1,30 @@
-// 平台點數（2026-10-09）：所有退款都先變成點數，1 點＝1 元，結帳時可以折抵（跨店、不過期），
-// 會員也可以自己按「退回 LINE Pay」把可退的點數退回原付款交易。
+// Platform points (2026-10-09): every refund becomes points first, 1 point = NT$1, redeemable at
+// checkout (any vendor, no expiry). Members can also press "Refund to LINE Pay" to send refundable
+// points back to the original payment transaction.
 //
-// 資料：
-//   wallets/{uid}：balance（可用點數）、updated_at
-//   wallets/{uid}/lots/{id}：一批點數。source_tx＝這筆錢最早是哪一筆 LINE Pay 交易付的（null＝不能退回，
-//     例如測試資料或舊資料），amount（入帳時）、remaining（還剩多少）、reason、lock_id、created_at
-//   wallets/{uid}/holds/{orderId}：結帳時先扣住的點數（付款成功＝used，取消／逾時＝released 還回批次）
-//   wallets/{uid}/entries/{id}：明細（credit 入帳、spend 折抵、release 退還扣住、withdraw 退回 LINE Pay）
+// Data:
+//   wallets/{uid}: balance (available points), updated_at
+//   wallets/{uid}/lots/{id}: one lot of points. source_tx = the LINE Pay transaction that originally paid
+//     this money (null = not refundable, e.g. test or legacy data), amount (when credited), remaining
+//     (what's left), reason, lock_id, created_at
+//   wallets/{uid}/holds/{orderId}: points held at checkout (payment succeeds = used; cancelled/timed out
+//     = released back to the lots)
+//   wallets/{uid}/entries/{id}: ledger (credit, spend at checkout, release of a hold, withdraw to LINE Pay)
 //
-// 退回 LINE Pay 一律退到批次記的原交易，金額不會超過那筆交易當初付的：
-//   - 退款入帳時依訂單的資金來源（funding）拆批：先退現金部分（訂單的 transaction_id），再退當初用點數折抵的部分
-//     （沿用那些點數原本的來源交易）
-//   - 結帳折抵時記下扣了哪些批次，所以同一筆交易的錢在系統裡永遠只會有一份
-// locks 上的 funding：[{ tx, amount }]＝這筆訂單還能退的錢、各自來自哪筆交易；舊資料沒有就由 transaction_id／paid_amount 推。
+// Refunds to LINE Pay always go to the original transaction recorded on the lot, never more than that
+// transaction originally paid:
+//   - When a refund is credited, it is split into lots by the order's funding sources: the cash part first
+//     (the order's transaction_id), then the part originally paid with points (keeping those points'
+//     original source transactions)
+//   - Checkout records which lots were drawn on, so money from one transaction only ever exists once in the system
+// funding on locks: [{ tx, amount }] = money still refundable on this order and which transaction each part
+// came from; legacy data without it is derived from transaction_id / paid_amount.
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { Timestamp } = require("firebase-admin/firestore");
 const { REGION, db, onCall, HttpsError, logger, FieldValue, t, assertSignedInUser, assertAdminOrEmulator, notifyUser } = require("./common");
 const { refundPayment } = require("./linePay");
 
-const HOLD_TTL_MS = 40 * 60 * 1000; // LINE Pay 付款頁大約 20 分鐘失效；超過 40 分鐘還沒付款就把點數還回去
+const HOLD_TTL_MS = 40 * 60 * 1000; // The LINE Pay payment page expires after about 20 minutes; return the points if still unpaid after 40
 
 const walletRef = (uid) => db().collection("wallets").doc(uid);
 const lotsOf = (uid) => walletRef(uid).collection("lots");
@@ -27,14 +33,14 @@ const entryRef = (uid) => walletRef(uid).collection("entries").doc();
 
 const int = (n) => Math.max(0, Math.round(Number(n) || 0));
 
-/** 訂單目前還能退的錢與來源 */
+/** Money still refundable on the order, with its sources */
 function fundingOf(lock) {
   if (Array.isArray(lock.funding)) return lock.funding.filter((f) => f && int(f.amount) > 0).map((f) => ({ tx: f.tx || null, amount: int(f.amount) }));
   const paid = Number.isFinite(lock.paid_amount) ? lock.paid_amount : lock.locked_price || 0;
   return int(paid) > 0 ? [{ tx: lock.transaction_id || null, amount: int(paid) }] : [];
 }
 
-/** 從資金來源取出 amount（先現金、照順序），回傳 { taken: 來源[], rest: 剩下的 funding } */
+/** Take amount from the funding sources (cash first, in order); returns { taken: source[], rest: remaining funding } */
 function takeFunding(funding, amount) {
   let left = int(amount);
   const taken = [];
@@ -48,7 +54,7 @@ function takeFunding(funding, amount) {
   return { taken, rest, short: left };
 }
 
-/** 入帳：依來源拆成批次。可在外部 transaction 裡用（傳 tx），也可以自己開。 */
+/** Credit points, split into lots by source. Works inside an outer transaction (pass tx) or standalone. */
 function writeCredit(tx, uid, sources, { reason, lockId = null, text = "" }) {
   const total = sources.reduce((s, x) => s + int(x.amount), 0);
   if (total <= 0) return 0;
@@ -74,8 +80,9 @@ async function creditPoints(uid, sources, opts) {
 }
 
 /**
- * 退款＝退成點數：從訂單的 funding 取出 amount 入帳給付款人，回傳 { credited, funding（剩下的）}。
- * 呼叫端負責把剩下的 funding 寫回 lock（同一個 batch／transaction 裡）。
+ * Refund = refund as points: take amount from the order's funding and credit it to the payer; returns
+ * { credited, funding (what remains) }. The caller writes the remaining funding back to the lock (in the
+ * same batch/transaction).
  */
 function refundSources(lock, amount) {
   const { taken, rest } = takeFunding(fundingOf(lock), amount);
@@ -83,8 +90,9 @@ function refundSources(lock, amount) {
 }
 
 /**
- * 結帳折抵：扣住 amount 點（不能退回的批次先用，再用最舊的），記在 holds/{orderId}。
- * 回傳實際扣到的 { used, sources:[{tx, amount}] }（餘額不足就扣到 0 為止）。
+ * Redeem at checkout: hold amount points (non-refundable lots first, then oldest first), recorded in
+ * holds/{orderId}. Returns what was actually held, { used, sources:[{tx, amount}] } (down to 0 if the
+ * balance is short).
  */
 async function holdPoints(uid, orderId, amount) {
   const want = int(amount);
@@ -114,7 +122,7 @@ async function holdPoints(uid, orderId, amount) {
   });
 }
 
-/** 付款沒成功（取消、額滿、逾時）：把扣住的點數還回原批次。重複呼叫沒關係。 */
+/** Payment didn't go through (cancelled, sold out, timed out): return held points to their lots. Safe to call repeatedly. */
 async function releaseHold(uid, orderId, why = "released") {
   if (!uid || !orderId) return 0;
   return db().runTransaction(async (tx) => {
@@ -131,11 +139,13 @@ async function releaseHold(uid, orderId, why = "released") {
 }
 
 /**
- * 確認付款分三步，避免「LINE Pay 已扣款」和「逾時把點數還回去」同時發生：
- *   lockHold：held → confirming（排程只會還 held 的）；回傳 false＝已經逾時還回去了，不能扣款
- *   commitHold：confirming → used（扣款成功）
- *   unlockHold：confirming → held（扣款失敗，讓買家重試）
- * 沒有用點數的訂單沒有 hold，三個都直接回 true。
+ * Payment confirmation takes three steps so "LINE Pay has charged" and "timeout returned the points"
+ * can't both happen:
+ *   lockHold: held → confirming (the schedule only releases held); false = already released on
+ *     timeout, do not charge
+ *   commitHold: confirming → used (charge succeeded)
+ *   unlockHold: confirming → held (charge failed, let the buyer retry)
+ * Orders that didn't use points have no hold; all three just return true.
  */
 async function moveHold(uid, orderId, from, to, entry) {
   return db().runTransaction(async (tx) => {
@@ -154,7 +164,7 @@ const lockHold = (uid, orderId) => moveHold(uid, orderId, "held", "confirming");
 const commitHold = (uid, orderId) => moveHold(uid, orderId, "confirming", "used", "spend");
 const unlockHold = (uid, orderId) => moveHold(uid, orderId, "confirming", "held");
 
-/** 把一筆付款的點數來源依序分給多份訂單（購物車一次結很多份）；回傳每份的 { points, funding } */
+/** Split one payment's point sources across several orders in order (a cart checks out many at once); returns { points, funding } per order */
 function splitFunding(prices, cashTx, pointSources) {
   const pool = pointSources.map((s) => ({ ...s }));
   return prices.map((price) => {
@@ -169,7 +179,7 @@ function splitFunding(prices, cashTx, pointSources) {
       need -= use;
     }
     const points = int(price) - need;
-    // 現金在前：退款時先退現金部分
+    // Cash first: refunds return the cash part first
     const funding = [...(need > 0 ? [{ tx: cashTx || null, amount: need }] : []), ...fromPoints];
     return { points, funding };
   });
@@ -179,7 +189,7 @@ function splitFunding(prices, cashTx, pointSources) {
  * callables
  * ------------------------------------------------------------------ */
 
-/** 會員中心：退回 LINE Pay。每一批退到它記的原交易；失敗的留著，回傳哪些沒退成功。 */
+/** Member center: refund to LINE Pay. Each lot goes back to its recorded original transaction; failed ones stay, and the result reports what didn't go through. */
 exports.withdrawPoints = onCall({}, async (request) => {
   assertSignedInUser(request, "退回點數");
   const uid = request.auth.uid;
@@ -187,7 +197,7 @@ exports.withdrawPoints = onCall({}, async (request) => {
   let withdrawn = 0;
   let failed = 0;
   for (const lot of lots) {
-    // 先扣掉再退款，失敗再加回去，避免同時按兩次退兩次
+    // Deduct before refunding and add back on failure, so a double click can't refund twice
     const amount = await db().runTransaction(async (tx) => {
       const fresh = await tx.get(lot.ref);
       const remaining = int(fresh.data()?.remaining);
@@ -217,8 +227,8 @@ exports.withdrawPoints = onCall({}, async (request) => {
 });
 
 /**
- * 管理員：店家未如期出餐（或其他平台確認的狀況）→ 這份餐點全額退成點數給付款人。
- * 狀態改成 cancelled／vendor_failed，撥款時就不會撥給店家。
+ * Admin: the vendor failed to serve the meal (or another platform-confirmed case) → refund this meal
+ * in full as points to the payer. Status becomes cancelled / vendor_failed so payout skips the vendor.
  */
 exports.refundLockAsPoints = onCall({}, async (request) => {
   assertAdminOrEmulator(request);
@@ -251,7 +261,7 @@ exports.refundLockAsPoints = onCall({}, async (request) => {
   return { refunded_points: result.amount };
 });
 
-/** 付款頁取消（LINE Pay 取消網址導回來）：把這筆扣住的點數還回去 */
+/** Cancelled on the payment page (redirected back from the LINE Pay cancel URL): return the held points */
 exports.cancelPaymentIntent = onCall({}, async (request) => {
   assertSignedInUser(request, "取消付款");
   const orderId = String(request.data?.order_id || "");
@@ -261,7 +271,7 @@ exports.cancelPaymentIntent = onCall({}, async (request) => {
   if (!snap.exists || snap.data().buyer_uid !== request.auth.uid) return { released: 0 };
   if (snap.data().status !== "pending") return { released: 0 };
   await ref.update({ status: "cancelled" });
-  // 轉讓接手：放掉 15 分鐘保留
+  // Resale take-over: release the 15-minute reservation
   if (snap.data().kind === "resale" && snap.data().lock_id) {
     const lockRef = db().collection("locks").doc(snap.data().lock_id);
     await db().runTransaction(async (tx) => {
@@ -272,7 +282,7 @@ exports.cancelPaymentIntent = onCall({}, async (request) => {
   return { released: await releaseHold(request.auth.uid, orderId, "cancelled") };
 });
 
-/** 沒付完款就離開的訂單：40 分鐘後把扣住的點數還回去（確認時發現已還回會擋下，不會扣款） */
+/** Orders abandoned before payment: return held points after 40 minutes (confirmation sees they were released and blocks the charge) */
 exports.releaseStalePointHolds = onSchedule({ schedule: "every 10 minutes", timeZone: "Asia/Taipei", region: REGION }, async () => {
   const cutoff = Timestamp.fromMillis(Date.now() - HOLD_TTL_MS);
   const snap = await db().collectionGroup("holds").where("status", "==", "held").where("created_at", "<", cutoff).limit(200).get();
