@@ -5,24 +5,22 @@
 對應文件：`BunnBaa_0到1架構文件.docx`（唯一權威文件）、`BunnBaa_技術規格文件_v6_消費者端補強版.docx`（都在 `doc/`）。舊雛型：`../BunnBaa Parse_Ref/`。架構與開發設定見 [開發指南.md](開發指南.md)。已完成項目的紀錄請看 git 歷史（10/09 整理前：`git show d087ca5:doc/TODO.md`；10/12 分工前：`git show fe1dc91:doc/TODO.md`）。
 
 正式站：https://bunnbaa-mvp-5474.web.app ｜ 部署狀態（2026-10-12 查）：
-- **Hosting、Functions**：推 `master` 由 GitHub Actions 自動部署，目前是 10/10 的 `fe1dc91`（79 支 Functions、Node 22），都成功
-- **Firestore rules／indexes**：沒有自動部署，要手動（A 的第一件事）
+- **Hosting、Functions**：推 `master` 由 GitHub Actions 自動部署（10/12 最後一次 `e4baea9` 都成功）
+- **Firestore rules／indexes**：沒有自動部署，改了要手動（10/12 已部署，18 個索引 READY）
 
 ---
 
 ## 🚨 最優先（10/12 盤點；repo 已經是 public）
 
 ### 安全：今天做
-- [ ] **`ckchildlikekid@gmail.com`（GCP／Firebase 專案擁有者）開 2FA**：repo 公開後，本檔、`測試文件.md`、`ISMS_管理制度文件.md`、`ISO27001_落差分析.md` 裡的管理員 Email、風險清單都看得到，而本檔還寫著這個帳號沒開 2FA。從 repo 刪檔也刪不掉 git 歷史，所以開 2FA 才是真正的處理。開完把下面「❓ 要跟雅婷確認的事」裡的 2FA 那項一起勾掉
+- [ ] **`ckchildlikekid@gmail.com`（GCP／Firebase 專案擁有者）開 2FA**：repo 公開後，本檔、`測試文件.md`、`ISMS_管理制度文件.md`、`ISO27001_落差分析.md` 裡的管理員 Email、風險清單都看得到，而本檔還寫著這個帳號沒開 2FA。從 repo 刪檔也刪不掉 git 歷史，所以開 2FA 才是真正的處理
 - [ ] SU 確認管理員帳號 `suw192336@gmail.com`（Google 帳號與 Firebase Auth 密碼）夠強、Google 帳號有開 2FA
 - [ ] Firebase Web API key 加限制：GCP Console → API 和服務 → 憑證 → 瀏覽器金鑰 → 應用程式限制「HTTP 參照網址」，只允許 `bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`（還有 PR 預覽網域 `bunnbaa-mvp-5474--*.web.app/*`）、本機開發用的 `localhost:5300/*`
 - [ ] 決定內部文件要不要留在公開 repo：`doc/` 的 ISMS／ISO27001、規格書、本檔。要移的話移到私人位置，README 的連結一起改；留下的話 README 已註明是中文內部文件
 
 ### 正式站：評審實際會點到的（10/16 前）
-- [ ] **補翻既有資料**（B）：管理後台 → 系統設定 →「補翻既有資料」，有失敗筆數就再按一次。沒做的話，英文介面的店名、菜名都是中文。做完切英文看首頁、店家頁、品項頁
 - [ ] **正式站示範商家帳號**（A＋B）：評審現在只能登入消費者體驗帳號，看不到商家端（拍照建菜單、今日備料、未來 7 天預估、客群）。建一個不放真實資料的示範店（或綁一家示範店），密碼補進 `web/src/lib/demoAccounts.ts` 的 vendor 那行，README「Try it」表格的 Vendor 那列一起填
 - [ ] **Looker Studio 報表**（B）：見下方 B 區同一項；簡報第 14 頁與影片腳本都有提到
-- [ ] **合併 PR #7**（https://github.com/Donna12301230/bunnbaa-mvp/pull/7）：英文預設語言（非中文瀏覽器開站就是英文、`?lang=en`／`?lang=zh` 可切換）合併後才會上線。合併後 A、B 各自的分支先 merge `master`，衝突只會在註解行：程式碼留自己的、註解用英文
 - [ ] 上面做完後，用無痕視窗、英文瀏覽器走一次評審路徑：開站 → 看菜單 → 體驗帳號登入 → 預購助理問一句 → 商家示範帳號看備料與預估
 
 ---
@@ -51,33 +49,20 @@
 ## 🔴 工程師 A：消費者端＋後端／Google Cloud
 
 ### 10/12–10/13 正式站資料（先做，C-MY-03 等測試要等這步）
-- [x] **部署 `firestore:rules,firestore:indexes`**：10/05 之後的規則都還沒手動部署過——BUG-9 轉讓期限 31 天（沒部署前上架 24 小時以後的餐點會 PERMISSION_DENIED）、轉讓價 `resale_price`、目錄分類、`wallets`／代領碼 `proxyCodes` 規則、`holds` collectionGroup 索引、`menu_embeddings` 向量索引（10/12 完成：rules 其實已是最新版、這次上的是索引；18 個索引全部 READY）
-- [x] 部署索引後，管理員呼叫一次 `backfillMenuEmbeddings`（轉讓媒合才找得到既有品項）（10/12 完成：updated 253、unchanged 8、failed 0）
-- [ ] 正式站灌 `node scripts/seed-phase1.js`（或 `--catalog-only` 只灌模板與配方）——需要服務帳號金鑰
-- [ ] 確認 09-29 的補設定資料做過沒：`$env:GOOGLE_APPLICATION_CREDENTIALS="金鑰檔路徑"; node scripts/seed.js --config-only`（沒做的話 Landing「近期活動」是空的）
-- [x] ~~Firebase Console 確認排程都有啟用並成功跑過~~（10/12 查 Cloud Scheduler：21 個排程都 ENABLED、最近都有跑；`dailyCalibration` 顯示 code 4 是因為整輪約 11 分鐘超過 Scheduler 等待期限，21 家報告其實都有產生）：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`、`closeRewardPeriod`、`buildWeeklyPurchase`、`pollDisasterFeeds`、`releaseStalePointHolds`、`settleVendorPayouts`、`dailyCalibration`、`demandForecast`（每天 05:00）、`customerInsights`（週一 04:00）
-- [x] BigQuery：四個 extension 的 changelog 有最新時間的資料；`bunnbaa_analytics` dataset 權限只給管理員（10/12 查：locks 當天有同步；dataset 只有專案擁有者 2 人與服務帳號）
-- [x] 刪掉 `functions/.env` 的 `GEMINI_API_KEY`（10/12 本機已刪、文件已改成 Vertex 說法），**還沒做**：`gh secret set FUNCTIONS_ENV < functions/.env`（正式站 log 仍出現「API key from the environment variables」）（10/12 完成：`FUNCTIONS_ENV` secret 已更新並重新部署）
-
-### 10/12–10/13 Google Cloud 補強收尾
-- [x] **常一起買**（10/12 程式＋單元測試 F-24 完成；**還沒做**：合併部署後重跑 `triggerCustomerInsightsNow`、正式站品項頁確認）（原本不會出現：前端讀 `menu_items/{id}.often_with`，後端沒寫）：`customerInsights.js` 寫完 `analytics/basket` 後，把每個品項的配對（依 `buyers` 排序、同店、最多 5 個 id）寫到 `menu_items/{id}.often_with`；內容沒變就不要寫（會觸發翻譯與向量觸發器的檢查），配對消失時要清掉。補單元測試，重跑 `triggerCustomerInsightsNow`，到正式站品項頁確認有出現（10/12 完成：重算後 152 個品項有 often_with，正式站品項頁已出現）
-- [x] **助理推薦理由**（10/12 完成：`reasons` 參數＋伺服器 `cardReason` 把關，C-AST-20；評估 24/24、13 張卡片有理由，抽查都對得上真實配對）（原本不會出現：`presentCandidates` 沒有這個參數）：加參數（例如 `reasons`：`[{ id, reason }]`，每則 20 字內、不催促），`buildCards` 填進卡片的 `reason`；只放有工具資料根據的理由（busier／quieter、常一起買）。前端標籤 `ShoppingAssistant.tsx` 已經有。改完重跑 `scripts/eval/assistantEval.js`，規則檢查要仍是 24/24，更新 `doc/評估/預購助理回答品質評估.md`
-- [x] 正式站實際問一次預購助理（「想挑比較不會排隊的店，順便推薦加點」），確認走 Vertex、卡片有推薦理由（10/12 完成：正式站卡片出現「常跟火雞肉飯一起點」等理由）
+- [ ] 正式站補設定資料：`$env:GOOGLE_APPLICATION_CREDENTIALS="金鑰檔路徑"; node scripts/seed.js --config-only`（10/12 查：`landing_events`、`platform_config/growth` 都還沒有，Landing「近期活動」是空的）
 
 ### B 測試時發現、交給 A（2026-10-12）
 - [ ] **已從店家設定移除的取餐時段，上面的訂單不進備料時間軸**：示範店 10/12 有 2 筆 17:30–18:30（晚餐）訂單，但店家目前沒有晚餐時段，`prepPlans.timelines` 只有早餐、午餐，這 2 筆沒有排進任何時間軸（`order_count` 有算到）。商家後台的時段格子 B 已改成照樣列出並標「已停用」
 - [ ] **模板候選菜數量**：「經典便當」模板說明寫每格 3 道候選菜，套用後第二格 0 道、第三格 1 道（`seed-phase1.js` 的模板資料）
-- [ ] **常一起買要轉成品項 id**：`analytics/basket` 的 `item_a`／`item_b` 是品項名稱，品項頁讀的 `menu_items.often_with` 要的是品項 id，寫入時要對回 id
 
 ### 10/13–10/15 消費者端測試（[測試文件.md](測試文件.md)，測完直接改該案例的結果欄）
-- [ ] **P0**：C-AST-01／02（正式站；現在不需要 Gemini 金鑰）
-- [ ] **整區沒測**：3.11 預購助理（C-AST-01～13、16、17）、第四道備案遞補（C-BNT-20～23）
+- [-] **預購助理**：C-AST-17 剩一部分（PARTIAL）；其餘 C-AST 與 C-BNT-20～23 都已 PASS
 - [ ] C-MY-03 上架 3 天後的餐點（要先部署 rules）；C-ORD-02 LINE Pay Sandbox 版的成功頁（emulator 假金流已 PASS）
 - [ ] **v4 改版待重測**：C-MY-17、C-BNT-08、C-RWD-08、C-PLN-01（金額）；畫面現已可測：C-BNT-09、C-CHR-05
 - [ ] **伺服器 PASS、畫面待測**：C-MTC-01（鈴鐺通知）、C-BNT-12 與 C-MEAL-01（各剩一部分）、C-BAN-02（購物車路徑）
 - [ ] **只能在正式站測**：C-NAV-03、C-AUTH-04／05（OTP）、C-CHR-06、C-MY-13、C-MTC-09、C-CHR-14、F-11、F-12、N-SEC-01～03、N-PRF-01
 - [ ] **端到端情境 A～H**（測試文件第 9 章）一次都還沒跑；至少跑 A、C、G
-- [ ] **部署前回歸清單**（測試文件第 10 章）：消費者端 P0 全 PASS、Scheduler 時區、`menu_embeddings` 索引＋`backfillMenuEmbeddings`
+- [-] **部署前回歸清單**（測試文件第 10 章）：消費者端 P0 全 PASS、Scheduler 時區（`menu_embeddings` 索引＋`backfillMenuEmbeddings` 已完成）
 
 ### 10/13–10/15 正式站要實際點過一次（消費者）
 - [ ] 品項頁組便當（選日期、許願候選菜、不要、加減飯）→ 購物車套折價券 → LINE Pay → 我的餐點（QR、修改許願、截單前取消、代領碼、捐為愛心餐）
@@ -98,7 +83,7 @@
   - 仁和雅店主名下的份數測試訂單 `EJEL6PRO`（可選）
 - [ ] README 的數字（10/12 已更新：Functions 79、logic 64、rules 65、Functions 測試 144；README、Submission_EN、簡報都已改。最後一次跑測試後再核對）：Functions 數量（最後再數一次：在 `functions/` 執行 `node -e "console.log(Object.keys(require('./src/index.js')).length)"`）、測試數字
 - [ ] 最後一次合併後確認 GitHub Actions 的 Hosting、Functions 部署都成功
-- [x] **repo 已公開**（10/12 用 `gh repo view` 確認 visibility=PUBLIC）；網址已在 `Submission_EN.md`，剩報名表單要填
+- [-] 報名表單要填（repo 已公開，網址在 `Submission_EN.md`）
 
 ---
 
@@ -107,23 +92,16 @@
 B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家與管理後台的測試不受 rules 部署影響。
 
 ### 10/12–10/13 Google Cloud 補強收尾
-- [x] **預測卡重複**（10/12 `64f884c`）：拿掉 `ForecastCard`（讀 `date`／`predicted`，跟後端格式對不上），營收頁只留 `DemandForecastCard`
-- [x] **客群卡永遠是空的**（10/12 `64f884c`）：拿掉 `SegmentsCard`，客群只由 `CustomerInsightsCard` 顯示（讀 `vendors/{v}/analytics/segments`）
 - [ ] **Looker Studio 報表**（只能手動）：管理後台 `/admin/analytics` 按「在 Looker Studio 建立報表」→ 加入 `dash_forecast_vs_actual`、`dash_forecast_next`、`dash_segments` 三個 view → 排圖表（每日鎖定量、預測 vs. 實際、救回份數＝轉讓＋愛心餐、客群分布）→ 檔案 → 嵌入報表 → 開啟嵌入，把嵌入網址貼回管理後台存檔，正式站確認嵌入有顯示
 
 ### 10/12–10/13 正式站設定
-- [x] **檢查 `platformConfig/global`**（2026-10-12 查正式站）：`rewardRate` 是 0.1，**SU 決定維持 10%**，程式預設值、規格、測試已改回 10%；`minRevenueToOpen` 10000、`cancelHoursBefore` 48、`cancelCouponRate` 0.3、`commissionRate` 0.05 文件裡沒存，走程式預設，管理後台顯示的值都正確。舊欄位 `minTicketsToOpen: 100` 還留在文件裡，已不使用
-- [ ] 補翻既有資料：管理後台 → 系統設定 →「補翻既有資料」，有失敗筆數就再按一次；做完切英文看店名／菜名
 - [ ] 幫一家店設公休日（A 測「加入計畫」預覽要用）
 
 ### 10/13–10/15 商家與管理後台測試（[測試文件.md](測試文件.md)，測完直接改該案例的結果欄）
 - [ ] **P0**：V-MNU-08／09（正式站；現在不需要 Gemini 金鑰）、V-RDM-10（正式站）
-- [x] **整區沒測**（2026-10-12 emulator 補測）：V-SES-01／02、V-ORD-01～03、V-PRP-01／06／08／10／12／16、V-MNU-02／04／05／07、V-SET-06／07／11／12、V-RCP-06～08 PASS。過程修了 3 個 bug：時段格子漏掉已停用時段的訂單、封面網址只顯示權限錯誤、改單價沒有重算候選菜份量級距
 - [ ] **還沒測（emulator 關閉 Gemini，要在正式站測）**：V-MNU-03（自動翻譯）、V-MNU-08～13（拍照上架）、V-MNU-17（向量）、V-RCP-04（AI 配方草稿）、V-PRP-07（what-if 追問）；其餘：V-MNU-15（權限）、V-RCP-05（自動標籤）、V-PRP-04（同星期幾）、V-SET-08（設定生效時機）
-- [x] 前景分頁複測畫面：V-RPT-01 圖表總額＝卡片、V-PRP-01 另一視窗下單後份數自動 +1（2026-10-12 emulator PASS）
-- [x] **v4 改版待重測**：V-PRP-17（伺服器＋畫面）（2026-10-12 emulator PASS；已移除時段上的訂單不進時間軸，已轉給 A）
-- [x] **伺服器 PASS、畫面待測**：V-CHR-03、V-INS-02、A-CFG-01 前台文字（2026-10-12 emulator PASS）；V-PRP-11 畫面只核對了飯量、V-SET-03 上限 12 只做程式確認
-- [ ] **只能在正式站測**：V-RDM-13／14／16、V-MNU-10、V-PUR-08、V-REV-06、A-SET-02、A-AUD-01、A-DIS-08
+- [-] **畫面待測**：V-PRP-11 只核對了飯量、V-SET-03 上限 12 只做程式確認
+- [ ] **只能在正式站測**：V-RDM-13／14／16、V-MNU-10、V-PUR-08、V-REV-06、A-AUD-01、A-DIS-08
 - [ ] **需要第二家店主**（目前正式站只有仁和雅有店主帳號；綁法：廠商申請 → `/admin/vendors` 核准）：
   - V-ACC-02、V-RDM-09、V-MNU-06；第二家店主看商家後台各頁只看得到自己的資料
   - 別家店主呼叫 `completePickup` 要回 `permission-denied`：用**手動輸入或直接呼叫**（相機掃碼前端就先擋了，測不到）。打已取餐的仁和雅鎖定，例：`F1S63VpLVZqDxVTvdHp0`——擋不住也只會回 `failed-precondition`，不會寫入
@@ -147,9 +125,9 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 - [ ] 截圖：Looker Studio「預測 vs. 實際」「救回份數」（目前 3,659 份救回 408 份、WAPE 6～15%）、商家後台預測卡與客群卡；A 的截圖到了再一起放
 - [ ] 投影片（https://claude.ai/artifact/FCk692pY4uC2KmKJ2qHzQD）：補方括號（團隊、剩食統計、影片連結）；架構圖（Firestore →（Extension）→ BigQuery → Looker Studio／`AI.FORECAST` 寫回 Firestore → 商家後台；Gemini 走 Vertex AI）；技術清單加 Vertex AI、BigQuery AI（`AI.FORECAST`、`ML.KMEANS`、`AI.GENERATE`）、Looker Studio、Gen AI Evaluation Service；Cloud Run（Functions 第二代）、Cloud Storage（Firebase Storage）、不用 AlloyDB 的理由各一句；Vertex AI Search 放「下一步」；匯出 PDF
 - [ ] 錄 Demo（腳本見 [Submission_EN.md](Submission_EN.md) 第 2 節）：一定要有商家後台「未來 7 天預估（僅供參考）」、Looker Studio「預測 vs. 實際」與「救回份數」；A 的推薦理由、常一起買正式站已經有的話，再加一段預購助理
-- [ ] `Submission_EN.md` 方括號處補完（影片連結、PDF、repo 網址、剩食統計）
-- [ ] 兩份 README 補方括號：展示影片連結、簡報 PDF 連結、repo 網址；英文版團隊成員要不要改成英文拼音
-- [ ] 建 `assets/`：用 Google Cloud 架構圖工具（官方圖示）照 README 的五層架構重畫 `architecture.png`、錄一段 10 秒左右的 `demo.gif`（建議拍轉讓媒合或商家預測卡，不用等 A）、幾張 App 截圖，嵌進兩份 README 最上面
+- [-] `Submission_EN.md` 方括號處補完：影片連結、PDF（repo 網址、剩食統計已補）
+- [-] 兩份 README 補方括號：展示影片連結、簡報 PDF 連結、商家 demo 帳密（repo 網址已有）；英文版團隊成員要不要改成英文拼音
+- [-] `assets/`：`architecture.png`（自製圖示版）與 4 張截圖已有、已嵌進 README；剩錄 10 秒左右的 `demo.gif`（建議拍轉讓媒合或商家預測卡），要換官方圖示版架構圖再用 Google Cloud 架構圖工具重畫
 - [ ] 推上 GitHub 後看一次 README：Mermaid 架構圖有正常顯示、徽章、連結都能點
 
 ---
@@ -160,20 +138,18 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 
 ### 表單上要交的 5 項
 - [ ] **英文簡報 PDF**（`BunnBaa_Proposal.pdf`，10–12 頁）：從 Slides artifact 補完後匯出，見下方「簡報素材」
-- [ ] **原型網址** `https://bunnbaa-mvp-5474.web.app/?lang=en`：`claude/amazing-dijkstra-uv5zcu`（英文預設語言）合併進 `master` 後才會上線
-- [ ] **3 分鐘影片**：MP4 1080p，上傳 YouTube（公開或不公開但有連結），長度 ≤ 3:00。**10/12：已錄完，剪輯中，還沒上傳**；上傳後連結要填進兩份 README、`Submission_EN.md`、簡報結尾頁
+- [-] **原型網址** `https://bunnbaa-mvp-5474.web.app/?lang=en`：英文預設語言已上線（PR #7 10/12 合併），剩填進表單
+- [-] **3 分鐘影片**：MP4 1080p，上傳 YouTube（公開或不公開但有連結），長度 ≤ 3:00。10/12 已錄完，剪輯中，還沒上傳；上傳後連結要填進兩份 README、`Submission_EN.md`、簡報結尾頁
 - [ ] **類別**：表單只勾 **Sustainability**
-- [ ] **GitHub repo 網址**填進報名表單（repo 已公開，下方「repo 公開後補做」仍要做完）
+- [ ] **GitHub repo 網址**填進報名表單：https://github.com/Donna12301230/bunnbaa-mvp（已公開）
 
 ### 簡報素材
 - [ ] 團隊頁：三位成員英文拼音姓名＋角色（照片可選）
-- [x] 架構圖 `assets/architecture.png`（原始檔 `assets/architecture.html`，已嵌進兩份 README）：五層架構，標明「79 Cloud Functions, 2nd gen」跑在 Cloud Run。沒有用官方圖示（這裡抓不到）；要換官方圖示版再用 Google Cloud 架構圖工具重畫
 - [ ] 剩食數據：UNEP *Food Waste Index Report 2024*（10.5 億噸、19%、餐飲服務業 2.9 億噸）**已放進簡報第 2 頁與 README**，請核對原文；要加台灣數據的話附出處
-- [x] Feasibility、Scalability 兩頁：簡報第 13、15 頁已有；封面與結尾頁領域已改成 Sustainability
 - [ ] 截圖（下方清單）
 
 ### 截圖清單（簡報與 README 共用，存 `assets/`）
-- [ ] （10/12 先放了 4 張本機 emulator 截圖到 `assets/screenshots/` 並嵌進 README：消費者首頁、預購頁、轉讓市場、商家後台總覽，英文介面但店名菜名未翻譯。正式站截圖到了就換掉）
+- [ ] 換掉 `assets/screenshots/` 的 4 張 emulator 截圖（消費者首頁、預購頁、轉讓市場、商家後台總覽）：正式站店名、菜名、地址 10/12 已翻成英文，可以重拍
 - [ ] 消費者：首頁、品項頁（早鳥價）、預購助理對話與卡片（含推薦理由）、我的餐點 QR、轉讓上架
 - [ ] 商家：拍照建菜單草稿、今日備料清單、未來 7 天預估卡、客群卡、掃碼取餐
 - [ ] 管理後台：Looker Studio「預測 vs. 實際」「救回份數」
@@ -190,16 +166,11 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 
 ### 評審用 demo 帳號（正式站）
 - [ ] 建 Demo Diner（消費者）、Demo Vendor（商家，綁一家有菜單與訂單的店），英文名稱；**不給管理員帳號**（可改平台參數、觸發退款）
-- [ ] 帳密寫進表單備註或 README 的「Try it」段落（兩份 README 的段落已建好，只剩填帳密）
+- [-] 帳密寫進表單備註或 README 的「Try it」段落：顧客帳號已填，剩商家
 - [ ] 無痕視窗、未登入狀態把三個角色流程各走一次
 
 ### repo 公開後補做（repo 10/12 已公開）
-- [ ] git 歷史已掃過：沒有服務帳號金鑰或 LINE Pay secret；`AIza…` 是 Firebase Web API key（設計上公開），到 GCP Console 加 HTTP referrer 限制只允許 `bunnbaa-mvp-5474.web.app`
 - [ ] 個資與內部文件：本檔有管理員 Email、成員本名與分工，`ISMS_管理制度文件.md`、`ISO27001_落差分析.md` 也是內部文件——移出 repo 或至少拿掉 Email
-- [ ] `doc/` 的中文規格書、開發指南、`.docx`：移到私人位置，或在 README 註明 "internal notes, in Chinese"
-- [x] 程式碼註解翻成英文（`claude/amazing-dijkstra-uv5zcu`，263 個檔案；只動註解，去掉註解後的程式碼逐 token 比對相同；註解裡剩下的中文是程式實際輸出或比對的文字、畫面標籤、品牌名與中文檔名路徑）。**A、B 各自的分支要先合併 master，衝突都只會在註解行**
-- [ ] README 方括號：影片連結、PDF 連結、repo 網址、demo 帳密（Functions 數量與測試數字 10/12 已更新）
-- [ ] 設成 public
 
 ### 送出前最後確認
 - [ ] PDF 打得開、文字可選取、10–12 頁
@@ -217,8 +188,7 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 - [ ] **取消留在店家的款項（`locks.kept_amount`）怎麼入帳**：目前會跟著撥款撥給店家並照抽 5%，但**不算進收益看板與統計報表的營收**（那邊只算沒取消的訂單）。要不要算、要不要抽成
 - [ ] **取消不退現金的法律面**：現做餐點可排除 7 天猶豫期，但「取餐 48 小時前取消也不退現金」是否符合消保法與定型化契約規範，上線前確認；條款文字在 `TermsNotices.tsx`（10/09 起退款一律改成平台點數，條款要跟著核對）
 - [ ] **轉讓價高於轉讓人實付時**：多出來的錢留在店家（LINE Pay 退款不能超過原付款額），轉讓人不會獲利。如果希望轉讓人拿到差額，要另外做撥款給個人的機制
-- [x] **開池時的券種**：回饋比例維持 10%（2026-10-12 SU 決定），1 萬元營業額的回饋池是 1,000 元，保底之外有預算升級免費餐券與半價券，這個問題不存在了
-- [ ] `ckchildlikekid@gmail.com` 開 2FA；GitHub `master` branch protection（會改變推 master 自動部署的流程）
+- [ ] GitHub `master` branch protection（會改變推 master 自動部署的流程；2FA 見最上方「安全」）
 
 ---
 
@@ -258,7 +228,7 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 - **本機開發**：`npm run dev` 只開 Vite :5300，⚠️ **直接讀寫正式資料**。要隔離：`.env.local` 改 `true` 後 `npm run dev:emulator`（重灌用 `npm run dev:emulator:reset`；emulator 視窗要 Ctrl+C 關才會存檔）
 - **設計系統預覽**：http://localhost:5300/#/design-system
 - **網域**：`bunnbaa.com` 掛在舊 Parse 專案，MVP 暫用 https://bunnbaa-mvp-5474.web.app
-- **GitHub**：https://github.com/Donna12301230/bunnbaa-mvp （private）
+- **GitHub**：https://github.com/Donna12301230/bunnbaa-mvp （public）
 - **刻意寫死、不用改**：管理員白名單 `lib/adminAuth.ts`、早鳥級距 `lib/pricing.ts`、預設取餐時段 `lib/pickupSlots.ts`
 
 ---
