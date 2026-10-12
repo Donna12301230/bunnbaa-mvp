@@ -24,11 +24,11 @@ export interface RadioProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   value: string;
   label?: ReactNode;
   description?: ReactNode;
-  /** 僅供預覽頁強制呈現狀態 */
+  /** Only for forcing states on the preview page */
   forceState?: 'hover' | 'focus';
 }
 
-/** 單選項。放在 <RadioGroup> 內時 name / checked / onChange 由群組管理。 */
+/** Single radio option. Inside a <RadioGroup>, name / checked / onChange are managed by the group. */
 export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
   { value, label, description, disabled, className, forceState, checked, onChange, name, ...rest },
   ref,
@@ -68,14 +68,14 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
 });
 
 export interface RadioGroupProps {
-  /** 群組標題（會成為 <legend>） */
+  /** Group title (rendered as the <legend>) */
   label?: ReactNode;
   name?: string;
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
   disabled?: boolean;
-  /** 排列方向，預設 vertical */
+  /** Layout direction, default vertical */
   orientation?: 'vertical' | 'horizontal';
   className?: string;
   children: ReactNode;

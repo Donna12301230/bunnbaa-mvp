@@ -1,9 +1,9 @@
-// 需求預測（doc/GoogleCloud改動建議.md P1）：BigQuery AI.FORECAST（TimesFM，免訓練）預測每家店未來 7 天的份數。
-// 資料：bunnbaa_analytics.daily_demand（Firestore → BigQuery extension 同步的 locks，加上展示用的模擬背景需求），
-// 建表與 view 見 bigquery/sql/01_demand_forecast.sql。
-// 結果寫進 BigQuery demand_forecast（保留歷史，給 Looker 比「預測 vs 實際」），再回寫 Firestore
-// vendors/{vendorId}/forecast/{YYYY-MM-DD}，商家後台報表頁顯示「預估明天 N 份」。
-// 跟 vendorCalibration 同一個原則：只給參考，不下備料指令（預付制下每一份都要做）。
+// Demand forecast (doc/GoogleCloud改動建議.md P1): BigQuery AI.FORECAST (TimesFM, no training) predicts each vendor's portions for the next 7 days.
+// Data: bunnbaa_analytics.daily_demand (locks synced by the Firestore → BigQuery extension, plus simulated background demand for demos);
+// table and view setup is in bigquery/sql/01_demand_forecast.sql.
+// Results go into BigQuery demand_forecast (history kept so Looker can compare forecast vs actual), then are written back to Firestore
+// vendors/{vendorId}/forecast/{YYYY-MM-DD}, where the vendor portal's report page shows "N expected tomorrow".
+// Same principle as vendorCalibration: reference only, no prep instructions (under prepayment every portion has to be made).
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { BigQuery } = require("@google-cloud/bigquery");
 const { REGION, db, onCall, logger, FieldValue, assertAdminOrEmulator, BatchWriter } = require("./common");
@@ -13,9 +13,9 @@ const DATASET = "bunnbaa_analytics";
 const BQ_LOCATION = "asia-east1";
 const HORIZON = 7;
 const LOOKBACK_DAYS = 90;
-const MODEL = "TimesFM 2.5"; // AI.FORECAST 預設模型，寫進 Firestore 讓前端標示來源
+const MODEL = "TimesFM 2.5"; // AI.FORECAST's default model; written to Firestore so the frontend can show the source
 
-// 跟 bigquery/sql/01_demand_forecast.sql 第 5 段（回測）同一個查詢
+// Same query as section 5 (backtest) of bigquery/sql/01_demand_forecast.sql
 const FORECAST_SQL = `
 DECLARE run_date DATE DEFAULT @run_date;
 DELETE FROM ${DATASET}.demand_forecast WHERE generated_date = run_date;
@@ -34,19 +34,19 @@ WHERE generated_date = run_date;
 let bigquery;
 const bq = () => (bigquery ??= new BigQuery());
 
-/** 跑一次預測並回寫 Firestore，回傳寫了幾家店、幾筆 */
+/** Run one forecast and write it back to Firestore; returns how many vendors and rows were written */
 async function runDemandForecast(runDate = taipeiToday()) {
   const [rows] = await bq().query({
     query: FORECAST_SQL,
     location: BQ_LOCATION,
-    // 要用 BigQuery.date()：純字串配 types DATE 會被當成 null 送出，INSERT 就變成 0 筆
+    // Must use BigQuery.date(): a plain string with types DATE is sent as null, and the INSERT ends up with 0 rows
     params: { run_date: BigQuery.date(runDate) },
   });
   const writer = new BatchWriter();
   const vendors = new Set();
   let written = 0;
   for (const r of rows) {
-    // ai_forecast_status 空字串＝成功；資料太短等錯誤時 forecast 是 null
+    // ai_forecast_status empty string = success; on errors such as too little data, forecast is null
     if (r.status || r.forecast == null) {
       logger.warn(`demandForecast: ${r.vendor_id} ${r.day} skipped: ${r.status}`);
       continue;
@@ -75,7 +75,7 @@ exports.demandForecast = onSchedule(
   }
 );
 
-/** 展示／測試用：不等排程，立刻重跑今天的預測（只限管理員） */
+/** For demos/testing: re-run today's forecast now without waiting for the schedule (admins only) */
 exports.triggerDemandForecastNow = onCall({ timeoutSeconds: 300 }, async (request) => {
   assertAdminOrEmulator(request);
   return runDemandForecast();

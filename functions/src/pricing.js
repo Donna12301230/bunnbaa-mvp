@@ -1,11 +1,11 @@
 // Server-side copy of web/src/lib/pricing.ts + web/src/lib/pickupSlots.ts.
-// 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格1002.md）：
-//   - 早／中／晚三個餐期（依取餐時段開始時間歸類），只做自取、營業日週一至週五
-//   - 取餐日前一天 cutoffTime（預設 20:00）截單；店家可提前（vendors.cutoff_time），不可延後
-//   - 預訂開放範圍：最遠提前 30 天
-//   - 早鳥折扣：明天 95 折、提前 2–30 天 8 折（提前 14 天以上 7 折列為後續改版，級距表預留第三階）
-// 店家取餐排程：vendors.pickup_windows（取餐時段內再切的小時段）、business_hours、holidays、
-// slot_capacity。沒設的欄位退回預設。價格一律由伺服器依 menu_items 計算，不信任前端。
+// Phase 1 spec (doc/BunnBaa 飯飽｜第一階段技術規格1002.md):
+//   - Three meal periods: breakfast / lunch / dinner (classified by pickup slot start time); pickup only, business days Monday to Friday
+//   - Cut-off at cutoffTime (default 20:00) the day before pickup; vendors can move it earlier (vendors.cutoff_time) but not later
+//   - Booking window: at most 30 days ahead
+//   - Early-bird discount: 5% off for tomorrow, 20% off for 2–30 days ahead (30% off for 14+ days ahead is deferred to a later release; the tier table reserves a third tier)
+// Vendor pickup schedule: vendors.pickup_windows (sub-slots within the pickup slot), business_hours, holidays,
+// slot_capacity. Unset fields fall back to defaults. Prices are always computed by the server from menu_items; the frontend is never trusted.
 // Keep the tiers and slots in sync with the web copies by hand.
 
 const { t } = require("./i18n");
@@ -15,13 +15,13 @@ const { taipeiToday, addDays, daysBetween, weekdayOf, lastBookableDate, at, toMi
 const EARLY_BIRD_TIERS = [
   { minDays: 0, maxDays: 1, discountPercent: 5 },
   { minDays: 2, maxDays: 30, discountPercent: 20 },
-  // 第三階（後續改版）：{ minDays: 14, maxDays: 30, discountPercent: 30 }，同時把上一階 maxDays 改成 13
+  // Third tier (later release): { minDays: 14, maxDays: 30, discountPercent: 30 }, and change the previous tier's maxDays to 13
 ];
 
 const MEAL_PERIODS = ["breakfast", "lunch", "dinner"];
 const MEAL_PERIOD_LABELS = { breakfast: ["早餐", "Breakfast"], lunch: ["午餐", "Lunch"], dinner: ["晚餐", "Dinner"] };
 
-/** 取餐時段屬於哪個餐期：依開始時間落在哪個餐期範圍；都不在就歸最近的那一個 */
+/** Which meal period a pickup slot belongs to: the period whose range contains its start time; if none, the nearest one */
 function mealPeriodOf(window, config = DEFAULT_PLATFORM_CONFIG) {
   const start = toMinutes(splitWindow(window).start);
   const ranges = config.mealPeriods || DEFAULT_PLATFORM_CONFIG.mealPeriods;
@@ -46,7 +46,7 @@ function mealPeriodLabel(period) {
   return t(zh, en);
 }
 
-/** 品項供應的餐期；沒設（舊資料）＝店家所有時段都可以 */
+/** Meal periods an item is served in; unset (legacy data) = all of the vendor's pickup slots */
 function itemMealPeriods(item) {
   const list = Array.isArray(item?.meal_periods) ? item.meal_periods.map((p) => (typeof p === "string" ? p : p?.period)) : [];
   return list.filter((p) => MEAL_PERIODS.includes(p));
@@ -67,7 +67,7 @@ function vendorWindows(vendor) {
   return own.length > 0 ? own : DEFAULT_PICKUP_WINDOWS;
 }
 
-/** 品項可選的取餐時段：店家時段裡屬於品項供應餐期的那些 */
+/** Pickup slots selectable for an item: the vendor's slots that fall in the item's meal periods */
 function itemWindows(vendor, item, config = DEFAULT_PLATFORM_CONFIG) {
   const windows = vendorWindows(vendor);
   const periods = itemMealPeriods(item);
@@ -81,14 +81,14 @@ function rangeOf(windows) {
   return `${starts[0]}-${ends[ends.length - 1]}`;
 }
 
-/** 整個取餐時段（最早開始～最晚結束），例 "11:00-13:00"；只給沒分餐期的舊呼叫端用 */
+/** The whole pickup range (earliest start to latest end), e.g. "11:00-13:00"; only for legacy callers without meal periods */
 function vendorPickupRange(vendor) {
   return rangeOf(vendorWindows(vendor));
 }
 
 /**
- * 各餐期的取餐時段範圍，例 { breakfast: "07:30-08:30", lunch: "11:00-13:00" }。
- * 轉愛心餐、取餐提醒、備料時間軸都依餐期分開算（§5.2、§7）。
+ * Pickup slot range per meal period, e.g. { breakfast: "07:30-08:30", lunch: "11:00-13:00" }.
+ * Charity meal conversion, pickup reminders and the prep timeline are all computed per meal period (§5.2, §7).
  */
 function vendorPeriodRanges(vendor, config = DEFAULT_PLATFORM_CONFIG) {
   const byPeriod = {};
@@ -99,14 +99,14 @@ function vendorPeriodRanges(vendor, config = DEFAULT_PLATFORM_CONFIG) {
   return Object.fromEntries(MEAL_PERIODS.filter((p) => byPeriod[p]).map((p) => [p, rangeOf(byPeriod[p])]));
 }
 
-/** 店家截單時間：只能比平台早，不能晚 */
+/** Vendor cut-off time: can only be earlier than the platform's, never later */
 function vendorCutoffTime(vendor, config = DEFAULT_PLATFORM_CONFIG) {
   const own = vendor?.cutoff_time;
   if (typeof own === "string" && TIME_PATTERN.test(own) && own < config.cutoffTime) return own;
   return config.cutoffTime;
 }
 
-/** 某個取餐日的截單時間點（取餐日前一天） */
+/** Cut-off instant for a pickup date (the day before pickup) */
 function cutoffAt(pickupDate, vendor, config = DEFAULT_PLATFORM_CONFIG) {
   return at(addDays(pickupDate, -1), vendorCutoffTime(vendor, config));
 }
@@ -115,15 +115,15 @@ function isPastCutoff(pickupDate, vendor, config = DEFAULT_PLATFORM_CONFIG, now 
   return now.getTime() >= cutoffAt(pickupDate, vendor, config).getTime();
 }
 
-/** 消費者可取消的期限：取餐時段開始前 cancelHoursBefore 小時（預設 48） */
+/** Deadline for diners to cancel: cancelHoursBefore hours before the pickup slot starts (default 48) */
 function cancelDeadlineAt(pickupDate, pickupWindow, config = DEFAULT_PLATFORM_CONFIG) {
   const start = splitWindow(pickupWindow).start || "00:00";
   return new Date(at(pickupDate, start).getTime() - (config.cancelHoursBefore ?? 48) * 3600000);
 }
 
 /**
- * 取消後退的折價券面額：原價（品項原價＋加減項）× cancelCouponRate（預設 30%），四捨五入到元；
- * 不超過付款人實付金額（用免費餐券換的 0 元單不發券）。
+ * Coupon value issued on cancellation: original price (item price + add-ons) × cancelCouponRate (default 30%), rounded to the dollar;
+ * capped at the payer's amount paid (no coupon for NT$0 orders paid with a free-meal coupon).
  */
 function cancelCouponAmount(lock, config = DEFAULT_PLATFORM_CONFIG) {
   const original = Math.max(0, (Number(lock.list_price) || 0) + (Number(lock.adjust_amount) || 0));
@@ -131,16 +131,16 @@ function cancelCouponAmount(lock, config = DEFAULT_PLATFORM_CONFIG) {
   return Math.max(0, Math.min(Math.round(original * (config.cancelCouponRate ?? 0.3)), paid));
 }
 
-// 營收／撥款口徑（2026-10-09 統一，以實際撥款為準）：全額預付的訂單算實付（未取餐、轉愛心餐也算）；
-// 顧客取消換券時留下的款項（kept_amount）也算；停班停課、店家未出餐退成點數的不算。
-// web/src/lib/lockOutcome.ts revenueOf 同一套。
+// Revenue/payout basis (unified 2026-10-09, based on actual payouts): fully prepaid orders count at the amount paid (including no-shows and charity conversions);
+// money kept when a customer cancels for a coupon (kept_amount) also counts; refunds to points for work-suspension days or vendor failures to serve don't.
+// Same as revenueOf in web/src/lib/lockOutcome.ts.
 const PAID_STATUSES = ["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "charity", "no_show"];
 function revenueOf(lock) {
   if (lock?.status === "cancelled") return Number(lock.kept_amount) || 0;
   return PAID_STATUSES.includes(lock?.status) ? Number(lock.locked_price) || 0 : 0;
 }
 
-/** 平台抽成（元）：每份餐點的營收 × 抽成比例，逐份四捨五入後加總（收益看板與撥款用同一套） */
+/** Platform commission (NT$): revenue per meal × commission rate, rounded per portion then summed (shared by the earnings dashboard and payouts) */
 function commissionOf(locks, rate = DEFAULT_PLATFORM_CONFIG.commissionRate) {
   return locks.reduce((sum, l) => sum + Math.round(revenueOf(l) * rate), 0);
 }
@@ -151,14 +151,14 @@ function vendorSlotCapacity(vendor) {
   return Number.isInteger(cap) && cap > 0 ? cap : null;
 }
 
-/** 這天店家有沒有營業（平台營業日＋店家公休／每週營業設定） */
+/** Whether the vendor is open on this day (platform business days + vendor closed days / weekly opening settings) */
 function closedReason(pickupDate, vendor, config = DEFAULT_PLATFORM_CONFIG) {
   const name = vendor?.name ?? t("這家店", "This vendor");
   const weekday = weekdayOf(pickupDate);
   if (!config.businessWeekdays.includes(weekday)) {
     return t(`${pickupDate} 不是營業日`, `${pickupDate} isn't a business day`);
   }
-  // 停班停課的日子（disaster.js 寫入）：單點下單另有檢查，這裡補上讓計畫型、預購助理也會跳過
+  // Work-suspension days (written by disaster.js): single orders have a separate check; this also makes meal plans and the pre-order assistant skip them
   if (Array.isArray(vendor?.disaster_dates) && vendor.disaster_dates.includes(pickupDate)) {
     return t(`${pickupDate} 因停班停課暫停供餐`, `No service on ${pickupDate} (work suspension)`);
   }
@@ -208,8 +208,8 @@ function validatePickup(pickupDate, pickupWindow, vendor, config = DEFAULT_PLATF
 
 /**
  * Meal-plan pickup dates: `days` bookable dates from startDate onward, all at
- * the same pickupWindow（遇公休自動順延）. Returns { dates, postponed } or { problem }；
- * postponed＝因公休往後順延的日期（確認視窗標示「順延」）。
+ * the same pickupWindow (closed days are skipped and pushed back). Returns { dates, postponed } or { problem };
+ * postponed = dates pushed back because of closed days (marked "postponed" in the confirmation dialog).
  */
 function planPickupDates(startDate, pickupWindow, vendor, days, config = DEFAULT_PLATFORM_CONFIG, now = new Date(), item = null) {
   const first = validatePickup(startDate, pickupWindow, vendor, config, now, item);
@@ -226,7 +226,7 @@ function planPickupDates(startDate, pickupWindow, vendor, days, config = DEFAULT
       dates.push(date);
       if (skipped) postponed.push(date);
     } else if (config.businessWeekdays.includes(weekdayOf(date))) {
-      skipped = true; // 平日卻不能訂（公休、停班）→ 之後的日期都算順延
+      skipped = true; // a weekday that can't be booked (closed day, work suspension) → every later date counts as postponed
     }
   }
   return { dates, postponed };

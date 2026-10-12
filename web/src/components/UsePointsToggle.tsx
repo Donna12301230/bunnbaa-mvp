@@ -4,7 +4,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { formatNT } from "@/lib/format";
 import { tr } from "@/lib/i18n";
 
-/** 結帳時「用平台點數折抵」；沒有點數就不顯示。回傳的折抵金額由伺服器重算，這裡只是預覽 */
+/** "Use platform points" at checkout; hidden when the diner has no points. The server recalculates the discount; this is only a preview */
 export function usePointsPreview(total: number, enabled: boolean) {
   const { balance } = useWallet();
   const used = enabled ? Math.min(balance, Math.max(0, total)) : 0;

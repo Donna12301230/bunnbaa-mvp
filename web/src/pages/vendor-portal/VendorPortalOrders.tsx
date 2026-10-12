@@ -21,10 +21,10 @@ import type { CharityMeal, Lock } from "@/types";
 export type OrdersTab = "pickup" | "charity" | "orders" | "slots";
 
 /**
- * 訂單取餐（2026-10-06 整合）：原本的「訂單管理」「取餐掃碼」「訂餐時段」「愛心餐」合成一頁四個大分頁。
- * 愛心餐就是今天沒來拿的便當，預約者也在取餐分頁掃 QR，所以跟取餐放在一起。
- * 舊路徑都保留：/vendor-portal/orders、/lock/vendor/redeem（取餐）、/vendor-portal/charity（愛心餐）、/vendor-portal/sessions（時段）。
- * 訂單列表、時段用最近 500 筆（vendor_id + created_at 索引）；取餐用今天的訂單（pickup_date 查詢，不受 500 筆限制）。
+ * Orders & pickup (merged 2026-10-06): the former "Orders", "Pickup scan", "Order slots" and "Charity meals" pages are now four tabs on one page.
+ * Charity meals are today's uncollected bentos, and claimants also scan a QR on the pickup tab, so they sit next to pickup.
+ * Old paths still work: /vendor-portal/orders, /lock/vendor/redeem (pickup), /vendor-portal/charity (charity meals), /vendor-portal/sessions (slots).
+ * The order list and slots use the latest 500 locks (vendor_id + created_at index); pickup uses today's orders (pickup_date query, not capped at 500).
  */
 export function OrdersHub({ initial = "pickup" }: { initial?: OrdersTab }) {
   const vendorId = useAuth().user?.vendorId;
@@ -43,7 +43,7 @@ export function OrdersHub({ initial = "pickup" }: { initial?: OrdersTab }) {
     }, () => setLoadingToday(false));
   }, [vendorId, today]);
 
-  // 今天的愛心餐與收攤結算
+  // Today's charity meals and end-of-day settlement
   const [charity, setCharity] = useState<CharityMeal[]>([]);
   const [charityLoaded, setCharityLoaded] = useState(false);
   const [charityResult, setCharityResult] = useState<{ total: number; given_onsite: number; wasted: number; reserved_claimed: number } | null>(null);

@@ -1,15 +1,19 @@
-// AI 功能 2：對話式預購助理（doc/AI功能設計.md）。消費者用一句話描述需求，例如
-// 「下週一到五中午，大安區，預算 120，不吃牛」，Gemini 透過 function calling 呼叫下面的工具
-// 查候選，最後呼叫 presentCandidates 交回卡片。
+// AI feature 2: conversational pre-order assistant (doc/AI功能設計.md). The diner describes
+// what they want in one sentence, e.g. "weekday lunches next week, Da'an District, budget 120,
+// no beef"; Gemini calls the tools below via function calling to find candidates, then calls
+// presentCandidates to return the cards.
 //
-// 負責任 AI：
-//   - 工具都在伺服器端執行，Gemini 不直接碰 Firestore；它給的 id 會再比對目錄，查無就丟掉
-//   - 助理不下單：卡片只連到品項頁／店家頁，付款照舊走 LINE Pay，價格由伺服器重算
-//   - 會員自己設定的過敏原一律在伺服器端先濾掉，不靠模型記得
-//   - 語氣沿用 consumerExplanation.js：不催促、不行銷
+// Responsible AI:
+//   - All tools run server-side; Gemini never touches Firestore. Any id it returns is checked
+//     against the catalog and dropped if not found
+//   - The assistant never places orders: cards only link to item/vendor pages, payment still
+//     goes through LINE Pay, and prices are recomputed by the server
+//   - Allergens the member has set are always filtered out server-side, not left to the model
+//   - Tone follows consumerExplanation.js: no pressure, no marketing
 //
-// 用量：每人每天 ASSISTANT_DAILY_LIMIT 次（users/{uid}.assistant_usage）；單輪問題相同時
-// 10 分鐘內直接回快取（assistant_cache，伺服器專用），減少免費層 429。
+// Usage: ASSISTANT_DAILY_LIMIT questions per person per day (users/{uid}.assistant_usage);
+// an identical single-turn question within 10 minutes is served from cache (assistant_cache,
+// server-only) to cut free-tier 429s.
 const crypto = require("crypto");
 const {
   db, onCall, HttpsError, logger, FieldValue, t, assertSignedInUser,
@@ -30,10 +34,10 @@ const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
 const PERIOD_ZH = { breakfast: "早餐", lunch: "午餐", dinner: "晚餐" };
 const PERIOD_ARG = `餐期，只能用：${MEAL_PERIODS.join("、")}（breakfast=早餐、lunch=午餐、dinner=晚餐）`;
 
-/** 模型給的餐期字串；不認得就當沒指定 */
+/** Meal-period string from the model; anything unrecognized counts as unspecified */
 const periodArg = (v) => (MEAL_PERIODS.includes(v) ? v : null);
 
-/** 品項在這家店、這個餐期有沒有可取餐的時段（品項供應餐期 × 店家時段） */
+/** Whether the item has a pickup slot at this vendor in this meal period (item's meal periods x vendor's slots) */
 function itemPeriodWindows(vendor, item, config, period) {
   const windows = itemWindows(vendor, item, config);
   return period ? windows.filter((w) => mealPeriodOf(w, config) === period) : windows;
@@ -41,10 +45,10 @@ function itemPeriodWindows(vendor, item, config, period) {
 
 const normalize = (s) => String(s || "").replace(/台/g, "臺").replace(/\s+/g, "");
 
-// 模型偶爾還是只寫「牛」：換成具體的詞，免得把牛蒡、牛奶也排掉（C-AST-05）
+// The model still sometimes writes just 牛 ("beef/cow"): expand it to specific words so burdock (牛蒡) and milk (牛奶) aren't excluded too (C-AST-05)
 const EXCLUDE_EXPAND = { 牛: ["牛肉", "牛腩", "牛排", "牛筋", "牛雜", "牛小排", "牛丼", "牛五花"] };
 
-/** 結帳時的原價：有多個主菜就用第一個（品項頁預設），沒有就用 item.price（同 bento.resolveMain） */
+/** Base price at checkout: the first main if there are several (the item page default), else item.price (same as bento.resolveMain) */
 const basePrice = (item) => {
   const price = Number(resolveMain(item, null).price);
   return price > 0 ? price : null;
@@ -54,11 +58,11 @@ const S = (description) => ({ type: "STRING", description });
 const N = (description) => ({ type: "NUMBER", description });
 const LIST = (description) => ({ type: "ARRAY", items: { type: "STRING" }, description });
 
-// 卡片推薦理由：中文 20 字內、英文 40 字元內；催促、行銷字眼一律不收
+// Card recommendation reasons: at most 20 characters in Chinese or 40 in English; urgency or marketing wording is always rejected
 const REASON_MAX = { zh: 20, en: 40 };
 const PRESSURE = /手刀|快搶|搶購|限時|趕快|錯過|售完|最後機會|很多人訂|熱銷|爆單|hurry|don't miss|limited|selling fast|popular/i;
 
-/** 對話框是純文字：模型偶爾會用 Markdown（**粗體**、# 標題），把符號拿掉 */
+/** The chat bubble is plain text: the model sometimes uses Markdown (**bold**, # headings), so strip the symbols */
 const plainText = (text) => String(text || "")
   .replace(/\*\*(.+?)\*\*/g, "$1")
   .replace(/__(.+?)__/g, "$1")
@@ -66,8 +70,8 @@ const plainText = (text) => String(text || "")
   .replace(/^\s*[*-]\s+/gm, "・");
 
 /**
- * 模型給的推薦理由。只有這一輪 getVendorInsights 真的查到資料（預估或常一起買）的店才收，
- * 其他店的理由沒有工具資料根據，丟掉；太長或有催促字眼也丟掉，卡片就不顯示理由。
+ * Recommendation reasons from the model. Accepted only for vendors where getVendorInsights actually found data this turn (forecast or frequently bought together);
+ * reasons for other vendors aren't backed by tool data and are dropped; overlong or urgent ones are dropped too, and the card shows no reason.
  */
 function cardReason(text, vendorId, insightVendors, lang) {
   const reason = plainText(text).trim();
@@ -202,7 +206,7 @@ async function loadTaste(uid) {
   };
 }
 
-/** 這次請求用到的目錄，第一次用到才讀（每次請求最多讀一次） */
+/** Catalog for this request, loaded lazily on first use (at most once per request) */
 function catalogLoader() {
   let promise = null;
   return () => {
@@ -265,8 +269,9 @@ function summarizeItem(item, vendor, config) {
 }
 
 /**
- * 品項在這幾天能不能訂，判斷跟下單（orders.buildDrafts）一致：營業日／公休、品項供應的星期與餐期、
- * 停班停課、截單、時段名額。
+ * Whether the item can be ordered on these dates, using the same checks as ordering (orders.buildDrafts):
+ * business days / closed days, the item's weekdays and meal periods, work-suspension days, cut-off,
+ * and slot capacity.
  */
 async function checkDates(item, vendor, dates, config, now = new Date(), period = null) {
   const capacity = vendorSlotCapacity(vendor);
@@ -375,9 +380,9 @@ function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set
           vendorRef.collection("analytics").doc("basket").get(),
         ]);
         const forecast = forecastSnap.docs.map((d) => d.data());
-        // 有查到預估或配對的店，卡片才能帶推薦理由（cardReason）
+        // Only vendors with a forecast or pairs found can carry a recommendation reason on their cards (cardReason)
         if (forecast.length || basketSnap.data()?.pairs?.length) insightVendors.add(vendorId);
-        // 「相對平常」：跟這家店未來 7 天預估的平均比，模型不用自己算
+        // "Relative to usual": compared with this vendor's 7-day forecast average, so the model doesn't have to compute it
         const avg = forecast.length ? forecast.reduce((sum, f) => sum + (f.forecast || 0), 0) / forecast.length : null;
         const byName = new Map();
         for (const item of items.values()) {
@@ -385,7 +390,7 @@ function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set
           if ((item.allergens || []).some((a) => taste.allergies.includes(a))) continue;
           byName.set(normalize(item.name), item);
         }
-        // 只給這一輪 searchMenuItems 回傳過的 id（已套用使用者不吃的食材等條件）；其他只給品名，卡片不會收
+        // Only expose ids returned by searchMenuItems this turn (already filtered for the diner's excluded ingredients etc.); others get just the name and won't become cards
         const idOf = (name) => {
           const item = byName.get(normalize(name));
           return item && seen.has(item.id) ? item.id : null;
@@ -439,9 +444,9 @@ function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set
 }
 
 /**
- * 模型給的 id 比對目錄，查無、下架的丟掉；價格一律用伺服器的。
- * 2026-10-09 加兩道把關：只接受這一輪 searchMenuItems 真的回傳過的品項（seen），
- * 以及會員設定的過敏原再濾一次——不靠模型記得。
+ * Check the model's ids against the catalog and drop missing or unlisted ones; prices always come from the server.
+ * 2026-10-09 added two guards: only accept items that searchMenuItems actually returned this turn (seen),
+ * and filter the member's allergens once more, rather than relying on the model to remember.
  */
 async function buildCards(finish, loadCatalog, availability, lang, config, now = new Date(), { seen = null, taste = null, insightVendors = null } = {}) {
   const { vendors, items, plans } = await loadCatalog();
@@ -459,7 +464,7 @@ async function buildCards(finish, loadCatalog, availability, lang, config, now =
     const vendor = vendors.get(item.vendor_id);
     const price = basePrice(item);
     if (!price) continue;
-    // 模型沒查過的建議日期，這裡補查，卡片不會帶到公休、截單或額滿的日子
+    // Check suggested dates the model didn't look up, so cards never show closed, cut-off or full days
     const checked = [...(availability.get(item.id) || [])];
     const unchecked = suggestedDates.filter((d) => !checked.some((c) => c.date === d)).slice(0, 5);
     if (unchecked.length) {
@@ -533,7 +538,7 @@ async function takeUsage(uid, today) {
   }
 }
 
-/** Gemini 失敗（429／503 等）不算會員的次數：退回 takeUsage 扣的那一次 */
+/** A Gemini failure (429/503 etc.) doesn't count against the member: refund the use taken by takeUsage */
 async function refundUsage(uid, today) {
   const ref = db().collection("users").doc(uid);
   await db().runTransaction(async (tx) => {
@@ -544,8 +549,9 @@ async function refundUsage(uid, today) {
 }
 
 /**
- * 助理本體（不含登入、次數與快取）：askShoppingAssistant 與回答品質評估（scripts/eval/assistantEval.js）共用。
- * onToolCall(name, args, result) 可以記下工具呼叫，評估時當作「有據性」的參考資料。
+ * Core assistant (without sign-in, usage limits or caching), shared by askShoppingAssistant and the
+ * answer-quality eval (scripts/eval/assistantEval.js).
+ * onToolCall(name, args, result) can record tool calls, used as reference data for the groundedness check.
  */
 async function runAssistant({ messages, lang, area, taste, now = new Date(), onToolCall = null }) {
   const today = taipeiToday(now);
@@ -557,8 +563,8 @@ async function runAssistant({ messages, lang, area, taste, now = new Date(), onT
   }
   const loadCatalog = catalogLoader();
   const availability = new Map();
-  const seen = new Set(); // 這一輪搜尋工具回傳過的品項 id
-  const insightVendors = new Set(); // 這一輪 getVendorInsights 查到資料的店
+  const seen = new Set(); // item ids returned by the search tool this turn
+  const insightVendors = new Set(); // vendors getVendorInsights found data for this turn
   const handlers = toolHandlers({ loadCatalog, taste, config, availability, seen, insightVendors });
   if (onToolCall) {
     for (const [name, fn] of Object.entries(handlers)) {
@@ -589,7 +595,7 @@ async function runAssistant({ messages, lang, area, taste, now = new Date(), onT
 
 /**
  * data: { messages: [{ role: "user"|"assistant", text }], area?: { county, town } }
- * 回傳 { reply, cards[], disclaimer }。
+ * Returns { reply, cards[], disclaimer }.
  */
 exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" }, async (request) => {
   assertSignedInUser(request, "使用預購助理");

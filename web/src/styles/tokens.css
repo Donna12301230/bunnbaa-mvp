@@ -1,88 +1,88 @@
 /* ══════════════════════════════════════════════════════════════════════════
    BunnBaa 飯飽 Design Tokens
    ──────────────────────────────────────────────────────────────────────────
-   作用範圍：:root 與 .bb-theme（由 <ThemeRoot> 產生）。
-   放在 :root，Radix 等渲染到 document.body 的彈層（Dialog、Select 選單）
-   也吃得到 tokens。舊原型頁的底色變數已改名為 --legacy-*，不再撞名；
-   與 shadcn 共用的 --border 兩邊色值相同。
-   深色模式仍以 .bb-theme[data-theme='dark'] 覆寫（只影響該子樹）。
+   Scope: :root and .bb-theme (created by <ThemeRoot>).
+   Defined on :root so overlays that Radix etc. render into document.body (Dialog, Select menus)
+   also get the tokens. The old prototype pages' background variables were renamed to --legacy-*, so names no longer clash;
+   --border, shared with shadcn, has the same value on both sides.
+   Dark mode is still overridden via .bb-theme[data-theme='dark'] (affects only that subtree).
    ══════════════════════════════════════════════════════════════════════════ */
 
 :root,
 .bb-theme {
-  /* ── 品牌色（規格原值） ─────────────────────────────────────────────── */
-  --brand-brown: #b87a5a;        /* 標題、Logo「Bunn」 */
-  --brand-brown-dark: #8f5a3f;   /* hover / 強調文字 */
-  /* 「飯」字色（取樣自 public/飯飽wordR.png）：轉讓市集橫幅、首頁轉讓專區、跑馬燈的
-     色帶底色。跟 --brand-brown 幾乎同色，但 cafe look 會把 --brand-brown 改成深可可棕，
-     這個不隨風格／深淺模式改變。白字 3.6:1，只適合大字或粗體短字 */
+  /* ── Brand colors (original spec values) ─────────────────────────────────────────────── */
+  --brand-brown: #b87a5a;        /* Headings, logo "Bunn" */
+  --brand-brown-dark: #8f5a3f;   /* hover / emphasized text */
+  /* Color of the rice glyph (sampled from public/飯飽wordR.png): background band for the resale market banner, the home page
+     resale section and the marquee. Nearly the same as --brand-brown, but the cafe look turns --brand-brown into dark cocoa brown,
+     while this one doesn't change with look or light/dark mode. White text is 3.6:1, so only for large or short bold text */
   --brand-rice: #b67856;
   --brand-rice-hover: #a86b4b;
   --text-on-rice: #ffffff;
-  --brand-orange: #f29e0c;       /* Logo「Baa」、icon、裝飾 */
+  --brand-orange: #f29e0c;       /* Logo "Baa", icons, decoration */
   --brand-orange-dark: #d98a00;
-  --brand-orange-soft: #fdebd3;  /* icon 底色、選取背景、標籤底 */
-  --brand-orange-tint: #fff4e3;  /* 大面積淡色區塊 */
+  --brand-orange-soft: #fdebd3;  /* Icon backgrounds, selection background, tag backgrounds */
+  --brand-orange-tint: #fff4e3;  /* Large light areas */
 
-  /* ── 無障礙衍生色（對比 ≥ 4.5:1） ─────────────────────────────────────
-     白字 on #F29E0C 只有 2.17:1、on #D98A00 2.77:1，不足 4.5:1，
-     依規格「不足時加深按鈕色」，主要按鈕改用 strong 系列。 */
-  --brand-orange-strong: #b35a00;        /* 主要按鈕底：白字 4.80:1 */
-  --brand-orange-strong-hover: #944a00;  /* 主要按鈕 hover/active：6.48:1 */
-  --brand-orange-text: #a34f00;          /* 橘色文字/連結：on bg 5.41、on soft 4.90 */
+  /* ── Accessible derived colors (contrast ≥ 4.5:1) ─────────────────────────────────────
+     White text on #F29E0C is only 2.17:1 and on #D98A00 2.77:1, below 4.5:1;
+     per the spec ("darken the button color when contrast is insufficient"), primary buttons use the strong series. */
+  --brand-orange-strong: #b35a00;        /* Primary button background: white text 4.80:1 */
+  --brand-orange-strong-hover: #944a00;  /* Primary button hover/active: 6.48:1 */
+  --brand-orange-text: #a34f00;          /* Orange text/links: on bg 5.41, on soft 4.90 */
 
-  /* ── 中性色 ─────────────────────────────────────────────────────────── */
+  /* ── Neutrals ─────────────────────────────────────────────────────────── */
   --bg: #fff8ec;
   --surface: #ffffff;
   --surface-muted: #f7f5f0;
   --border: #ece6dc;
-  --border-strong: #dcd3c6;      /* 輸入框 hover 外框（比 --border 深一階，仍屬細柔線） */
-  --border-control: #948778;     /* 核取框/單選框/開關外框：非文字元素 ≥3:1 */
+  --border-strong: #dcd3c6;      /* Input hover outline (one step darker than --border, still a soft line) */
+  --border-control: #948778;     /* Checkbox/radio/switch outline: non-text elements ≥3:1 */
   --text: #2b2b2b;
   --text-secondary: #5c5c5c;
-  /* 規格原值 #8A8A8A on #FFF8EC 僅 3.27:1，調為暖灰 #6F6B66（5.01:1） */
+  /* The spec value #8A8A8A on #FFF8EC is only 3.27:1, adjusted to warm grey #6F6B66 (5.01:1) */
   --text-muted: #6f6b66;
   --text-on-brand: #ffffff;
   --text-on-danger: #ffffff;     /* on --danger-strong 4.73:1 */
-  /* 描邊線：classic 與 --border 相同；cafe 風格改為深可可棕 */
+  /* Border line: same as --border in classic; dark cocoa brown in the cafe look */
   --border-ink: var(--border);
-  /* 色帶表面：整段滿版的深色 / 強調色區塊 */
+  /* Banded surfaces: full-width dark / accent sections */
   --surface-inverse: #3a2f26;
   --text-on-inverse: #fff4e3;
   --surface-accent: var(--brand-orange-soft);
   --text-on-accent: var(--brand-orange-text);
   --overlay: rgba(43, 32, 22, 0.42);
-  --tooltip-bg: #3a2f26;         /* 暖深棕，避免純黑；白字 13:1 */
+  --tooltip-bg: #3a2f26;         /* Warm dark brown instead of pure black; white text 13:1 */
   --tooltip-text: #ffffff;
   --skeleton-base: #f1ece3;
   --skeleton-shine: rgba(255, 255, 255, 0.6);
 
-  /* ── 狀態色（規格原值：做圖示、邊框、點；文字請用 *-text） ─────────── */
+  /* ── Status colors (original spec values: for icons, borders, dots; use *-text for text) ─────────── */
   --success: #5a9e6f;  --success-soft: #e6f2e9;  --success-text: #437552;
   --warning: #e0a030;  --warning-soft: #fbf1dc;  --warning-text: #8f6315;
   --danger:  #d0604a;  --danger-soft:  #f8e3de;  --danger-text:  #af432e;
   --info:    #6b8fb3;  --info-soft:    #e6eef5;  --info-text:    #4a6d8f;
-  /* 危險按鈕底：白字 on #D0604A 僅 3.85:1 → #C24E36（4.73:1） */
-  /* 品牌橘底上的深棕字（徽章、時間軸），亮暗都一樣：on #F29E0C 8.6:1 */
+  /* Danger button background: white text on #D0604A is only 3.85:1 → #C24E36 (4.73:1) */
+  /* Dark brown text on brand orange (badges, timeline), same in light and dark: on #F29E0C 8.6:1 */
   --text-on-brand: #2b180d;
-  /* 奶油黃強調底（認證徽章），亮暗都一樣，配 --text-on-brand */
+  /* Cream yellow accent background (verified badge), same in light and dark, paired with --text-on-brand */
   --highlight: #ffe1a1;
-  /* 第五個語意色「紫」：食材分組的包材、時間軸的裝盒、成本色條的手續費 */
+  /* Fifth semantic color, "plum": packaging in ingredient groups, packing on the timeline, fees in the cost bar */
   --plum: #9b86c4;  --plum-soft: #efeaf7;  --plum-text: #4b3a73;  --text-on-plum: #24183d;
-  --success-strong: #467d57;  /* 實心成功色底（白字 4.85:1）、進度條 */
+  --success-strong: #467d57;  /* Solid success background (white text 4.85:1), progress bars */
   --danger-strong: #c24e36;
   --danger-strong-hover: #a84030;
 
   /* ── Focus ring ────────────────────────────────────────────────────────
-     規格為 --brand-orange；但 #F29E0C on 奶油底僅 2.06:1，低於非文字元素
-     3:1 門檻，故使用 strong 色。 */
+     The spec says --brand-orange, but #F29E0C on cream is only 2.06:1, below the
+     3:1 threshold for non-text elements, so the strong color is used. */
   --focus-ring-color: var(--brand-orange-strong);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
-  /* ── 字體 ───────────────────────────────────────────────────────────── */
+  /* ── Typography ───────────────────────────────────────────────────────────── */
   --font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-  --font-heading: var(--font-family);  /* 標題字體；cafe 風格改為襯線 */
+  --font-heading: var(--font-family);  /* Heading font; serif in the cafe look */
 
   --font-display-size: 32px; --font-display-weight: 700; --font-display-lh: 1.3;
   --font-h1-size: 24px;      --font-h1-weight: 700;      --font-h1-lh: 1.35;
@@ -92,7 +92,7 @@
   --font-body-sm-size: 13px; --font-body-sm-weight: 400; --font-body-sm-lh: 1.5;
   --font-caption-size: 12px; --font-caption-weight: 400; --font-caption-lh: 1.5;
 
-  /* ── 間距（4px 基準） ─────────────────────────────────────────────────── */
+  /* ── Spacing (4px base) ─────────────────────────────────────────────────── */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -104,47 +104,47 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  /* ── 圓角 ───────────────────────────────────────────────────────────── */
-  --radius-sm: 6px;    /* 標籤 */
-  --radius-md: 8px;    /* 按鈕、輸入框 */
-  --radius-lg: 12px;   /* 小卡片、icon 方塊 */
-  --radius-xl: 16px;   /* 大卡片、彈窗 */
-  --radius-2xl: 24px;  /* 頁面大區塊（首頁菜單區、推薦區） */
+  /* ── Radii ───────────────────────────────────────────────────────────── */
+  --radius-sm: 6px;    /* Tags */
+  --radius-md: 8px;    /* Buttons, inputs */
+  --radius-lg: 12px;   /* Small cards, icon boxes */
+  --radius-xl: 16px;   /* Large cards, dialogs */
+  --radius-2xl: 24px;  /* Large page sections (home menu section, recommendations) */
   --radius-full: 999px;
 
-  /* ── 陰影（暖棕色調，不用純黑） ─────────────────────────────────────── */
+  /* ── Shadows (warm brown, not pure black) ─────────────────────────────────────── */
   --shadow-sm: 0 2px 8px rgba(120, 80, 40, 0.05);
   --shadow-md: 0 8px 24px rgba(120, 80, 40, 0.08);
   --shadow-lg: 0 16px 40px rgba(120, 80, 40, 0.12);
 
-  /* ── 動態 ───────────────────────────────────────────────────────────── */
+  /* ── Motion ───────────────────────────────────────────────────────────── */
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-slow: 320ms;
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  /* ── 尺寸 ───────────────────────────────────────────────────────────── */
+  /* ── Sizes ───────────────────────────────────────────────────────────── */
   --icon-sm: 16px;
   --icon-md: 20px;
   --icon-lg: 24px;
   --icon-stroke: 1.75;
-  --hit-target: 44px;  /* 最小點擊區域 */
+  --hit-target: 44px;  /* Minimum tap target */
 
-  /* ── 斷點（CSS 變數無法用於 @media，僅供 JS 讀取與文件參考；
-        @media 請直接寫 375 / 768 / 1024 / 1280px） ───────────────────── */
+  /* ── Breakpoints (CSS variables can't be used in @media; only for JS reads and documentation;
+        in @media write 375 / 768 / 1024 / 1280px directly) ───────────────────── */
   --bp-sm: 375px;
   --bp-md: 768px;
   --bp-lg: 1024px;
   --bp-xl: 1280px;
 
-  /* ── Tailwind 品牌色階（tailwind.config.ts 的 orange-* / amber-500/600 讀這組）
-        頁面大量寫死 bg-orange-500 等 class；cafe 風格在 look-cafe.css 改寫這組，
-        頁面檔不用動就能換裝。classic 值 = 原本的 hex。 ─────────────────── */
+  /* ── Tailwind brand scale (orange-* / amber-500/600 in tailwind.config.ts read these)
+        Pages hard-code lots of classes like bg-orange-500; the cafe look overrides this set in look-cafe.css,
+        re-skinning without touching page files. Classic values = the original hex. ─────────────────── */
   --palette-orange-50: #fff4e3;
   --palette-orange-100: #fdebd3;
   --palette-orange-200: #fbddb5;
-  --palette-orange-500: #b35a00;  /* 主要按鈕底 */
-  --palette-orange-600: #944a00;  /* 主要按鈕 hover、橘色文字 */
+  --palette-orange-500: #b35a00;  /* Primary button background */
+  --palette-orange-600: #944a00;  /* Primary button hover, orange text */
 
   /* ── z-index ───────────────────────────────────────────────────────── */
   --z-tooltip: 60;
@@ -154,7 +154,7 @@
   color-scheme: light;
 }
 
-/* ── 深色模式：品牌主色維持不變，只覆寫中性色、衍生色與文字用的 brown-dark ── */
+/* ── Dark mode: brand primaries stay the same; only neutrals, derived colors and the text brown-dark are overridden ── */
 .bb-theme[data-theme='dark'] {
   --bg: #1f1a15;
   --surface: #2a231d;
@@ -176,8 +176,8 @@
   --brand-orange-soft: #43321c;
   --brand-orange-tint: #2f261c;
   --brand-orange-text: #f29e0c;   /* on #1F1A15 7.95:1 */
-  /* 強調文字用的深棕在深底上只有 3.04:1，深色模式改為淺棕（7.63:1）；
-     --brand-brown 本身維持不變 */
+  /* The dark brown used for emphasized text is only 3.04:1 on a dark background, so dark mode uses a light brown (7.63:1);
+     --brand-brown itself stays the same */
   --brand-brown-dark: #d9a07f;
 
   --success-soft: #22322a;  --success-text: #8cc79c;
@@ -193,7 +193,7 @@
   color-scheme: dark;
 }
 
-/* ── prefers-reduced-motion：縮短時長，由 global.css 關閉位移/縮放 ─────── */
+/* ── prefers-reduced-motion: shorter durations; global.css turns off translate/scale ─────── */
 @media (prefers-reduced-motion: reduce) {
   :root,
   .bb-theme {

@@ -20,7 +20,7 @@ import { EmptyState } from "@/components/ds";
 interface DisasterEvent { id: string; type: string; counties?: string[]; towns?: string[]; dates?: string[]; source: string; summary?: string; processed?: boolean; result?: { vendors: number; cancelled: number; failed: number; notified: number } }
 interface Anomaly { id: string; type: string; user_id: string; vendor_id: string | null; detail: string; date: string; status: string }
 
-// 顯示用標籤：render 當下才呼叫 tr()，切換語言才會跟著變
+// Display labels: tr() is called at render time so they follow language switches
 const TYPE_LABEL: Record<string, { zh: string; en: string }> = {
   work_suspension: { zh: "停班停課", en: "Work/school suspension" },
   typhoon_warning: { zh: "颱風警報", en: "Typhoon warning" },
@@ -34,7 +34,7 @@ const ANOMALY_LABEL: Record<string, { zh: string; en: string }> = {
 const typeLabel = (t: string) => (TYPE_LABEL[t] ? tr(TYPE_LABEL[t].zh, TYPE_LABEL[t].en) : t);
 const anomalyLabel = (t: string) => (ANOMALY_LABEL[t] ? tr(ANOMALY_LABEL[t].zh, ANOMALY_LABEL[t].en) : t);
 
-/** 天災事件（§11）：自動抓 NCDR（彙整氣象署、人事總處）；資料來源失效時管理者手動建立。 */
+/** Disaster events (§11): fetched automatically from NCDR (aggregating the Central Weather Administration and DGPA); admins create them manually when the source fails. */
 function DisasterContent() {
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -49,7 +49,7 @@ function DisasterContent() {
     const counties = form.counties.split(/[,，、\s]+/).map((x) => x.trim().replace(/台/g, "臺")).filter(Boolean);
     const dates = form.dates.split(/[,，、\s]+/).map((x) => x.trim()).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x));
     if (dates.length === 0) return toast({ variant: "destructive", title: tr("請輸入日期 YYYY-MM-DD", "Enter dates as YYYY-MM-DD") });
-    // summary 存進資料庫，固定用中文
+    // summary is stored in the database, always in Chinese
     const label = TYPE_LABEL[form.type]?.zh ?? form.type;
     if (form.type === "work_suspension" && !(await confirm({
       title: tr("建立停班停課事件？", "Create a work/school suspension event?"),
@@ -118,7 +118,7 @@ function DisasterContent() {
   );
 }
 
-/** 異常偵測（§9.5）：標記並通知平台與店家，不自動處分。 */
+/** Anomaly detection (§9.5): flags and notifies the platform and vendor; no automatic penalties. */
 function AnomalyContent() {
   const [itemList, setItems] = useState<Anomaly[] | null>(null);
   const items = itemList ?? [];

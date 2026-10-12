@@ -5,8 +5,8 @@ import { functions } from "@/lib/firebase";
 import { getLang, tr } from "@/lib/i18n";
 
 /**
- * 品項頁「金額明細」裡的 AI 折扣說明（2026-10-09）：下單前讓消費者看懂為什麼是這個折數、預購後有哪些彈性。
- * Functions getDiscountExplanation 依「折扣級距 × 店家穩定度」快取；失敗或沒有就不顯示，不影響下單。
+ * AI discount explanation in the item page's "Price breakdown" (2026-10-09): before ordering, diners can see why the discount is what it is and what flexibility a pre-order gives.
+ * Functions getDiscountExplanation caches by "discount tier × vendor reliability"; on failure or when missing, nothing is shown and ordering is unaffected.
  */
 export default function DiscountExplanation({ vendorId, discountPercent }: { vendorId: string; discountPercent: number }) {
   const lang = getLang();

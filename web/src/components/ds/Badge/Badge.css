@@ -58,8 +58,8 @@
   --badge-fg: var(--bg);
 }
 
-/* ── Tag（可互動膠囊）──
-   .is-hover / .is-active / .is-focus 只供預覽頁強制呈現狀態使用。 */
+/* ── Tag (interactive pill) ──
+   .is-hover / .is-active / .is-focus are only for forcing states on the preview page. */
 .bb-tag {
   position: relative;
   display: inline-flex;
@@ -91,7 +91,7 @@
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
 }
-/* 視覺 36px，點擊區 44px */
+/* 36px visually, 44px hit area */
 .bb-tag__main::after {
   content: '';
   position: absolute;

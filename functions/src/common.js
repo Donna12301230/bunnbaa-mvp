@@ -1,5 +1,5 @@
-// Functions 共用：權限檢查、通知、讀取店家配方。index.js 先 initializeApp 才 require 各模組，
-// 這裡的 db() 用到時才取，避免載入順序問題。
+// Shared Functions helpers: permission checks, notifications, loading vendor recipes. index.js calls initializeApp before
+// requiring the modules, so db() here is resolved lazily to avoid load-order issues.
 const { onCall: rawOnCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
@@ -9,7 +9,7 @@ const { withLang, t } = require("./i18n");
 const REGION = "asia-east1";
 const db = () => admin.firestore();
 
-// 所有 callable 都包 withLang：handler 內的 t() 依前端送來的 data.lang 回中文或英文
+// Every callable is wrapped in withLang: t() inside the handler returns Chinese or English based on data.lang from the frontend
 const onCall = (opts, handler) => rawOnCall({ region: REGION, ...opts }, withLang(handler));
 
 // ISO 27001 A.5.15/A.8.3: privileged and cost-bearing callables fail closed in
@@ -49,7 +49,7 @@ async function assertAdminOrVendorOwner(request, vendorId) {
   throw new HttpsError("permission-denied", "Only this vendor's owner or a platform admin can do this.");
 }
 
-/** 呼叫者綁定的店家 id（店主）；管理員可指定任一家 */
+/** The vendor id bound to the caller (vendor owner); admins may specify any vendor */
 async function callerVendorId(request, requested) {
   if (requested) {
     await assertAdminOrVendorOwner(request, requested);
@@ -62,13 +62,13 @@ async function callerVendorId(request, requested) {
 }
 
 /**
- * 站內通知＋盡量推播。notifications 是使用者自己可讀的收件匣（通知鈴鐺），
- * FCM token 存在 userTokens/{uid}；推播失敗不影響主流程。
+ * In-app notification + best-effort push. notifications is the user's own readable inbox (the notification bell);
+ * FCM tokens live in userTokens/{uid}; push failures don't affect the main flow.
  */
 async function notifyUser(uid, { title, body, link = null, kind = "general" }) {
   if (!uid) return;
   try {
-    // 會員中心關掉的通知類別（例如愛心餐）：站內通知與推播都不送
+    // Notification kinds turned off in the member center (e.g. charity meals): neither in-app nor push is sent
     const prefs = await db().collection("users").doc(uid).get();
     const muted = prefs.exists ? prefs.data().muted_kinds || [] : [];
     if (muted.includes(kind)) return;
@@ -78,7 +78,7 @@ async function notifyUser(uid, { title, body, link = null, kind = "general" }) {
     const tokenSnap = await db().collection("userTokens").doc(uid).get();
     const tokens = tokenSnap.exists ? tokenSnap.data().tokens || [] : [];
     for (const token of tokens.slice(-3)) {
-      // data-only：由 service worker 顯示並處理點擊（打開 link 那一頁）；用 notification 欄位會被 SDK 自動再顯示一次、點了也不會開頁
+      // data-only: the service worker shows it and handles the click (opens the link page); a notification field would make the SDK show it a second time, and clicking it wouldn't open the page
       await admin.messaging().send({ token, data: { title: String(title || ""), body: String(body || ""), link: String(link || "") } })
         .catch((err) => logger.debug("push failed", err.message));
     }
@@ -93,7 +93,7 @@ async function notifyVendor(vendorId, message) {
   if (owner) await notifyUser(owner, { kind: "vendor", ...message });
 }
 
-/** 店家的品項、半成品、原物料，一次讀齊（備料、採購、標籤都要） */
+/** Load a vendor's items, components and ingredients in one go (needed for prep, purchasing and tags) */
 async function loadVendorCatalog(vendorId) {
   const vendorRef = db().collection("vendors").doc(vendorId);
   const [itemsSnap, compSnap, ingSnap] = await Promise.all([
@@ -110,7 +110,7 @@ async function allVendors() {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((v) => v.status !== "disabled");
 }
 
-/** 對每家店執行，單店失敗不影響其他店 */
+/** Run for every vendor; one vendor failing doesn't affect the others */
 async function forEachVendor(label, fn) {
   for (const vendor of await allVendors()) {
     try {
@@ -121,7 +121,7 @@ async function forEachVendor(label, fn) {
   }
 }
 
-/** 批次寫入，自動在 400 筆時送出 */
+/** Batched writes, committed automatically every 400 */
 class BatchWriter {
   constructor() {
     this.batch = db().batch();
@@ -141,7 +141,7 @@ class BatchWriter {
   }
 }
 
-/** 縣市（地址開頭，台→臺） */
+/** County/city (start of the address, 台 → 臺) */
 function countyOf(address) {
   const m = String(address || "").replace(/台/g, "臺").match(/^(.{2}[市縣])/);
   return m ? m[1] : null;
@@ -149,7 +149,7 @@ function countyOf(address) {
 
 const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 
-/** geohash → 中心點（常用地點只存粗略 geohash，web/src/lib/geo.ts 有同一份） */
+/** geohash → center point (usual locations are stored only as coarse geohashes; web/src/lib/geo.ts has the same code) */
 function decodeGeohash(hash) {
   if (typeof hash !== "string" || !hash) return null;
   const lat = [-90, 90];
@@ -169,7 +169,7 @@ function decodeGeohash(hash) {
   return { lat: (lat[0] + lat[1]) / 2, lng: (lng[0] + lng[1]) / 2 };
 }
 
-/** 兩點距離（公尺） */
+/** Distance between two points (meters) */
 function distanceMeters(a, b) {
   if (!Number.isFinite(a?.lat) || !Number.isFinite(b?.lat)) return Infinity;
   const R = 6371000;

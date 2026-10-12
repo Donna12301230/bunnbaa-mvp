@@ -2,17 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// 管理後台「平台儀表板」嵌入的 Looker Studio 網址。
-// 需求預測與客群／常一起買的卡片直接讀後端寫的文件，見 components/insights/DemandForecastCard.tsx、CustomerInsightsCard.tsx。
+// Looker Studio URL embedded in the admin console's "Platform dashboard".
+// The demand-forecast and segment / frequently-bought-together cards read the backend's documents directly; see components/insights/DemandForecastCard.tsx and CustomerInsightsCard.tsx.
 
-/** 管理後台嵌入的 Looker Studio 儀表板網址：platformConfig/analytics（管理員可寫、公開可讀） */
+/** Looker Studio dashboard URL embedded in the admin console: platformConfig/analytics (admin-writable, publicly readable) */
 export interface AnalyticsConfig {
   lookerStudioEmbedUrl?: string;
-  /** 舊欄位名（合併前另一版寫的），只讀不寫 */
+  /** Old field name (written by another version before the merge); read only, never written */
   looker_embed_url?: string | null;
 }
 
-/** Looker Studio 的嵌入網址長這樣；只收這個網域，避免管理頁被塞進別的網站 */
+/** What a Looker Studio embed URL looks like; only this domain is accepted so the admin page can't be made to embed another site */
 export const LOOKER_EMBED_PREFIX = "https://lookerstudio.google.com/embed/";
 export const isLookerEmbedUrl = (url: string) => url.startsWith(LOOKER_EMBED_PREFIX) && url.length <= 500;
 

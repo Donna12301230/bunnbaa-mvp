@@ -15,28 +15,28 @@ import { cx } from '../_shared/cx';
 import './ThemeRoot.css';
 
 export type BbTheme = 'light' | 'dark';
-/** 視覺風格：classic（預設）或 cafe（深可可棕 + 奶油黃、襯線標題、描邊取代陰影）。 */
+/** Visual style: classic (default) or cafe (dark cocoa brown + butter yellow, serif headings, outlines instead of shadows). */
 export type BbLook = 'classic' | 'cafe';
 
 const ThemeContext = createContext<BbTheme>('light');
 const LookContext = createContext<BbLook>('classic');
 
-/** 目前所在的設計系統主題。 */
+/** The current design-system theme. */
 export function useBbTheme(): BbTheme {
   return useContext(ThemeContext);
 }
 
 export interface ThemeRootProps extends HTMLAttributes<HTMLDivElement> {
-  /** 'light'（預設）或 'dark'；深色模式只覆寫中性色，品牌色不變。 */
+  /** 'light' (default) or 'dark'; dark mode only overrides neutral colors, brand colors stay the same. */
   theme?: BbTheme;
-  /** 'classic'（預設）或 'cafe'；與 theme 可自由組合。 */
+  /** 'classic' (default) or 'cafe'; combines freely with theme. */
   look?: BbLook;
   children?: ReactNode;
 }
 
 /**
- * 設計系統根容器：套用 tokens 與全域排版（.bb-theme）。
- * 所有 ds 元件都必須放在 <ThemeRoot> 之內。
+ * Design-system root container: applies tokens and global typography (.bb-theme).
+ * Every ds component must be inside a <ThemeRoot>.
  */
 export const ThemeRoot = forwardRef<HTMLDivElement, ThemeRootProps>(function ThemeRoot(
   { theme = 'light', look = 'classic', className, children, ...rest },
@@ -54,13 +54,13 @@ export const ThemeRoot = forwardRef<HTMLDivElement, ThemeRootProps>(function The
 });
 
 /**
- * 把內容渲染到 document.body，並帶上 .bb-theme 與目前主題，
- * 讓 Modal / Toast 等浮層也吃得到 tokens。
+ * Renders content into document.body with .bb-theme and the current theme,
+ * so overlays like Modal / Toast also get the tokens.
  */
 export function Portal({ children }: { children: ReactNode }) {
   const theme = useBbTheme();
   const look = useContext(LookContext);
-  // 同步建立容器，讓子元件第一次 render 就有 DOM（Modal 開啟時才能立即聚焦）
+  // Create the container synchronously so children have a DOM node on first render (so Modal can focus immediately when opened)
   const [host] = useState(() => {
     const el = document.createElement('div');
     el.className = 'bb-theme bb-portal';

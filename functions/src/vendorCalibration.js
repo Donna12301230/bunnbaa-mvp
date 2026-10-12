@@ -7,9 +7,10 @@
  * report. Never outputs a restocking instruction — output is explicitly
  * labeled as reference-only.
  *
- * 2026-10-09：準確率與誤差區間改由程式計算（calibrationStats），不再請 Gemini 算——
- * 準確率會決定消費者看到的「穩定」徽章，數字不能交給 LLM（doc/AI功能設計.md 負責任 AI 原則）。
- * Gemini 只拿算好的數字寫白話說明、歸納備註裡的模式、回答 what-if 追問。
+ * 2026-10-09: accuracy rate and error range are now computed in code (calibrationStats) instead of
+ * by Gemini. The accuracy rate drives the "Stable" badge diners see, so the numbers can't be left to
+ * an LLM (responsible-AI principles in doc/AI功能設計.md). Gemini only takes the computed numbers to
+ * write a plain-language explanation, summarize patterns in the notes, and answer what-if follow-ups.
  */
 const { logger } = require("firebase-functions");
 const { generateJSON } = require("./gemini");
@@ -30,9 +31,11 @@ const SCENARIO_INSTRUCTION = `你是一個食物預購平台的校準助手。�
 輸出必須是嚴格的 JSON，不要加任何 markdown。`;
 
 /**
- * 程式計算的校準統計（不經 LLM）。history 每一輪：locked_qty（已結束的訂單數）、fulfilled_qty（原買家或接手者實際取餐）。
- * - accuracy_rate：Σ取餐 ÷ Σ鎖定（預付制下鎖定量就是預測，取餐率越接近 1 越準）
- * - error_range：每輪「鎖定 − 取餐」的平均落差（±，四捨五入到整份），附最大落差
+ * Calibration stats computed in code (no LLM). Each history round: locked_qty (orders that have ended),
+ * fulfilled_qty (actually picked up by the original buyer or whoever took it over).
+ * - accuracy_rate: sum(pickups) / sum(locks) (with prepayment the lock quantity is the forecast; the closer
+ *   the pickup rate is to 1, the more accurate)
+ * - error_range: mean per-round gap of locks minus pickups (±, rounded to whole meals), plus the max gap
  */
 function calibrationStats(history) {
   const rounds = history.filter((h) => h.locked_qty > 0);
@@ -89,14 +92,14 @@ async function generateVendorCalibrationReport({ history }) {
     },
   });
 
-  // Gemini 失敗（沒設 key、429／503）只少兩段說明文字；數字照樣更新，徽章不會因為 AI 掛掉而停住
+  // A Gemini failure (no key, 429/503) only loses the two text sections; the numbers still update, so the badge never stalls because the AI is down
   let out = null;
   try {
     out = await generateJSON({ systemInstruction: SYSTEM_INSTRUCTION, userPrompt });
   } catch (err) {
     logger.warn("calibration explanation failed; writing numbers only", err);
   }
-  // 數字一律用程式算的；模型只貢獻兩段文字
+  // Numbers always come from code; the model only contributes the two text sections
   return {
     accuracy_rate: stats.accuracy_rate,
     error_range: stats.error_range,
@@ -109,7 +112,8 @@ async function generateVendorCalibrationReport({ history }) {
 }
 
 /**
- * what-if 追問（4.1a）：只回答問題，不重產整份報告。歷史只帶最近 14 輪的數字（備註不帶），省 token。
+ * What-if follow-up (4.1a): answers the question only, without regenerating the whole report. Sends just
+ * the numbers from the last 14 rounds (no notes) to save tokens.
  * @returns {Promise<{ scenario_answer: string, disclaimer: string }>}
  */
 async function answerCalibrationScenario({ history, question }) {

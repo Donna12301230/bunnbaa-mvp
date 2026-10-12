@@ -12,21 +12,21 @@ import { cx } from '../_shared/cx';
 import './Tooltip.css';
 
 export interface TooltipProps {
-  /** 提示內容：簡短文字，不放互動元素 */
+  /** Tooltip content: short text, no interactive elements */
   content: ReactNode;
-  /** 觸發元素：必須是可聚焦的單一元素（Button、icon 按鈕等） */
+  /** Trigger element: must be a single focusable element (Button, icon button, etc.) */
   children: ReactElement;
   placement?: 'top' | 'bottom' | 'left' | 'right';
-  /** 滑鼠停留多久後出現（ms），預設 300；鍵盤聚焦立即出現 */
+  /** Hover delay before showing (ms), default 300; keyboard focus shows it immediately */
   delay?: number;
-  /** 強制顯示（預覽頁用），或完全受控 */
+  /** Force it open (for the preview page), or fully controlled */
   open?: boolean;
   className?: string;
 }
 
 /**
- * 補充說明用的小提示：hover / focus 顯示，Esc 關閉。
- * 手機沒有 hover，重要資訊不要只放在 Tooltip。
+ * Small hint for supplementary info: shown on hover / focus, closed with Esc.
+ * Phones have no hover, so don't put important information only in a Tooltip.
  */
 export function Tooltip({ content, children, placement = 'top', delay = 300, open, className }: TooltipProps) {
   const id = useId();
@@ -55,7 +55,7 @@ export function Tooltip({ content, children, placement = 'top', delay = 300, ope
     return () => document.removeEventListener('keydown', onKey);
   }, [visible]);
 
-  // 一律掛上 aria-describedby：焦點進入時螢幕閱讀器就能讀到，不必等 state 更新
+  // Always set aria-describedby: screen readers can read it as soon as focus enters, without waiting for a state update
   const trigger = isValidElement<Record<string, unknown>>(children)
     ? cloneElement(children, { 'aria-describedby': id })
     : children;

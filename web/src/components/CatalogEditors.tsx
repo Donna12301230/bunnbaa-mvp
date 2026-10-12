@@ -18,12 +18,12 @@ import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Component, Ingredient } from "@/types";
 
-// 半成品、原物料的編輯視窗：配方頁用，菜單編輯也會疊開（找不到半成品時直接建、成本缺單價時直接補），
-// 存完回傳新文件 id，原本的視窗內容不受影響。
+// Edit dialogs for semi-finished items and ingredients: used on the recipe page and also stacked from the menu editor (create a missing semi-finished item, fill a missing unit price),
+// return the new document id on save; the underlying dialog's contents are unaffected.
 
 export const EMPTY_ING: Omit<Ingredient, "id"> = {
   name: "", category: "其他", unit: "g",
-  // 採購單位名稱是店家自填的文字，預設值跟著介面語言（getter：每次展開 {...EMPTY_ING} 時才挑語言）
+  // The purchase unit name is free text entered by the vendor; its default follows the UI language (getter: picks the language each time {...EMPTY_ING} is spread)
   get purchase_unit_label() { return tr("公斤", "kg"); },
   purchase_unit_size: 1000,
   yield_rate: 1, loss_rate: 0, shelf_days: 7, frequency: "weekly", supplier_id: null, unit_price: 0,
@@ -35,7 +35,7 @@ export const ING_CATEGORIES = ["雞", "豬", "牛", "海鮮", "素", "蛋", "豆
 const EQUIPMENT = ["炒鍋", "電鍋", "炸鍋", "烤箱", "滷鍋", "蒸籠", "湯鍋", "工作台"];
 const METHODS = ["炸", "滷", "烤", "炒", "蒸", "煮", "涼拌"];
 const FLAVORS = ["辣", "清淡", "甜"];
-// 1002 規格 §5：採購只分每週進料與每日備料；米、油、調味料、乾貨、包材等久放品項（monthly）併入每週，低於安全庫存才叫
+// 1002 spec §5: purchasing is only weekly stock-up or daily prep; long-life items (monthly) such as rice, oil, seasonings, dry goods and packaging fold into weekly and are ordered only below safety stock
 export const FREQ_LABEL: Record<string, { zh: string; en: string }> = {
   monthly: { zh: "久放品項（低於安全庫存才叫）", en: "Long-life (reorder below safety stock)" },
   weekly: { zh: "每週進料", en: "Weekly delivery" },
@@ -43,7 +43,7 @@ export const FREQ_LABEL: Record<string, { zh: string; en: string }> = {
 };
 export const freqLabel = (k: string) => (FREQ_LABEL[k] ? tr(FREQ_LABEL[k].zh, FREQ_LABEL[k].en) : k);
 
-// 以上類別、設備、做法、口味的值都是中文存進資料庫（別處會比對），只在顯示時換英文
+// The category, equipment, method and flavor values above are stored in Chinese (compared elsewhere); only the display switches to English
 const EN_LABEL: Record<string, string> = {
   雞: "Chicken", 豬: "Pork", 牛: "Beef", 海鮮: "Seafood", 素: "Vegetarian", 蛋: "Egg", 豆: "Beans & tofu", 葉菜: "Leafy greens",
   根莖: "Root vegetables", 瓜類: "Gourds", 米: "Rice", 麵: "Noodles", 調味: "Seasoning", 乾貨: "Dry goods", 包材: "Packaging", 其他: "Other",
@@ -51,19 +51,19 @@ const EN_LABEL: Record<string, string> = {
   炸: "Fried", 滷: "Braised", 烤: "Roasted", 炒: "Stir-fried", 蒸: "Steamed", 煮: "Boiled", 涼拌: "Cold-tossed",
   辣: "Spicy", 清淡: "Mild", 甜: "Sweet",
 };
-/** 類別／設備／做法／口味的顯示文字；不認得的值照原文 */
+/** Display text for category / equipment / method / flavor; unknown values are shown as is */
 export const catalogLabel = (v: string) => tr(v, EN_LABEL[v] ?? v);
-// 計量單位由店家自訂（§3.2），這些只是建議
+// Units of measure are vendor-defined (§3.2); these are only suggestions
 const UNIT_SUGGESTIONS = ["克", "片", "顆", "塊", "毫升", "支", "張", "g", "ml", "個"];
 const NEW_ING = "__new__";
 
 export type ComponentDraft = Omit<Component, "id"> & { id?: string };
 export type IngredientDraft = Omit<Ingredient, "id"> & { id?: string };
 
-/** 存半成品／原物料／小盤商；回傳文件 id */
+/** Save a semi-finished item / ingredient / supplier; returns the document id */
 /**
- * 改原物料單價後，請後端依新單價重算未截單日期的候選菜份量級距（functions/src/disaster.js recalcPortionLevels）。
- * 失敗不影響單價已存好，只是份量級距維持舊的，下次改價或平台的菜價事件會再算。
+ * After an ingredient's unit price changes, ask the backend to recompute the portion tiers of candidate dishes for dates not yet past cut-off (functions/src/disaster.js recalcPortionLevels).
+ * A failure doesn't undo the saved price; the portion tiers just stay as they were until the next price change or a platform dish-price event recomputes them.
  */
 export async function recalcPortionLevelsAfterPrice(vendorId: string): Promise<number | null> {
   try {
@@ -87,7 +87,7 @@ export async function saveCatalogDoc(vendorId: string, kind: "ingredients" | "co
 const SELECT = selectClass("md", "w-full");
 
 /**
- * 漲價影響（3.3(c)）：改單價時，列出用到這個原物料的品項，預設組合（一碗飯、第一道主菜、預設配菜）的成本與毛利前後變化。
+ * Price-increase impact (3.3(c)): when a unit price changes, list the items that use this ingredient and the before/after cost and margin of their default combination (one rice, first main, default sides).
  */
 function PriceImpact({ vendorId, draft }: { vendorId: string | undefined; draft: IngredientDraft }) {
   const { data: catalog } = useVendorCatalog(vendorId);
@@ -145,7 +145,7 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
       const before = ing.id ? catalog?.ingredientsById[ing.id]?.unit_price : undefined;
       const id = await saveCatalogDoc(vendorId, "ingredients", ing);
       toast({ title: tr("已儲存", "Saved"), description: ing.name });
-      // 改了單價：份量級距跟著重算（對話框裡的「存檔後會自動重算」就是這一步）
+      // Unit price changed: recompute the portion tiers too (this is the "recalculated automatically after saving" step the dialog mentions)
       if (before !== undefined && before !== ing.unit_price) void recalcPortionLevelsAfterPrice(vendorId);
       onSaved?.(id);
       onClose();
@@ -197,7 +197,7 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
   );
 }
 
-// 烹調方式與設備帶出預設值（簡化提案 §3-4）：選了做法就自動填設備、每批份數、製程分鐘，店家不用自己想
+// Cooking method and equipment fill in defaults (simplification proposal §3-4): picking a method auto-fills equipment, servings per batch and process minutes, so the vendor doesn't have to work them out
 const METHOD_PRESET: Record<string, { equipment: string; batch_capacity: number; prep_minutes: number }> = {
   炒: { equipment: "炒鍋", batch_capacity: 10, prep_minutes: 15 },
   煮: { equipment: "電鍋", batch_capacity: 20, prep_minutes: 50 },
@@ -213,17 +213,17 @@ const EQUIPMENT_PRESET: Record<string, { batch_capacity: number; prep_minutes: n
   湯鍋: { batch_capacity: 40, prep_minutes: 60 }, 工作台: { batch_capacity: 20, prep_minutes: 15 },
 };
 
-/** 熟重 = 生重 × 熟成率 ×（1 − 損耗率）；rawAmount 的反函數 */
+/** Cooked weight = raw weight × cooking yield × (1 − loss rate); inverse of rawAmount */
 function cookedFromRaw(raw: number, ing: Pick<Ingredient, "yield_rate" | "loss_rate">): number {
   return raw / rawAmount(1, ing);
 }
 const round1 = (n: number) => Math.round(n * 10) / 10;
-/** 以克、毫升計的才有生熟之分；片、顆、支照數量算 */
+/** Only gram / milliliter units distinguish raw vs cooked; slices, pieces and sticks count by quantity */
 const isWeight = (unit: string | undefined) => !unit || ["g", "ml", "克", "毫升"].includes(unit);
 
 /**
- * 半成品（一道配菜）的編輯視窗。預設只有三樣：名稱、原物料、份量；做法選了會帶出設備與批量，其餘收進「進階」。
- * 份量可以填生重或熟重（資料一律存熟重，備料、叫貨用熟成率換回生料）：五穀米 180 g 是生重，煮熟後遠大於 180 g，兩個要分開標。
+ * Edit dialog for a semi-finished item (one side dish). By default only three fields: name, ingredients, portion; picking a method fills in equipment and batch size, everything else goes under "Advanced".
+ * Portion can be entered as raw or cooked weight (data is always stored as cooked weight; prep and purchasing convert back to raw via cooking yield): 180 g of multigrain rice is raw weight and far more than 180 g once cooked, so the two must be labeled separately.
  */
 export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
   vendorId: string | undefined;
@@ -243,7 +243,7 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
     setComp(value);
     setAdvanced(false);
   }
-  // 疊開的原物料視窗：建好後填回第 lineIdx 行
+  // Stacked ingredient dialog: once created, fill it back into row lineIdx
   const [newIng, setNewIng] = useState<{ draft: IngredientDraft; lineIdx: number } | null>(null);
 
   const setLine = (idx: number, patch: Partial<Component["ingredients"][number]>) =>
@@ -252,7 +252,7 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
   async function save() {
     if (!vendorId || !comp) return;
     try {
-      // 店家按過儲存＝確認過，AI 草稿標記拿掉
+      // The vendor pressing Save counts as confirmation, so the AI draft flag is removed
       const id = await saveCatalogDoc(vendorId, "components", { ...comp, ingredients: comp.ingredients.filter((l) => l.ingredient_id), ai_draft: false });
       toast({ title: tr("已儲存", "Saved"), description: comp.name });
       onSaved?.(id, comp.name);

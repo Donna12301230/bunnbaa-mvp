@@ -23,7 +23,7 @@
 .bb-divider--space-md { --divider-space: var(--space-4); }
 .bb-divider--space-lg { --divider-space: var(--space-6); }
 
-/* 帶文字：線改由左右偽元素繪製 */
+/* With text: the line is drawn by the left and right pseudo-elements instead */
 .bb-divider--labelled.bb-divider--horizontal {
   display: flex;
   align-items: center;

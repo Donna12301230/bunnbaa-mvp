@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 /* ── shadcn/ui design tokens ──────────────────────────────────────────────
-   已對齊 BunnBaa 設計系統（src/styles/tokens.css，預覽：#/design-system）。
-   色值與 tokens.css 同源，改色時兩邊一起改。
+   Aligned with the BunnBaa design system (src/styles/tokens.css, preview: #/design-system).
+   Colors share their source with tokens.css; change both together.
    Drives the marketplace UI (login/home/admin/vendor-portal pages).
-   和下方舊原型頁的 --ink / --brand / --legacy-* 分開，變數名稱不重疊。 */
+   Kept separate from the legacy prototype pages' --ink / --brand / --legacy-* below; variable names don't overlap. */
 :root {
   --background: #fff8ec;          /* --bg */
   --foreground: #2b2b2b;          /* --text */
@@ -14,16 +14,16 @@
   --card-foreground: #2b2b2b;
   --popover: #ffffff;
   --popover-foreground: #2b2b2b;
-  --primary: #b35a00;             /* --brand-orange-strong：白字 4.80:1 */
+  --primary: #b35a00;             /* --brand-orange-strong: white text 4.80:1 */
   --primary-foreground: #ffffff;
-  --primary-hover: #944a00;       /* hover 加深（設計系統：hover 微微變深） */
+  --primary-hover: #944a00;       /* darker on hover (design system: slightly darker on hover) */
   --secondary: #fdebd3;           /* --brand-orange-soft */
-  --secondary-foreground: #a34f00;/* --brand-orange-text：4.90:1 */
+  --secondary-foreground: #a34f00;/* --brand-orange-text: 4.90:1 */
   --muted: #f7f5f0;               /* --surface-muted */
-  --muted-foreground: #6f6b66;    /* --text-muted：4.85:1 on muted */
-  --accent: #fff4e3;              /* --brand-orange-tint：hover / 選取底 */
+  --muted-foreground: #6f6b66;    /* --text-muted: 4.85:1 on muted */
+  --accent: #fff4e3;              /* --brand-orange-tint: hover / selected background */
   --accent-foreground: #a34f00;
-  --destructive: #c24e36;         /* --danger-strong：白字 4.73:1 */
+  --destructive: #c24e36;         /* --danger-strong: white text 4.73:1 */
   --destructive-foreground: #ffffff;
   --destructive-hover: #a84030;
   --border: #ece6dc;
@@ -31,10 +31,10 @@
   --ring: #b35a00;                /* focus ring */
   --chart-1: #b35a00;
   --chart-2: #f29e0c;
-  /* 訂單統計報表「每日收入 vs 材料成本」兩線（dataviz validator 驗過：亮色白底、暗色 #2a231d）*/
+  /* Two lines for the order report's "daily revenue vs ingredient cost" (checked with the dataviz validator: light on white, dark on #2a231d) */
   --chart-revenue: #b35a00;
   --chart-cost: #2f6f9f;
-  --chart-profit: #2e7d4f;         /* 淨利線（第三條） */
+  --chart-profit: #2e7d4f;         /* net profit line (third line) */
   --chart-3: #b87a5a;
   --chart-4: #5a9e6f;
   --chart-5: #6b8fb3;
@@ -46,7 +46,7 @@
   --sidebar-accent-foreground: #a34f00;
   --sidebar-border: #ece6dc;
   --sidebar-ring: #b35a00;
-  /* 原為海軍藍；設計系統避免冷色調，改用品牌深棕（白字 5.67:1）。變數名稱保留以免改頁面 */
+  /* Was navy blue; the design system avoids cool tones, so it's the brand dark brown (white text 5.67:1). Variable name kept to avoid changing pages */
   --brand-navy: #8f5a3f;
   --brand-navy-hover: #744630;
   --surface-dark: #3a2f26;
@@ -105,27 +105,27 @@
   }
 }
 
-/* ── lock-prototype tokens（ConsumerLockPage / VendorDashboard / Payment 結果頁）
-   色值為 BunnBaa 設計系統（原為灰玫瑰色系）。底色類變數加 legacy- 前綴，
-   避免和設計系統 tokens.css 的 --bg / --surface 撞名（全站都在 .bb-theme 之內）。
-   文字色皆 ≥ 4.5:1；狀態色對應設計系統 success / warning / danger / info。 ── */
+/* ── lock-prototype tokens (ConsumerLockPage / VendorDashboard / Payment result page)
+   Colors are from the BunnBaa design system (originally a gray-rose palette). Background variables get a legacy- prefix
+   to avoid clashing with --bg / --surface in the design system's tokens.css (the whole site is inside .bb-theme).
+   All text colors are ≥ 4.5:1; status colors map to the design system's success / warning / danger / info. ── */
 :root {
   --ink: #2b2b2b;                 /* --text */
   --sub: #5c5c5c;                 /* --text-secondary */
   --faint: #6f6b66;               /* --text-muted */
-  --brand: #a34f00;               /* --brand-orange-text：白字 5.71:1、on brand-light 4.90:1 */
+  --brand: #a34f00;               /* --brand-orange-text: white text 5.71:1, on brand-light 4.90:1 */
   --brand-strong: #7a3d00;
   --brand-light: #fdebd3;         /* --brand-orange-soft */
-  --on-brand: #fff;               /* 品牌底上的文字 */
+  --on-brand: #fff;               /* text on brand background */
   --line: #ece6dc;                /* --border */
-  --legacy-bg: #fff8ec;                  /* 奶油底 */
+  --legacy-bg: #fff8ec;                  /* cream background */
   --legacy-surface: #fff;
-  --legacy-surface-muted: #f7f5f0;       /* 輸入框底（淡灰無框） */
-  --line-strong: #dcd3c6;         /* --border-strong：輸入框 hover 外框 */
-  --focus: #f29e0c;               /* --brand-orange：focus 外框 */
+  --legacy-surface-muted: #f7f5f0;       /* input background (light gray, no border) */
+  --line-strong: #dcd3c6;         /* --border-strong: input hover border */
+  --focus: #f29e0c;               /* --brand-orange: focus outline */
   --legacy-shadow-sm: 0 2px 8px rgba(120, 80, 40, 0.05);
 
-  /* status colors — one pair per lock.status value (spec §04 設計代幣) */
+  /* status colors — one pair per lock.status value (spec §04 design tokens) */
   --status-locked: #a34f00;      --status-locked-bg: #fdebd3;
   --status-resale: #8f6315;      --status-resale-bg: #fbf1dc;
   --status-fulfilled: #437552;   --status-fulfilled-bg: #e6f2e9;
@@ -144,7 +144,7 @@
     --brand: #f29e0c;
     --brand-strong: #f7c27a;
     --brand-light: #43321c;
-    --on-brand: #1f1a15;          /* 深色模式品牌底較亮，改用深字（7.95:1） */
+    --on-brand: #1f1a15;          /* brand background is lighter in dark mode, so use dark text (7.95:1) */
     --line: #3d342b;
     --legacy-bg: #1f1a15;
     --legacy-surface: #2a231d;
@@ -165,7 +165,7 @@
 
 body { margin: 0; background: var(--legacy-bg); color: var(--ink); }
 
-/* 全站包在 <ThemeRoot>（淺色）之內；舊原型頁仍跟隨系統深色模式，自己鋪底色與字色 */
+/* The whole site is wrapped in <ThemeRoot> (light); legacy prototype pages still follow the system dark mode and set their own background and text colors */
 .legacy-ui { min-height: 100vh; background: var(--legacy-bg); color: var(--ink); }
 
 .legacy-ui .page { max-width: 720px; margin: 0 auto; padding: 24px 20px 64px; }
@@ -174,7 +174,7 @@ body { margin: 0; background: var(--legacy-bg); color: var(--ink); }
   font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
   color: var(--brand); text-transform: uppercase; margin-bottom: 4px;
 }
-/* 字級對齊設計系統：h1 24/700、卡片標題用 h3 17/600 */
+/* Type sizes match the design system: h1 24/700, card titles use h3 17/600 */
 .legacy-ui h1 { font-size: 24px; font-weight: 700; line-height: 1.35; margin: 0 0 20px; }
 .legacy-ui h2 { font-size: 17px; font-weight: 600; line-height: 1.4; margin: 0 0 8px; }
 .legacy-ui .title-with-icon { display: flex; align-items: center; gap: 8px; }
@@ -186,7 +186,7 @@ body { margin: 0; background: var(--legacy-bg); color: var(--ink); }
 }
 .legacy-ui .card.tinted { background: var(--brand-light); border-color: transparent; box-shadow: none; }
 
-/* 設計系統 Badge：唯讀標記，--radius-sm、高 24px */
+/* Design-system Badge: read-only marker, --radius-sm, 24px tall */
 .legacy-ui .badge {
   display: inline-flex; align-items: center; height: 24px; vertical-align: middle;
   font-size: 12px; font-weight: 600; line-height: 1;
@@ -194,7 +194,7 @@ body { margin: 0; background: var(--legacy-bg); color: var(--ink); }
   color: var(--brand);
 }
 
-/* lock.status badge — color is fixed per status value, shared by both ends (spec §05 元件庫) */
+/* lock.status badge — color is fixed per status value, shared by both ends (spec §05 component library) */
 .legacy-ui .status-badge {
   display: inline-flex; align-items: center; height: 24px; vertical-align: middle;
   font-size: 12px; font-weight: 600; line-height: 1;
@@ -226,7 +226,7 @@ body { margin: 0; background: var(--legacy-bg); color: var(--ink); }
 .legacy-ui button.secondary { background: var(--legacy-surface); color: var(--brand); border: 1px solid var(--brand); }
 .legacy-ui button.secondary:hover:not(:disabled) { background: var(--brand-light); }
 
-/* 設計系統 Input：淡灰底無框，hover 出現細框，focus 轉白底 + 品牌橘 ring */
+/* Design-system Input: light gray, no border; a thin border on hover, white background + brand-orange ring on focus */
 .legacy-ui input[type="text"], .legacy-ui textarea {
   width: 100%; min-height: 44px; padding: 10px 12px; box-sizing: border-box;
   background: var(--legacy-surface-muted); color: var(--ink);

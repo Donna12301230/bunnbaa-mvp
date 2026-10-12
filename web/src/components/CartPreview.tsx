@@ -5,8 +5,8 @@ import { useCart } from "@/hooks/useCart";
 import { tr, loc } from "@/lib/i18n";
 import { slotLabel } from "@/lib/pickupSlots";
 
-// 加入購物車後在右下角浮出「已選品項」，讓使用者不用離開目前頁面就看到自己選了什麼。
-// 由 MenuItemPage 的 confirmAdd() 發出 BB_CART_ADDED_EVENT 觸發；不自動收起，由使用者手動關閉。
+// After adding to the cart, a "Selected items" popover appears at the bottom right so users see what they picked without leaving the page.
+// Triggered by BB_CART_ADDED_EVENT from MenuItemPage's confirmAdd(); doesn't auto-close, the user dismisses it.
 export const BB_CART_ADDED_EVENT = "bb:cart-added";
 export function notifyCartAdded() {
   globalThis.dispatchEvent(new Event(BB_CART_ADDED_EVENT));

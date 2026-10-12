@@ -8,18 +8,18 @@ export type BadgeTone = 'neutral' | 'brand' | 'success' | 'warning' | 'danger' |
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: BadgeTone;
-  /** soft 淡底深字（預設）/ solid 實心（僅 brand、danger 建議使用） */
+  /** soft: light background, dark text (default) / solid: filled (recommended only for brand and danger) */
   variant?: 'soft' | 'solid';
   size?: 'sm' | 'md';
-  /** 前置 icon（16px 以下） */
+  /** Leading icon (16px or smaller) */
   icon?: ReactNode;
-  /** 前置圓點，用於狀態標示 */
+  /** Leading dot, for status indicators */
   dot?: boolean;
-  /** rounded 標籤（--radius-sm，預設）/ pill 膠囊 */
+  /** rounded: tag (--radius-sm, default) / pill: capsule */
   shape?: 'rounded' | 'pill';
 }
 
-/** 唯讀的狀態/分類標記。 */
+/** Read-only status/category marker. */
 export function Badge({
   tone = 'neutral',
   variant = 'soft',
@@ -55,16 +55,16 @@ export function Badge({
 }
 
 export interface TagProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onChange'> {
-  /** 可選取的篩選標籤（aria-pressed） */
+  /** Selectable filter tag (aria-pressed) */
   selected?: boolean;
   icon?: ReactNode;
-  /** 提供時顯示移除鈕 */
+  /** When provided, shows a remove button */
   onRemove?: () => void;
-  /** 僅供預覽頁強制呈現狀態 */
+  /** Only for forcing states on the preview page */
   forceState?: 'hover' | 'active' | 'focus';
 }
 
-/** 可互動的膠囊標籤：篩選條件、已選項目。 */
+/** Interactive pill tag: filter criteria, selected items. */
 export function Tag({
   selected = false,
   icon,

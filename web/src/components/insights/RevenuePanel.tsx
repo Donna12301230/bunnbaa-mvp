@@ -33,8 +33,8 @@ interface ReportStats {
   topItems: { name: string; qty: number; revenue: number }[];
 }
 
-// 以取餐日落在最近 REPORT_DAYS 天（含今天）的鎖定計算；口徑跟撥款相同（lockOutcome revenueOf）：
-// 預付的照實付算（未取餐也算），顧客取消換券留下的款項也算，退成點數的不算。份數只算有出餐的。
+// Computed from locks whose pickup date falls in the last REPORT_DAYS days (including today); same basis as payouts (lockOutcome revenueOf):
+// prepaid locks count at the amount paid (no-shows included), money kept when a diner cancels for a coupon also counts, refunds to points don't. Portions count only served meals.
 function computeStats(locks: Lock[]): ReportStats | null {
   const { start, end } = reportRange();
   const inRange = locks.filter((l) => l.pickup_date >= start && l.pickup_date <= end);
@@ -43,7 +43,7 @@ function computeStats(locks: Lock[]): ReportStats | null {
   const totalRevenue = inRange.reduce((sum, l) => sum + revenueOf(l), 0);
   const byItem = new Map<string, { qty: number; revenue: number }>();
   for (const l of rows) {
-    const name = planBaseName(loc(l, "item_name")); // 計畫型「A方案・第1/5天」併成同一項
+    const name = planBaseName(loc(l, "item_name")); // merge meal-plan items like "Plan A · Day 1/5" into one entry
     const item = byItem.get(name) ?? { qty: 0, revenue: 0 };
     item.qty += 1;
     item.revenue += l.locked_price || 0;
@@ -58,7 +58,7 @@ function computeStats(locks: Lock[]): ReportStats | null {
   };
 }
 
-/** 營收：15 天四個大數字、每日收入／材料成本／淨利圖、熱銷排行（獎牌＋長條）、預測準確率量表＋問 AI */
+/** Revenue: four headline numbers for 15 days, daily revenue / ingredient cost / net profit chart, best-seller ranking (medals + bars), forecast accuracy gauge + ask AI */
 export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {
   const [report, setReport] = useState<AccuracyReport | null>(null);
   const [askOpen, setAskOpen] = useState(false);
@@ -70,7 +70,7 @@ export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: strin
 
   useEffect(() => {
     if (!vendorId) return;
-    // 單一等值不加 orderBy，避免另外要求複合索引，最新一份在前端挑
+    // A single equality filter without orderBy avoids needing a composite index; pick the latest one on the client
     const q = query(collection(db, "accuracy_reports"), where("vendor_id", "==", vendorId), limit(50));
     return onSnapshot(q, (snap) => {
       const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as AccuracyReport & { generated_at?: { toMillis?: () => number } });
@@ -79,7 +79,7 @@ export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: strin
     }, () => setReport(null));
   }, [vendorId]);
 
-  // 直接查取餐日區間（vendor_id + pickup_date 索引），不用「最近 500 筆」——訂單一多會被截掉（BUG-13）
+  // Query the pickup-date range directly (vendor_id + pickup_date index) instead of "latest 500"; with many orders that gets truncated (BUG-13)
   useEffect(() => {
     if (!vendorId) return;
     const { start, end } = reportRange();
@@ -167,7 +167,7 @@ export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: strin
       <DemandForecastCard vendorId={vendorId} />
       <CustomerInsightsCard vendorId={vendorId} />
 
-      {/* 預測準確率：量表；說明與追問收起來 */}
+      {/* Forecast accuracy: gauge; explanation and follow-up questions collapsed */}
       <Card className="border-2">
         <CardContent className="p-4 space-y-3">
           <div className="flex flex-wrap items-center gap-2">

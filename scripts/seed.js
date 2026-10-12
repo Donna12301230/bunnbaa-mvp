@@ -5,10 +5,10 @@
  * discount_explanations, growth_rewards, draws.
  *
  * Story this tells (2026-09-23 seed, TODO.md pilot scope):
- *   - cafe-renheya-demo ("仁和雅咖啡"): the hero vendor every hardcoded
+ *   - cafe-renheya-demo ("仁和雅咖啡", Renheya Cafe): the hero vendor every hardcoded
  *     VENDOR_ID in the frontend (Marketplace/VendorDashboard/VendorPortal*)
  *     points at. 45 days of history, accuracy improving 55%→90%, settled
- *     payouts cross the 20萬 growth-reward threshold so the consumer-side
+ *     payouts cross the NT$200k growth-reward threshold so the consumer-side
  *     draw card + VendorPortalGrowth page both have something to show.
  *   - wang-mama-biandang / ajia-friedchicken: two more real vendors with
  *     their own history at different reliability levels (variable, not
@@ -22,17 +22,17 @@
  *
  * AI-generated fields (accuracy_reports, discount_explanations) are
  * hand-written here instead of calling Gemini — the API key isn't
- * provisioned yet (TODO.md 卡點 2). discount_explanations is pre-warmed
+ * provisioned yet (TODO.md, blocker 2). discount_explanations is pre-warmed
  * *before* any lock is written, so the real deployed `onLockCreated`
  * trigger finds a cache hit for every lock this script creates and never
  * attempts a Gemini call. Swap in real reports once the key lands; nothing
  * here needs to change to stop conflicting with it.
  *
- * Plan-type locks (訂閱制多日方案, HomePage.tsx handleJoinPlan) are
+ * Plan-type locks (subscription-style multi-day plans, HomePage.tsx handleJoinPlan) are
  * deliberately NOT seeded — they're only ever visible on the buyer's own
  * MyBookings page (queried by buyer_uid), and a synthetic buyer_uid isn't
  * reachable by anyone signing in for the demo. Same call the project
- * already made for this (TODO.md: "「計畫型」...這次沒有補假資料").
+ * already made for this (TODO.md: "plan-type ... no fake data added this time").
  *
  * Usage:
  *   cd scripts && npm install       # one-time: installs firebase-admin locally
@@ -51,12 +51,12 @@
  *   - run via `firebase emulators:exec` against the local emulator, or
  *   - set GOOGLE_APPLICATION_CREDENTIALS to a service account JSON
  *     for the real bunnbaa-mvp-5474 project (this is what TODO.md's
- *     "錄 demo 前再灌資料" step means).
+ *     "seed the data right before recording the demo" step means).
  *
  * After running against production, still manually needed (this script
  * can't do it — no real Firebase Auth UID to bind):
- *   - vendors/{id}.owner_uid for each vendor, per TODO.md "商家帳號綁定"
- *     流程, otherwise the vendor-portal login guard has nothing to match.
+ *   - vendors/{id}.owner_uid for each vendor, per TODO.md's "vendor account
+ *     binding" flow, otherwise the vendor-portal login guard has nothing to match.
  */
 const admin = require("firebase-admin");
 
@@ -66,7 +66,7 @@ const { FieldValue, Timestamp } = admin.firestore;
 
 const FORCE = process.argv.includes("--force");
 const CATALOG_ONLY = process.argv.includes("--catalog-only");
-// 只寫平台設定（platform_config/growth、landing_events），不動商家／菜單／帳號，正式站補資料用
+// Only writes platform settings (platform_config/growth, landing_events); leaves vendors/menus/accounts alone. For backfilling production
 const CONFIG_ONLY = process.argv.includes("--config-only");
 
 /* ------------------------------------------------------------------ *
@@ -162,7 +162,7 @@ const VENDORS = [
     rainyEveryNDays: 5,
     rainPenalty: 0.15,
     unsettledRecentDays: 2, // left for the live demo to settle via triggerSettlementNow
-    targetMinRevenue: 210000, // safely clears the 20萬 growth-reward tier1, nowhere near tier2 (100萬)
+    targetMinRevenue: 210000, // safely clears the NT$200k growth-reward tier1, nowhere near tier2 (NT$1M)
     buyerPrefix: "demo-user-cafe",
   },
   {
@@ -314,7 +314,7 @@ async function seedVendors(finalAccuracyByVendor) {
       address: v.address,
       phone: v.phone,
       // owner_uid intentionally left unset — bind it manually to a real
-      // Firebase Auth uid per TODO.md's "商家帳號綁定" before the demo.
+      // Firebase Auth uid per TODO.md's "vendor account binding" before the demo.
       owner_uid: null,
       created_at: Timestamp.fromDate(daysAgo(v.historyDays > 0 ? v.historyDays + 5 : 2)),
     });
@@ -332,7 +332,7 @@ async function seedVendors(finalAccuracyByVendor) {
 async function seedVendorHistory(v, writer) {
   if (v.historyDays === 0) return { revenue: 0, lockCount: 0, payoutCount: 0, finalAccuracy: null };
 
-  const lockedPrice = Math.round(v.originalPrice * 0.95); // same-day pickup = 95折 early-bird tier
+  const lockedPrice = Math.round(v.originalPrice * 0.95); // same-day pickup = 5%-off early-bird tier
   let revenue = 0;
   let lockCount = 0;
   let payoutCount = 0;
@@ -340,7 +340,7 @@ async function seedVendorHistory(v, writer) {
 
   for (let day = v.historyDays; day >= 1; day--) {
     const date = daysAgo(day);
-    if (date.getDay() === 0 || date.getDay() === 6) continue; // 第一階段週一至週五營業（規格 §2）
+    if (date.getDay() === 0 || date.getDay() === 6) continue; // phase 1 is open Monday to Friday (spec §2)
     const dateStr = isoDate(date);
     const progress = v.historyDays === 1 ? 1 : (v.historyDays - day) / (v.historyDays - 1);
     let dayAccuracy = v.accuracyStart + progress * (v.accuracyEnd - v.accuracyStart);
@@ -359,7 +359,7 @@ async function seedVendorHistory(v, writer) {
       const ref = db.collection("locks").doc();
       await writer.set(ref, {
         vendor_id: v.id,
-        menu_item_id: `${v.id}-item-1`, // 材料成本、備料都靠它對到配方
+        menu_item_id: `${v.id}-item-1`, // ingredient cost and prep both use this to match the recipe
         item_name: v.itemName,
         pickup_window: v.pickupWindow,
         pickup_date: dateStr,
@@ -415,7 +415,7 @@ async function topUpRevenue(v, currentRevenue, lockedPrice, writer) {
     const ref = db.collection("locks").doc();
     await writer.set(ref, {
       vendor_id: v.id,
-      menu_item_id: `${v.id}-item-1`, // 材料成本、備料都靠它對到配方
+      menu_item_id: `${v.id}-item-1`, // ingredient cost and prep both use this to match the recipe
       item_name: v.itemName,
       pickup_window: v.pickupWindow,
       pickup_date: dateStr,
@@ -450,7 +450,7 @@ async function topUpRevenue(v, currentRevenue, lockedPrice, writer) {
  * accuracy_reports — hand-written stand-ins for Gemini output (see file
  * header). Each vendor with history gets an early low-confidence report
  * and a latest report matching its actual simulated accuracy, so the
- * "履約穩定度" badge and VendorDashboard's report card agree with the
+ * "fulfillment reliability" badge and VendorDashboard's report card agree with the
  * lock data underneath them.
  * ------------------------------------------------------------------ */
 
@@ -510,14 +510,14 @@ async function seedCurrentLocks(writer) {
   const zaoan = VENDORS[3];
 
   async function addLock(v, { daysAhead: requested, window, status, resaleDeadlineHoursFromNow, buyerSuffix }) {
-    // 週一至週五營業（規格 §2）：落在週六、週日的往後挪到週一（今天本身是週末就照舊，demo 才有今天的單）
+    // Open Monday to Friday (spec §2): dates on Sat/Sun move forward to Monday (if today itself is a weekend, keep it so the demo has orders for today)
     const day = daysFromNow(requested).getDay();
     const daysAhead = requested === 0 ? 0 : day === 6 ? requested + 2 : day === 0 ? requested + 1 : requested;
     const pickupDate = isoDate(daysFromNow(daysAhead));
     const { discountPercent, lockedPrice } = priceForDaysAhead(v.originalPrice, daysAhead);
     const data = {
       vendor_id: v.id,
-      menu_item_id: `${v.id}-item-1`, // 材料成本、備料都靠它對到配方
+      menu_item_id: `${v.id}-item-1`, // ingredient cost and prep both use this to match the recipe
       item_name: v.itemName,
       pickup_window: window,
       pickup_date: pickupDate,
@@ -542,9 +542,9 @@ async function seedCurrentLocks(writer) {
   await addLock(cafe, { daysAhead: 1, window: cafe.pickupWindow, status: "locked", buyerSuffix: 3 });
   await addLock(cafe, { daysAhead: 0, window: "17:30-18:30", status: "locked", buyerSuffix: 4 });
   await addLock(cafe, { daysAhead: 1, window: "17:30-18:30", status: "locked", buyerSuffix: 5 });
-  await addLock(cafe, { daysAhead: 6, window: cafe.pickupWindow, status: "locked", buyerSuffix: 6 }); // 8折 tier
-  await addLock(cafe, { daysAhead: 9, window: cafe.pickupWindow, status: "locked", buyerSuffix: 7 }); // 8折 tier
-  await addLock(cafe, { daysAhead: 21, window: cafe.pickupWindow, status: "locked", buyerSuffix: 8 }); // 7折 tier
+  await addLock(cafe, { daysAhead: 6, window: cafe.pickupWindow, status: "locked", buyerSuffix: 6 }); // 20%-off tier
+  await addLock(cafe, { daysAhead: 9, window: cafe.pickupWindow, status: "locked", buyerSuffix: 7 }); // 20%-off tier
+  await addLock(cafe, { daysAhead: 21, window: cafe.pickupWindow, status: "locked", buyerSuffix: 8 }); // 30%-off tier
   await addLock(cafe, { daysAhead: 0, window: cafe.pickupWindow, status: "for_resale", resaleDeadlineHoursFromNow: 3, buyerSuffix: 9 });
   await addLock(cafe, { daysAhead: 1, window: cafe.pickupWindow, status: "for_resale", resaleDeadlineHoursFromNow: 5, buyerSuffix: 10 });
   await addLock(cafe, { daysAhead: 0, window: "17:30-18:30", status: "for_resale", resaleDeadlineHoursFromNow: 2, buyerSuffix: 11 });
@@ -575,15 +575,15 @@ async function seedCurrentLocks(writer) {
 
 /* ------------------------------------------------------------------ *
  * growth_rewards / draws — only for cafe-renheya-demo, the vendor whose
- * settled revenue is engineered to clear the 20萬 tier1 threshold.
+ * settled revenue is engineered to clear the NT$200k tier1 threshold.
  * ------------------------------------------------------------------ */
 
 async function seedGrowthRewards(cafe, writer) {
   await writer.set(db.collection("growth_rewards").doc(cafe.id), {
     voucher_total: 10,
-    voucher_remaining: 9, // one 0-元 draw already seeded below
+    voucher_remaining: 9, // one NT$0 draw already seeded below
     // mirrors functions/src/index.js syncGrowthUnlock — the seeded payouts
-    // are engineered to clear tier1 (20萬) but not tier2 (100萬)
+    // are engineered to clear tier1 (NT$200k) but not tier2 (NT$1M)
     unlocked_milestones: ["tier1"],
   });
 
@@ -644,7 +644,7 @@ async function seedMenuItems(writer) {
   console.log(`Seeded ${VENDORS.length} menu_items`);
 }
 
-// Two plans per vendor (A/B, 5天/7天), price_per_meal is a discount off
+// Two plans per vendor (A/B, 5-day/7-day), price_per_meal is a discount off
 // the vendor's existing single-item price — not an invented number.
 const MEAL_PLAN_DEFS = [
   { key: "a", label: "A方案", days: 5, priceFactor: 0.9, name: "五日輕食計畫" },
@@ -669,8 +669,8 @@ async function seedMealPlans(writer) {
   console.log(`Seeded ${VENDORS.length * MEAL_PLAN_DEFS.length} meal_plans`);
 }
 
-// 平台層級設定，前端商家後台與 Functions（drawGrowthReward／syncGrowthUnlock）讀同一份。
-// 用 set 覆寫，重跑 seed 會把管理員在 Console 改過的值蓋回預設。
+// Platform-level settings, read by both the frontend vendor portal and Functions (drawGrowthReward/syncGrowthUnlock).
+// Written with set, so re-running the seed resets any values the admin changed in the Console back to defaults.
 async function seedPlatformConfig(writer) {
   await writer.set(db.collection("platform_config").doc("growth"), {
     milestones: [
@@ -681,8 +681,8 @@ async function seedPlatformConfig(writer) {
   });
   console.log("Seeded platform_config/growth");
 
-  // Landing 頁「近期活動」（*_en 是英文版文案，選填）。icon 是前端 EVENT_ICONS 的 key（sparkle／calendar／
-  // repeat／store／ticket／bell）；active: false 可以先下架不刪除。
+  // Landing page "Upcoming events" (*_en fields are the optional English copy). icon is a key of the frontend's
+  // EVENT_ICONS (sparkle/calendar/repeat/store/ticket/bell); active: false hides an event without deleting it.
   const events = [
     { id: "growth-draw", date_label: "每月 1 日", title: "成長獎勵抽獎", body: "合作店家營收達標就解鎖，最高抽中整份 0 元。", icon: "sparkle", href: "/home",
       date_label_en: "1st of every month", title_en: "Growth reward draw", body_en: "Unlocked when a partner vendor hits its revenue goal — win up to a free meal." },

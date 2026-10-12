@@ -9,9 +9,9 @@ export interface Favorite {
 }
 
 /**
- * 我的最愛（§4.5）：users/{uid}/favorites/{vendorId}，僅本人可讀寫（firestore.rules）。
- * 收藏也是口味偏好的正面訊號（functions/src/insights.js onFavoriteCreated）。
- * 店家卡片上每顆愛心都會用到，所以整站共用一個 onSnapshot（依 uid）。
+ * Favorites (§4.5): users/{uid}/favorites/{vendorId}, readable and writable only by the owner (firestore.rules).
+ * A favorite is also a positive taste-preference signal (functions/src/insights.js onFavoriteCreated).
+ * Every heart on vendor cards uses this, so the whole site shares one onSnapshot (per uid).
  */
 interface State {
   uid: string | null;
@@ -33,7 +33,7 @@ function watch(uid: string | null) {
     collection(db, "users", uid, "favorites"),
     (snap) => {
       const list = snap.docs.map((d) => ({ vendor_id: d.id, ...(d.data() as Omit<Favorite, "vendor_id">) }));
-      // 依收藏時間排序（新的在前；剛按下、伺服器時間還沒回來的排最前面）
+      // Sort by when favorited (newest first; ones just tapped whose server timestamp hasn't arrived yet go first)
       list.sort((a, b) => (b.created_at?.toMillis?.() ?? Infinity) - (a.created_at?.toMillis?.() ?? Infinity));
       state = { uid, favorites: list, loading: false };
       emit();

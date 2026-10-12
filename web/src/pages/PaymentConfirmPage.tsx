@@ -17,8 +17,8 @@ import type { Lock } from "@/types";
 
 /**
  * LINE Pay redirects here after the buyer approves payment (confirmUrl set in
- * createCartLinePayReservation). 折價券全額折抵（0 元）的訂單不經 LINE Pay，
- * 購物車直接導到這裡。We must wait for Firebase Auth to restore the buyer's
+ * createCartLinePayReservation). Orders fully covered by a coupon (NT$0) skip LINE Pay
+ * and the cart redirects straight here. We must wait for Firebase Auth to restore the buyer's
  * session before calling confirmLinePayPayment — this is a full page reload
  * coming back from LINE Pay's domain.
  */
@@ -26,7 +26,7 @@ export default function PaymentConfirmPage() {
   const [status, setStatus] = useState<"waiting-auth" | "confirming" | "done" | "error">("waiting-auth");
   const [locks, setLocks] = useState<Lock[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
-  const [isResale, setIsResale] = useState(false); // 轉讓市集付費接手（同一個確認頁）
+  const [isResale, setIsResale] = useState(false); // Paid takeover from the resale market (same confirmation page)
   // LINE Pay's ?transactionId=... append can end up glued onto this param
   const { orderId: rawOrderId } = useParams<{ orderId: string }>();
   const orderId = rawOrderId?.split(/[?&]/)[0];
@@ -50,14 +50,14 @@ export default function PaymentConfirmPage() {
         const { lock_ids: ids, kind } = result.data as { lock_ids: string[]; kind?: string };
         setIsResale(kind === "resale");
         cartStore.discardPending();
-        // 付款已成功，讀不到細節也不能讓頁面變成「付款確認失敗」
+        // Payment already succeeded; failing to read the details must not turn the page into "Payment confirmation failed"
         const docs = await Promise.all(ids.map((id) => getDoc(doc(db, "locks", id)).catch(() => null)));
         setLocks(docs.filter((d) => d?.exists()).map((d) => ({ id: d!.id, ...d!.data() }) as Lock));
         setStatus("done");
         try {
           const fcmToken = await registerForPickupReminders();
           if (fcmToken) {
-            // 規則限制最多 5 個 token（firestore.rules userTokens）：保留最新的 4 個再加這台，第 6 台裝置起才不會寫入失敗
+            // The rules allow at most 5 tokens (firestore.rules userTokens): keep the newest 4 plus this device, so a 6th device onward doesn't fail to write
             const ref = doc(db, "userTokens", user.uid);
             const prev = ((await getDoc(ref).catch(() => null))?.data()?.tokens as string[] | undefined) ?? [];
             if (!prev.includes(fcmToken)) await setDoc(ref, { tokens: [...prev.slice(-4), fcmToken] }, { merge: true });

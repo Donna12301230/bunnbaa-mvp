@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-// 元素第一次捲進可視範圍就觸發一次（之後捲出畫面也不會復原），純粹拿來做
-// 「進場淡入」用；不是資料載入判斷，跟 useIntersection 之類的無限監聽不同。
+// Fires once the first time the element scrolls into view (scrolling out again doesn't reset it). Used only for
+// fade-in on enter; it's not for data loading, unlike continuous observers such as useIntersection.
 export function useInView<T extends HTMLElement>(options?: IntersectionObserverInit) {
   const ref = useRef<T>(null);
   const [inView, setInView] = useState(false);

@@ -7,17 +7,17 @@ import type { MealPeriod, MenuItem, Vendor } from "@/types";
 export interface SlotAvailability {
   window: string;
   started: boolean;
-  /** 剩幾份；商家沒設上限時是 null */
+  /** Portions left; null when the vendor has no cap */
   remaining: number | null;
-  /** 可以選：沒開始、沒額滿、店有營業 */
+  /** Selectable: not started, not full, and the store is open */
   open: boolean;
 }
 
 /**
- * 某家店某一天每個取餐時段的狀態。份數來自 slot_counters（只有
- * confirmLinePayPayment 會寫，見 functions/src/index.js），伺服器結帳時會再擋一次，
- * 這裡只是讓消費者先看到。沒傳 vendor（例如首頁還沒選店）就用預設時段、不算份數。
- * 給 item／period 只列品項供應餐期（或指定餐期）的時段。
+ * Status of each pickup slot at one vendor on one day. Portion counts come from slot_counters (written only
+ * by confirmLinePayPayment, see functions/src/index.js); the server checks again at checkout,
+ * this just shows the diner first. Without a vendor (e.g. no store chosen yet on the home page), use the default slots and skip counts.
+ * With item / period, only list slots in the meal periods the item is served (or the given period).
  */
 export function useSlotAvailability(
   vendor: Vendor | null | undefined,
@@ -41,7 +41,7 @@ export function useSlotAvailability(
     staleTime: 15 * 1000,
   });
 
-  // 非營業日、公休、停班停課、已截單、超出預訂範圍都算不能訂
+  // Non-business days, closed days, work-suspension days, past cut-off and beyond the booking range are all unbookable
   const closedReason = pickupDate ? bookingProblem(vendor, pickupDate) : null;
   const slots: SlotAvailability[] = itemWindows(vendor, item, period).map((window) => {
     const started = isSlotStarted(pickupDate, window);

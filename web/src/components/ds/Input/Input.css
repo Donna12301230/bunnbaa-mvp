@@ -1,4 +1,4 @@
-/* 眼睛切換鈕：視覺貼齊欄位右緣，點擊區 44×44 */
+/* Eye toggle: visually flush with the field's right edge, 44×44 hit area */
 .bb-input__reveal {
   display: inline-flex;
   align-items: center;

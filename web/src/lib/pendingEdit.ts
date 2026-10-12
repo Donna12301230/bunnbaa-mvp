@@ -1,5 +1,5 @@
-// 跨頁「打開某一筆來編輯」：例如配方頁點「用在：雞腿便當」→ 跳到菜單管理並打開該品項。
-// 只在同一個分頁的 SPA 內傳遞，跳頁後由目標頁取走一次就清掉。
+// Cross-page "open a record for editing": e.g. clicking "Used in: Chicken leg bento" on the recipes page → jump to menu management and open that item.
+// Passed only within the SPA in the same tab; the target page takes it once after navigation and it is cleared.
 
 type Target = "menu_item" | "component" | "ingredient";
 let pending: { target: Target; id: string } | null = null;

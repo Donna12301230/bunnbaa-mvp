@@ -1,9 +1,11 @@
 /**
- * 資料庫內容的英文版：用 Gemini 把中文翻成英文，存成同名的 *_en 欄位
- * （例：menu_items.name → name_en）。前端英文介面優先讀 *_en，沒有就顯示中文。
+ * English versions of database content: Gemini translates the Chinese into English and stores it
+ * in a matching *_en field (e.g. menu_items.name -> name_en). The English UI reads *_en first and
+ * falls back to the Chinese.
  *
- * 每份文件記下「翻譯時的原文」(i18n_src)，原文沒變就不重翻——Firestore 觸發器
- * 寫回 *_en 會再觸發一次自己，靠這個比對停下來，不會無限迴圈。
+ * Each document records the source text it was translated from (i18n_src) and is not re-translated
+ * while the source is unchanged. Writing *_en back re-fires the Firestore trigger on the same
+ * document; this comparison stops it there instead of looping forever.
  */
 const { generateJSON } = require("./gemini");
 
@@ -15,7 +17,7 @@ Rules:
 - Keep numbers, prices, dates, times and emoji unchanged. Do not add explanations.
 - If an input is empty, return an empty string for it.`;
 
-/** 一次翻一批字串，回傳同樣順序的英文陣列 */
+/** Translate a batch of strings; returns the English strings in the same order */
 async function translateTexts(texts) {
   if (texts.length === 0) return [];
   const result = await generateJSON({
@@ -31,8 +33,9 @@ async function translateTexts(texts) {
 }
 
 /**
- * 算出這份文件要寫回的英文欄位；原文跟上次翻譯時一樣就回傳 null（不用寫）。
- * fields：要翻的中文欄位名，例 ["name", "description"]。
+ * Compute the English fields to write back for this document; returns null (nothing to write)
+ * when the source matches the last translation.
+ * fields: names of the Chinese fields to translate, e.g. ["name", "description"].
  */
 async function translationPatch(data, fields) {
   const src = {};
@@ -51,12 +54,12 @@ async function translationPatch(data, fields) {
   return patch;
 }
 
-// 各 collection 要翻的欄位（地址的 address_en 只給英文介面顯示；地區篩選照樣比對中文 address）
+// Fields to translate per collection (address_en is only for display in the English UI; area filtering still matches the Chinese address)
 const TRANSLATED_FIELDS = {
   vendors: ["name", "description", "address"],
   menu_items: ["name", "description", "category", "catalog"],
   meal_plans: ["label", "name", "description", "fastest_booking"],
-  // 評價（使用者寫的心得、系所署名）與抽獎紀錄的品名
+  // Reviews (the user's comment and department signature) and item names on draw records
   reviews: ["comment", "item_name", "reviewer_label"],
   draws: ["item_name"],
 };

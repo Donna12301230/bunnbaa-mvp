@@ -1,12 +1,12 @@
-// 店家財務（規格 §1、§9.3）：平台抽成、基本工資、本月收益看板。
-// 合作方案 2026-10-05 改版：不收月費（原本的維護費、寬限、暫停接單、首月免費都拿掉），改成每份餐點實付金額抽成
-// commissionRate（預設 5%）；撥款時扣（index.js settleVendorPayout），收益看板列為一項成本。
-// 金額、份數一律由程式計算（AI 不參與）。純函式放 module.exports.helpers，給測試用。
+// Vendor finance (spec §1, §9.3): platform commission, minimum wage, this month's earnings dashboard.
+// Partnership plan revised 2026-10-05: no monthly fee (the old maintenance fee, grace period, order suspension and free first month are gone); instead a
+// commission of commissionRate (default 5%) on the amount paid per meal, deducted at payout (index.js settleVendorPayout) and listed as a cost on the earnings dashboard.
+// Amounts and portion counts are always computed in code (no AI). Pure functions are in module.exports.helpers for tests.
 //
-// vendors/{id} 相關欄位：
-//   hourly_wage（備料人工時薪，只能調高）、staff_salaries[]（正職月薪）、fixed_costs（其他固定成本／月）
-//   owner_hours_per_day（老闆每天工時，算老闆實際時薪）、linepay_fee_rate（LINE Pay 合約費率）
-// vendors/{id}/revenueForecast/{YYYY-MM}：buildRevenueForecast 每天 21:00 寫
+// Related fields on vendors/{id}:
+//   hourly_wage (prep labor hourly wage, can only go up), staff_salaries[] (full-time monthly salaries), fixed_costs (other fixed costs per month)
+//   owner_hours_per_day (owner's daily hours, for the owner's effective hourly wage), linepay_fee_rate (LINE Pay contract fee rate)
+// vendors/{id}/revenueForecast/{YYYY-MM}: written daily at 21:00 by buildRevenueForecast
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const {
   REGION, db, onCall, HttpsError, FieldValue, t, logger, callerVendorId, notifyVendor, loadVendorCatalog, forEachVendor,
@@ -20,17 +20,17 @@ const { helpers: purchasing } = require("./purchasing");
 
 const DAY_MS = 86400000;
 const DEFAULT_LINEPAY_FEE_RATE = 0.0275;
-// 營收口徑跟撥款一致：pricing.js revenueOf（預付的照實付算；取消換券留下的款項也算；退成點數的不算）
+// Revenue is counted the same way as payouts: pricing.js revenueOf (prepaid orders at the amount paid; money kept from cancellations for coupons counts; refunds to points don't)
 const { PAID_STATUSES, revenueOf } = require("./pricing");
-/** 有出餐成本的訂單（取消的沒做餐點，只算營收不算材料與人工） */
+/** Orders with a food cost (cancelled ones were never made: they count as revenue but not materials or labor) */
 const hasMeal = (l) => PAID_STATUSES.includes(l.status);
 
 /* ------------------------------------------------------------------ *
- * 基本工資（§9.3）：平台自動更新（以勞動部公告為準、生效日套用）；
- * 店家輸入低於基本工資會被擋下，調漲時自動上調並通知
+ * Minimum wage (§9.3): the platform updates it automatically (per the Ministry of Labor announcement, applied on its effective date);
+ * vendor inputs below the minimum wage are rejected, and when it rises, vendor settings are raised automatically with a notification
  * ------------------------------------------------------------------ */
 
-/** 把店家薪資設定拉到不低於基本工資；回傳 { patch, raised[] } */
+/** Raise a vendor's wage settings to at least the minimum wage; returns { patch, raised[] } */
 function raiseToMinimum(vendor, wage) {
   const patch = {};
   const raised = [];
@@ -48,8 +48,8 @@ function raiseToMinimum(vendor, wage) {
 }
 
 exports.syncMinimumWage = onSchedule({ schedule: "10 0 * * *", timeZone: "Asia/Taipei", region: REGION }, async () => {
-  // 第一階段資料來源：平台管理者在 platformConfig/minimumWage 填勞動部公告（含未來生效的 history）；
-  // 這支每天依生效日套用。自動抓勞動部資料待確認（規格 §16）。
+  // Phase 1 data source: platform admins enter the Ministry of Labor announcement in platformConfig/minimumWage (including future entries in history);
+  // this job applies it daily by effective date. Fetching Ministry of Labor data automatically is still to be decided (spec §16).
   const today = taipeiToday();
   const doc = await loadMinimumWage(db());
   const wage = wageOn(doc, today);
@@ -70,7 +70,7 @@ exports.syncMinimumWage = onSchedule({ schedule: "10 0 * * *", timeZone: "Asia/T
   });
 });
 
-/** 店家設定成本參數（收益看板用）。薪資不得低於基本工資，由後端檢查後寫入 */
+/** Vendor sets cost parameters (for the earnings dashboard). Wages can't be below the minimum wage; the backend checks before writing */
 exports.updateVendorCosts = onCall({}, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const wage = wageOn(await loadMinimumWage(db()), taipeiToday());
@@ -105,7 +105,7 @@ exports.updateVendorCosts = onCall({}, async (request) => {
 });
 
 /* ------------------------------------------------------------------ *
- * 本月收益看板（§9.3）：營收（已確定＋預估）、材料、人工、手續費、平台抽成、薪資、固定成本 → 預估淨利
+ * This month's earnings dashboard (§9.3): revenue (confirmed + forecast), materials, labor, fees, platform commission, salaries, fixed costs → forecast net profit
  * ------------------------------------------------------------------ */
 
 function monthDays(month) {
@@ -114,7 +114,7 @@ function monthDays(month) {
   return Array.from({ length: n }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`);
 }
 
-/** 原物料用量 → 材料成本（元）：用量 ÷ 採購單位大小 × 最新單價 */
+/** Ingredient usage → material cost (NT$): usage ÷ purchase unit size × latest unit price */
 function needsCost(needs, ingredientsById) {
   let cost = 0;
   for (const [id, amount] of needs) {
@@ -126,17 +126,17 @@ function needsCost(needs, ingredientsById) {
   return cost;
 }
 
-/** 時間軸工時（分鐘）：每批任務時間＋前一晚任務（以半成品製程時間計）＋裝盒 */
+/** Timeline labor (minutes): time for each batch task + night-before tasks (by component process time) + boxing */
 function timelineMinutes(timeline, componentsById) {
   if (!timeline) return 0;
   let minutes = 0;
   for (const s of timeline.slots || []) minutes += Math.max(0, toMinutes(s.end) - toMinutes(s.start));
   for (const o of timeline.overnight || []) minutes += Number(componentsById[o.component_id]?.prep_minutes) || 20;
-  if ((timeline.slots || []).length > 0 || (timeline.overnight || []).length > 0) minutes += 20; // 裝盒、貼標籤
+  if ((timeline.slots || []).length > 0 || (timeline.overnight || []).length > 0) minutes += 20; // boxing and labeling
   return minutes;
 }
 
-/** 一天的人工分鐘：依餐期分開排時間軸再加總 */
+/** Labor minutes for a day: schedule a timeline per meal period, then sum */
 function dayLaborMinutes(locks, catalog, vendor, config) {
   const ranges = vendorPeriodRanges(vendor, config);
   let minutes = 0;
@@ -150,7 +150,7 @@ function dayLaborMinutes(locks, catalog, vendor, config) {
   return minutes;
 }
 
-/** 每份毛利（§9.3）：最深早鳥折扣後的售價（EARLY_BIRD_TIERS，目前 8 折）− 單份材料成本；毛利低於材料成本 30% 標紅 */
+/** Gross margin per portion (§9.3): price after the deepest early-bird discount (EARLY_BIRD_TIERS, currently 20% off) − material cost per portion; flagged red when the margin is below 30% of material cost */
 function itemMargins(catalog, config) {
   const out = [];
   for (const item of Object.values(catalog.itemsById)) {
@@ -186,7 +186,7 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
   const all = snap.docs.map((d) => d.data()).filter((l) => revenueOf(l) > 0 || hasMeal(l));
   const inMonth = all.filter((l) => l.pickup_date >= first);
 
-  // 近 4 週平均實付（預估營收用）
+  // Average amount paid over the last 4 weeks (for forecast revenue)
   const recent = all.filter((l) => l.pickup_date < today && l.pickup_date >= addDays(today, -28));
   const avgPaid = recent.length > 0 ? recent.reduce((s, l) => s + revenueOf(l), 0) / recent.length
     : (inMonth.length > 0 ? inMonth.reduce((s, l) => s + revenueOf(l), 0) / inMonth.length : 0);
@@ -217,7 +217,7 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
     const revenue = dayAll.reduce((s, l) => s + revenueOf(l), 0);
     confirmedRevenue += revenue;
     confirmedQty += locks.length;
-    // 還沒到截單的日期補上預測份數（預設配菜、一般飯量）
+    // For dates not yet past cut-off, add forecast portions (default sides, normal rice)
     let predicted = [];
     if (open && date > today) {
       const counts = new Map();
@@ -233,7 +233,7 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
     materialCost += dayMaterial;
     const minutes = dayLaborMinutes(dayLocks, catalog, vendor, config);
     laborMinutes += minutes;
-    // 每天的人工用當天生效的基本工資（店家設定較高時用店家的）
+    // Each day's labor uses the minimum wage in effect that day (or the vendor's setting if higher)
     const hourly = Math.max(ownHourly, wageOn(wageDoc, date).hourly);
     laborCost += (minutes / 60) * hourly;
     for (const l of locks) {
@@ -255,7 +255,7 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
 
   const revenue = confirmedRevenue + forecastRevenue;
   const paymentFee = revenue * feeRate;
-  // 平台抽成：已確定的逐份算，預估的用預估營收 × 比例
+  // Platform commission: per portion for confirmed orders; forecast revenue × rate for forecasts
   const commissionRate = Number(config.commissionRate) || 0;
   const commissionFee = commissionOf(inMonth, commissionRate) + forecastRevenue * commissionRate;
   const salaries = (Array.isArray(vendor.staff_salaries) ? vendor.staff_salaries : []).reduce((s, n) => s + (Number(n) || 0), 0);
@@ -263,7 +263,7 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
   const netProfit = revenue - materialCost - laborCost - paymentFee - commissionFee - salaries - otherFixed;
   const ownerHours = (Number(vendor.owner_hours_per_day) || 0) * businessDays;
 
-  // 損益兩平：本月還要賣幾份才打平固定成本（每份貢獻 = 平均實付 − 平均材料 − 平均人工 − 手續費 − 平台抽成）
+  // Break-even: how many more portions this month to cover fixed costs (contribution per portion = avg paid − avg materials − avg labor − fees − platform commission)
   const qty = confirmedQty + forecastQty;
   const perServing = qty > 0 ? (revenue - materialCost - laborCost - paymentFee - commissionFee) / qty : 0;
   const fixed = salaries + otherFixed;
@@ -313,9 +313,9 @@ async function buildForecast(vendor, month, { today = taipeiToday() } = {}) {
 }
 
 /**
- * 最近 15 天每日收入、材料成本與淨利（訂單統計報表折線圖）。
- * 淨利＝收入 − 材料 − 備料人工 − LINE Pay 手續費 − 平台抽成 − 固定成本日攤（正職月薪＋其他固定成本 ÷ 當月天數），
- * 跟本月收益看板（buildForecast）同一套成本項目，只是逐日算、不含預估份數。
+ * Daily revenue, material cost and net profit for the last 15 days (line chart in the order statistics report).
+ * Net profit = revenue − materials − prep labor − LINE Pay fees − platform commission − daily share of fixed costs (full-time salaries + other fixed costs ÷ days in the month),
+ * the same cost items as this month's earnings dashboard (buildForecast), but computed per day and without forecast portions.
  */
 async function dailySeries(vendor, today) {
   const config = await loadPlatformConfig(db());
@@ -363,7 +363,7 @@ exports.buildRevenueForecast = onSchedule({ schedule: "0 21 * * *", timeZone: "A
   await forEachVendor("buildRevenueForecast", (vendor) => writeForecast(vendor, month));
 });
 
-/** 店家後台按「重新計算」，或打開看板時資料太舊 */
+/** Vendor presses "Recalculate" in the vendor portal, or the dashboard data is stale when opened */
 exports.refreshRevenueForecast = onCall({ timeoutSeconds: 120 }, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const vendor = { id: vendorId, ...(await db().collection("vendors").doc(vendorId).get()).data() };
@@ -371,7 +371,7 @@ exports.refreshRevenueForecast = onCall({ timeoutSeconds: 120 }, async (request)
   return writeForecast(vendor, month);
 });
 
-/** 訂單統計報表：最近 15 天每日收入、材料成本、淨利 */
+/** Order statistics report: daily revenue, material cost and net profit for the last 15 days */
 exports.getDailyRevenueSeries = onCall({ timeoutSeconds: 60 }, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const vendor = { id: vendorId, ...(await db().collection("vendors").doc(vendorId).get()).data() };

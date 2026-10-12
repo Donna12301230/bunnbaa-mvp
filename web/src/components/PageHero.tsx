@@ -2,9 +2,9 @@ import { ReactNode } from "react";
 import { Search } from "lucide-react";
 import "./PageHero.css";
 
-// 各分頁共用的頁首（轉讓市集／我的餐點／商家／成長獎勵／關於我們／常見問題／聯絡／加入我們）。
-// 2026-10-01 全站改版：跟品牌形象頁同一套編輯式語彙——小標 eyebrow、大字襯線標題、
-// 奶油底加一顆緩慢變形的奶油黃色塊；右側 children 通常放 HeroSearch。
+// Page header shared by tabs (Resale market / My meals / Vendors / Growth rewards / About us / FAQ / Contact / Join us).
+// 2026-10-01 site redesign: same editorial vocabulary as the brand page — small eyebrow, large serif title,
+// cream background with a slowly morphing butter-yellow blob; children on the right is usually HeroSearch.
 export default function PageHero({
   title,
   description,
@@ -13,7 +13,7 @@ export default function PageHero({
 }: {
   title: string;
   description?: ReactNode;
-  /** 標題上方的小標（例：「Transfers · 轉讓」），沒給就不顯示 */
+  /** Small label above the title (e.g. "Transfers"); hidden if not given */
   eyebrow?: string;
   children?: ReactNode;
 }) {

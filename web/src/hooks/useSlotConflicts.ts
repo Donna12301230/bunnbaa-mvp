@@ -5,9 +5,9 @@ import { windowsOverlap } from "@/lib/pickupSlots";
 import type { Lock } from "@/types";
 
 /**
- * 同一天、時段重疊、而且還是「已鎖定」的自己的訂單——只拿來提醒，不擋下單
- * （2026-09-25 決定：可能是幫朋友多訂一份）。轉賣中／贈送中的不算，因為正在讓出去。
- * 只用 buyer_uid + pickup_date 兩個等值條件，不需要額外的複合索引。
+ * The user's own orders on the same day with overlapping slots that are still "locked"; used only as a reminder, ordering isn't blocked
+ * (decided 2026-09-25: they may be ordering an extra one for a friend). Ones being resold / gifted don't count, since they are being given away.
+ * Uses only the two equality filters buyer_uid + pickup_date, so no extra composite index is needed.
  */
 export function useSlotConflicts(uid: string | null | undefined, pickupDate: string, pickupWindow: string) {
   const { data: sameDayLocks = [] } = useQuery({

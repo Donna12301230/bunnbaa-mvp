@@ -1,14 +1,16 @@
-// doc/測試文件.md 中 functions.test.js 沒涵蓋、但伺服器端可以自動測的案例：
-// 排程（轉愛心餐、愛心餐截止、預約逾時、回饋池結算、券過期、抽獎期結束、到期提醒、異常偵測、
-// 取餐提醒）、轉讓媒合、天災、採購、口味分數、開放許願、區域洞察、撥款、計畫方案、英文錯誤訊息。
+// Cases from doc/測試文件.md that functions.test.js doesn't cover but can be automated server-side:
+// schedules (no-show to charity meal, charity meal close, reservation timeout, reward pool settlement,
+// coupon expiry, draw period end, expiry reminders, anomaly detection, pickup reminders), resale matching,
+// disaster days, purchasing, taste scores, open wishes, area insights, payouts, meal plans, English error messages.
 //
-// 執行（跟 functions.test.js 用同一個測試 emulator）：
-//   cd scripts/tests && npm run emulator      # 另一個視窗
+// Run (uses the same test emulator as functions.test.js):
+//   cd scripts/tests && npm run emulator      # in another window
 //   cd scripts/tests && npm run test:functions:more
 //
-// 排程類 Functions 在 emulator 不會自己跑，這裡直接在本機 process 內呼叫 onSchedule 的 handler
-// （`.run()`），讀寫的是同一個 Firestore emulator，所以後續的 Firestore 觸發器（發抽獎券、媒合）
-// 照樣在 emulator 裡跑。每次執行都用新的店家與會員（id 帶 RUN），不受前一次殘留資料影響。
+// Scheduled Functions don't run by themselves in the emulator, so this calls the onSchedule handler
+// (`.run()`) directly in the local process. It reads and writes the same Firestore emulator, so the
+// follow-up Firestore triggers (issuing draw tickets, matching) still run in the emulator. Each run uses
+// fresh vendors and members (ids include RUN), so leftover data from earlier runs doesn't interfere.
 const path = require("node:path");
 const admin = require("firebase-admin");
 const { initializeApp } = require("firebase/app");
@@ -33,7 +35,7 @@ admin.initializeApp({ projectId: PROJECT });
 const db = admin.firestore();
 const { Timestamp, FieldValue } = admin.firestore;
 
-// Functions 的模組用 functions/node_modules 裡的 firebase-admin（另一份），要先 initializeApp 才能 require
+// Functions modules use the firebase-admin in functions/node_modules (a separate copy); call initializeApp before requiring them
 const fnAdmin = require(path.join(FN_DIR, "node_modules/firebase-admin"));
 if (!fnAdmin.apps.length) fnAdmin.initializeApp({ projectId: PROJECT });
 const fn = (mod) => require(path.join(SRC, mod));
@@ -60,7 +62,7 @@ async function waitFor(f, ms = 180000) {
 }
 const CJK = /[一-鿿]/;
 
-// ── 身分 ──
+// ── Identities ──
 const RUN = Date.now().toString(36);
 const PASSWORD = "test1234";
 async function ensureUser(email) {
@@ -81,7 +83,7 @@ async function client(email) {
   };
   return { uid: auth.currentUser?.uid, call };
 }
-/** 這次執行專用的新會員（已登入的 client） */
+/** A fresh member just for this run (signed-in client) */
 async function freshUser(role) {
   const email = `zz2-${role}-${RUN}@bunnbaa.test`;
   await ensureUser(email);
@@ -93,14 +95,14 @@ function expectCode(r, code, msg) {
   if (r.code !== code) throw new Error(`${msg || ""} expected ${code}, got ${r.code}: ${r.message}`);
   return r;
 }
-/** 轉讓市集付費接手（§4.1）：保留＋請款 → 確認付款。emulator 沒有 LINE Pay 金鑰，走假金流 */
+/** Paid takeover on the resale market (§4.1): reserve + request payment → confirm payment. The emulator has no LINE Pay keys, so this uses a fake payment flow */
 async function takeOver(user, lockId) {
   const r = await user.call("createResaleLinePayReservation", { lock_id: lockId });
   if (!r.ok) return r;
   return user.call("confirmLinePayPayment", { order_id: r.data.order_id });
 }
 
-// ── 日期 ──
+// ── Dates ──
 const TODAY = taipeiToday();
 const NOW_HM = taipeiTime(); // "HH:MM"
 function nextBusinessDay(from) {
@@ -111,7 +113,7 @@ function nextBusinessDay(from) {
 let OPEN_DAY = nextBusinessDay(TODAY);
 while (isPastCutoff(OPEN_DAY, {}, CFG)) OPEN_DAY = nextBusinessDay(OPEN_DAY);
 const TODAY_IS_BUSINESS = CFG.businessWeekdays.includes(weekdayOf(TODAY));
-// 還能取消的最近營業日：取餐時段開始前 48 小時才能取消（WINDOW 從 00:00 開始，所以至少要大後天）
+// Nearest business day that can still be cancelled: cancellation closes 48 hours before the pickup slot starts (WINDOW starts at 00:00, so at least 3 days out)
 const CANCEL_DAY = nextBusinessDay(addDays(TODAY, 2));
 const prevBusinessDays = (n) => {
   const out = [];
@@ -122,7 +124,7 @@ const prevBusinessDays = (n) => {
 const hm = (mins) => `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
 const nowMinutes = Number(NOW_HM.slice(0, 2)) * 60 + Number(NOW_HM.slice(3, 5));
 
-// ── 測試資料 ──
+// ── Test data ──
 const WINDOW = "00:00-23:59";
 const vid = (p) => `zz2-${p}-${RUN}`;
 let seq = 0;
@@ -137,7 +139,7 @@ async function mkVendor(id, extra = {}) {
   });
   return id;
 }
-/** 跟 functions.test.js 的 zz-bento 同結構的便當品項 */
+/** Bento item with the same structure as zz-bento in functions.test.js */
 async function mkBento(vendorId, extra = {}) {
   const id = `${vendorId}-bento`;
   await db.doc(`menu_items/${id}`).set({
@@ -151,7 +153,7 @@ async function mkBento(vendorId, extra = {}) {
   });
   return id;
 }
-/** 把種子店（有原物料、半成品、配方）的目錄複製成新店，採購與口味分數要用 */
+/** Copies a seeded vendor's catalog (ingredients, semi-finished items, recipes) into a new vendor, for the purchasing and taste-score tests */
 async function cloneCatalog(from, to) {
   for (const sub of ["ingredients", "components"]) {
     const snap = await db.collection(`vendors/${from}/${sub}`).get();
@@ -194,7 +196,7 @@ const notes = async (uid, filter = {}) => {
 };
 const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
 
-/** geohash（跟 web/src/lib/geo.ts 同一套），給「常用地點」用 */
+/** geohash (same implementation as web/src/lib/geo.ts), for "frequent locations" */
 function geohash(lat, lng, precision = 7) {
   const B = "0123456789bcdefghjkmnpqrstuvwxyz";
   const la = [-90, 90];
@@ -215,12 +217,12 @@ function geohash(lat, lng, precision = 7) {
 }
 
 (async () => {
-  try { await db.doc("_ping/x").get(); } catch { console.error(`連不到 Firestore emulator ${HOST}:${PORTS.firestore}，請先 npm run emulator`); process.exit(2); }
+  try { await db.doc("_ping/x").get(); } catch { console.error(`Cannot reach the Firestore emulator at ${HOST}:${PORTS.firestore}; run npm run emulator first`); process.exit(2); }
   OWNER_UID = await ensureUser("zz-owner@bunnbaa.test");
   const OWNER = await client("zz-owner@bunnbaa.test");
   console.log(`RUN=${RUN} TODAY=${TODAY} ${NOW_HM} OPEN_DAY=${OPEN_DAY}\n`);
 
-  // ════ 3.15 未取餐轉愛心餐、截止、全數送出、預約逾時（排程） ════
+  // ════ 3.15 No-show to charity meal, close, all given out, reservation timeout (schedules) ════
   {
     const VN = await mkVendor(vid("noshow"), { pickup_windows: ["00:00-00:30"], owner_uid: `zz2-owner-noshow-${RUN}` });
     await mkBento(VN);
@@ -249,7 +251,7 @@ function geohash(lat, lng, precision = 7) {
       if (!noshow) throw new Error("SKIP：前一案例沒跑");
       if (nowMinutes < 150) throw new Error("SKIP：00:30 + 2 小時還沒到");
       await runSchedule("charity.js", "closeCharity");
-      eq((await get(`vendors/${VN}/prepPlans/${TODAY}`)).charity_closed_breakfast, true); // v4 依餐期：00:00 時段歸早餐
+      eq((await get(`vendors/${VN}/prepPlans/${TODAY}`)).charity_closed_breakfast, true); // v4 by meal period: the 00:00 slot counts as breakfast
       eq((await notes(`zz2-owner-noshow-${RUN}`, { title: /愛心餐已截止/ })).length, 1, "店家提醒");
       const R = await freshUser("late");
       const meal = (await get(`locks/${noshow.id}`)).charity_meal_id;
@@ -312,8 +314,8 @@ function geohash(lat, lng, precision = 7) {
     });
   }
 
-  // ════ 3.14 回饋池結算、券過期、抽獎期結束、到期提醒、退款扣回 ════
-  const P = addDays(mondayOf(TODAY), -7); // 上一期
+  // ════ 3.14 Reward pool settlement, coupon expiry, draw period end, expiry reminders, refund clawback ════
+  const P = addDays(mondayOf(TODAY), -7); // previous period
   await test("C-RWD-03 C-RWD-17", "累積淨營業額不到 1 萬不開池：carried、結轉下一期、rewardStatus 再 X 元開獎；重跑不重算", async () => {
     const VR = await mkVendor(vid("carry"));
     for (let i = 0; i < 60; i++) {
@@ -433,12 +435,12 @@ function geohash(lat, lng, precision = 7) {
     eq(x.tickets_issued, 0, "暫停期間不發券");
     eq(expectOk(await OWNER.call("triggerRewardPeriodNow", { vendor_id: VG, period_id: from }))[VG], "paused");
     const U = await freshUser("pzc");
-    const c = await coupon(U.uid, VG, 1000); // 全額折抵走免付款路徑（emulator 沒有 LINE Pay）
+    const c = await coupon(U.uid, VG, 1000); // a full-amount discount takes the no-payment path (the emulator has no LINE Pay)
     expectOk(await U.call("createCartLinePayReservation", { lines: [{ ...line(), menu_item_id: `${VG}-bento`, coupon_id: c }] }), "已持有的券照常能用");
     eq(expectOk(await OWNER.call("setRewardPause", { vendor_id: VG, paused: false })).paused_from, null);
   });
 
-  // ════ 5. 異常偵測（排程） ════
+  // ════ 5. Anomaly detection (schedule) ════
   await test("A-ANM-01", "7 天退款 3 筆、單人抽獎券占 > 20%、同裝置 3 帳號 → anomalies 各一筆、通知店家、不自動處分", async () => {
     const ownerA = `zz2-owner-anm-${RUN}`;
     const VA = await mkVendor(vid("anm"), { owner_uid: ownerA });
@@ -461,7 +463,7 @@ function geohash(lat, lng, precision = 7) {
     assert(!(await get(`users/${Q}`))?.orderBanned, "不應自動封鎖");
   });
 
-  // ════ 3.16 口味分數、開放許願；4.10 區域洞察 ════
+  // ════ 3.16 Taste scores, open wishes; 4.10 area insights ════
   await test("C-TST-02 C-TST-03", "onLockCreatedTaste：購買 +2、許願 +3、不要 −2；舊分數 30 天半衰", async () => {
     const VT = vid("taste");
     await mkVendor(VT);
@@ -488,7 +490,7 @@ function geohash(lat, lng, precision = 7) {
     const prof = await waitFor(async () => (await get(`tasteProfiles/${T}`))?.scores);
     eq(Object.fromEntries([...Object.entries(prof)].sort()), Object.fromEntries([...expected].sort()), "分數");
     assert(Array.isArray((await get(`locks/${l.id}`)).tags), "lock.tags 要寫回");
-    // 半衰期：把分數改成 30 天前的 {X: 10}，再下一單 → X 變 5
+    // Half-life: set the score to {X: 10} dated 30 days ago, place another order → X becomes 5
     await db.doc(`tasteProfiles/${T}`).set({ scores: { 測試標籤: 10 }, scores_updated_at: Timestamp.fromMillis(Date.now() - 30 * 86400000) });
     await lock(T, VT, { menu_item_id: ids.classic, slots, pickup_date: TODAY });
     const after = await waitFor(async () => { const p = await get(`tasteProfiles/${T}`); return p.scores?.測試標籤 !== 10 ? p.scores : null; });
@@ -556,7 +558,7 @@ function geohash(lat, lng, precision = 7) {
     eq((await get(`areaInsights/${VJ}_${mondayOf(TODAY)}`)).insufficient, true);
   });
 
-  // ════ 3.12 轉讓媒合（matchResaleLock 觸發器在 emulator 裡跑；沒有向量時退回「訂過同一品項」） ════
+  // ════ 3.12 Resale matching (the matchResaleLock trigger runs in the emulator; without embeddings it falls back to "ordered the same item") ════
   {
     const VM = await mkVendor(vid("match"));
     const IM = await mkBento(VM);
@@ -566,9 +568,9 @@ function geohash(lat, lng, precision = 7) {
     const [B2, B3, H, M, F, D] = ["b2", "b3", "h", "m", "f", "d"].map(u);
     await db.doc(`users/${B2}`).set({ lang: "en" });
     await db.doc(`users/${M}`).set({ muted_kinds: ["resale_match"] });
-    await db.doc(`users/${F}`).set({ home_geo: geohash(22.6273, 120.3014) }); // 高雄，離店 > 10 km
+    await db.doc(`users/${F}`).set({ home_geo: geohash(22.6273, 120.3014) }); // Kaohsiung, > 10 km from the vendor
     for (const x of [B1.uid, B2, B3, H, M, F, D]) await lock(x, VM, { menu_item_id: IM, pickup_date: addDays(TODAY, -3), status: "fulfilled" });
-    await lock(D, VM, { menu_item_id: "other", pickup_date: OPEN_DAY }); // D 當天已訂這家店
+    await lock(D, VM, { menu_item_id: "other", pickup_date: OPEN_DAY }); // D already has an order at this vendor that day
     const S = u("s");
     const list = async (extra = {}) => {
       const l = await lock(S, VM, { menu_item_id: IM, ...extra });
@@ -651,7 +653,7 @@ function geohash(lat, lng, precision = 7) {
     assert(!(await get(`lock_tokens/${l.id}`)), "lock_tokens 仍在（A 會繼續收到這筆的提醒）");
   });
 
-  // ════ 6. 取餐提醒（排程） ════
+  // ════ 6. Pickup reminders (schedule) ════
   await test("F-02 F-03 C-CHR-02", "時段結束前 30 分仍未取餐 → 提醒；lang=en 收英文、用 item_name_en；轉讓後只提醒新持有人", async () => {
     if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
     if (nowMinutes < 30 || nowMinutes > 23 * 60 + 40) throw new Error("SKIP：時段跨午夜");
@@ -672,7 +674,7 @@ function geohash(lat, lng, precision = 7) {
     assert(!CJK.test(ne[0].title + ne[0].body) && /Test Chicken Bento/.test(ne[0].body), `英文提醒：${ne[0].title} / ${ne[0].body}`);
   });
 
-  // ════ 5. 天災 ════
+  // ════ 5. Disaster days ════
   await test("A-DIS-02", "已截單（取餐日當天）建立停班事件 → 仍取消退款", async () => {
     if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
     const VD = await mkVendor(vid("dis"), { address: `臺北市測災${RUN}區測試路 1 號` });
@@ -720,7 +722,7 @@ function geohash(lat, lng, precision = 7) {
     eq((await get(`vendors/${VS2}/prepPlans/${OPEN_DAY}`)).substitutions, [{ from: "地瓜葉", to: "高麗菜" }]);
   });
 
-  // ════ 4.8 採購 ════
+  // ════ 4.8 Purchasing ════
   await test("V-PUR-01 V-PUR-03 V-PUR-05 V-PUR-09 A-DIS-07 V-CHR-04 V-RCP-09", "週叫貨單：原物料 × 週一至週五、已確定／預測；4 週同星期幾平均排除停班日與報廢；盤點；冪等；主菜鎖定", async () => {
     const VPU = vid("pur");
     const thisMonday = mondayOf(TODAY);
@@ -730,9 +732,9 @@ function geohash(lat, lng, precision = 7) {
     const ids = await cloneCatalog("cafe-renheya-demo", VPU);
     const hist = async (date, n) => { for (let i = 0; i < n; i++) await lock(`zz2-h${i}-${RUN}`, VPU, { menu_item_id: ids.classic, pickup_date: date, status: "fulfilled", reward_counted: true }); };
     for (const d of mondays.slice(0, 3)) await hist(d, 4);
-    await hist(mondays[3], 20); // 停班日：不列入平均
+    await hist(mondays[3], 20); // work-suspension day: excluded from the average
     for (const d of tuesdays) await hist(d, 4);
-    await db.doc(`vendors/${VPU}/prepPlans/${tuesdays[0]}`).set({ date: tuesdays[0], charity_result: { wasted: 4 } }); // 那天全部報廢
+    await db.doc(`vendors/${VPU}/prepPlans/${tuesdays[0]}`).set({ date: tuesdays[0], charity_result: { wasted: 4 } }); // everything was wasted that day
     const week = mondayOf(addDays(TODAY, 7));
     await lock(`zz2-cf-${RUN}`, VPU, { menu_item_id: ids.classic, pickup_date: week });
     const r = expectOk(await OWNER.call("triggerPurchaseListNow", { vendor_id: VPU, week_start: week }));
@@ -741,7 +743,7 @@ function geohash(lat, lng, precision = 7) {
     eq(list.board[0], { date: week, closed: false, confirmed: 1, forecast: 3 }, "週一：確定 1、預測 4−1");
     eq(list.board[1].forecast, 3, "週二：(0+4+4+4)/4 = 3");
     const ings = Object.fromEntries((await db.collection(`vendors/${VPU}/ingredients`).get()).docs.map((d) => [d.id, d.data()]));
-    // v4：久放品項（monthly）併入週單，只在庫存不夠時出現，一次週一到貨
+    // v4: long-shelf-life items (monthly) are folded into the weekly order, appear only when stock is short, and arrive in one Monday delivery
     const longLived = list.lines.filter((l) => ings[l.ingredient_id].frequency === "monthly");
     assert(longLived.every((l) => l.long_lived && l.deliveries.length === 1 && l.deliveries[0].date === week), `久放品項：${JSON.stringify(longLived)}`);
     assert(list.lines.every((l) => l.by_day.length === 5 && l.by_day.every((d) => "confirmed" in d && "forecast" in d)), "每格分已確定與預測");
@@ -771,7 +773,7 @@ function geohash(lat, lng, precision = 7) {
     assert(breast && breast.deliveries.length === 1 && breast.deliveries[0].date === week, `雞胸一次週一：${JSON.stringify(breast?.deliveries)}`);
   });
 
-  // ════ 6. 截單排程 ════
+  // ════ 6. Cut-off schedule ════
   await test("F-19", "lockOrders 排程：截單時間已過的店各自產生備料（20:00 與 18:00 兩家）", async () => {
     const tomorrow = addDays(TODAY, 1);
     if (!CFG.businessWeekdays.includes(weekdayOf(tomorrow))) throw new Error("SKIP：明天不是營業日");
@@ -783,24 +785,24 @@ function geohash(lat, lng, precision = 7) {
     for (const v of [V20, V18]) eq((await get(`vendors/${v}/prepPlans/${tomorrow}`))?.order_count, 1, v);
   });
 
-  // ════ 1b. 撥款 ════
+  // ════ 1b. Payouts ════
   await test("F-01 A-PAY-01", "手動結算：已取餐＋愛心餐＋轉讓取餐＋舊制未取餐＋取消換券留下的款項計入，還沒取餐、已退款的不算；扣 5% 抽成；重按不重複結算", async () => {
     const VS3 = await mkVendor(vid("pay"));
     await lock(`zz2-pa-${RUN}`, VS3, { status: "fulfilled", locked_price: 80 });
     await lock(`zz2-pb-${RUN}`, VS3, { status: "charity", locked_price: 100 });
     await lock(`zz2-pc-${RUN}`, VS3, { status: "resold_and_fulfilled", locked_price: 50 });
     await lock(`zz2-pd-${RUN}`, VS3, { status: "locked", locked_price: 70 });
-    await lock(`zz2-pe-${RUN}`, VS3, { status: "cancelled", cancel_reason: "customer", locked_price: 60, kept_amount: 60, refunded_amount: 0 }); // 取消換券：款項留在店家
-    await lock(`zz2-pf-${RUN}`, VS3, { status: "cancelled", cancel_reason: "disaster", locked_price: 90, refunded_amount: 90 }); // 停班全額退款：不撥
-    await lock(`zz2-pg-${RUN}`, VS3, { status: "no_show", locked_price: 40 }); // 舊制未取餐：預付不退，照常撥款（2026-10-09）
+    await lock(`zz2-pe-${RUN}`, VS3, { status: "cancelled", cancel_reason: "customer", locked_price: 60, kept_amount: 60, refunded_amount: 0 }); // cancelled for a coupon: the money stays with the vendor
+    await lock(`zz2-pf-${RUN}`, VS3, { status: "cancelled", cancel_reason: "disaster", locked_price: 90, refunded_amount: 90 }); // work-suspension full refund: not paid out
+    await lock(`zz2-pg-${RUN}`, VS3, { status: "no_show", locked_price: 40 }); // legacy no-show: prepayment not refunded, paid out as usual (2026-10-09)
     const r = expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VS3 }));
     const p = await get(`payouts/${r.payout_id}`);
-    // 抽成逐份四捨五入：80→4、100→5、50→3、60→3、40→2
+    // Commission is rounded per meal: 80→4, 100→5, 50→3, 60→3, 40→2
     eq([p.gross_amount, p.commission_amount, p.amount, p.lock_count], [330, 17, 313, 5]);
     eq(expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VS3 })).payout_id, null, "重按");
   });
 
-  // ════ 3.5／3.6 下單與計畫方案 ════
+  // ════ 3.5/3.6 Ordering and meal plans ════
   await test("C-ORD-08", "份數 1、數量 2 → 提示只剩 1 份", async () => {
     const U = await freshUser("q2");
     await db.doc(`vendors/${VO}`).update({ slot_capacity: 1 });
@@ -831,7 +833,7 @@ function geohash(lat, lng, precision = 7) {
   await test("C-ORD-11", "LINE Pay Confirm 失敗 → 份數與折價券退回、意圖回 pending、不產生 locks", async () => {
     const U = await freshUser("cf");
     const c = await coupon(U.uid, VO, 10);
-    // 金額 > 0 要經 LINE Pay（emulator 沒有金鑰），直接寫一筆付款意圖模擬「已導去付款」
+    // An amount > 0 has to go through LINE Pay (the emulator has no keys), so write a payment intent directly to simulate "redirected to payment"
     const intent = db.collection("payment_intents").doc(uniq("zzpi"));
     const draft = { vendor_id: VO, menu_item_id: `${VO}-bento`, item_name: "測試雞腿便當", pickup_date: OPEN_DAY, pickup_window: WINDOW, slots: [], rice: "normal", list_price: 100, locked_price: 70, coupon_id: c, coupon_discount: 10 };
     await intent.set({ status: "pending", buyer_uid: U.uid, transaction_id: "tx-fake", amount: 70, lock_drafts: [draft], created_at: Timestamp.now() });
@@ -865,7 +867,7 @@ function geohash(lat, lng, precision = 7) {
     });
 
     await test("C-PLN-04", "30 天內排不滿 N 個營業日 → 被擋並提示", async () => {
-      const r = expectCode(await join(await plan({ days: 30 })), "invalid-argument"); // 30 天內最多 22 個營業日
+      const r = expectCode(await join(await plan({ days: 30 })), "invalid-argument"); // at most 22 business days within 30 days
       assert(/湊不滿/.test(r.message), r.message);
     });
 
@@ -878,7 +880,7 @@ function geohash(lat, lng, precision = 7) {
     });
   }
 
-  // ════ 6. 英文錯誤訊息、AI 失敗、平台參數 ════
+  // ════ 6. English error messages, AI failures, platform settings ════
   await test("F-08", "lang=en：公休、額滿、封鎖、截單的錯誤訊息是英文", async () => {
     const U = await freshUser("en");
     const en = (lines) => U.call("createCartLinePayReservation", { lines, lang: "en" });
@@ -909,7 +911,7 @@ function geohash(lat, lng, precision = 7) {
     const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     const m = expectCode(await OWNER.call("extractMenuFromImage", { vendor_id: VO, image_base64: png, mime_type: "image/png" }), "unavailable");
     assert(/AI 暫時無法辨識/.test(m.message), m.message);
-    // 其他流程在沒有 Gemini 的 emulator 裡已經整份跑過（下單、截單、結算、抽獎、叫貨單都 PASS）
+    // The other flows already ran end to end in the emulator without Gemini (ordering, cut-off, settlement, draws and supplier orders all PASS)
   });
 
   await test("A-CFG-01 A-CFG-02", "平台參數改截單時間 → 伺服器照新值；刪掉欄位 → 用預設值", async () => {
@@ -919,7 +921,7 @@ function geohash(lat, lng, precision = 7) {
     const original = (await ref.get()).data();
     const U = await freshUser("cfg");
     const pastDefault = nowMinutes >= 20 * 60;
-    const flip = pastDefault ? "23:59" : "00:01"; // 讓「明天」的結果跟預設 20:00 相反
+    const flip = pastDefault ? "23:59" : "00:01"; // makes the result for "tomorrow" the opposite of the default 20:00
     try {
       await ref.set({ cutoffTime: flip }, { merge: true });
       const r = await U.call("createCartLinePayReservation", { lines: [line({ pickup_date: tomorrow, coupon_id: await coupon(U.uid, VO, 1000) })] });
@@ -930,7 +932,7 @@ function geohash(lat, lng, precision = 7) {
     } finally { await ref.set(original); }
   });
 
-  // ════ v4（1002 規格）：主菜、第四道、改時段、依餐期轉愛心餐、維護費、基本工資、收益看板 ════
+  // ════ v4 (1002 spec): mains, fourth dish, changing slot, charity meals by meal period, maintenance fee, minimum wage, revenue dashboard ════
   {
     const VB = await mkVendor(vid("v4bento"), { pickup_windows: ["07:30-08:00", "11:00-11:30", "12:00-12:30"] });
     const BENTO = await mkBento(VB, {
@@ -945,7 +947,7 @@ function geohash(lat, lng, precision = 7) {
     });
     const U = await freshUser("v4");
     const vline = (extra = {}) => ({ menu_item_id: BENTO, pickup_date: OPEN_DAY, pickup_window: "11:00-11:30", quantity: 1, rice: "normal", slots: [{ choice: "default" }, { choice: "default" }], ...extra });
-    /** 用全額折價券下單（不經 LINE Pay），回傳 { draft, lockId } */
+    /** Places an order with a full-amount coupon (no LINE Pay); returns { draft, lockId } */
     const order = async (extra = {}) => {
       const r = expectOk(await U.call("createCartLinePayReservation", { lines: [vline({ coupon_id: await coupon(U.uid, VB, 1000), ...extra })] }));
       const draft = (await get(`payment_intents/${r.order_id}`)).lock_drafts[0];
@@ -989,7 +991,7 @@ function geohash(lat, lng, precision = 7) {
     });
 
     await test("C-BNT-19", "備案遞補：許願未成立 → 那格換成備案、backup_used、used_for_slot、推播寫「換成備案」", async () => {
-      // 地瓜葉要 10 份才成立（只有這一份）；備案筊白筍 1 份就成立
+      // Sweet potato leaves need 10 portions to go ahead (this is the only one); the backup, water bamboo, goes ahead at 1
       const { lockId } = await order({ slots: [{ choice: 0 }, { choice: "default" }], extra_side: { slot: 0, candidate: 1, mode: "backup" } });
       expectOk(await OWNER.call("triggerLockOrdersNow", { vendor_id: VB, date: OPEN_DAY, force: true }));
       const l = await get(`locks/${lockId}`);
@@ -1000,18 +1002,18 @@ function geohash(lat, lng, precision = 7) {
     });
   }
 
-  // ════ 備案／加菜的其他截單情境（C-BNT-20～23）：獨立一家店，每個案例一位會員，通知不互相干擾 ════
+  // ════ Other cut-off scenarios for backups/add-ons (C-BNT-20 to 23): a separate vendor, one member per case, so notifications don't interfere ════
   {
     const VW = await mkVendor(vid("backup"), { pickup_windows: ["11:00-11:30"] });
-    // 標「難」的候選菜要 10 份才成立（每個案例最多一兩份，一定不成立）；標「易」的 1 份就成立
+    // Candidates marked "hard" need 10 portions to go ahead (each case has one or two at most, so they never do); those marked "easy" go ahead at 1
     const ITEM = await mkBento(VW, {
       slots: [
         { category: "青菜類", default: { name: "高麗菜", component_id: "zzb-cabbage" }, candidates: [
-          { name: "地瓜葉", component_id: "zzb-yam", portion_level: 1, weekly_cap: 1000, min_qty: 10 }, // 難
-          { name: "筊白筍", component_id: "zzb-bamboo", portion_level: 1, weekly_cap: 1000, min_qty: 1 }, // 易
+          { name: "地瓜葉", component_id: "zzb-yam", portion_level: 1, weekly_cap: 1000, min_qty: 10 }, // hard
+          { name: "筊白筍", component_id: "zzb-bamboo", portion_level: 1, weekly_cap: 1000, min_qty: 1 }, // easy
         ] },
         { category: "蛋豆類", default: { name: "滷蛋", component_id: "zzb-egg" }, candidates: [
-          { name: "豆干", component_id: "zzb-tofu", portion_level: 1, weekly_cap: 1000, min_qty: 10 }, // 難
+          { name: "豆干", component_id: "zzb-tofu", portion_level: 1, weekly_cap: 1000, min_qty: 10 }, // hard
         ] },
       ],
     });
@@ -1027,7 +1029,7 @@ function geohash(lat, lng, precision = 7) {
     const cutoff = async () => expectOk(await OWNER.call("triggerLockOrdersNow", { vendor_id: VW, date: OPEN_DAY, force: true }), "截單");
     const wishBodies = async (uid) => (await notes(uid, { kind: "wish" })).map((x) => x.body);
 
-    // 先全部下單再截單一次：截單會重判同店同日所有訂單。setup 失敗時四個案例各自記 FAIL，不中斷整個測試
+    // Place all orders first, then run cut-off once: cut-off re-evaluates every order for the same vendor and day. If setup fails, each of the four cases records FAIL without stopping the whole test
     const setup = (async () => {
       const [U20, U21, U22, U23] = [await freshUser("bnt20"), await freshUser("bnt21"), await freshUser("bnt22"), await freshUser("bnt23")];
       const o20 = await orderAs(U20, { slots: [{ choice: 1 }, { choice: "default" }], extra_side: { slot: 0, candidate: null, mode: "backup" } });
@@ -1077,7 +1079,7 @@ function geohash(lat, lng, precision = 7) {
       eq(l.locked_price, o23.draft.locked_price, "不退 10 元");
       const b = (await wishBodies(U23.uid)).join("\n");
       assert(/加菜「地瓜葉」未成立，已改為「高麗菜」/.test(b), b);
-      // 備料：地瓜葉一份都不做（全部未成立）；高麗菜＝o22、o23 兩格預設＋o23 第四道＝3 份（o20 的備案高麗菜沒用到、不算）
+      // Prep: no sweet potato leaves at all (none went ahead); cabbage = default slots of o22 and o23 + o23's fourth dish = 3 portions (o20's backup cabbage wasn't used, so it doesn't count)
       eq(portionsOf("zzb-yam"), 0, "地瓜葉不備料");
       eq(portionsOf("zzb-cabbage"), 3, "高麗菜份數");
       eq(portionsOf("zzb-bamboo"), 2, "筊白筍＝o20 許願＋o21 備案");
@@ -1092,7 +1094,7 @@ function geohash(lat, lng, precision = 7) {
     const X = `zz2-px-${RUN}`;
     const bf = await lock(X, VC, { pickup_date: TODAY, pickup_window: "07:30-08:00", locked_price: 80 });
     const lu = await lock(X, VC, { pickup_date: TODAY, pickup_window: "11:00-11:30", locked_price: 80 });
-    // 排程在本機 process 內執行，只在這段把 Date.now 換成台北今天的指定時間
+    // Schedules run in the local process; only within this block, Date.now is swapped for set times today in Taipei
     const realNow = Date.now;
     const at = (hhmm) => () => Date.parse(`${TODAY}T${hhmm}:00+08:00`);
     try {
@@ -1117,7 +1119,7 @@ function geohash(lat, lng, precision = 7) {
     const VC = await mkVendor(vid("commission"));
     const buyer = `zz2-cm-${RUN}`;
     for (const price of [80, 90, 110]) await lock(buyer, VC, { status: "fulfilled", locked_price: price, created_at: Timestamp.now() });
-    await lock(buyer, VC, { status: "locked", locked_price: 500, created_at: Timestamp.now() }); // 還沒取餐的不撥
+    await lock(buyer, VC, { status: "locked", locked_price: 500, created_at: Timestamp.now() }); // not picked up yet: not paid out
     const id = expectOk(await OWNER.call("triggerSettlementNow", { vendor_id: VC })).payout_id;
     const p = await get(`payouts/${id}`);
     eq([p.gross_amount, p.commission_amount, p.amount, p.commission_rate, p.lock_count], [280, 4 + 5 + 6, 265, CFG.commissionRate, 3]);
@@ -1148,7 +1150,7 @@ function geohash(lat, lng, precision = 7) {
     let expQty = 0;
     for (const d of past) { await mk(d, "fulfilled", 90); expRevenue += 90; expQty++; }
     await mk(OPEN_DAY.startsWith(month) ? OPEN_DAY : TODAY, "locked", 80); expRevenue += 80; expQty++;
-    await mk(past[0] || TODAY, "cancelled", 500); // 取消的不算
+    await mk(past[0] || TODAY, "cancelled", 500); // cancelled ones don't count
     const r = expectOk(await OWNER.call("refreshRevenueForecast", { vendor_id: VRV, month }));
     eq([r.confirmed_revenue, r.confirmed_qty], [expRevenue, expQty], "已確定");
     eq([r.maintenance_fee, r.commission_rate, r.staff_salary, r.other_fixed_costs, r.hourly_wage], [undefined, CFG.commissionRate, 30000, 3000, 200]);
@@ -1161,7 +1163,7 @@ function geohash(lat, lng, precision = 7) {
   });
 
   await test("V-REV-03", "人工用當天的基本工資：月中調漲前用舊時薪、之後用新時薪；店家自設較高時用店家的", async () => {
-    // 用上個月（整月都已過去，沒有預測份數）：5 號、25 號各一筆同樣的單 → 兩天人工分鐘數相同，比例只看時薪
+    // Use last month (fully past, no forecast portions): one identical order on the 5th and the 25th → same labor minutes on both days, so the ratio depends only on the hourly wage
     const ref = db.doc("platformConfig/minimumWage");
     const original = (await ref.get()).data() || null;
     const VW3 = await mkVendor(vid("rev3"));
@@ -1173,13 +1175,13 @@ function geohash(lat, lng, precision = 7) {
     const flat = { monthly: 20000, hourly: 100, effectiveFrom: "2020-01-01" };
     try {
       await ref.set({ ...flat, history: [flat] });
-      const base = await labor(); // 兩天都 100
+      const base = await labor(); // 100 on both days
       assert(base > 0, `人工 ${base}`);
       await ref.set({ ...flat, history: [flat, { monthly: 80000, hourly: 400, effectiveFrom: `${month}-15` }] });
-      const raised = await labor(); // 5 號 100、25 號 400
+      const raised = await labor(); // 100 on the 5th, 400 on the 25th
       assert(Math.abs(raised / base - 2.5) < 0.02, `月中調漲：${raised} / ${base} 應為 2.5`);
       await db.doc(`vendors/${VW3}`).update({ hourly_wage: 300 });
-      const own = await labor(); // 5 號店家 300、25 號基本工資 400
+      const own = await labor(); // vendor's 300 on the 5th, minimum wage 400 on the 25th
       assert(Math.abs(own / base - 3.5) < 0.02, `店家較高：${own} / ${base} 應為 3.5`);
     } finally { if (original) await ref.set(original); else await ref.delete(); }
   });
@@ -1196,13 +1198,13 @@ function geohash(lat, lng, precision = 7) {
     const realNow = Date.now;
     const at = (hhmm) => () => Date.parse(`${TODAY}T${hhmm}:00+08:00`);
     try {
-      Date.now = at("07:40"); // 早餐結束前 20 分
+      Date.now = at("07:40"); // 20 min before breakfast ends
       await runSchedule("orders.js", "pickupReminder");
-      Date.now = at("11:10"); // 午餐結束前 20 分
+      Date.now = at("11:10"); // 20 min before lunch ends
       await runSchedule("orders.js", "pickupReminder");
       Date.now = at("12:30");
       await runSchedule("charity.js", "convertToCharity");
-      Date.now = at("14:00"); // 早餐截止 10:00、午餐截止 13:30 都過了
+      Date.now = at("14:00"); // past both the breakfast close (10:00) and the lunch close (13:30)
       await runSchedule("charity.js", "closeCharity");
     } finally { Date.now = realNow; }
     eq([(await notes(XB, { title: /還沒取餐/ })).length, (await notes(XL, { title: /還沒取餐/ })).length], [1, 0], "取餐提醒：早餐有、午餐沿用舊旗標");
@@ -1234,7 +1236,7 @@ function geohash(lat, lng, precision = 7) {
     eq((await get(`locks/${later.id}`)).cutoff_done, true, "截單判定");
   });
 
-  // ════ v4 補測：組便當邊界、餐期參數、依餐期截止、維護費恢復、基本工資、平台參數、收藏 ════
+  // ════ v4 extra tests: build-a-bento edge cases, meal-period settings, close by meal period, maintenance fee restore, minimum wage, platform settings, favorites ════
   {
     const VX = await mkVendor(vid("v4more"), { pickup_windows: ["10:30-11:00", "11:00-11:30"] });
     const MAINS = await mkBento(VX, {
@@ -1280,7 +1282,7 @@ function geohash(lat, lng, precision = 7) {
     });
 
     await test("C-BNT-24", "第四道選候選菜也算許願：sideWishes +1、取消 −1；weekly_cap 滿了也擋第四道", async () => {
-      // 用還能取消的日期（取餐前 48 小時才能取消）
+      // Use a date that can still be cancelled (cancellation closes 48 hours before pickup)
       const wid = `sideWishes/${VX}_${CANCEL_DAY}_${MAINS}_0_0`;
       const before = (await get(wid))?.count || 0;
       const r = expectOk(await reserve({ pickup_date: CANCEL_DAY, extra_side: { slot: 0, candidate: 0, mode: "backup" } }));
@@ -1293,7 +1295,7 @@ function geohash(lat, lng, precision = 7) {
     });
 
     await test("C-BNT-25", "舊資料相容：只有 main＋price 的便當照 price 計價；沒有 extra_side 的舊 lock 截單、核對不報錯", async () => {
-      // 舊格式：只有 main＋price，沒有 mains、meal_periods
+      // Legacy format: only main + price, no mains or meal_periods
       const OLD = `${VX}-old`;
       const { mains: _mains, ...base } = await get(`menu_items/${MAINS}`);
       await db.doc(`menu_items/${OLD}`).set({ ...base, main: { name: "滷雞腿" }, price: 100 });

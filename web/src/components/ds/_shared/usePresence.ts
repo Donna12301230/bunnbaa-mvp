@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
 /**
- * 讓元件在 open → false 後仍掛載 exitMs，以播放離場動畫。
- * 回傳 mounted（是否渲染）與 visible（是否處於「進場後」狀態，用於 data-state）。
+ * Keeps the component mounted for exitMs after open becomes false so the exit animation can play.
+ * Returns mounted (whether to render) and visible (whether it is in the "entered" state, used for data-state).
  */
 export function usePresence(open: boolean, exitMs: number) {
   const [mounted, setMounted] = useState(open);
@@ -11,7 +11,7 @@ export function usePresence(open: boolean, exitMs: number) {
   useEffect(() => {
     if (open) {
       setMounted(true);
-      // 下一幀才切 visible，確保進場 transition 有起點
+      // Switch visible on the next frame so the enter transition has a starting point
       const raf = requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
       return () => cancelAnimationFrame(raf);
     }

@@ -1,4 +1,4 @@
-/* .is-hover / .is-focus / .is-active 只供預覽頁強制呈現狀態使用 */
+/* .is-hover / .is-focus / .is-active are only for forcing states on the preview page */
 .bb-switch {
   display: inline-flex;
   align-items: center;
@@ -26,7 +26,7 @@
   -webkit-tap-highlight-color: transparent;
   transition: background-color var(--duration-base) var(--ease-standard);
 }
-/* 點擊區擴大到 44px 高 */
+/* Enlarge the hit area to 44px tall */
 .bb-switch__track::before {
   content: '';
   position: absolute;
@@ -78,7 +78,7 @@
 .bb-switch__track[aria-checked='true'] .bb-switch__thumb {
   transform: translateX(18px);
 }
-/* 按下時 thumb 略為拉長，手感更軟 */
+/* Stretch the thumb slightly while pressed for a softer feel */
 .bb-switch__track:active:not(:disabled) .bb-switch__thumb,
 .bb-switch.is-active .bb-switch__thumb {
   width: 26px;

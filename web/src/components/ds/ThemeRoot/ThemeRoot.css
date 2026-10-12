@@ -1,4 +1,4 @@
-/* Portal 容器只是 token 的載體，不應有底色或佔位 */
+/* The portal container only carries the tokens; it should have no background or take up space */
 .bb-theme.bb-portal {
   background: none;
   position: relative;

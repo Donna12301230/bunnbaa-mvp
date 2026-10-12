@@ -17,8 +17,8 @@ interface Segment {
 }
 
 /**
- * 常一起買＋客群分布（functions/src/customerInsights.js 每週一用 BigQuery ML.KMEANS／AI.GENERATE 寫入
- * vendors/{id}/analytics/basket、segments）。只有彙總，沒有會員名單；兩份都還沒有就整張不顯示。
+ * Frequently bought together + customer segment distribution (written every Monday by functions/src/customerInsights.js using BigQuery ML.KMEANS / AI.GENERATE
+ * to vendors/{id}/analytics/basket and segments). Aggregates only, no member list; the whole card is hidden until either exists.
  */
 export default function CustomerInsightsCard({ vendorId }: { vendorId: string | undefined }) {
   const [pairs, setPairs] = useState<BasketPair[]>([]);

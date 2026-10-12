@@ -20,7 +20,7 @@ interface Template { id: string; name: string; structure: string; items?: unknow
 
 const TAGS = ["雞", "豬", "牛", "海鮮", "素", "炸", "滷", "烤", "炒", "蒸", "辣", "清淡", "甜", "葉菜", "根莖", "瓜類"];
 const CATEGORIES = ["青菜類", "肉類配菜", "蛋豆類", "根莖類", "主菜", "其他"];
-// 標籤、類別存中文（開放許願歸類會比對），英文介面只換顯示文字
+// Tags and categories are stored in Chinese (wish classification matches against them); the English UI only swaps the display text
 const EN_LABEL: Record<string, string> = {
   雞: "Chicken", 豬: "Pork", 牛: "Beef", 海鮮: "Seafood", 素: "Vegetarian", 炸: "Fried", 滷: "Braised", 烤: "Roasted", 炒: "Stir-fried", 蒸: "Steamed",
   辣: "Spicy", 清淡: "Mild", 甜: "Sweet", 葉菜: "Leafy greens", 根莖: "Root vegetables", 瓜類: "Gourds",
@@ -29,8 +29,8 @@ const EN_LABEL: Record<string, string> = {
 const label = (v: string) => tr(v, EN_LABEL[v] ?? v);
 
 /**
- * 平台菜色庫與定式模板（規格 §3.1、§4.4）：開放許願先從菜色庫選、自由輸入再由 Gemini 歸類到
- * 這裡的標準菜名；定式模板給店家一鍵開店。模板內容由 scripts/seed.js 建立，這裡可檢視與刪除。
+ * Platform dish library and preset templates (spec §3.1, §4.4): open wishes are picked from the dish library first; free-text input is then classified by Gemini into
+ * the standard dish names here. Preset templates let a vendor open shop in one click. Template content is created by scripts/seed.js; it can be viewed and deleted here.
  */
 function DishesContent() {
   const { toast } = useToast();

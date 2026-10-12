@@ -6,7 +6,7 @@ import { aiDraftComponentsInUse } from "@/lib/prep";
 import { tr } from "@/lib/i18n";
 import { useConfirm } from "@/components/ConfirmDialog";
 
-/** 上架品項用到的 AI 草稿半成品（還沒確認）；沒有就空陣列 */
+/** AI-drafted semi-finished items used by listed items that are not yet confirmed; empty array if none */
 export function useAiDraftsInUse(vendorId: string | undefined) {
   const { data: catalog } = useVendorCatalog(vendorId);
   const { data: items = [] } = useVendorMenu(vendorId);
@@ -14,8 +14,9 @@ export function useAiDraftsInUse(vendorId: string | undefined) {
 }
 
 /**
- * 備料、叫貨頁上方的提醒：AI 一次補完產生的配方份量是估計值，店家確認前照它備料、叫貨可能多叫或少叫。
- * AI 不替商家決定備貨量（doc/AI功能設計.md 負責任 AI 原則），所以要讓店家看到、自己決定。
+ * Notice at the top of the prep and purchasing pages: recipe quantities from "AI fill all" are estimates, so prepping
+ * or ordering from them before the vendor confirms may over- or under-order.
+ * AI does not decide stock levels for vendors (doc/AI功能設計.md responsible-AI principles), so vendors must see this and decide.
  */
 export default function AiDraftWarning({ vendorId, what }: { vendorId: string | undefined; what: string }) {
   const drafts = useAiDraftsInUse(vendorId);
@@ -37,7 +38,7 @@ export default function AiDraftWarning({ vendorId, what }: { vendorId: string | 
   );
 }
 
-/** 傳 LINE 叫貨前：有未確認的 AI 草稿就先問店家要不要照樣傳 */
+/** Before sending a supplier order via LINE: if there are unconfirmed AI drafts, ask the vendor whether to send anyway */
 export function useConfirmAiDrafts(vendorId: string | undefined) {
   const drafts = useAiDraftsInUse(vendorId);
   const confirm = useConfirm();

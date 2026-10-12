@@ -1,13 +1,13 @@
 /**
- * BunnBaa 飯飽 設計系統
+ * BunnBaa design system
  *
- * 使用方式：
+ * Usage:
  *   import { ThemeRoot, Button } from '@/components/ds';
- *   <ThemeRoot><Button>立即預約</Button></ThemeRoot>
+ *   <ThemeRoot><Button>Book now</Button></ThemeRoot>
  *
- * 所有元件都必須放在 <ThemeRoot> 內（tokens 限定於 .bb-theme，不影響舊頁面）。
- * 需要 Toast 時，在 ThemeRoot 內再包一層 <ToastProvider>。
- * 規範與所有狀態一覽：#/design-system
+ * Every component must be inside a <ThemeRoot> (tokens are scoped to .bb-theme and don't affect older pages).
+ * For Toast, wrap a <ToastProvider> inside the ThemeRoot.
+ * Guidelines and every state at a glance: #/design-system
  */
 export * from './ThemeRoot';
 export * from './Spinner';

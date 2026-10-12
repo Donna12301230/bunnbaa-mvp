@@ -1,7 +1,7 @@
-/* 全站共用頁尾。只用 tokens.css 的全域變數（除了 --sf-deep 這種頁尾自己的配色），
-   不依賴 LandingPage.css 的 .bb-landing 作用域，才能在任何頁面單獨掛用。 */
+/* Site-wide shared footer. Only uses global variables from tokens.css (apart from footer-specific colors like --sf-deep),
+   and doesn't depend on LandingPage.css's .bb-landing scope, so it can be mounted on any page on its own. */
 .site-footer {
-  --sf-deep: #73472d;  /* 溫暖褐色：--sf-text 5.2:1、--sf-heading 6.7:1 */
+  --sf-deep: #73472d;  /* Warm brown: --sf-text 5.2:1, --sf-heading 6.7:1 */
   --sf-heading: #fbead0;
   --sf-text: #e9cfa8;
   --sf-line: color-mix(in srgb, white 22%, transparent);
@@ -82,7 +82,7 @@
   letter-spacing: -0.05em;
   white-space: nowrap;
   user-select: none;
-  /* 讓字的下緣切在頁尾底邊，像蓋印一樣 */
+  /* Clip the bottom edge of the letters at the footer's bottom, like a stamp */
   margin-bottom: -0.06em;
 }
 .site-footer__wordmark .site-footer__logo-bunn { color: color-mix(in srgb, var(--sf-heading) 92%, transparent); }

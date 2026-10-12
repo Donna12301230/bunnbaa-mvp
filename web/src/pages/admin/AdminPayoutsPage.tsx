@@ -39,7 +39,7 @@ function PayoutsContent() {
   }, []);
 
   const totalAmount = useMemo(() => payouts.reduce((sum, p) => sum + (p.amount || 0), 0), [payouts]);
-  // 2026-10-05 改成每份抽成；之前的撥款紀錄沒有 commission_amount（當時全額撥款）
+  // Changed to per-serving commission on 2026-10-05; earlier payout records have no commission_amount (paid out in full back then)
   const totalCommission = useMemo(() => payouts.reduce((sum, p) => sum + (p.commission_amount || 0), 0), [payouts]);
 
   return (

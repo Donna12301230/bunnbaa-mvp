@@ -1,14 +1,14 @@
-// AI 功能 1：拍照上架菜單（doc/AI功能設計.md）。店主拍紙本菜單或餐點照片，Gemini Vision
-// 讀成商品草稿；這裡只回傳草稿，不寫 menu_items——店主在菜單管理頁確認、修改後才上架。
-// 飲食標記、過敏原只能是前端固定選項（web/src/types.ts 的 DIETARY_TAGS／ALLERGEN_LIST，
-// 要改兩邊一起改），模型給的其他值一律丟掉；過敏原是食安法要求，畫面會提醒店主逐項確認。
+// AI feature 1: list menus from a photo (doc/AI功能設計.md). The vendor owner photographs a paper menu or a dish, and Gemini Vision
+// reads it into item drafts; this only returns drafts and doesn't write menu_items. The owner confirms and edits them on the menu page before listing.
+// Dietary tags and allergens must be one of the frontend's fixed options (DIETARY_TAGS / ALLERGEN_LIST in web/src/types.ts;
+// change both together); any other value from the model is dropped. Allergens are required by food safety law, and the UI reminds the owner to confirm each one.
 const { onCall, HttpsError, logger, t, callerVendorId } = require("./common");
 const { generateJSONFromImage } = require("./gemini");
 
 const DIETARY_TAGS = ["葷食", "素食", "全素", "辣"];
 const ALLERGENS = ["蛋", "奶", "花生", "堅果", "小麥/麩質", "大豆", "海鮮", "芝麻"];
 const MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 前端先縮到 1600px JPEG，通常 < 500 KB
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // the frontend first downsizes to a 1600px JPEG, usually < 500 KB
 const MAX_ITEMS = 30;
 
 const SYSTEM_INSTRUCTION = `你是台灣小吃店、便當店的上架助手。店主會拍一張紙本菜單、價目表或餐點照片，你把看得到的品項整理成結構化資料。
@@ -53,7 +53,7 @@ function cleanItem(raw) {
 
 /**
  * data: { vendor_id?, image_base64, mime_type }
- * 回傳 { items: 草稿[], note, disclaimer }。只有該店店主或管理員能用（會花 Gemini 額度）。
+ * Returns { items: drafts[], note, disclaimer }. Only that vendor's owner or an admin can use it (it spends Gemini quota).
  */
 exports.extractMenuFromImage = onCall({ timeoutSeconds: 120, memory: "512MiB" }, async (request) => {
   await callerVendorId(request, request.data?.vendor_id);

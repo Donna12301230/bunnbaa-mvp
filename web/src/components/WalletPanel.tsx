@@ -25,8 +25,8 @@ function entryLabel(e: WalletEntry): string {
 }
 
 /**
- * 會員中心「平台點數」（2026-10-09）：所有退款先變成點數（1 點＝1 元），結帳可折抵；
- * 記得原付款交易的點數可以按「退回 LINE Pay」退到原交易（functions/src/wallet.js withdrawPoints）。
+ * Member center "Platform points" (2026-10-09): every refund becomes points first (1 point = NT$1) and can be used at checkout;
+ * points that remember their original payment can be sent back to that transaction via "Send back to LINE Pay" (functions/src/wallet.js withdrawPoints).
  */
 export default function WalletPanel() {
   const { balance, withdrawable, entries, loading } = useWallet();

@@ -1,10 +1,10 @@
-// 開放許願、口味偏好、區域洞察（規格 §4.4、§10），以及 Gemini 的菜名歸類與配方草稿（§3.1）。
-// 資料主線：配方 → 自動標籤 → 口味統計 → 發現缺口 → 許願 → 進入備料 → 完成取餐 → 計入成長獎勵。
+// Open wishes, taste preferences, area insights (spec §4.4, §10), plus Gemini dish-name classification and recipe drafts (§3.1).
+// Main data flow: recipe → auto tags → taste stats → find gaps → wishes → into prep → pickup completed → counted toward growth rewards.
 //
-// openWishes/{vendorId}_{uid}_{dishKey}：同一人重複許願只算一次（doc id 去重），created_at 每次更新
-// vendors/{v}/wishTally/{dishKey}：name, count（近 30 天人數）, notified, listed
-// tasteProfiles/{uid}：prefs{spicy,no_beef,vegetarian}, allergies[]（本人寫）；scores{tag:分數}（後端寫）
-// areaInsights/{vendorId}_{週一}：users, tag_shares, removal_rates, open_wishes, gaps（只給該店讀）
+// openWishes/{vendorId}_{uid}_{dishKey}: repeat wishes by the same person count once (deduped by doc id); created_at updates each time
+// vendors/{v}/wishTally/{dishKey}: name, count (people in the last 30 days), notified, listed
+// tasteProfiles/{uid}: prefs{spicy,no_beef,vegetarian}, allergies[] (written by the user); scores{tag: score} (written by the backend)
+// areaInsights/{vendorId}_{Monday}: users, tag_shares, removal_rates, open_wishes, gaps (readable only by that vendor)
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { Timestamp } = require("firebase-admin/firestore");
@@ -24,7 +24,7 @@ function dishKey(name) {
   return String(name || "").trim().replace(/\s+/g, "").replace(/[\/.#$[\]]/g, "_").slice(0, 60);
 }
 
-/** 口味分數加權計數，舊分數依 30 天半衰期衰減 */
+/** Weighted count for taste scores; old scores decay with a 30-day half-life */
 async function bumpTaste(uid, deltas) {
   if (!uid || deltas.size === 0) return;
   const ref = db().collection("tasteProfiles").doc(uid);
@@ -41,8 +41,8 @@ async function bumpTaste(uid, deltas) {
 }
 
 /**
- * 新鎖定：算出這份便當的標籤存回 lock.tags（區域洞察用），並更新付款人的口味分數。
- * 購買 +2、候選菜許願 +3、選「不要」−2（負面訊號）。
+ * New lock: compute this bento's tags, store them on lock.tags (for area insights), and update the payer's taste scores.
+ * Purchase +2, candidate-dish wish +3, choosing "none" −2 (negative signal).
  */
 exports.onLockCreatedTaste = onDocumentCreated({ document: "locks/{lockId}", region: REGION }, async (event) => {
   const lock = event.data.data();
@@ -71,7 +71,7 @@ exports.onLockCreatedTaste = onDocumentCreated({ document: "locks/{lockId}", reg
       defaultTags.forEach((x) => lockTags.add(x));
     }
   });
-  // 第四道（加菜／備案）：選了就算正面訊號；候選菜算許願
+  // Fourth side (add-on / backup): choosing it counts as a positive signal; a candidate dish counts as a wish
   const extra = lock.extra_side;
   if (extra?.component_id) {
     const w = tagsOf(extra.component_id);
@@ -83,8 +83,8 @@ exports.onLockCreatedTaste = onDocumentCreated({ document: "locks/{lockId}", reg
 });
 
 /**
- * 收藏店家（我的最愛，§4.5、§10）：與購買同等的正面訊號。依這家店供應中的主菜與預設配菜標籤
- * 平均分配 +2，避免菜色多的店一次灌太多分。
+ * Favoriting a vendor (Favorites, §4.5, §10): a positive signal equal to a purchase. +2 is spread evenly across the tags
+ * of the vendor's currently served mains and default sides, so vendors with many dishes don't get flooded with points at once.
  */
 exports.onFavoriteCreated = onDocumentCreated({ document: "users/{uid}/favorites/{vendorId}", region: REGION }, async (event) => {
   const { uid, vendorId } = event.params;
@@ -104,8 +104,8 @@ exports.onFavoriteCreated = onDocumentCreated({ document: "users/{uid}/favorites
 });
 
 /**
- * 瀏覽品項頁（§10.1 訊號最弱的一種，+1）：只加主菜與預設配菜的標籤。
- * 同一人同一品項每天只算一次（users/{uid}.viewed_items 記當天看過的品項）。
+ * Viewing an item page (§10.1, the weakest signal, +1): only the tags of the main and default sides are added.
+ * Counted once per person per item per day (users/{uid}.viewed_items records items viewed that day).
  */
 exports.recordItemView = onCall({}, async (request) => {
   assertSignedInUser(request, "記錄瀏覽");
@@ -137,8 +137,8 @@ exports.recordItemView = onCall({}, async (request) => {
 });
 
 /**
- * 開放許願（§4.4）：先從平台菜色庫選（dish_id），找不到再自由輸入，由 Gemini 歸類到標準菜名。
- * 以人數計，同一人重複許願只算一次；只計近 30 天。畫面註明「許願不保證供應」。
+ * Open wishes (§4.4): pick from the platform dish library first (dish_id); if not found, free text, which Gemini maps to a standard dish name.
+ * Counted by people: repeat wishes by the same person count once; only the last 30 days count. The screen notes "wishes don't guarantee availability".
  */
 exports.placeOpenWish = onCall({}, async (request) => {
   assertSignedInUser(request, "許願");
@@ -170,7 +170,7 @@ exports.placeOpenWish = onCall({}, async (request) => {
   return { dish_name: name, dish_key: key };
 });
 
-/** 每日：近 30 天人數，達門檻通知店家列入參考名單 */
+/** Daily: people in the last 30 days; when the threshold is reached, notify the vendor and add it to the reference list */
 async function tallyVendor(vendor, config) {
   const since = Timestamp.fromMillis(Date.now() - config.openWishWindowDays * 86400000);
   const snap = await db().collection("openWishes").where("vendor_id", "==", vendor.id).where("created_at", ">=", since).get();
@@ -215,7 +215,7 @@ exports.triggerTallyOpenWishesNow = onCall({}, async (request) => {
   return { ok: true };
 });
 
-/** 店家上架許願的菜之後，通知當初許願的人 */
+/** After a vendor lists a wished-for dish, notify the people who wished for it */
 exports.notifyWishersListed = onCall({}, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const key = String(request.data?.dish_key || "");
@@ -235,8 +235,8 @@ exports.notifyWishersListed = onCall({}, async (request) => {
 });
 
 /* ------------------------------------------------------------------ *
- * Gemini：菜名歸類、配方草稿。AI 不參與任何份量、金額、抽獎運算——
- * 配方草稿的數字只是起點，店家修改後才儲存。
+ * Gemini: dish-name classification and recipe drafts. AI plays no part in any portion, amount or draw calculation;
+ * recipe draft numbers are only a starting point and are saved only after the vendor edits them.
  * ------------------------------------------------------------------ */
 
 async function normalizeDish(text) {
@@ -286,8 +286,8 @@ exports.draftRecipe = onCall({ timeoutSeconds: 60 }, async (request) => {
 });
 
 /* ------------------------------------------------------------------ *
- * 區域洞察（§10.2）：取餐點方圓 1 公里、近 30 天；統計人數少於 20 人不產生。
- * 愛心餐的預約、領取、瀏覽紀錄一律不進入統計（這裡只讀 locks 與 openWishes）。
+ * Area insights (§10.2): within 1 km of the pickup point, last 30 days; not generated when fewer than 20 people are counted.
+ * Charity meal reservations, claims and views never enter the stats (only locks and openWishes are read here).
  * ------------------------------------------------------------------ */
 
 function itemTags(item, catalog) {
@@ -347,7 +347,7 @@ async function buildInsightsFor(vendor, vendors, config, week) {
   }
   const openWishes = [...wishGroups.values()].map((g) => ({ dish: g.dish, dish_key: g.dish_key, people: g.users.size }))
     .sort((a, b) => b.people - a.people).slice(0, 10);
-  // 供需缺口：需求占比高（≥ 15%）但附近提供該標籤的店家少（≤ 1 家）
+  // Supply gap: high demand share (≥ 15%) but few nearby vendors offering that tag (≤ 1)
   const supply = new Map();
   for (const v of nearby) {
     const catalog = await loadVendorCatalog(v.id);

@@ -1,4 +1,4 @@
-/* 共用頁首：只用 tokens.css／look-cafe.css 的變數 */
+/* Shared page header: only uses variables from tokens.css / look-cafe.css */
 .bb-pagehero {
   position: relative;
   overflow: hidden;
@@ -30,7 +30,7 @@
   margin: 0 auto;
   padding: 56px 16px 40px;
 }
-/* 左右內距跟導覽列（max-w-[1400px] px-4 md:px-6）對齊 */
+/* Horizontal padding aligned with the nav bar (max-w-[1400px] px-4 md:px-6) */
 @media (min-width: 768px) {
   .bb-pagehero__inner { padding: 88px 24px 56px; }
 }

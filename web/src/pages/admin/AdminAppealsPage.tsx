@@ -27,10 +27,10 @@ interface BanAppeal {
   created_at: { toDate?: () => Date };
 }
 
-// 消費者端在 ProfilePage.tsx 的 BanAppealSection 提交；這裡讀取 + 核准/拒絕。
-// 核准時要一併解除 users/{uid} 的 orderBanned，不然申訴核准了但使用者還是下不了單，
-// 所以跟 firestore.rules 一樣把兩個寫入包進同一個 batch，並比照其他管理員覆寫動作
-// 補一筆 admin_audit_logs（ISO 27001 A.8.15）。
+// Diners submit appeals via BanAppealSection in ProfilePage.tsx; this page reads them and approves/rejects.
+// Approval must also clear orderBanned on users/{uid}, otherwise the appeal is approved but the user still can't order,
+// so, as in firestore.rules, both writes go into one batch, and like other admin override actions
+// an admin_audit_logs entry is added (ISO 27001 A.8.15).
 function AppealsList() {
   const { toast } = useToast();
 
@@ -53,7 +53,7 @@ function AppealsList() {
         admin_note: adminNote ?? null,
       });
       if (approved) {
-        // 一併清乾淨 noPickupCount，不然核准後立刻又因為舊的累計次數被判定已達門檻。
+        // Also reset noPickupCount, otherwise right after approval the old running count would hit the threshold again.
         batch.update(doc(db, "users", appeal.buyer_uid), { orderBanned: false, noPickupCount: 0 });
       }
       batch.set(doc(collection(db, "admin_audit_logs")), {

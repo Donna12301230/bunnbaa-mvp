@@ -1,5 +1,5 @@
-// 位置工具：距離、步行時間、geohash。常用地點只存粗略 geohash（7 碼約 150 公尺，
-// 規格 §14.2），不存定位軌跡。functions/src/common.js 有同一套 geohash 解碼。
+// Location utilities: distance, walking time, geohash. Saved places store only a coarse geohash (7 characters ≈ 150 m,
+// spec §14.2), never location history. functions/src/common.js has the same geohash decoding.
 
 const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 
@@ -61,7 +61,7 @@ export function distanceMeters(a: { lat: number; lng: number } | null, b: { lat:
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-/** 步行時間（分鐘），以每分鐘 80 公尺估 */
+/** Walking time (minutes), estimated at 80 m per minute */
 export function walkMinutes(meters: number): number {
   return Math.ceil(meters / 80);
 }

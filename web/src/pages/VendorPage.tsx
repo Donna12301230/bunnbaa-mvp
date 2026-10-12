@@ -27,14 +27,14 @@ function categoryAnchorId(category: string) {
   return `category-${encodeURIComponent(category)}`;
 }
 
-// 手機上長菜單一直滑很痛苦，點分類直接捲到對應區塊；避免用 <a href="#..">，
-// 整站是 hash router（wouter + useHashLocation），網址的 # 是路由本身，不能
-// 拿來當錨點用，所以用 scrollIntoView 純 DOM 捲動。
+// Scrolling a long menu on mobile is painful, so tapping a category scrolls to its section. Avoid <a href="#..">:
+// the whole site uses a hash router (wouter + useHashLocation), so the URL's # is the route itself and can't
+// be used as an anchor; scrollIntoView does a plain DOM scroll instead.
 function scrollToCategory(category: string) {
   document.getElementById(categoryAnchorId(category))?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-// 商家頁 — 也兼商品(鎖定品項)列表頁：顯示這家商家所有可預購品項。
+// Vendor page, which doubles as the product (lockable item) list: shows all of this vendor's pre-orderable items.
 export default function VendorPage() {
   const { id } = useParams<{ id: string }>();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -67,8 +67,8 @@ export default function VendorPage() {
     enabled: !!id,
   });
 
-  // 目錄 > 分類 兩層（lib/menuCatalog.ts）：店家有用目錄、而且不只一個目錄時，先切目錄再看分類；
-  // 否則維持只有分類一層。分類保留品項在資料庫裡原本的順序，只是把同分類的拉在一起。
+  // Two levels, catalog > category (lib/menuCatalog.ts): if the vendor uses catalogs and has more than one, pick a catalog first, then a category;
+  // otherwise keep a single category level. Categories keep the items' original database order, only grouping same-category items together.
   const categoryOf = (item: MenuItem) => loc(item, "category").trim() || tr("其他", "Other");
   const catalogGroups = useMemo(() => groupByCatalog(items, vendor?.menu_catalogs, categoryOf), [items, vendor?.menu_catalogs]); // eslint-disable-line react-hooks/exhaustive-deps
   const showCatalogs = catalogGroups.length > 1 && catalogGroups.some((g) => g.catalog);
@@ -91,7 +91,7 @@ export default function VendorPage() {
 
   const effectiveCategory = activeCategory ?? categories[0]?.[0] ?? null;
 
-  // 便當要選日期與配菜，直接帶到品項頁；單品用最近能訂的日期時段快速加入
+  // Bentos need a date and sides, so go straight to the item page; single items are quick-added with the nearest orderable date and pickup slot
   function quickAdd(e: MouseEvent, item: MenuItem) {
     e.preventDefault();
     e.stopPropagation();
@@ -133,7 +133,7 @@ export default function VendorPage() {
         <ArrowLeft className="w-4 h-4" aria-hidden="true" /> {tr("回店家清單", "Back to vendors")}
       </Link>
 
-      {/* ── 店家頁首：大圖＋疊在圖上的店名（深色漸層保證白字對比） ── */}
+      {/* ── Vendor header: large image with the vendor name overlaid (dark gradient keeps the white text readable) ── */}
       <section className="relative overflow-hidden rounded-card border border-ink bg-secondary">
         {vendor.cover_image ? (
           <img src={vendor.cover_image} alt="" className="w-full h-[260px] md:h-[420px] object-cover" />
@@ -152,7 +152,7 @@ export default function VendorPage() {
         </div>
       </section>
 
-      {/* ── 店家資訊列 ── */}
+      {/* ── Vendor info row ── */}
       <div className="flex flex-wrap gap-3 text-sm">
         {rating && (
           <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-ink bg-card">
@@ -173,7 +173,7 @@ export default function VendorPage() {
         )}
       </div>
 
-      {/* ── 提醒 ── */}
+      {/* ── Notices ── */}
       <div className="grid gap-3 md:grid-cols-2">
         {vendor.typhoon_notice?.dates?.length ? (
           <div className="flex items-start gap-3 rounded-2xl border border-warning/50 bg-warning-soft p-4 text-sm text-warning-text md:col-span-2">
@@ -195,7 +195,7 @@ export default function VendorPage() {
       </div>
       <OpenWishDialog open={wishOpen} onOpenChange={setWishOpen} vendorId={vendor.id} vendorName={loc(vendor, "name")} />
 
-      {/* ── 菜單 ── */}
+      {/* ── Menu ── */}
       <div>
         <h2 className="font-heading text-3xl md:text-4xl font-semibold mb-6">{tr("菜單", "Menu")}</h2>
         {itemsLoading ? (
@@ -262,7 +262,7 @@ export default function VendorPage() {
                   </h3>
                   <ul className="grid gap-x-10 md:grid-cols-2">
                     {categoryItems.map((item) => (
-                      /* 整列是連結，「加入購物車」是旁邊的獨立按鈕（原本 button 包在 a 裡，互動元素不能巢狀） */
+                      /* The whole row is a link; "Add to cart" is a separate button beside it (the button used to be nested inside the a, and interactive elements can't nest) */
                       <li key={item.id} className="flex items-center gap-4 py-5 border-b border-border">
                         <button type="button" onClick={() => setOpenItemId(item.id)} className="group text-left flex items-center gap-4 min-w-0 flex-1 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                           <span className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border border-ink bg-secondary shrink-0 flex items-center justify-center">
@@ -308,7 +308,7 @@ export default function VendorPage() {
         )}
       </div>
 
-      {/* 點品項跳出點餐視窗（同品項頁的內容），加入購物車後自動關閉 */}
+      {/* Tapping an item opens the ordering dialog (same content as the item page); it closes automatically after adding to cart */}
       <Dialog open={!!openItemId} onOpenChange={(open) => !open && setOpenItemId(null)}>
         <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogTitle className="sr-only">{tr("點餐", "Order")}</DialogTitle>

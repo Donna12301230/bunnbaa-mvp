@@ -19,7 +19,7 @@ import PortalPageHeader from "@/components/PortalPageHeader";
 import { EmptyState } from "@/components/ds";
 
 interface VendorApplication {
-  id: string; // = 申請人的 uid
+  id: string; // = applicant's uid
   store_name: string;
   phone: string;
   email: string;
@@ -28,14 +28,14 @@ interface VendorApplication {
 
 const NEW_VENDOR = "__new__";
 
-// Ported from BunnBaa Parse_Ref's client/src/pages/admin/vendors.tsx (廠商管理 tab).
-// 接真 Firestore：
-//   - 待審核申請讀 vendor_applications（LoginPage「廠商申請」寫入，doc id = 申請人 uid）
-//   - 核准 = 把 vendors/{id}.owner_uid 設成申請人 uid（新建商家，或綁到既有商家，
-//     例如種子資料的 cafe-renheya-demo），這就是 ISO27001 文件的「商家帳號綁定」
-//   - 每個決定都跟 admin_audit_logs 同一個 batch 寫入（ISO 27001 A.8.15）
-//   - 商家訂閱沒有金流：管理員確認收到月費後按「續約 30 天」（lib/subscription.ts）
-// 商家停用／認證徽章在 AdminSettingsPage。
+// Ported from BunnBaa Parse_Ref's client/src/pages/admin/vendors.tsx (vendor management tab).
+// Wired to real Firestore:
+//   - Pending applications are read from vendor_applications (written by the "Vendor application" form in LoginPage, doc id = applicant uid)
+//   - Approve = set vendors/{id}.owner_uid to the applicant uid (a new vendor, or bound to an existing vendor,
+//     e.g. the seed data's cafe-renheya-demo); this is the "vendor account binding" in the ISO27001 docs
+//   - Every decision is written in the same batch as admin_audit_logs (ISO 27001 A.8.15)
+//   - Vendor subscriptions have no payment flow: after confirming the monthly fee was received, the admin presses "Renew 30 days" (lib/subscription.ts)
+// Vendor disabling / certification badges are in AdminSettingsPage.
 export default function AdminVendorsPage() {
   const { toast } = useToast();
   const confirm = useConfirm();

@@ -15,20 +15,20 @@ export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement
   label?: ReactNode;
   helperText?: ReactNode;
   error?: ReactNode;
-  /** 選項；也可以直接傳 <option> children */
+  /** Options; <option> children can also be passed directly */
   options?: SelectOption[];
-  /** 未選取時顯示的提示文字 */
+  /** Hint text shown when nothing is selected */
   placeholder?: string;
   leftIcon?: ReactNode;
-  /** 選項載入中：顯示 spinner 並停用 */
+  /** Options loading: shows a spinner and disables the select */
   loading?: boolean;
   size?: 'md' | 'lg';
   containerClassName?: string;
-  /** 僅供預覽頁強制呈現狀態 */
+  /** Only for forcing states on the preview page */
   forceState?: 'hover' | 'focus';
 }
 
-/** 原生 <select> 客製外觀：保留手機原生選單與鍵盤行為。 */
+/** Native <select> with a custom look: keeps the native mobile picker and keyboard behavior. */
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
   {
     id: idProp,
@@ -56,7 +56,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
   const id = idProp ?? autoId;
   const invalid = hasFieldError(error);
   const isDisabled = disabled || loading;
-  // 有 placeholder、非受控且沒給 defaultValue 時，預設停在 placeholder
+  // With a placeholder, uncontrolled and no defaultValue, start on the placeholder
   const initial = value === undefined && defaultValue === undefined && placeholder ? '' : defaultValue;
 
   return (

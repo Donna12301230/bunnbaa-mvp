@@ -3,8 +3,8 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
-// 舊連結或「另開新分頁」把 query 放在 hash 裡（#/my-bookings?tab=market）：wouter 的 hash 路由
-// 把 query 放在真正的 ?search，hash 帶 ? 會比對不到路由而 404。開站前先改寫成 /?tab=market#/my-bookings。
+// Old links or "open in new tab" put the query inside the hash (#/my-bookings?tab=market). wouter's hash routing
+// reads the query from the real ?search, so a ? in the hash fails to match any route and 404s. Rewrite it to /?tab=market#/my-bookings before startup.
 {
   const { hash, pathname, search } = window.location;
   const q = hash.indexOf("?");

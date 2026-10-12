@@ -27,7 +27,7 @@ import { getPreferredPickup, mealPeriodLabel, mealPeriodOf, priceDays, slotLabel
 import { notifyCartAdded } from "@/components/CartPreview";
 import DiscountExplanation from "@/components/DiscountExplanation";
 
-/** 下拉式選單一列（§4.2）：左邊是目前選的那道菜的小圖，右邊是原生下拉（手機上是系統選單） */
+/** One dropdown row (§4.2): thumbnail of the selected dish on the left, native select on the right (system picker on mobile) */
 function DishSelectRow({
   label, image, hint, children,
 }: {
@@ -56,16 +56,16 @@ function DishSelectRow({
   );
 }
 
-// 品項頁＝組便當（規格 §4.2）：價格日期列選取餐日（30 天內）、時段；白飯、主菜、配菜都用下拉式選單
-// （配菜預設菜已選好、選候選菜就是許願、選「不要」＝少一道）、第四道（備案或加菜）；
-// 下方以「素材 + 素材 → 便當」列出材料總和；底部固定合計、可展開金額拆解。
-// 金額只是預覽，結帳時伺服器會重算。
+// Item page = build a bento (spec §4.2): the price/date row picks the pickup date (within 30 days) and pickup slot; rice, main and sides all use dropdowns
+// (sides come preselected with the default dishes; picking a candidate dish is a wish; picking "None" drops one dish), plus a fourth dish (backup or add-on);
+// below, ingredients are listed as "ingredient + ingredient → bento"; the total is pinned at the bottom with an expandable price breakdown.
+// Prices are only a preview; the server recalculates them at checkout.
 export default function MenuItemPage() {
   const { id } = useParams<{ id: string }>();
   return <MenuItemOrder id={id} />;
 }
 
-// 品項點餐內容：路由頁與商家頁的彈窗共用。dialog 模式不顯示回上一頁連結，加入後呼叫 onAdded。
+// Item ordering content, shared by the routed page and the vendor page's dialog. Dialog mode hides the back link and calls onAdded after adding.
 export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dialog?: boolean; onAdded?: () => void }) {
   const { toast } = useToast();
   const { add, vendorId: cartVendorId } = useCart();
@@ -116,7 +116,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     [item?.weekdays]
   );
 
-  // 預設日期：首頁帶過來的，否則最近一個能訂的
+  // Default date: the one passed from the home page, otherwise the nearest orderable date
   useEffect(() => {
     if (!vendor || date) return;
     const pref = getPreferredPickup();
@@ -126,11 +126,11 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     if (pref?.window) setWindow(pref.window);
   }, [vendor]);
 
-  // 常一起買的排前面另成一區（照後端給的順序、最多 3 個、只列還在上架的），其餘留在「同一家店的其他品項」
+  // Frequently-bought-together items go first in their own section (backend order, at most 3, active items only); the rest stay in "Other items from this vendor"
   const oftenWith = (item?.often_with ?? []).map((id) => relatedItems.find((r) => r.id === id)).filter((r): r is MenuItem => !!r).slice(0, 3);
   const otherItems = relatedItems.filter((r) => !oftenWith.includes(r));
 
-  // 換品項（點「同一家店的其他品項」）元件不會重掛，數量、備註、飯量要重設；日期與時段沿用
+  // Switching items (via "Other items from this vendor") doesn't remount the component, so reset quantity, notes and rice portion; keep date and pickup slot
   useEffect(() => {
     setQty(1);
     setNote("");
@@ -141,7 +141,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     setCustomPicks(customFields(item).map(() => 0));
   }, [item?.id]);
 
-  // 瀏覽訊號（§10）：登入者看品項頁記一次，伺服器端同一天同品項只算一次
+  // Browse signal (§10): log one view per signed-in user on the item page; the server counts the same item at most once per day
   useEffect(() => {
     if (!item?.id || !auth.currentUser) return;
     httpsCallable(functions, "recordItemView")({ menu_item_id: item.id }).catch(() => {});
@@ -193,10 +193,10 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     return { cand, count, min, full };
   }
 
-  /** 某一格的下拉選了什麼：預設菜、候選菜（許願）或 "none"（這格不要，少一道 −5） */
+  /** What a slot's dropdown is set to: the default dish, a candidate dish (wish), or "none" (skip this slot, one dish fewer, −5) */
   function pickSide(slotIdx: number, choice: SlotChoice) {
     setChoices((prev) => item!.slots!.map((_, j) => (j === slotIdx ? choice : prev[j] ?? "default")));
-    // 第四道跟這格新選的菜撞到，就把第四道拿掉
+    // If the fourth dish clashes with the dish just picked for this slot, remove the fourth dish
     if (extra && extra.slot === slotIdx && extra.candidate === (choice === "default" ? null : choice)) setExtra(null);
   }
 
@@ -209,7 +209,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
   );
   const extraOptions = options.filter((o) => !chosenNames.has(o.name));
 
-  /** 第四道下拉的值："" 不加；"backup|slot|cand" 或 "addon|slot|cand"（cand 為 d＝預設菜） */
+  /** Value of the fourth-dish dropdown: "" for none; "backup|slot|cand" or "addon|slot|cand" (cand is d = default dish) */
   const extraValue = extra ? `${extra.mode}|${extra.slot}|${extra.candidate ?? "d"}` : "";
   function pickExtra(value: string) {
     if (!value) return setExtra(null);
@@ -217,7 +217,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     setExtra({ mode: mode as ExtraSideMode, slot: Number(slot), candidate: cand === "d" ? null : Number(cand) });
   }
 
-  // 材料總和（§4.2）：這一份實際包含的每樣材料與份量；跟店家每日備料用同一份配方
+  // Ingredient totals (§4.2): every ingredient and quantity in this serving; uses the same recipe as the vendor's daily prep
   const riceText = RICE_OPTIONS.find((r) => r.value === rice);
   const materials: { label: string; image?: string | null }[] = [];
   if (bento && item.rice_component_id && riceText) materials.push({ label: tr(`白飯 ${riceText.label}`, `Rice: ${riceText.labelEn}`) });
@@ -240,7 +240,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     if (o) materials.push({ label: `${f.label}：${o.name}` });
   });
 
-  // 加入購物車前先用對話框確認訂單內容（不直接加入）
+  // Before adding to cart, confirm the order in a dialog (don't add directly)
   function openConfirm() {
     if (!canAdd || !vendor) return;
     if (cartVendorId && cartVendorId !== item!.vendor_id) {
@@ -322,7 +322,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
         </div>
 
         <div className="min-w-0 space-y-7">
-          {/* 價格日期列＋時段 */}
+          {/* Price/date row + pickup slot */}
           <section className="space-y-3">
             <PriceDateStrip value={date} onChange={setDate} vendor={vendor} basePrice={listPrice} extraProblem={servedProblem} />
             {date && (
@@ -343,7 +343,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                   >
                     <span className="text-xs text-muted-foreground mr-1">{mealPeriodLabel(mealPeriodOf(s.window))}</span>
                     {slotLabel(s.window)}
-                    {/* 額滿的時段要寫出來，不能只是變淡——不然看不出是額滿還是沒開 */}
+                    {/* Full pickup slots must say so, not just be dimmed; otherwise you can't tell full from not open */}
                     {s.remaining !== null && s.open ? tr(`（剩 ${s.remaining}）`, ` (${s.remaining} left)`) : s.remaining !== null && s.remaining <= 0 ? tr("（已額滿）", " (full)") : ""}
                   </button>
                 ))}
@@ -360,7 +360,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
             )}
           </section>
 
-          {/* 組便當：白飯、主菜、配菜都用下拉式選單 */}
+          {/* Build a bento: rice, main and sides all use dropdowns */}
           {bento && (
             <section className="space-y-4">
               <div className="flex items-baseline justify-between gap-2 flex-wrap">
@@ -420,7 +420,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                 );
               })}
 
-              {/* 第四道：選滿標準數量後才能選，「備案」不加價或「加菜 +10」 */}
+              {/* Fourth dish: available once the standard count is filled; "Backup" at no extra charge or "Add-on +10" */}
               {standardCount < maxSides && (
                 <DishSelectRow
                   label={tr(`配菜 ${standardCount + 1}（選填）`, `Side ${standardCount + 1} (optional)`)}
@@ -447,7 +447,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                   </Select>
                 </DishSelectRow>
               )}
-              {/* 店家自訂欄位（例：湯品、飲料、辣度），第一個選項是預設 */}
+              {/* Vendor-defined fields (e.g. soup, drink, spice level); the first option is the default */}
               {custom.map((f, i) => (
                 <DishSelectRow key={`custom-${i}`} label={f.label}>
                   <Select aria-label={f.label} value={String(customPicks[i] ?? 0)} onChange={(e) => setCustomPicks((prev) => custom.map((_, j) => (j === i ? Number(e.target.value) : prev[j] ?? 0)))}>
@@ -459,7 +459,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
             </section>
           )}
 
-          {/* 材料總和（§4.2）：素材 + 素材 + … → 便當 */}
+          {/* Ingredient totals (§4.2): ingredient + ingredient + … → bento */}
           {materials.length > 0 && (
             <section className="rounded-2xl border border-ink bg-accent p-4 space-y-3" aria-label={tr("材料總和", "What's in it")}>
               <h2 className="font-heading text-lg font-semibold">{tr("材料總和", "What's in it")}</h2>
@@ -487,7 +487,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
             <Input id="item-note" type="text" value={note} maxLength={100} onChange={(e) => setNote(e.target.value)} placeholder={tr("例如：不要香菜", "e.g. no coriander")} />
           </div>
 
-          {/* 底部固定：合計（已含早鳥），點開看材料總和與金額拆解 */}
+          {/* Pinned to the bottom: total (early-bird included); tap to see ingredient totals and price breakdown */}
           <div className="sticky bottom-0 z-10 -mx-4 px-4 md:mx-0 md:px-0 pt-2 pb-4 bg-background/95 backdrop-blur-md border-t border-border space-y-2">
             {showMaterials && breakdown && (
               <div className="rounded-2xl border border-ink bg-accent p-4 text-sm space-y-2">
@@ -531,7 +531,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
         </div>
       </div>
 
-      {/* 常一起買（BigQuery 購物籃分析寫在 menu_items.often_with）；沒有資料就不顯示 */}
+      {/* Frequently bought together (BigQuery basket analysis, written to menu_items.often_with); hidden when there's no data */}
       {!dialog && oftenWith.length > 0 && (
         <section className="space-y-3">
           <h2 className="font-heading text-xl font-semibold">{tr("常一起買", "Often bought together")}</h2>
@@ -551,7 +551,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
         </section>
       )}
 
-      {/* 同一商店的其他品項（頁面模式才顯示；彈窗模式不另外跳頁） */}
+      {/* Other items from the same vendor (page mode only; dialog mode doesn't navigate away) */}
       {!dialog && otherItems.length > 0 && (
         <section className="space-y-3">
           <h2 className="font-heading text-xl font-semibold">{tr("同一家店的其他品項", "More from this vendor")}</h2>
@@ -571,7 +571,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
         </section>
       )}
 
-      {/* 點商品圖片放大 */}
+      {/* Tap the product image to enlarge it */}
       <Dialog open={imageOpen} onOpenChange={setImageOpen}>
         <DialogContent className="max-w-3xl p-3 md:p-4 bg-transparent border-0 shadow-none">
           <DialogTitle className="sr-only">{loc(item, "name")}</DialogTitle>
@@ -579,7 +579,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
         </DialogContent>
       </Dialog>
 
-      {/* 下訂前確認：把要下的訂單完整列出來，確認後才真正加入購物車 */}
+      {/* Pre-checkout confirmation: list the full order, and only add it to the cart once confirmed */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>

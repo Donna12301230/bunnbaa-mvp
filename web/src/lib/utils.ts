@@ -1,8 +1,8 @@
 import { clsx, type ClassValue } from "clsx"
 import { extendTailwindMerge } from "tailwind-merge"
 
-// tailwind.config.ts 自訂的字級（text-body、text-body-sm…）要登記成 font-size，
-// 否則 twMerge 會把它當成文字顏色，和 text-primary-foreground 等顏色 class 互相覆蓋掉。
+// Custom font sizes from tailwind.config.ts (text-body, text-body-sm, ...) must be registered as font-size,
+// otherwise twMerge treats them as text colors and they override color classes like text-primary-foreground.
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {

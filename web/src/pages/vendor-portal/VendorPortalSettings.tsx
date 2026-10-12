@@ -53,7 +53,7 @@ function fmtHoliday(dateStr: string): string {
   }
 }
 
-// 沒設定過的商家，消費端是「每天營業」，這裡的預設要一致
+// For vendors that never set this, diners see "open every day", so the default here must match
 const DEFAULT_BH: BusinessHour[] = [0, 1, 2, 3, 4, 5, 6].map(d => ({
   weekday: d,
   open: true,
@@ -66,7 +66,7 @@ function addMinutes(hhmm: string, mins: number): string {
   return minsToTime(h * 60 + m + mins);
 }
 
-/** 取餐時段清單有問題就回傳錯誤訊息。 */
+/** Returns an error message if the pickup slot list is invalid. */
 function pickupWindowsProblem(windows: string[]): string | null {
   if (windows.length === 0) return tr("至少要有一個取餐時段", "Add at least one pickup time");
   if (windows.length > MAX_PICKUP_WINDOWS) return tr(`取餐時段最多 ${MAX_PICKUP_WINDOWS} 個`, `At most ${MAX_PICKUP_WINDOWS} pickup times`);
@@ -77,18 +77,18 @@ function pickupWindowsProblem(windows: string[]): string | null {
       if (windowsOverlap(windows[i], windows[j])) return tr(`取餐時段「${slotLabel(windows[i])}」跟「${slotLabel(windows[j])}」重疊了`, `Pickup times ${slotLabel(windows[i])} and ${slotLabel(windows[j])} overlap`);
     }
   }
-  // 1002 規格 §2：每個餐期一段取餐時段，每段不超過 2 小時（早餐、午餐、晚餐各自算）
+  // Spec 1002 §2: one pickup slot per meal period, each at most 2 hours (breakfast, lunch and dinner counted separately)
   if (pickupRangeMinutes(windows) > MAX_PICKUP_RANGE_MINUTES) return tr("每個餐期的取餐時段（最早到最晚）不可超過 2 小時", "Each meal's pickup window can't exceed 2 hours");
   return null;
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/settings.tsx.
-// 2026-09-25：簡介／地址／電話／營業日／公休日／取餐時段／份數上限改讀寫真實
-// vendors/{id}（firestore.rules 限定店主只能改這幾個欄位，店名只有管理員能改），
-// 消費端取餐時段選擇跟結帳驗證都照這裡的設定（lib/pickupSlots.ts、functions/src/pricing.js）。
-// 封面圖 2026-09-28 改存 vendors/{id}.cover_image。原本 Parse 雛型的「桌位 QR（現場點餐）」
-// 同日拿掉：TODO §7 決定不做現場點餐，QR 連到的 /menu/:id 也從來沒有這個頁面。
+// 2026-09-25: about / address / phone / business days / closed days / pickup slots / portion limit now read and write the real
+// vendors/{id} (firestore.rules lets the vendor owner change only these fields; only admins can change the store name),
+// and diner-side pickup slot selection and checkout validation follow these settings (lib/pickupSlots.ts, functions/src/pricing.js).
+// The cover image moved to vendors/{id}.cover_image on 2026-09-28. The Parse prototype's "table QR (dine-in ordering)"
+// was removed the same day: TODO §7 decided against dine-in ordering, and the /menu/:id page the QR linked to never existed.
 export default function VendorPortalSettings() {
   const { toast } = useToast();
 
@@ -103,7 +103,7 @@ export default function VendorPortalSettings() {
   const [newHoliday, setNewHoliday] = useState("");
   const [pickupWindows, setPickupWindows] = useState<string[]>(DEFAULT_PICKUP_WINDOWS);
   const [slotCapacity, setSlotCapacity] = useState("");
-  // 第一階段規格 §2「店家可調」
+  // Phase 1 spec §2 "vendor-adjustable"
   const [cutoffTime, setCutoffTime] = useState(liveConfig().cutoffTime);
   const [safetyRate, setSafetyRate] = useState(String(DEFAULT_PLATFORM_CONFIG.safetyStockRate * 100));
   const [minQty, setMinQty] = useState(String(DEFAULT_PLATFORM_CONFIG.candidateMinQty));
@@ -152,7 +152,7 @@ export default function VendorPortalSettings() {
       if (!Number.isInteger(capacity) || capacity < 0 || capacity > 10000) {
         throw new Error(tr("份數上限請填 0～10000 的整數（空白或 0 代表不限）", "The limit must be a whole number from 0 to 10000 (blank or 0 means no limit)"));
       }
-      // firestore.rules 只收 https 的封面網址；先在這裡擋，不然只會看到 PERMISSION_DENIED
+      // firestore.rules only accepts https cover URLs; check here first, otherwise the user only sees PERMISSION_DENIED
       if (coverImage && !coverImage.trim().startsWith("https://")) throw new Error(tr("封面圖網址要以 https:// 開頭", "The cover image URL must start with https://"));
       if (coverImage.length > 500) throw new Error(tr("封面圖網址太長（最多 500 字）", "The cover image URL is too long (500 characters max)"));
       if (holidays.length > MAX_HOLIDAYS) throw new Error(tr(`公休日最多 ${MAX_HOLIDAYS} 天`, `At most ${MAX_HOLIDAYS} closing days`));
@@ -168,8 +168,8 @@ export default function VendorPortalSettings() {
       if ((latNum !== null && !Number.isFinite(latNum)) || (lngNum !== null && !Number.isFinite(lngNum))) throw new Error(tr("座標格式不正確", "Invalid coordinates"));
       await updateDoc(doc(db, "vendors", realVendor.id), {
         description: description.trim(),
-        // 英文簡介：手動改過就釘住（i18n_src 設成目前中文，自動翻譯不會蓋掉）；
-        // 清空＝交回自動翻譯；沒動＝只改中文時照常自動重翻
+        // English description: once edited by hand it's pinned (i18n_src is set to the current Chinese, so auto-translation won't overwrite it);
+        // cleared = hand back to auto-translation; untouched = re-translated automatically as usual when only the Chinese changes
         ...(descriptionEn.trim() !== (realVendor.description_en ?? "").trim()
           ? descriptionEn.trim()
             ? { description_en: descriptionEn.trim(), "i18n_src.description": description.trim() }
@@ -201,7 +201,7 @@ export default function VendorPortalSettings() {
     setBusinessHours(prev => prev.map(h => h.weekday === weekday ? { ...h, ...patch } : h));
   }
 
-  // 將第一個開放日的時間套用至所有開放日
+  // Apply the first open day's hours to all open days
   function syncAllOpenTimes() {
     const first = businessHours.find(h => h.open);
     if (!first) return;
@@ -247,7 +247,7 @@ export default function VendorPortalSettings() {
     { key: "plan" as const, icon: CreditCard, label: tr("合作方案", "Plan"), sub: tr(`每份抽成 ${commissionPct}%`, `${commissionPct}% per meal`) },
   ];
 
-  // 取餐時間軸範圍：06:00–20:30，三個餐期是底色帶
+  // Pickup timeline range: 06:00–20:30, with the three meal periods as background bands
   const T0 = 6 * 60, T1 = 20 * 60 + 30;
   const pos = (hhmm: string) => {
     const [h, m] = hhmm.split(":").map(Number);
@@ -259,7 +259,7 @@ export default function VendorPortalSettings() {
     <VendorPortalLayout>
       <PortalPageHeader icon={Settings} title={tr("店家設定", "Store settings")} />
 
-      {/* 五張大分頁卡，每張一行現況 */}
+      {/* Five large tab cards, each with a one-line status */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-5" role="tablist">
         {sections.map((s) => (
           <button key={s.key} type="button" role="tab" aria-selected={section === s.key} onClick={() => setSection(s.key)}
@@ -273,7 +273,7 @@ export default function VendorPortalSettings() {
       </div>
 
       <div className="max-w-3xl space-y-4 pb-24">
-        {/* ── 店面 ── */}
+        {/* ── Store ── */}
         {section === "store" && (
           <Card className="border-2 overflow-hidden">
             <div className="relative h-40 sm:h-52 bg-muted">
@@ -304,7 +304,7 @@ export default function VendorPortalSettings() {
           </Card>
         )}
 
-        {/* ── 營業：一週時間軸＋公休日曆 ── */}
+        {/* ── Hours: weekly timeline + closed-day calendar ── */}
         {section === "hours" && (
           <>
             <Card className="border-2">
@@ -373,7 +373,7 @@ export default function VendorPortalSettings() {
           </>
         )}
 
-        {/* ── 取餐：餐期色帶上的時段塊＋份數上限 ── */}
+        {/* ── Pickup: slot blocks on the meal-period bands + portion limit ── */}
         {section === "pickup" && (
           <>
             <Card className="border-2">
@@ -422,7 +422,7 @@ export default function VendorPortalSettings() {
           </>
         )}
 
-        {/* ── 預購規則 ── */}
+        {/* ── Pre-order rules ── */}
         {section === "rules" && (
           <>
             <div className="grid sm:grid-cols-3 gap-3">
@@ -486,7 +486,7 @@ export default function VendorPortalSettings() {
           </>
         )}
 
-        {/* ── 合作方案：不收月費，每份餐點抽成 ── */}
+        {/* ── Plan: no monthly fee, commission per meal ── */}
         {section === "plan" && realVendor && (
           <Card className="border-2 border-success/40 bg-success-soft">
             <CardContent className="p-5 space-y-3">
@@ -511,7 +511,7 @@ export default function VendorPortalSettings() {
         )}
       </div>
 
-      {/* 儲存：固定在下方，哪個分頁都按得到 */}
+      {/* Save: pinned to the bottom, reachable from any tab */}
       {section !== "plan" && (
         <div className="fixed bottom-16 md:bottom-0 left-0 right-0 md:left-60 z-30 border-t border-border bg-card/95 backdrop-blur px-4 py-3">
           <div className="max-w-3xl flex items-center gap-3">
@@ -526,7 +526,7 @@ export default function VendorPortalSettings() {
   );
 }
 
-/** − 數字 ＋，大顆好按 */
+/** − number +, large and easy to tap */
 function Stepper({ value, step, min = 0, onChange, label }: { value: number; step: number; min?: number; onChange: (n: number) => void; label: string }) {
   return (
     <span className="inline-flex items-center rounded-full border-2 border-border bg-card">
@@ -537,7 +537,7 @@ function Stepper({ value, step, min = 0, onChange, label }: { value: number; ste
   );
 }
 
-/** 一個月的日曆，點日期切換公休；每週休息的日子灰底 */
+/** One-month calendar; tap a date to toggle a closed day; weekly days off are greyed */
 function MonthGrid({ offset, holidays, closedWeekdays, onToggle }: { offset: number; holidays: string[]; closedWeekdays: number[]; onToggle: (d: string) => void }) {
   const first = startOfMonth(addMonths(new Date(), offset));
   const days = eachDayOfInterval({ start: first, end: endOfMonth(first) });

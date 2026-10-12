@@ -14,16 +14,16 @@ import { useVendorLocks } from "@/hooks/useVendorLocks";
 import { DONE_STATUSES, PENDING_STATUSES, revenueOf } from "@/lib/lockOutcome";
 import { slotLabel } from "@/lib/pickupSlots";
 
-// 時段明細：2026-09-28 改用真實 locks。網址參數是「取餐日__時段」（見
-// VendorPortalSessions 的 slotKey），列出這個時段的備料彙總與每筆訂單，
-// 可以直接確認取餐／登記未取餐。
+// Slot details: switched to real locks on 2026-09-28. The URL param is "pickupDate__slot" (see
+// slotKey in VendorPortalSessions); lists the prep summary and every order for this slot,
+// and lets the vendor confirm pickup / record a no-show directly.
 function parseSlot(raw: string | undefined): { date: string; window: string } | null {
   if (!raw) return null;
   let decoded = raw;
   try {
     decoded = decodeURIComponent(raw);
   } catch {
-    // 已經是解碼過的字串
+    // Already a decoded string
   }
   const [date, window] = decoded.split("__");
   return date && window ? { date, window } : null;
@@ -40,9 +40,9 @@ export default function VendorPortalSessionSummary() {
   const active = slotLocks.filter((l) => l.status !== "no_show");
   const pending = slotLocks.filter((l) => PENDING_STATUSES.has(l.status)).length;
   const done = slotLocks.filter((l) => DONE_STATUSES.has(l.status)).length;
-  const revenue = slotLocks.reduce((sum, l) => sum + revenueOf(l), 0); // 跟撥款同一口徑（退成點數的不算）
+  const revenue = slotLocks.reduce((sum, l) => sum + revenueOf(l), 0); // Same basis as payouts (refunds to platform points excluded)
 
-  // 備料彙總：計畫型品名「A方案・第1/5天」合併成同一道
+  // Prep summary: meal-plan item names such as "Plan A · Day 1/5" are merged into one dish
   const items = useMemo(() => {
     const byName = new Map<string, number>();
     for (const l of active) {

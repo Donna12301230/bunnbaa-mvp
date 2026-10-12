@@ -18,7 +18,7 @@ import { policy } from "@/lib/policy";
 import type { CharityMeal, CharityReservation } from "@/types";
 
 const RANGES = [500, 1000, 2000, 3000];
-/** 愛心餐截止（時段結束後幾小時／分鐘），讀平台參數 */
+/** Charity meal deadline (hours / minutes after the pickup slot ends), read from platform settings */
 const closeHours = () => {
   const m = liveConfig().charityCloseAfterMinutes;
   return m % 60 === 0 ? tr(`${m / 60} 小時`, `${m / 60} hour${m === 60 ? "" : "s"}`) : tr(`${m} 分鐘`, `${m} min`);
@@ -26,10 +26,10 @@ const closeHours = () => {
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 
 /**
- * 「我的餐點」頁上方的「附近愛心餐」分頁（規格 1002 §4.5、§7；原本放在轉讓市集頁，1002 規格移到我的餐點）。
- * 未取餐或主動捐出的便當，當天現場領取：線上預約（手機驗證、每人每天 1 份、10 分鐘內到場；逾時釋出給下一位、不停權）
- * 或現場先到先領。依距離排序、顯示剩餘份數、截止時間、步行時間，走不到的標「來不及」。
- * 愛心餐的預約、領取、瀏覽紀錄一律不進入統計與推薦（§10.3）。
+ * "Charity meals nearby" tab at the top of the "My meals" page (spec 1002 §4.5, §7; previously on the resale market page, moved to My meals in the 1002 spec).
+ * No-show or donated bentos, picked up in person the same day: reserve online (phone verification, 1 per person per day, arrive within 10 minutes; if late it goes to the next person, no suspension)
+ * or first come, first served on site. Sorted by distance, showing remaining count, deadline and walking time; ones you can't reach in time are marked "Too late".
+ * Charity meal reservations, pickups and views are never included in stats or recommendations (§10.3).
  */
 export default function CharityMealsSection() {
   const { user } = useAuth();
@@ -63,7 +63,7 @@ export default function CharityMealsSection() {
     }, () => setMine([]));
   }, [user?.id, today]);
 
-  // 常用地點（粗略 geohash）當預設位置
+  // Use the saved frequent location (coarse geohash) as the default position
   useEffect(() => {
     if (!here && user) {
       const home = decodeGeohash(user.homeGeo ?? "");
@@ -82,7 +82,7 @@ export default function CharityMealsSection() {
     }
   }
 
-  // 依店家彙總：剩餘份數、截止時間
+  // Aggregate by vendor: remaining count, deadline
   const byVendor = useMemo(() => {
     const map = new Map<string, { vendor_id: string; name: string; address?: string; lat: number | null; lng: number | null; available: CharityMeal[]; deadline: number }>();
     for (const m of meals) {

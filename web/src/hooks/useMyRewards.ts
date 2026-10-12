@@ -5,7 +5,7 @@ import type { Coupon, RewardTicket } from "@/types";
 
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 
-/** 本人的折價券（coupons，本人可讀），即時更新 */
+/** The current user's coupons (coupons, readable by the owner), live */
 export function useMyCoupons(uid: string | null | undefined) {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   useEffect(() => {
@@ -21,7 +21,7 @@ export function useMyCoupons(uid: string | null | undefined) {
   return { coupons, usable };
 }
 
-/** 本人的抽獎券 */
+/** The current user's draw tickets */
 export function useMyTickets(uid: string | null | undefined) {
   const [tickets, setTickets] = useState<RewardTicket[]>([]);
   useEffect(() => {

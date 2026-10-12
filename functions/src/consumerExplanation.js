@@ -6,10 +6,10 @@
  * is and what locking in means. Never recommends buying — purely explanatory,
  * generate-once-and-cache.
  *
- * 2026-10-09 改版：原本在每筆訂單建立後（onLockCreated）產生、寫到 locks 上，但沒有任何畫面顯示，
- * 而且是付款「之後」才產生，跟「給正在考慮的消費者看」的設計相反。改成品項頁點開金額明細時呼叫
- * getDiscountExplanation，快取鍵只有「折扣級距 × 店家穩定度 × 取消規則」，組合很少，幾乎不花額度。
- * 規則數字（截單、取消換券比例）由呼叫端從平台參數帶入，模型只負責把它講白，不自己編規則。
+ * Revised 2026-10-09: this used to run after each order was created (onLockCreated) and was written onto locks, but no screen showed it,
+ * and it was generated *after* payment, the opposite of the intent (shown to diners who are still deciding). It is now called as
+ * getDiscountExplanation when the price breakdown is opened on the item page; the cache key is just "discount tier × vendor reliability × cancellation rules", so there are few combinations and it costs almost nothing.
+ * Rule numbers (cut-off, cancellation coupon rate) are passed in by the caller from platform settings; the model only puts them in plain words and never invents rules.
  */
 const { db, onCall, HttpsError, logger, FieldValue } = require("./common");
 const { generateJSON } = require("./gemini");
@@ -27,11 +27,11 @@ const DISCLAIMER = "此為預購規則說明，非購買建議";
 
 /**
  * @param {object} params
- * @param {number} params.discountPercent   e.g. 20 for "8折"
+ * @param {number} params.discountPercent   e.g. 20 for 20% off
  * @param {"stable"|"variable"|"new"} params.vendorReliabilityTone
  *        Qualitative only — never pass the raw accuracy number to this agent,
- *        per spec 6.2 ("僅作為語氣參考，不呈現具體數字給消費者").
- * @param {object} params.rules  平台參數：tiers、cancelHoursBefore、cancelCouponRate
+ *        per spec 6.2 ("tone reference only; never show specific numbers to diners").
+ * @param {object} params.rules  platform settings: tiers, cancelHoursBefore, cancelCouponRate
  * @returns {Promise<{ explanation_text: string, explanation_text_en: string, disclaimer: string }>}
  */
 async function generateDiscountExplanation({ discountPercent, vendorReliabilityTone, rules }) {
@@ -64,8 +64,8 @@ async function generateDiscountExplanation({ discountPercent, vendorReliabilityT
 const TONES = ["stable", "variable", "new"];
 
 /**
- * 品項頁「金額明細」裡的折扣說明。data: { vendor_id, discount_percent }。不用登入（瀏覽就看得到）；
- * 折扣只接受平台的早鳥級距，快取鍵組合有限，Gemini 只會被呼叫幾次。
+ * Discount explanation in the "price breakdown" on the item page. data: { vendor_id, discount_percent }. No login needed (visible while browsing);
+ * the discount must be one of the platform's early-bird tiers, so the cache key space is small and Gemini is called only a few times.
  */
 exports.getDiscountExplanation = onCall({}, async (request) => {
   const pct = Number(request.data?.discount_percent);
@@ -85,7 +85,7 @@ exports.getDiscountExplanation = onCall({}, async (request) => {
     try {
       explanation = await generateDiscountExplanation({ discountPercent: pct, vendorReliabilityTone: tone, rules });
     } catch (err) {
-      // 只是說明文字：失敗就不顯示，不影響下單
+      // Just explanatory text: if it fails we show nothing; ordering is unaffected
       logger.warn("getDiscountExplanation failed", err);
       return { explanation: null };
     }

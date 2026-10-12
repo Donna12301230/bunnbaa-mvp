@@ -6,7 +6,7 @@ import CustomerLayout from "@/components/CustomerLayout";
 import PageHero from "@/components/PageHero";
 import { Link } from "wouter";
 
-// 規則數字一律從 lib/policy.ts（平台參數）來；寫成函式，切換語言時才會重新產生
+// Rule numbers always come from lib/policy.ts (platform settings); written as a function so it is regenerated when the language switches
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const faqs = () => {
   const c = liveConfig();
@@ -74,7 +74,7 @@ export default function FaqPage() {
       active={null}
       hero={<PageHero eyebrow={tr("支援", "Support")} title={tr("常見問題", "FAQ")} description={tr("關於預購、取餐、退款最常被問到的問題。", "Answers to the questions we hear most about pre-ordering, pickup, and refunds.")} />}
     >
-      {/* 桌機兩欄：左邊 sticky 的「找不到答案？」，右邊問答 */}
+      {/* Desktop two columns: sticky "Can't find an answer?" on the left, Q&A on the right */}
       <div className="grid gap-10 lg:grid-cols-[320px_1fr] lg:gap-16 items-start py-4 md:py-8">
         <aside className="lg:sticky lg:top-24 rounded-card border border-ink bg-accent p-7 space-y-3">
           <p className="font-heading text-2xl font-semibold">{tr("沒找到你想問的？", "Didn't find your answer?")}</p>

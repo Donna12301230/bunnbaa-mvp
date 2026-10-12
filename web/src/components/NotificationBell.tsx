@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { tr } from "@/lib/i18n";
 import type { AppNotification } from "@/types";
 
-/** 站內通知收件匣（notifications，Functions 寫、本人可讀）。推播是另外盡量送，這裡保證看得到。 */
+/** In-app notification inbox (notifications, written by Functions, readable by the owner). Push is best-effort; this guarantees they can be seen. */
 export default function NotificationBell() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
@@ -32,7 +32,7 @@ export default function NotificationBell() {
 
   function open(n: AppNotification) {
     if (!n.read) updateDoc(doc(db, "notifications", n.id), { read: true }).catch(() => {});
-    // wouter 的 hash navigate 會把 ?query 放到網址的 search（# 前面），路由照樣比對得到
+    // wouter's hash navigate puts ?query in the URL search (before #); routes still match
     if (n.link) navigate(n.link);
   }
 

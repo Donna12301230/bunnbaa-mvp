@@ -16,8 +16,8 @@ import { cn } from "@/lib/utils";
 import type { ExtraSideChoice, Lock, MenuItem, RiceOption, SlotChoice, Vendor } from "@/types";
 
 /**
- * 截單前修改（規格 §4.1）：取餐時段（同一天，計畫的每一天也在這裡個別改）、主菜、配菜、飯量、第四道。
- * 金額以下單時的早鳥折數重算：變便宜差額退成平台點數；變貴目前不能線上補差額（伺服器 updateLockChoices 擋）。
+ * Edit before cut-off (spec §4.1): pickup slot (same day; each day of a meal plan is also edited here individually), main, sides, rice amount, fourth dish.
+ * The amount is recomputed with the early-bird discount from order time: if cheaper, the difference is refunded as platform points; if more expensive, paying the difference online isn't supported yet (blocked by server updateLockChoices).
  */
 export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null; onClose: () => void }) {
   const { toast } = useToast();
@@ -61,7 +61,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
   const mains = item ? itemMains(item) : [];
   const options = useMemo(() => (item ? sideOptions(item) : []), [item]);
 
-  // 預覽新金額（伺服器會再算一次）
+  // Preview the new amount (the server recomputes it)
   const preview = useMemo(() => {
     if (!lock || !item || !bento) return null;
     const list = itemListPrice(item, mainIndex);

@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from "react";
 import type { Vendor } from "@/types";
 
-// 頂部列「選擇地區」：縣市＋（選填）鄉鎮市區，首頁／商家列表／轉讓市集依店家地址篩選。
-// 記在 localStorage，只是這台裝置的瀏覽偏好，讀寫失敗（無痕模式）就當沒選。
+// Top bar "Choose area": county/city + (optional) township/district; home / vendor list / resale market filter by vendor address.
+// Stored in localStorage as this device's browsing preference only; if reads/writes fail (private mode), treat it as nothing selected.
 export interface SelectedArea {
   county: string;
   town?: string;
@@ -29,7 +29,7 @@ export function setSelectedArea(area: SelectedArea | null) {
     if (area) localStorage.setItem(STORAGE_KEY, JSON.stringify(area));
     else localStorage.removeItem(STORAGE_KEY);
   } catch {
-    // 存不了就只在這次瀏覽有效
+    // If it can't be saved, it only lasts for this visit
   }
   listeners.forEach((fn) => fn());
 }
@@ -48,10 +48,10 @@ export function areaLabel(area: SelectedArea | null): string {
   return area ? `${area.county}${area.town ? ` ${area.town}` : ""}` : "";
 }
 
-// 地址常混用「台」「臺」，統一成「臺」再比對
+// Addresses often mix 台 and 臺; normalize to 臺 before comparing
 const normalize = (s: string) => s.replace(/台/g, "臺").replace(/\s+/g, "");
 
-/** 沒選地區＝全部符合；選了就看店家地址有沒有包含該縣市（與鄉鎮市區）。沒填地址的店家不符合。 */
+/** No area selected = everything matches; otherwise check whether the vendor address contains that county/city (and township/district). Vendors without an address don't match. */
 export function vendorInArea(vendor: Pick<Vendor, "address"> | undefined, area: SelectedArea | null): boolean {
   if (!area) return true;
   const address = normalize(vendor?.address ?? "");

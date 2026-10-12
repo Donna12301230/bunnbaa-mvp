@@ -19,7 +19,7 @@ import PortalPageHeader from "@/components/PortalPageHeader";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 
-// 狀態文字：全站共用 lib/lockOutcome.ts，管理頁用比較精確的說法（例：未取餐（舊制））
+// Status text: shared site-wide via lib/lockOutcome.ts; the admin page uses more precise wording (e.g. "No-show (legacy)")
 const ALL_STATUSES: LockStatus[] = ["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "no_show", "charity", "cancelling", "cancelled"];
 const statusLabels = () => Object.fromEntries(ALL_STATUSES.map((st) => [st, lockStatus(st, true).label])) as Record<LockStatus, string>;
 
@@ -66,7 +66,7 @@ function LocksContent() {
     [locks, statusFilter, vendorFilter]
   );
 
-  /** 店家未如期出餐（或其他平台確認的狀況）：全額退成平台點數給付款人（functions/src/wallet.js refundLockAsPoints） */
+  /** Vendor didn't serve the meal as scheduled (or another platform-confirmed case): full refund to the payer as platform points (functions/src/wallet.js refundLockAsPoints) */
   async function refundAsPoints(lock: Lock) {
     const note = await prompt({
       title: tr(`「${lock.item_name}」全額退成點數？`, `Refund ${lock.item_name} in full as points?`),

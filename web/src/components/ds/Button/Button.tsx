@@ -7,19 +7,19 @@ export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'text' | 'dang
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** primary 橘底白字（主行動）、secondary 淡橘底、outline、text、danger。預設 primary */
+  /** primary: orange with white text (main action), secondary: light orange, outline, text, danger. Default primary */
   variant?: ButtonVariant;
-  /** sm 36px / md 44px / lg 52px。sm 會自動擴大點擊區至 44px。預設 md */
+  /** sm 36px / md 44px / lg 52px. sm automatically enlarges the hit area to 44px. Default md */
   size?: ButtonSize;
-  /** 文字前的 icon（lucide-react 元件） */
+  /** Icon before the text (lucide-react component) */
   leftIcon?: ReactNode;
-  /** 文字後的 icon */
+  /** Icon after the text */
   rightIcon?: ReactNode;
-  /** 只放 icon 的正方形按鈕：icon 放在 children，務必同時提供 aria-label */
+  /** Square icon-only button: put the icon in children and always provide aria-label */
   iconOnly?: boolean;
-  /** 載入中：顯示 spinner、禁止點擊，並設 aria-busy */
+  /** Loading: shows a spinner, blocks clicks, and sets aria-busy */
   loading?: boolean;
-  /** 撐滿父容器寬度 */
+  /** Fill the parent's width */
   fullWidth?: boolean;
 }
 

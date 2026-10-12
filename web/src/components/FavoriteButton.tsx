@@ -6,14 +6,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-/** 店家卡片標章旁的愛心收藏按鈕（§4.5） */
+/** Heart (favorite) button next to the badge on vendor cards (§4.5) */
 export default function FavoriteButton({ vendorId, vendorName, className }: { vendorId: string; vendorName: string; className?: string }) {
   const { ids, toggle } = useFavorites();
   const requireLogin = useRequireLogin();
   const { toast } = useToast();
   const { t } = useI18n();
   const on = ids.has(vendorId);
-  // 廠商帳號沒有會員功能（2026-10-09），不顯示收藏
+  // Vendor accounts have no member features (2026-10-09), so no favorite button
   const { isVendor } = useAuth();
 
   async function onClick(e: React.MouseEvent) {

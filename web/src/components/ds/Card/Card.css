@@ -1,5 +1,5 @@
 /* ── Card ────────────────────────────────────────────────────────────────
-   .is-hover / .is-active / .is-focus 只供預覽頁強制呈現狀態使用。 */
+   .is-hover / .is-active / .is-focus are only for forcing states on the preview page. */
 .bb-card {
   display: block;
   position: relative;
@@ -12,7 +12,7 @@
     border-color var(--duration-base) var(--ease-standard),
     opacity var(--duration-base) var(--ease-standard);
 }
-/* <button> 版本需要撐滿 */
+/* The <button> version needs to fill the width */
 button.bb-card {
   width: 100%;
   font: inherit;
@@ -40,7 +40,7 @@ button.bb-card {
 .bb-card--pad-md { padding: var(--space-4); }
 .bb-card--pad-lg { padding: var(--space-6); }
 
-/* 可互動：hover 上浮 2px + 陰影加深 */
+/* Interactive: lift 2px on hover + deeper shadow */
 .bb-card--interactive {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;

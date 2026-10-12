@@ -4,17 +4,17 @@ import { db } from "@/lib/firebase";
 import { addDaysStr, mondayOf, todayStr } from "@/lib/pickupSlots";
 
 export interface StockOnHand {
-  /** ingredient_id → 現有量（原物料自己的單位） */
+  /** ingredient_id → quantity on hand (in the ingredient's own unit) */
   stock: Record<string, number>;
-  /** 期初有實際盤點（上週六）；否則期初用叫貨單的理論庫存 */
+  /** Opening stock comes from an actual count (last Saturday); otherwise it uses the supplier order's theoretical stock */
   counted: boolean;
   loaded: boolean;
 }
 
 /**
- * 某天開工前的現有庫存，跟 functions/src/orders.js 的 shortageFor 同一套算法（缺料警示用的也是這個數字）：
- * 期初＝上週六盤點（inventory/{上週一}）；沒盤點就用本週叫貨單的 lines[].stock，
- * ＋ 本週叫貨單到貨量 − 本週在這天之前的備料用量（prepPlans.raw_needs）。
+ * Stock on hand before work starts on a given day, using the same calculation as shortageFor in functions/src/orders.js (the shortage warning uses this number too):
+ * opening = last Saturday's count (inventory/{last Monday}); without a count, use this week's supplier order lines[].stock,
+ * + this week's supplier-order deliveries − this week's prep usage before that day (prepPlans.raw_needs).
  */
 export function useStockOnHand(vendorId: string | undefined, date: string = todayStr()): StockOnHand {
   const week = mondayOf(date);

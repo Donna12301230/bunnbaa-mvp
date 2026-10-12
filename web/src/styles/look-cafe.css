@@ -1,36 +1,36 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   BunnBaa 飯飽 — Cafe Look（<ThemeRoot look="cafe">）
+   BunnBaa 飯飽 — Cafe Look (<ThemeRoot look="cafe">)
    ──────────────────────────────────────────────────────────────────────────
-   參考咖啡館形象站：深可可棕 + 奶油黃雙主色、襯線標題、1px 深棕描邊
-   取代靜態陰影、膠囊按鈕、更大的區塊圓角。
-   做法：
-   · 主要按鈕改「深棕底 + 奶油字」，強調色改「奶油黃底 + 深棕字」，
-     品牌橘 #F29E0C 不必再為了白字對比而加深。
-   · 文字色帶暖棕，不用中性灰。
-   · 只覆寫 tokens 與少數元件外觀，元件 API 不變。
-   · 渲染到 body 的 shadcn 彈層（Dialog 等）不在 ThemeRoot 之內，
-     可在彈層元素上加 className="bb-look" data-look="cafe" 取得同一組 tokens。
-   specificity 說明：淺色區塊 (0,2,0) 會蓋過 tokens.css 的深色區塊，
-   所以深色區塊 (0,3,0) 必須重設淺色區塊裡的每一個 token。
+   Modeled on a cafe brand site: dark cocoa brown + cream yellow as dual primaries, serif headings, 1px dark-brown borders
+   instead of static shadows, pill buttons, larger section radii.
+   Approach:
+   · Primary buttons become "dark brown background + cream text", accents become "cream yellow background + dark brown text",
+     so brand orange #F29E0C no longer has to be darkened for white-text contrast.
+   · Text colors carry warm brown instead of neutral grey.
+   · Only tokens and a few component styles are overridden; component APIs are unchanged.
+   · shadcn overlays rendered into body (Dialog etc.) sit outside ThemeRoot;
+     add className="bb-look" data-look="cafe" on the overlay element to get the same tokens.
+   Specificity: the light block (0,2,0) overrides the dark block in tokens.css,
+   so the dark block (0,3,0) must reset every token from the light block.
    ══════════════════════════════════════════════════════════════════════════ */
 
 :is(.bb-theme, .bb-look)[data-look='cafe'] {
-  /* ── 品牌 ── */
-  --cafe-ink: #3b2314;              /* 深可可棕：文字、主要按鈕、描邊 */
+  /* ── Brand ── */
+  --cafe-ink: #3b2314;              /* Dark cocoa brown: text, primary buttons, borders */
   --cafe-ink-hover: #22130a;
-  --cafe-butter: #ffe1a1;           /* 奶油黃：強調底、選取、標籤 */
+  --cafe-butter: #ffe1a1;           /* Cream yellow: accent backgrounds, selection, tags */
   --cafe-butter-hover: #ffd37a;
 
-  --brand-brown: var(--cafe-ink);            /* 品牌標題改深棕：on bg 13.9:1 */
+  --brand-brown: var(--cafe-ink);            /* Brand headings become dark brown: on bg 13.9:1 */
   --brand-brown-dark: #6e3a1f;
   --brand-orange-soft: var(--cafe-butter);
   --brand-orange-tint: #fdf0d2;
-  --brand-orange-strong: var(--cafe-ink);    /* 主要按鈕、勾選、focus ring */
+  --brand-orange-strong: var(--cafe-ink);    /* Primary buttons, checkmarks, focus ring */
   --brand-orange-strong-hover: var(--cafe-ink-hover);
-  --brand-orange-text: #9a4a00;              /* on bg 5.96、on butter 5.07 */
+  --brand-orange-text: #9a4a00;              /* on bg 5.96, on butter 5.07 */
   --text-on-brand: #fff3d6;                  /* on ink 12.9:1 */
 
-  /* ── 中性色（全部帶暖棕） ── */
+  /* ── Neutrals (all warm brown) ── */
   --bg: #fff8ec;
   --surface: #fffdf7;
   --surface-muted: #f8eedc;
@@ -40,30 +40,30 @@
   --border-ink: var(--cafe-ink);
   --text: var(--cafe-ink);
   --text-secondary: #6e4a3a;       /* on bg 7.4:1 */
-  --text-muted: #806050;           /* on bg 5.38、on surface-muted 4.91 */
+  --text-muted: #806050;           /* on bg 5.38, on surface-muted 4.91 */
   --tooltip-bg: var(--cafe-ink);
   --tooltip-text: #fff3d6;
   --skeleton-base: #f3e6d0;
 
-  /* ── 色帶表面 ── */
-  --surface-inverse: #73472d;                /* 大面積色帶改溫暖褐色（不用近黑的可可棕） */
+  /* ── Banded surfaces ── */
+  --surface-inverse: #73472d;                /* Large color bands use a warm brown (not the near-black cocoa) */
   --text-on-inverse: var(--cafe-butter);     /* 11.6:1 */
   --surface-accent: var(--cafe-butter);
   --text-on-accent: var(--cafe-ink);
 
-  /* ── 字體：襯線標題，字重偏細、字級放大 ── */
-  /* Fraunces 只有拉丁字：英文與數字走 Fraunces，中文自動落到 Noto Serif TC */
+  /* ── Typography: serif headings, lighter weights, larger sizes ── */
+  /* Fraunces is Latin-only: English and digits use Fraunces, Chinese falls back to Noto Serif TC */
   --font-heading: 'Fraunces', 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
   --font-display-size: 40px; --font-display-weight: 600; --font-display-lh: 1.25;
   --font-h1-size: 28px;      --font-h1-weight: 600;
   --font-h2-size: 22px;      --font-h2-weight: 600;
 
-  /* ── 圓角放大 ── */
+  /* ── Larger radii ── */
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-2xl: 40px;
 
-  /* ── 陰影：靜態元件不用陰影；浮層保留但更收斂 ── */
+  /* ── Shadows: none on static components; overlays keep a subtler one ── */
   --shadow-sm: none;
   --shadow-md: 0 8px 24px rgba(59, 35, 20, 0.12);
   --shadow-lg: 0 16px 40px rgba(59, 35, 20, 0.18);
@@ -79,7 +79,7 @@
   --brand-brown-dark: #f3c98a;
   --brand-orange-soft: #4a3219;
   --brand-orange-tint: #2e2016;
-  --brand-orange-strong: #ffd98a;            /* 深色模式主要按鈕：奶油黃底 + 深棕字 */
+  --brand-orange-strong: #ffd98a;            /* Dark-mode primary buttons: cream yellow background + dark brown text */
   --brand-orange-strong-hover: #ffe7b0;
   --brand-orange-text: #ffc766;
   --text-on-brand: #2a1709;
@@ -108,9 +108,9 @@
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 
-/* ══ shadcn/ui 變數（index.css）對應到 cafe tokens ═══════════════════════
-   行銷平台頁面（首頁等）用 Tailwind + shadcn，改這組就會跟著換裝。
-   引用 ds tokens，深色模式自動跟著走。 */
+/* ══ shadcn/ui variables (index.css) mapped to cafe tokens ═══════════════════════
+   Marketing pages (home etc.) use Tailwind + shadcn, so changing this set re-skins them.
+   References ds tokens, so dark mode follows automatically. */
 :is(.bb-theme, .bb-look)[data-look='cafe'] {
   --background: var(--bg);
   --foreground: var(--text);
@@ -136,8 +136,8 @@
   --font-sans: var(--font-family);
   color: var(--text);
 
-  /* Tailwind 品牌色階（tokens.css --palette-*）：「主要色」orange-500 → 深可可棕、
-     淡色 orange-50/100/200 → 奶油黃系。orange-300/400 與狀態色維持原值。 */
+  /* Tailwind brand scale (tokens.css --palette-*): the "primary" orange-500 → dark cocoa brown,
+     light orange-50/100/200 → cream yellows. orange-300/400 and status colors keep their values. */
   --palette-orange-50: var(--brand-orange-tint);
   --palette-orange-100: var(--brand-orange-soft);
   --palette-orange-200: var(--cafe-butter-hover);
@@ -145,24 +145,24 @@
   --palette-orange-600: var(--brand-orange-strong-hover);
 }
 
-/* Tailwind 頁面的卡片（白底 + 邊框）改深棕描邊；輸入框、下拉選單不在此列 */
+/* Tailwind page cards (white background + border) get dark-brown borders; inputs and selects are excluded */
 :is(.bb-theme, .bb-look)[data-look='cafe'] :is(.bg-white, .bg-card):is(.border, .border-2) {
   border-color: var(--border-ink);
 }
 
-/* 標題一律襯線 */
+/* All headings are serif */
 :is(.bb-theme, .bb-look)[data-look='cafe'] :is(h1, h2, h3, h4) {
   font-family: var(--font-heading);
 }
 
-/* 舊原型頁（.legacy-ui，index.css 的 --ink / --brand / --legacy-* 變數）對應 cafe 色 */
+/* Legacy prototype pages (.legacy-ui, the --ink / --brand / --legacy-* variables in index.css) mapped to cafe colors */
 :is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui {
   --ink: #3b2314;
   --sub: #6e4a3a;
   --faint: #806050;
-  --brand: #3b2314;          /* 主要按鈕底、強調文字 */
+  --brand: #3b2314;          /* Primary button background, emphasized text */
   --brand-strong: #22130a;
-  --brand-light: #ffe1a1;    /* 標籤底、tinted 卡片 */
+  --brand-light: #ffe1a1;    /* Tag backgrounds, tinted cards */
   --on-brand: #fff3d6;       /* on #3B2314 12.9:1 */
   --line: #e8d6bf;
   --line-strong: #c9ae92;
@@ -213,19 +213,19 @@
   border-radius: 999px;
 }
 
-/* ══ 元件外觀 ════════════════════════════════════════════════════════════ */
+/* ══ Component styles ════════════════════════════════════════════════════════════ */
 
-/* 標題類元件跟著換襯線 */
+/* Heading-type components switch to serif too */
 .bb-theme[data-look='cafe'] :is(.bb-feature__title, .bb-modal__title, .bb-sheet__title, .bb-empty__title) {
   font-family: var(--font-heading);
 }
 
-/* ── Button：膠囊 ── */
+/* ── Button: pill ── */
 .bb-theme[data-look='cafe'] .bb-btn,
 .bb-theme[data-look='cafe'] .bb-btn--lg {
   border-radius: var(--radius-full);
 }
-/* secondary：奶油黃底 + 深棕描邊（參考站的「Explore our menu」） */
+/* secondary: cream yellow background + dark brown border (the reference site's "Explore our menu") */
 .bb-theme[data-look='cafe'] .bb-btn--secondary {
   --btn-bg: var(--surface-accent);
   --btn-bg-hover: var(--cafe-butter-hover);
@@ -244,7 +244,7 @@
 .bb-theme[data-look='cafe'] .bb-btn--text {
   --btn-fg: var(--text);
 }
-/* 深色模式：primary 已是奶油黃實心，secondary 改為深底 + 奶油描邊以拉開層級 */
+/* Dark mode: primary is already solid cream yellow, so secondary uses a dark background + cream border to separate levels */
 .bb-theme[data-look='cafe'][data-theme='dark'] .bb-btn--secondary {
   --btn-bg: var(--brand-orange-soft);
   --btn-bg-hover: color-mix(in srgb, var(--brand-orange-soft) 80%, var(--cafe-butter));
@@ -253,7 +253,7 @@
   --btn-border: var(--cafe-butter);
 }
 
-/* ── Card：描邊取代陰影；hover 換底色，不上浮 ── */
+/* ── Card: border instead of shadow; hover changes background, no lift ── */
 .bb-theme[data-look='cafe'] :is(.bb-card--elevated, .bb-card--outlined) {
   background: var(--surface);
   border-color: var(--border-ink);
@@ -279,7 +279,7 @@
   border-color: var(--border-strong);
 }
 
-/* ── IconBox：奶油黃底 + 深棕描邊 + 深棕 icon ── */
+/* ── IconBox: cream yellow background + dark brown border + dark brown icon ── */
 .bb-theme[data-look='cafe'] .bb-iconbox {
   border: 1px solid var(--border-ink);
   color: var(--text);
@@ -289,7 +289,7 @@
   color: var(--text-on-accent);
 }
 
-/* ── Tabs：選中塊 = 奶油黃膠囊 + 描邊（參考站導覽列） ── */
+/* ── Tabs: selected = cream yellow pill + border (the reference site's nav bar) ── */
 .bb-theme[data-look='cafe'] .bb-tabs {
   background: transparent;
   border: 1px solid var(--border-ink);
@@ -304,7 +304,7 @@
   color: var(--text-on-accent);
 }
 
-/* ── Badge：膠囊；brand soft 款加描邊（參考站的「Popular」標籤） ── */
+/* ── Badge: pill; the brand soft variant gets a border (the reference site's "Popular" tag) ── */
 .bb-theme[data-look='cafe'] .bb-badge {
   border-radius: var(--radius-full);
   padding-inline: 10px;
@@ -314,7 +314,7 @@
   box-shadow: inset 0 0 0 1px var(--border-ink);
 }
 
-/* ── Tag：描邊膠囊；選取 = 奶油黃底 ── */
+/* ── Tag: bordered pill; selected = cream yellow background ── */
 .bb-theme[data-look='cafe'] .bb-tag {
   background: transparent;
   border-color: var(--border-ink);
@@ -332,12 +332,12 @@
   color: var(--text-on-accent);
 }
 
-/* ── 浮層：加一圈描邊 ── */
+/* ── Overlays: add a border ── */
 .bb-theme[data-look='cafe'] :is(.bb-modal__panel, .bb-sheet__panel, .bb-toast) {
   border: 1px solid var(--border-ink);
 }
 
-/* ── EmptyState：描邊圓章 + 大一號的襯線標題（2026-10-01 全站改版） ── */
+/* ── EmptyState: bordered round badge + one-size-larger serif heading (2026-10-01 site redesign) ── */
 .bb-theme[data-look='cafe'] .bb-empty { padding-block: 72px; max-width: 460px; }
 .bb-theme[data-look='cafe'] .bb-empty__icon {
   width: 104px;
@@ -356,8 +356,8 @@
 }
 .bb-theme[data-look='cafe'] .bb-empty__desc { font-size: var(--font-body-size); }
 
-/* ── Tailwind 舊卡片（bg-white rounded-xl border）全站統一：奶油白底、更大圓角 ──
-   （2026-10-01 全站改版；後台與尚未個別改版的頁面一次跟上新的視覺語彙） */
+/* ── Legacy Tailwind cards (bg-white rounded-xl border) unified site-wide: cream-white background, larger radii ──
+   (2026-10-01 site redesign; brings the back office and pages not yet individually redesigned onto the new visual language at once) */
 :is(.bb-theme, .bb-look)[data-look='cafe'] .bg-white:is(.border, .border-2) {
   background-color: var(--surface);
 }

@@ -17,11 +17,11 @@ import { cn } from "@/lib/utils";
 import type { Lock } from "@/types";
 
 /**
- * 取餐核銷（規格 §6）：店家以手機網頁相機掃消費者的 QR（伺服器簽章的一次性憑證），
- * 畫面顯示取餐號、主菜、實際配菜（許願結果）、加減飯、折價券折抵、實付金額，按「完成取餐」
- * 觸發 onOrderCompleted（計入營業額、發抽獎券）。只有該店帳號可核銷。
- * 備援：4 碼取餐號＋手機末三碼。代領：支援連續掃描多筆。愛心餐預約的 QR 也在這裡掃。
- * 今天的訂單依取餐時段分組，每組一條已取／待取進度條。
+ * Pickup redemption (spec §6): the vendor scans the diner's QR (a server-signed one-time token) with the phone's web camera;
+ * the screen shows the pickup number, main dish, actual sides (wish result), more/less rice, coupon discount and amount paid, and "Complete pickup"
+ * triggers onOrderCompleted (counted in sales, issues draw tickets). Only the store's own account can redeem.
+ * Fallback: 4-digit pickup number + last three digits of the phone. Proxy pickup: supports scanning several in a row. Charity-meal reservation QRs are scanned here too.
+ * Today's orders are grouped by pickup slot, each group with a picked-up / pending progress bar.
  */
 export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[]; loading: boolean }) {
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -41,7 +41,7 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
     charity: todayLocks.filter((l) => l.status === "charity").length,
   }), [todayLocks]);
 
-  // 依取餐時段分組
+  // Group by pickup slot
   const windows = useMemo(() => {
     const map = new Map<string, Lock[]>();
     for (const l of todayLocks) {
@@ -91,7 +91,7 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
 
   return (
     <div className="space-y-4">
-      {/* 大按鈕：掃描；備援輸入收起來 */}
+      {/* Big button: scan; fallback input collapsed */}
       <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
         <Card className="border-2 border-foreground">
           <CardContent className="p-4 space-y-3">

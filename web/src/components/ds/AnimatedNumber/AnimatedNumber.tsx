@@ -4,15 +4,15 @@ import './AnimatedNumber.css';
 
 export interface AnimatedNumberProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'prefix'> {
   value: number;
-  /** roll：數字滾動到新值（價格、累計）；fade：淡入新值（折扣、倒數） */
+  /** roll: digits roll to the new value (prices, totals); fade: the new value fades in (discounts, countdowns) */
   animation?: 'roll' | 'fade';
-  /** 滾動時長（ms），預設 600 */
+  /** Roll duration (ms), default 600 */
   duration?: number;
-  /** 顯示格式，預設千分位整數 */
+  /** Display format, default integer with thousands separators */
   format?: (n: number) => string;
   prefix?: ReactNode;
   suffix?: ReactNode;
-  /** 值改變時是否讓螢幕閱讀器朗讀（aria-live="polite"） */
+  /** Whether screen readers announce value changes (aria-live="polite") */
   announce?: boolean;
 }
 
@@ -22,7 +22,7 @@ function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-/** 價格、折扣、倒數等數字：tabular-nums + 變化動畫；尊重 prefers-reduced-motion。 */
+/** Prices, discounts, countdowns and other numbers: tabular-nums + change animation; respects prefers-reduced-motion. */
 export function AnimatedNumber({
   value,
   animation = 'roll',
@@ -36,7 +36,7 @@ export function AnimatedNumber({
 }: AnimatedNumberProps) {
   const [display, setDisplay] = useState(value);
   const [fadeKey, setFadeKey] = useState(0);
-  // 目前畫面上的值：動畫中途收到新值時，從這裡接續滾動而非跳回
+  // Value currently on screen: if a new value arrives mid-animation, keep rolling from here instead of jumping back
   const shownRef = useRef(value);
   const frame = useRef<number>();
 
@@ -54,7 +54,7 @@ export function AnimatedNumber({
     const start = performance.now();
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic，收尾柔和
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic, soft finish
       shownRef.current = from + (value - from) * eased;
       setDisplay(shownRef.current);
       if (t < 1) frame.current = requestAnimationFrame(tick);

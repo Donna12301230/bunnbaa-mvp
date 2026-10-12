@@ -1,5 +1,5 @@
-// 臺灣 22 個直轄市／縣市與 368 個鄉鎮市區（2014 年縣市合併升格後的行政區劃）。
-// 頂部列「選擇地區」用，依內政部排序；比對店家地址時「台」「臺」視為相同（見 lib/location.ts）。
+// Taiwan's 22 special municipalities / counties / cities and 368 townships and districts (administrative divisions after the 2014 mergers and upgrades).
+// Used by the top bar's "Choose area"; ordered per the Ministry of the Interior. When matching vendor addresses, 台 and 臺 are treated as the same (see lib/location.ts).
 export const TAIWAN_DISTRICTS: { county: string; towns: string[] }[] = [
   { county: "臺北市", towns: ["中正區", "大同區", "中山區", "松山區", "大安區", "萬華區", "信義區", "士林區", "北投區", "內湖區", "南港區", "文山區"] },
   { county: "新北市", towns: ["板橋區", "三重區", "中和區", "永和區", "新莊區", "新店區", "樹林區", "鶯歌區", "三峽區", "淡水區", "汐止區", "瑞芳區", "土城區", "蘆洲區", "五股區", "泰山區", "林口區", "深坑區", "石碇區", "坪林區", "三芝區", "石門區", "八里區", "平溪區", "雙溪區", "貢寮區", "金山區", "萬里區", "烏來區"] },

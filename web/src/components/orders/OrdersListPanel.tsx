@@ -9,8 +9,8 @@ import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Lock } from "@/types";
 
-// 訂單列表：依狀態篩選（色塊按鈕），可用取餐編號或品名搜尋。
-// 排序可切換：取餐時間（由近到遠，依取餐日期分組）或下單時間（最新的在前，依下單日期分組）。
+// Order list: filter by status (colored buttons), search by pickup number or item name.
+// Sort is switchable: pickup time (soonest first, grouped by pickup date) or order time (newest first, grouped by order date).
 const filters = () => [
   { value: "pending", label: tr("待取餐", "To pick up"), dot: "bg-warning", match: (l: Lock) => PENDING_STATUSES.has(l.status) },
   { value: "done", label: tr("已完成", "Done"), dot: "bg-success-strong", match: (l: Lock) => DONE_STATUSES.has(l.status) },
@@ -25,7 +25,7 @@ function createdMillis(lock: Lock): number {
   const ts = lock.created_at as { toMillis?: () => number } | null | undefined;
   return ts?.toMillis ? ts.toMillis() : 0;
 }
-/** 下單日期（台北，YYYY-MM-DD）；沒有時間戳的舊資料歸在一起 */
+/** Order date (Taipei, YYYY-MM-DD); legacy records without a timestamp are grouped together */
 function orderedDate(lock: Lock): string {
   const ms = createdMillis(lock);
   return ms ? new Date(ms).toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }) : "";
@@ -34,7 +34,7 @@ function orderedDate(lock: Lock): string {
 export default function OrdersListPanel({ locks, loading, truncated }: { locks: Lock[]; loading: boolean; truncated: boolean }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("pending");
-  // 日期分組預設只展開第一天，其他點開才看；搜尋時全部展開
+  // Date groups: only the first day is expanded by default, the rest on click; everything expands while searching
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [sort, setSort] = useState<SortMode>(() => {
     try { return localStorage.getItem(SORT_KEY) === "ordered" ? "ordered" : "pickup"; } catch { return "pickup"; }
@@ -42,7 +42,7 @@ export default function OrdersListPanel({ locks, loading, truncated }: { locks: 
   function changeSort(mode: SortMode) {
     setSort(mode);
     setOpen({});
-    try { localStorage.setItem(SORT_KEY, mode); } catch { /* 無痕模式等存不了就算了 */ }
+    try { localStorage.setItem(SORT_KEY, mode); } catch { /* can't save (e.g. private mode); ignore */ }
   }
 
   const searched = useMemo(() => {

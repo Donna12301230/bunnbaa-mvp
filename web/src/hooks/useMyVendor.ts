@@ -6,7 +6,7 @@ import type { Vendor } from "@/types";
 
 export const myVendorDocKey = (vendorId?: string) => ["myVendorDoc", vendorId] as const;
 
-/** 登入廠商綁定（owner_uid）的真實 vendors/{id} 文件 */
+/** The real vendors/{id} document bound to the signed-in vendor (owner_uid) */
 export function useMyVendor() {
   const { user } = useAuth();
   const vendorId = user?.vendorId;

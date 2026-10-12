@@ -10,6 +10,23 @@
 
 ---
 
+## 🚨 最優先（10/12 盤點；repo 已經是 public）
+
+### 安全：今天做
+- [ ] **`ckchildlikekid@gmail.com`（GCP／Firebase 專案擁有者）開 2FA**：repo 公開後，本檔、`測試文件.md`、`ISMS_管理制度文件.md`、`ISO27001_落差分析.md` 裡的管理員 Email、風險清單都看得到，而本檔還寫著這個帳號沒開 2FA。從 repo 刪檔也刪不掉 git 歷史，所以開 2FA 才是真正的處理。開完把下面「❓ 要跟雅婷確認的事」裡的 2FA 那項一起勾掉
+- [ ] SU 確認管理員帳號 `suw192336@gmail.com`（Google 帳號與 Firebase Auth 密碼）夠強、Google 帳號有開 2FA
+- [ ] Firebase Web API key 加限制：GCP Console → API 和服務 → 憑證 → 瀏覽器金鑰 → 應用程式限制「HTTP 參照網址」，只允許 `bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`（還有 PR 預覽網域 `bunnbaa-mvp-5474--*.web.app/*`）、本機開發用的 `localhost:5300/*`
+- [ ] 決定內部文件要不要留在公開 repo：`doc/` 的 ISMS／ISO27001、規格書、本檔。要移的話移到私人位置，README 的連結一起改；留下的話 README 已註明是中文內部文件
+
+### 正式站：評審實際會點到的（10/16 前）
+- [ ] **補翻既有資料**（B）：管理後台 → 系統設定 →「補翻既有資料」，有失敗筆數就再按一次。沒做的話，英文介面的店名、菜名都是中文。做完切英文看首頁、店家頁、品項頁
+- [ ] **正式站示範商家帳號**（A＋B）：評審現在只能登入消費者體驗帳號，看不到商家端（拍照建菜單、今日備料、未來 7 天預估、客群）。建一個不放真實資料的示範店（或綁一家示範店），密碼補進 `web/src/lib/demoAccounts.ts` 的 vendor 那行，README「Try it」表格的 Vendor 那列一起填
+- [ ] **Looker Studio 報表**（B）：見下方 B 區同一項；簡報第 14 頁與影片腳本都有提到
+- [ ] **合併 PR #7**（https://github.com/Donna12301230/bunnbaa-mvp/pull/7）：英文預設語言（非中文瀏覽器開站就是英文、`?lang=en`／`?lang=zh` 可切換）合併後才會上線。合併後 A、B 各自的分支先 merge `master`，衝突只會在註解行：程式碼留自己的、註解用英文
+- [ ] 上面做完後，用無痕視窗、英文瀏覽器走一次評審路徑：開站 → 看菜單 → 體驗帳號登入 → 預購助理問一句 → 商家示範帳號看備料與預估
+
+---
+
 ## 分工原則
 
 **按區域切，不按前後端切。** 每個人負責的區域從程式、部署、測試到截圖都自己做，不用等對方：
@@ -79,7 +96,7 @@
   - `customer@bunnbaa.test` 名下「A方案：五日輕食計畫」5 筆 locks：`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`（no_show，會被算進校準報告）、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`
   - `ban_appeals/lI5dGTVtIBfByBIUTy3W`
   - 仁和雅店主名下的份數測試訂單 `EJEL6PRO`（可選）
-- [ ] README 的數字（10/12 已更新：Functions 79、logic 63、Functions 測試 144；最後一次跑測試後再核對）：Functions 數量（最後再數一次：在 `functions/` 執行 `node -e "console.log(Object.keys(require('./src/index.js')).length)"`）、測試數字（logic 61、Functions 141，最後一次跑測試後更新）
+- [ ] README 的數字（10/12 已更新：Functions 79、logic 64、rules 65、Functions 測試 144；README、Submission_EN、簡報都已改。最後一次跑測試後再核對）：Functions 數量（最後再數一次：在 `functions/` 執行 `node -e "console.log(Object.keys(require('./src/index.js')).length)"`）、測試數字
 - [ ] 最後一次合併後確認 GitHub Actions 的 Hosting、Functions 部署都成功
 - [ ] **repo 目前是 private**：設成公開（或確認評審有權限），把 repo 網址給 B 填進 `Submission_EN.md`、README 與報名表單
 
@@ -134,6 +151,63 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 - [ ] 兩份 README 補方括號：展示影片連結、簡報 PDF 連結、repo 網址；英文版團隊成員要不要改成英文拼音
 - [ ] 建 `assets/`：用 Google Cloud 架構圖工具（官方圖示）照 README 的五層架構重畫 `architecture.png`、錄一段 10 秒左右的 `demo.gif`（建議拍轉讓媒合或商家預測卡，不用等 A）、幾張 App 截圖，嵌進兩份 README 最上面
 - [ ] 推上 GitHub 後看一次 README：Mermaid 架構圖有正常顯示、徽章、連結都能點
+
+---
+
+## 📦 投稿交付清單（10/18 截止，對照官方規格）
+
+所有正式文件（簡報、影片旁白與字幕、README、表單文字、程式碼註解）一律英文。規格逐項對照見 [Submission_EN.md](Submission_EN.md) 第 3 節。
+
+### 表單上要交的 5 項
+- [ ] **英文簡報 PDF**（`BunnBaa_Proposal.pdf`，10–12 頁）：從 Slides artifact 補完後匯出，見下方「簡報素材」
+- [ ] **原型網址** `https://bunnbaa-mvp-5474.web.app/?lang=en`：`claude/amazing-dijkstra-uv5zcu`（英文預設語言）合併進 `master` 後才會上線
+- [ ] **3 分鐘影片**：MP4 1080p，上傳 YouTube（公開或不公開但有連結），長度 ≤ 3:00。**10/12：已錄完，剪輯中，還沒上傳**；上傳後連結要填進兩份 README、`Submission_EN.md`、簡報結尾頁
+- [ ] **類別**：表單只勾 **Sustainability**
+- [ ] **GitHub repo 網址**：公開前先做完下方「repo 公開前」
+
+### 簡報素材
+- [ ] 團隊頁：三位成員英文拼音姓名＋角色（照片可選）
+- [x] 架構圖 `assets/architecture.png`（原始檔 `assets/architecture.html`，已嵌進兩份 README）：五層架構，標明「79 Cloud Functions, 2nd gen」跑在 Cloud Run。沒有用官方圖示（這裡抓不到）；要換官方圖示版再用 Google Cloud 架構圖工具重畫
+- [ ] 剩食數據：UNEP *Food Waste Index Report 2024*（10.5 億噸、19%、餐飲服務業 2.9 億噸）**已放進簡報第 2 頁與 README**，請核對原文；要加台灣數據的話附出處
+- [x] Feasibility、Scalability 兩頁：簡報第 13、15 頁已有；封面與結尾頁領域已改成 Sustainability
+- [ ] 截圖（下方清單）
+
+### 截圖清單（簡報與 README 共用，存 `assets/`）
+- [ ] （10/12 先放了 4 張本機 emulator 截圖到 `assets/screenshots/` 並嵌進 README：消費者首頁、預購頁、轉讓市場、商家後台總覽，英文介面但店名菜名未翻譯。正式站截圖到了就換掉）
+- [ ] 消費者：首頁、品項頁（早鳥價）、預購助理對話與卡片（含推薦理由）、我的餐點 QR、轉讓上架
+- [ ] 商家：拍照建菜單草稿、今日備料清單、未來 7 天預估卡、客群卡、掃碼取餐
+- [ ] 管理後台：Looker Studio「預測 vs. 實際」「救回份數」
+- [ ] 助理評估結果表（10/12 最新：24/24、過敏原違規 0、符合度 4.79/5、有據性 4.96/5；英文版 `doc/assistant-evaluation.md`）
+- [ ] `assets/demo.gif`（約 10 秒）
+
+### 影片
+- [ ] 英文旁白（自錄或 TTS）＋英文字幕：初稿 `doc/demo_captions.srt` 已從腳本產生，剪完片要重新對時間
+- [ ] 錄影前準備：紙本／手寫菜單一張（拍照建菜單用）、兩支手機（QR 掃碼、轉讓推播）
+- [ ] 帳號：消費者 A、消費者 B（先鎖一份類似的菜，轉讓媒合才會觸發）、商家
+- [ ] 至少一筆「明天」的已鎖定訂單（備料清單才有東西）、LINE Pay Sandbox 付款帳號
+- [ ] Looker Studio 報表先建好（兩張圖要入鏡）
+- [ ] 上傳後登出 YouTube 測一次連結
+
+### 評審用 demo 帳號（正式站）
+- [ ] 建 Demo Diner（消費者）、Demo Vendor（商家，綁一家有菜單與訂單的店），英文名稱；**不給管理員帳號**（可改平台參數、觸發退款）
+- [ ] 帳密寫進表單備註或 README 的「Try it」段落（兩份 README 的段落已建好，只剩填帳密）
+- [ ] 無痕視窗、未登入狀態把三個角色流程各走一次
+
+### repo 公開前
+- [ ] git 歷史已掃過：沒有服務帳號金鑰或 LINE Pay secret；`AIza…` 是 Firebase Web API key（設計上公開），到 GCP Console 加 HTTP referrer 限制只允許 `bunnbaa-mvp-5474.web.app`
+- [ ] 個資與內部文件：本檔有管理員 Email、成員本名與分工，`ISMS_管理制度文件.md`、`ISO27001_落差分析.md` 也是內部文件——公開前移出 repo 或至少拿掉 Email
+- [ ] `doc/` 的中文規格書、開發指南、`.docx`：移到私人位置，或在 README 註明 "internal notes, in Chinese"
+- [x] 程式碼註解翻成英文（`claude/amazing-dijkstra-uv5zcu`，263 個檔案；只動註解，去掉註解後的程式碼逐 token 比對相同；註解裡剩下的中文是程式實際輸出或比對的文字、畫面標籤、品牌名與中文檔名路徑）。**A、B 各自的分支要先合併 master，衝突都只會在註解行**
+- [ ] README 方括號：影片連結、PDF 連結、repo 網址、demo 帳密（Functions 數量與測試數字 10/12 已更新）
+- [ ] 設成 public
+
+### 送出前最後確認
+- [ ] PDF 打得開、文字可選取、10–12 頁
+- [ ] 原型網址在無痕視窗打開是英文介面
+- [ ] 影片登出 YouTube 仍可播放，≤ 3:00
+- [ ] repo 連結登出 GitHub 可以看到
+- [ ] 表單只勾 Sustainability
+- [ ] GitHub Actions 最後一次部署（Hosting、Functions）成功
 
 ---
 

@@ -1,4 +1,4 @@
-/* 設計系統預覽頁專用版面（dsp-*），不屬於設計系統本身 */
+/* Layout used only by the design system preview page (dsp-*); not part of the design system itself */
 
 .dsp {
   min-height: 100vh;
@@ -17,7 +17,7 @@
   color: var(--brand-orange);
 }
 
-/* ── 頂部 ── */
+/* ── Header ── */
 .dsp-top {
   position: sticky;
   top: 0;
@@ -92,7 +92,7 @@
   color: var(--brand-orange-text);
 }
 
-/* ── 主體 ── */
+/* ── Body ── */
 .dsp-main {
   max-width: 1120px;
   margin: 0 auto;
@@ -188,7 +188,7 @@
   .dsp-grid--3, .dsp-grid--4, .dsp-grid--5, .dsp-grid--6 { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* ── 規範 ── */
+/* ── Guidelines ── */
 .dsp-guide {
   display: grid;
   gap: var(--space-4);
@@ -229,7 +229,7 @@
 .dsp-guide__title--do { color: var(--success-text); }
 .dsp-guide__title--dont { color: var(--danger-text); }
 
-/* ── 狀態矩陣 ── */
+/* ── State matrix ── */
 .dsp-matrix-wrap {
   overflow-x: auto;
   margin-inline: calc(var(--space-4) * -1);
@@ -264,12 +264,12 @@
   font-size: var(--font-caption-size);
   color: var(--text-muted);
 }
-/* 預覽 checkbox / radio 的按下狀態 */
+/* Pressed state for preview checkbox / radio */
 .dsp-press .bb-choice__box {
   transform: scale(0.92);
 }
 
-/* ── 色票 ── */
+/* ── Color swatches ── */
 .dsp-swatches {
   display: grid;
   gap: var(--space-3);
@@ -312,7 +312,7 @@
   color: var(--text-muted);
 }
 
-/* ── 對比表 ── */
+/* ── Contrast table ── */
 .dsp-contrast {
   width: 100%;
   min-width: 620px;
@@ -348,7 +348,7 @@
   color: var(--text-muted);
 }
 
-/* ── 字體 ── */
+/* ── Typography ── */
 .dsp-type {
   display: flex;
   flex-direction: column;
@@ -384,7 +384,7 @@
   border-radius: var(--radius-lg);
 }
 
-/* ── 間距 ── */
+/* ── Spacing ── */
 .dsp-spacing {
   display: flex;
   flex-direction: column;
@@ -407,7 +407,7 @@
   opacity: 0.8;
 }
 
-/* ── 圓角 / 陰影 ── */
+/* ── Radius / shadow ── */
 .dsp-token-tile {
   display: flex;
   flex-direction: column;
@@ -432,7 +432,7 @@
   border-radius: var(--radius-xl);
 }
 
-/* ── 動態 ── */
+/* ── Motion ── */
 .dsp-motion-tile {
   display: flex;
   flex-direction: column;
@@ -474,7 +474,7 @@
   color: var(--text-secondary);
 }
 
-/* ── 斷點 ── */
+/* ── Breakpoints ── */
 .dsp-bps {
   display: flex;
   flex-direction: column;
@@ -510,7 +510,7 @@
   border: 1px solid var(--border);
 }
 
-/* ── Overlay 靜態 ── */
+/* ── Static overlays ── */
 .dsp-overlay-static {
   display: grid;
   gap: var(--space-6);
@@ -540,7 +540,7 @@
   padding: var(--space-4);
 }
 
-/* ── 版面範例（showcase） ── */
+/* ── Layout examples (showcase) ── */
 .dsp-band {
   border-radius: var(--radius-2xl);
 }
