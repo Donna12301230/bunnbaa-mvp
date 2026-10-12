@@ -8,6 +8,9 @@ import { vendorBlockedToast } from "@/hooks/useRequireLogin";
 // span several days, but only one vendor (coupons can only be used at the issuing vendor).
 // _v3: switched to the bento format on 2026-09-30; old carts (no date / sides) are discarded.
 const CART_KEY = "bento_cart_v3";
+// Before checkout redirects to LINE Pay the cart is cleared (so returning after payment can't order twice), but its contents are kept here:
+// they go back into the cart when payment is cancelled or fails and the cancel page loads, and are dropped only on success. Fixed 2026-10-12: cancelling used to lose the cart.
+const PENDING_KEY = "bento_cart_pending_payment";
 
 export interface CartLine {
   key: string;
@@ -85,6 +88,45 @@ export const cartStore = {
   clear() {
     _lines = [];
     save();
+  },
+  /** Call before going to payment: stash this checkout's contents, then clear the cart */
+  stashForPayment(orderId: string) {
+    try {
+      localStorage.setItem(PENDING_KEY, JSON.stringify({ orderId, lines: _lines }));
+    } catch {
+      // If it can't be stored, the diner just has to re-add items after cancelling
+    }
+    this.clear();
+  },
+  /** Payment cancelled: put the stashed contents for this order back in the cart (without an orderId, restore the latest one, e.g. when the LINE Pay page was closed without reaching the cancel page) */
+  restoreAfterCancel(orderId?: string) {
+    try {
+      const pending = JSON.parse(localStorage.getItem(PENDING_KEY) ?? "null") as { orderId: string; lines: CartLine[] } | null;
+      if (!pending || (orderId && pending.orderId !== orderId)) return;
+      localStorage.removeItem(PENDING_KEY);
+      if (_lines.length === 0 && pending.lines.length > 0) {
+        _lines = pending.lines;
+        save();
+      }
+    } catch {
+      // If the stash can't be read, give up quietly
+    }
+  },
+  /** Whether an unpaid checkout is stashed (offered for restore when the cart is empty) */
+  get hasPending() {
+    try {
+      return !!JSON.parse(localStorage.getItem(PENDING_KEY) ?? "null")?.lines?.length;
+    } catch {
+      return false;
+    }
+  },
+  /** Payment succeeded: drop the stash */
+  discardPending() {
+    try {
+      localStorage.removeItem(PENDING_KEY);
+    } catch {
+      // ignore
+    }
   },
   subscribe(fn: () => void) {
     _listeners.add(fn);

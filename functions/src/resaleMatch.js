@@ -179,10 +179,15 @@ async function matchResale(lockId, lock) {
   const county = countyOf(vendor.address);
 
   const similar = lock.menu_item_id ? await similarItems(lock.menu_item_id, county) : new Map();
-  const pastQuery = similar.size > 0
-    ? db().collection("locks").where("menu_item_id", "in", [...similar.keys()].slice(0, 30)).limit(400)
-    : db().collection("locks").where("vendor_id", "==", lock.vendor_id).orderBy("created_at", "desc").limit(400);
-  const pastLocks = (await pastQuery.get()).docs.filter((d) => d.id !== lockId).map((d) => d.data());
+  // Always query the vendor's recent orders; when there are similar items, also query orders for those. Before 2026-10-12 it was one or the other,
+  // but older orders (seed data included) have no menu_item_id, so after the embedding backfill only a few could be compared and there were 0 candidates
+  const queries = [db().collection("locks").where("vendor_id", "==", lock.vendor_id).orderBy("created_at", "desc").limit(400)];
+  if (similar.size > 0) queries.push(db().collection("locks").where("menu_item_id", "in", [...similar.keys()].slice(0, 30)).limit(400));
+  const pastById = new Map();
+  for (const snap of await Promise.all(queries.map((q) => q.get()))) {
+    for (const d of snap.docs) if (d.id !== lockId) pastById.set(d.id, d.data());
+  }
+  const pastLocks = [...pastById.values()];
 
   const excluded = new Set([lock.buyer_uid, lock.payer_uid, ...(lock.transferred_from_uids || [])].filter(Boolean));
   const ranked = [...scoreCandidates(pastLocks, similar, lock)]
