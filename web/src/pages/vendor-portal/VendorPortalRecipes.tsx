@@ -6,7 +6,7 @@ import { AlertTriangle, BookOpen, Carrot, Clock, Flame, MessageCircle, Pencil, P
 import { useLocation } from "wouter";
 import VendorPortalLayout from "@/components/VendorPortalLayout";
 import InfoTip from "@/components/InfoTip";
-import { ComponentDialog, EMPTY_COMP, EMPTY_ING, IngredientDialog, catalogLabel, saveCatalogDoc, type ComponentDraft, type IngredientDraft } from "@/components/CatalogEditors";
+import { ComponentDialog, EMPTY_COMP, EMPTY_ING, IngredientDialog, catalogLabel, recalcPortionLevelsAfterPrice, saveCatalogDoc, type ComponentDraft, type IngredientDraft } from "@/components/CatalogEditors";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -229,6 +229,8 @@ export default function VendorPortalRecipes() {
     try {
       await saveCatalogDoc(vendorId, "ingredients", { ...i, ...patch });
       toast({ title: tr(`已更新 ${i.name}`, `Updated ${i.name}`) });
+      // 直接點價格改單價也要重算候選菜份量級距，跟編輯視窗一致
+      if (patch.unit_price !== undefined && patch.unit_price !== i.unit_price) void recalcPortionLevelsAfterPrice(vendorId);
     } catch (err) {
       toast({ variant: "destructive", title: tr("儲存失敗", "Couldn't save"), description: (err as Error).message });
     }

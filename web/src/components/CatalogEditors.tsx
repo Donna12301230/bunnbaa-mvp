@@ -11,7 +11,8 @@ import { useVendorCatalog } from "@/hooks/useVendorCatalog";
 import { useVendorMenu } from "@/hooks/useVendorMenu";
 import { componentPortionsForLock, portionsCost } from "@/lib/prep";
 import { queryClient } from "@/lib/queryClient";
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
+import { httpsCallable } from "@/lib/callable";
 import { componentCost, rawAmount } from "@/lib/bento";
 import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,19 @@ export type ComponentDraft = Omit<Component, "id"> & { id?: string };
 export type IngredientDraft = Omit<Ingredient, "id"> & { id?: string };
 
 /** 存半成品／原物料／小盤商；回傳文件 id */
+/**
+ * 改原物料單價後，請後端依新單價重算未截單日期的候選菜份量級距（functions/src/disaster.js recalcPortionLevels）。
+ * 失敗不影響單價已存好，只是份量級距維持舊的，下次改價或平台的菜價事件會再算。
+ */
+export async function recalcPortionLevelsAfterPrice(vendorId: string): Promise<number | null> {
+  try {
+    const res = await httpsCallable<{ vendor_id: string }, { changed: number }>(functions, "recalcPortionLevels")({ vendor_id: vendorId });
+    return res.data?.changed ?? 0;
+  } catch {
+    return null;
+  }
+}
+
 export async function saveCatalogDoc(vendorId: string, kind: "ingredients" | "components" | "suppliers", data: Record<string, unknown> & { id?: string }): Promise<string> {
   const { id, ...rest } = data;
   let docId = id;
@@ -128,8 +142,11 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
   async function save() {
     if (!vendorId || !ing) return;
     try {
+      const before = ing.id ? catalog?.ingredientsById[ing.id]?.unit_price : undefined;
       const id = await saveCatalogDoc(vendorId, "ingredients", ing);
       toast({ title: tr("已儲存", "Saved"), description: ing.name });
+      // 改了單價：份量級距跟著重算（對話框裡的「存檔後會自動重算」就是這一步）
+      if (before !== undefined && before !== ing.unit_price) void recalcPortionLevelsAfterPrice(vendorId);
       onSaved?.(id);
       onClose();
     } catch (err) {
