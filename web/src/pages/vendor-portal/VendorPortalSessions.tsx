@@ -1,6 +1,6 @@
 import { OrdersHub } from "@/pages/vendor-portal/VendorPortalOrders";
 
-// 訂餐時段併進「訂單取餐」頁的「時段」分頁（2026-10-06），保留路徑讓舊連結可用。
+// Order slots were merged into the "Slots" tab of the "Orders & pickup" page (2026-10-06); this path stays so old links work.
 export { slotKey } from "@/components/orders/SlotsPanel";
 
 export default function VendorPortalSessions() {

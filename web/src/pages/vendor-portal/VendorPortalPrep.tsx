@@ -63,8 +63,8 @@ const toMin = (hm: string | undefined) => {
 const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 
 /**
- * 把時間畫出來（簡化提案 §4、§5.1）：開火 → 裝盒 → 取餐 三段橫向色塊，取代「10:40 裝盒」的文字列表。
- * 細的設備、批次排程收在「詳細排程」裡（第三層，量大的店才需要）。
+ * Draws the timeline (simplification proposal §4, §5.1): cook → pack → pickup as three horizontal bars, replacing the "10:40 pack" text list.
+ * Fine-grained equipment and batch scheduling lives under "Detailed schedule" (third tier, only high-volume vendors need it).
  */
 function PickupTimeline({ timeline, range, label, showNow }: { timeline: Timeline; range: string; label?: string; showNow?: boolean }) {
   const [ps, pe] = range.split("-").map((x) => toMin(x.trim()));
@@ -112,7 +112,7 @@ interface PrepPlan {
   pickup_range: string;
   components: { component_id: string; name: string; portions: number }[];
   timeline: Timeline;
-  // 1002 規格 §5.2：時間軸依每個餐期的取餐開始時間分別往回推
+  // Spec 1002 §5.2: the timeline works backward from each meal period's pickup start time
   timelines?: Partial<Record<MealPeriod, Timeline & { range: string; order_count: number }>>;
   labels: { lock_id: string; pickup_code: string; pickup_window: string; item: string; main: string | null; fixed?: string[]; sides: string[]; rice: string | null; note: string | null }[];
   shortages: { ingredient_id: string; name: string; unit: string; need: number; have: number; short: number }[];
@@ -123,7 +123,7 @@ interface PrepPlan {
   charity_result?: { total: number; given_onsite: number; wasted: number };
 }
 
-// 預估取餐區間（functions/src/pickupForecast.js）：一般統計算的數字，不經 LLM
+// Estimated pickup window (functions/src/pickupForecast.js): plain statistics, no LLM
 interface PickupForecast {
   date: string;
   locked: number;
@@ -137,8 +137,8 @@ interface PickupForecast {
 }
 
 /**
- * 預估實際取餐（AI 功能 4）。樣本太少（取餐紀錄不到 3 個營業日）時整張不出現，不顯示沒意義的預測；
- * 白話追問收在「問 AI」後面。
+ * Estimated actual pickup (AI feature 4). With too few samples (under 3 business days of pickup records) the card is hidden rather than showing a meaningless forecast;
+ * plain-language follow-up questions sit behind "Ask AI".
  */
 function PickupForecastCard({ vendorId, date, lockCount }: { vendorId: string; date: string; lockCount: number }) {
   const [forecast, setForecast] = useState<PickupForecast | null>(null);
@@ -197,7 +197,7 @@ function PickupForecastCard({ vendorId, date, lockCount }: { vendorId: string; d
   );
 }
 
-/** 頂部數字卡 */
+/** Top stat cards */
 function StatCard({ label, children, tone }: { label: ReactNode; children: ReactNode; tone?: "red" | "green" }) {
   return (
     <Card className={cn("flex-1 min-w-[9rem]", tone === "red" && "border-danger/40 bg-danger-soft/60", tone === "green" && "border-success/40 bg-success-soft/60")}>
@@ -209,7 +209,7 @@ function StatCard({ label, children, tone }: { label: ReactNode; children: React
   );
 }
 
-/** 備料卡片：點一下＝做好了，卡片變綠 */
+/** Prep tile: tap = done, the tile turns green */
 function PrepTile({ name, sub, group, done, onToggle, onDetail }: { name: string; sub: string; group: FoodGroup; done: boolean; onToggle?: () => void; onDetail?: () => void }) {
   return (
     <div className="relative">
@@ -239,7 +239,7 @@ function PrepTile({ name, sub, group, done, onToggle, onDetail }: { name: string
   );
 }
 
-/** 收合區塊：說明、例外功能預設收起來 */
+/** Collapsible section: help text and exception features start collapsed */
 function Fold({ title, open, onToggle, children, className }: { title: ReactNode; open: boolean; onToggle: () => void; children: ReactNode; className?: string }) {
   return (
     <Card className={className}>
@@ -254,11 +254,11 @@ function Fold({ title, open, onToggle, children, className }: { title: ReactNode
 }
 
 /**
- * 今日備料（規格 §5.4；簡化提案 §5.1）：一頁只回答「現在要做什麼」。
- * - 頂部三個數字卡：份數、完成進度、缺料
- * - 中段：取餐時間軸（開火 → 裝盒 → 取餐）
- * - 下段：備料卡片，點一下＝做好了。沒有配方也能用（第一層）：直接用訂單的品項份數當卡片
- * - 空的就不出現；樣本太少不顯示預測；天災替換收進「今天有狀況？」
+ * Today's prep (spec §5.4; simplification proposal §5.1): the page only answers "what do I do now".
+ * - Top: three stat cards: portions, progress, shortages
+ * - Middle: pickup timeline (cook → pack → pickup)
+ * - Bottom: prep tiles, tap = done. Works without recipes (first tier): uses item portion counts from orders as tiles
+ * - Empty sections are hidden; forecast hidden when samples are too few; disaster substitution lives under "Something wrong today?"
  */
 export default function VendorPortalPrep() {
   const vendorId = useAuth().user?.vendorId;
@@ -273,12 +273,12 @@ export default function VendorPortalPrep() {
   const [date, setDate] = useState(today);
   const [plan, setPlan] = useState<PrepPlan | null>(null);
   const [locks, setLocks] = useState<Lock[]>([]);
-  // 目前日期的訂單／備料單是否已讀回（切換日期時重新顯示載入中）
+  // Whether orders / prep plan for the current date have loaded (switching dates shows loading again)
   const [loadedLocksDate, setLoadedLocksDate] = useState<string | null>(null);
   const [loadedPlanDate, setLoadedPlanDate] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sub, setSub] = useState({ from: "", to: "" });
-  // 列印：出餐標籤或領料單（分開印）
+  // Print: meal labels or pick list (printed separately)
   const [printMode, setPrintMode] = useState<"labels" | "picklist">("labels");
   const [openTask, setOpenTask] = useState<string | null>(null);
   const [fold, setFold] = useState<Record<string, boolean>>({});
@@ -313,7 +313,7 @@ export default function VendorPortalPrep() {
     };
   }, [vendorId, date]);
 
-  // 第一層：只靠訂單，依品項的份數
+  // First tier: orders only, portions per item
   const itemCounts = useMemo(() => {
     const m = new Map<string, number>();
     if (plan) plan.labels.forEach((l) => m.set(l.item, (m.get(l.item) ?? 0) + 1));
@@ -360,7 +360,7 @@ export default function VendorPortalPrep() {
     }
   }
 
-  // 截單前的預估：用目前的訂單在前端先算（跟後端同一套規則，許願結果還沒判定，一律當預設菜）
+  // Pre-cut-off estimate: computed client-side from current orders (same rules as the backend; wishes aren't decided yet, so all count as the default dish)
   const estimate = useMemo(() => {
     if (plan || !catalog || locks.length === 0) return null;
     const itemsById = Object.fromEntries(menuItems.map((i) => [i.id, i]));
@@ -370,7 +370,7 @@ export default function VendorPortalPrep() {
   const planNeeds = useMemo(() => new Map(Object.entries(plan?.raw_needs ?? {})), [plan]);
   const stockNote = counted ? tr("上週六盤點＋本週到貨−已用", "last count + deliveries − used") : tr("理論庫存（上週六未盤點）", "theoretical stock (not counted)");
 
-  // 缺料：截單後用後端算好的；截單前用預估（需求 > 現有）
+  // Shortages: after cut-off use the backend result; before cut-off use the estimate (need > on hand)
   const shortNames = useMemo(() => {
     if (plan) return plan.shortages.map((s) => s.name);
     if (!estimate) return [];
@@ -382,7 +382,7 @@ export default function VendorPortalPrep() {
     window.setTimeout(() => window.print(), 50);
   }
 
-  /** 缺料 → LINE 叫貨（依小盤商分組，進位到採購單位）；份量還有 AI 草稿就先問 */
+  /** Shortages → LINE supplier order (grouped by small supplier, rounded up to purchase units); if portions still have an AI draft, ask first */
   async function shareShortages() {
     if (!plan || !catalog) return;
     if (!(await confirmAiDrafts())) return;
@@ -398,7 +398,7 @@ export default function VendorPortalPrep() {
     navigate("/vendor-portal/recipes");
   }
 
-  // 備料卡片：有配方就用半成品（第二層），沒有就用品項份數（第一層）
+  // Prep tiles: use semi-finished components when there's a recipe (second tier), otherwise item portion counts (first tier)
   const tiles = plan
     ? plan.components.length > 0
       ? plan.components.map((c) => {
@@ -434,7 +434,7 @@ export default function VendorPortalPrep() {
 
         <div className="print:hidden"><AiDraftWarning vendorId={vendorId} what={tr("備料份量與缺料", "prep amounts and shortages")} /></div>
 
-        {/* 頂部三個數字卡 */}
+        {/* Top three stat cards */}
         <div className="flex flex-wrap gap-3 print:hidden">
           <StatCard label={`${dayLabel} ${date.slice(5).replace("-", "/")}`}>
             <p className="text-3xl font-bold text-accent-foreground leading-none">{total}<span className="text-base font-semibold text-foreground"> {tr(plan ? "份要做" : "份已訂", plan ? " to make" : " ordered")}</span></p>
@@ -482,7 +482,7 @@ export default function VendorPortalPrep() {
           )
         ) : (
           <>
-            {/* 取餐時間軸 */}
+            {/* Pickup timeline */}
             {periodTimelines.length > 0 && (
               <Card className="print:hidden">
                 <CardContent className="p-4 space-y-3">
@@ -491,7 +491,7 @@ export default function VendorPortalPrep() {
               </Card>
             )}
 
-            {/* 缺料：一個圖示、一個詞，點開才看細節 */}
+            {/* Shortages: one icon, one word; details on tap */}
             {plan.shortages.length > 0 && (
               <Card className="border-danger/40 print:hidden">
                 <CardContent className="p-3 flex flex-wrap items-center gap-2">
@@ -513,7 +513,7 @@ export default function VendorPortalPrep() {
               </Card>
             )}
 
-            {/* 備料卡片：點一下＝做好了 */}
+            {/* Prep tiles: tap = done */}
             <div className="print:hidden space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-semibold">{tr("要做的", "To make")}</h2>
@@ -558,7 +558,7 @@ export default function VendorPortalPrep() {
               </Fold>
             )}
 
-            {/* 工具列：列印、重新計算、例外狀況 */}
+            {/* Toolbar: print, recalculate, exceptions */}
             <div className="flex flex-wrap gap-2 print:hidden">
               <Button variant="outline" onClick={() => printWith("labels")}><Printer /> {tr("印出餐標籤", "Print labels")}</Button>
               {planNeeds.size > 0 && <Button variant="outline" onClick={() => printWith("picklist")}><ClipboardList /> {tr("印領料單", "Print pick list")}</Button>}
@@ -584,7 +584,7 @@ export default function VendorPortalPrep() {
               </Card>
             )}
 
-            {/* 領料單：今天從冰箱、倉庫拿出的生料（prepPlans.raw_needs） */}
+            {/* Pick list: raw ingredients taken from the fridge / storeroom today (prepPlans.raw_needs) */}
             {planNeeds.size > 0 && (
               <>
                 <Fold className="print:hidden" title={<span className="flex items-center gap-1.5"><ClipboardList className="w-4 h-4" />{tr("領料單（今天要拿出來的生料）", "Pick list (raw ingredients)")}</span>} open={!!fold.pick} onToggle={() => toggleFold("pick")}>
@@ -603,7 +603,7 @@ export default function VendorPortalPrep() {
               </>
             )}
 
-            {/* 詳細排程（第三層，設備、批次） */}
+            {/* Detailed schedule (third tier: equipment, batches) */}
             {periodTimelines.some((t) => t.timeline.slots.length > 0) && (
               <Fold className="print:hidden" title={tr("詳細排程（設備、批次）", "Detailed schedule (equipment, batches)")} open={!!fold.schedule} onToggle={() => toggleFold("schedule")}>
                 <div className="text-sm space-y-4">
@@ -618,7 +618,7 @@ export default function VendorPortalPrep() {
               </Fold>
             )}
 
-            {/* 出餐標籤：每盒一張，不印姓名（便當可能轉為愛心餐） */}
+            {/* Meal labels: one per box, no names printed (the bento may become a charity meal) */}
             <div className={cn(printMode === "labels" ? "print:block" : "print:hidden", !fold.labels && "hidden")}>
               <h3 className="font-semibold mb-2 print:hidden">{tr(`出餐標籤（${plan.labels.length} 張）`, `Labels (${plan.labels.length})`)}</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 print:grid-cols-3">

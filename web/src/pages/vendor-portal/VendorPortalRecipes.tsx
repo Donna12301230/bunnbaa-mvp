@@ -31,9 +31,9 @@ import { cn } from "@/lib/utils";
 import { componentGroup, GROUP_CELL, GROUP_DOT, groupLabel, ingredientGroup, type FoodGroup } from "@/lib/foodColors";
 import type { Component, Ingredient, Supplier } from "@/types";
 
-// 配方三層（規格 §3）：品項（菜單管理）→ 半成品 → 原物料。
-// 配方同時產生備料數量、成本、份量級距與口味標籤；數量一律由程式計算，Gemini 只給草稿。
-// 每個半成品顯示「用在哪些菜」，原物料標出會讓成本／叫貨算錯的缺漏（未填單價、未選供應商、沒有配方用到）。
+// Three recipe tiers (spec §3): item (menu management) → semi-finished component → ingredient.
+// Recipes drive prep quantities, cost, portion tiers and flavor tags; quantities are always computed by code, Gemini only drafts.
+// Each component shows "used in which dishes"; ingredients flag gaps that would skew cost / purchasing (no unit price, no supplier, not used by any recipe).
 
 interface TemplateDoc {
   id: string;
@@ -82,7 +82,7 @@ export default function VendorPortalRecipes() {
   const compIssueCount = (catalog?.components ?? []).filter((c) => costIssue(c.id, compById, ingById)).length;
   const ingIssueCount = (catalog?.ingredients ?? []).filter((i) => ingredientIssues(i, usedIngredientIds).length > 0).length;
 
-  // 從菜單或進度條跳過來：直接打開那一筆
+  // Arrived from the menu or the progress bar: open that entry directly
   useEffect(() => {
     if (!catalog) return;
     const compId = takePendingEdit("component");
@@ -122,7 +122,7 @@ export default function VendorPortalRecipes() {
     navigate("/vendor-portal/menu");
   }
 
-  /** Gemini 配方草稿：產生半成品＋原物料，同名原物料沿用既有的；店家接著在編輯視窗改數字 */
+  /** Gemini recipe draft: creates components + ingredients, reusing existing ingredients with the same name; the vendor then edits numbers in the dialog */
   async function draftRecipe() {
     if (!vendorId || !draftName.trim()) return;
     setDrafting(true);
@@ -151,7 +151,7 @@ export default function VendorPortalRecipes() {
     }
   }
 
-  /** 從定式模板開店（§3.1）：複製原物料、半成品與品項（含配菜格、候選菜建議） */
+  /** Set up the shop from a preset template (§3.1): copies ingredients, components and items (including side-dish cells and candidate dish suggestions) */
   async function applyTemplate(t: TemplateDoc) {
     if (!vendorId) return;
     try {
@@ -188,7 +188,7 @@ export default function VendorPortalRecipes() {
           ...item,
           vendor_id: vendorId,
           template: t.id,
-          is_available: false, // 店家確認價格後自己上架
+          is_available: false, // The vendor lists items after confirming prices
           image: null,
           allergens: (item as { allergens?: string[] }).allergens ?? [],
           dietary_tags: (item as { dietary_tags?: string[] }).dietary_tags ?? [],
@@ -223,7 +223,7 @@ export default function VendorPortalRecipes() {
     .map((g) => ({ g, items: ingredients.filter((i) => ingredientGroup(i.category) === g) }))
     .filter((x) => x.items.length > 0);
 
-  /** 單價、供應商直接在卡片上改（最常改的兩個欄位），不用開視窗 */
+  /** Unit price and supplier are edited right on the card (the two most-edited fields), no dialog needed */
   async function quickSave(i: Ingredient, patch: Partial<Ingredient>) {
     if (!vendorId) return;
     try {
@@ -260,7 +260,7 @@ export default function VendorPortalRecipes() {
 
       {isLoading ? <SkeletonBlocks count={3} height={64} className="space-y-2" /> : (
         <div className="space-y-4">
-          {/* 大分頁：圖示＋數字＋警示數 */}
+          {/* Main tabs: icon + count + warning count */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3" role="tablist">
             {tabs.map((t) => (
               <button
@@ -279,7 +279,7 @@ export default function VendorPortalRecipes() {
             ))}
           </div>
 
-          {/* 待補：一個圖示、一個詞，點了直接補 */}
+          {/* To fix: one icon, one word; tap to fix directly */}
           {tab === "ingredients" && (noPrice.length > 0 || noSupplier.length > 0) && (
             <div className="flex flex-wrap items-center gap-2">
               {noPrice.map((i) => (
@@ -303,7 +303,7 @@ export default function VendorPortalRecipes() {
             </div>
           )}
 
-          {/* 食材：依類別色塊分組，每樣一張卡；價格點了就能改 */}
+          {/* Ingredients: grouped by category color block, one card each; tap the price to edit */}
           {tab === "ingredients" && (
             <div className="space-y-5">
               {catalog?.ingredients.length === 0 && <EmptyState size="compact" icon={<Carrot size={32} />} title={tr("還沒有食材", "No ingredients yet")} description={tr("在菜單管理按「AI 幫我填」，會自動建好用到的食材。", "Use “Let AI fill it” in Menu and ingredients are created for you.")} />}
@@ -329,7 +329,7 @@ export default function VendorPortalRecipes() {
                               <Button variant="ghost" size="icon" className="w-8 h-8 -mr-1 text-muted-foreground" aria-label={tr(`刪除 ${i.name}`, `Delete ${i.name}`)} onClick={() => remove("ingredients", i.id, i.name)}><Trash2 className="w-3.5 h-3.5" /></Button>
                             </div>
 
-                            {/* 價格：最常改，大字、點了直接改 */}
+                            {/* Price: edited most often, large text, tap to edit */}
                             {editing ? (
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm">NT$</span>
@@ -348,7 +348,7 @@ export default function VendorPortalRecipes() {
                               </button>
                             )}
 
-                            {/* 小圖示：供應商、生熟比、保存天數 */}
+                            {/* Small icons: supplier, raw-to-cooked ratio, shelf life */}
                             <div className="flex flex-wrap gap-1.5 text-xs">
                               <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5", i.supplier_id ? "bg-muted" : "bg-warning-soft text-warning-text")}>
                                 <Store className="w-3 h-3" />{supplierName(i.supplier_id) ?? tr("沒供應商", "No supplier")}
@@ -376,7 +376,7 @@ export default function VendorPortalRecipes() {
             </div>
           )}
 
-          {/* 供應商：一家一張卡，電話、LINE 一按就通；下面是跟他買的食材 */}
+          {/* Suppliers: one card each, tap to call or LINE; below are the ingredients bought from them */}
           {tab === "suppliers" && (
             <div className="space-y-3">
               {noSupplier.length > 0 && suppliers.length > 0 && (
@@ -438,7 +438,7 @@ export default function VendorPortalRecipes() {
             </div>
           )}
 
-          {/* 配菜：跟便當格子同一套顏色；成本大字，食材用色點列出 */}
+          {/* Dishes: same colors as the bento cells; cost in large text, ingredients listed as color dots */}
           {tab === "components" && (
             <div className="space-y-3">
               <Card>
@@ -503,7 +503,7 @@ export default function VendorPortalRecipes() {
       <IngredientDialog vendorId={vendorId} value={ing} onClose={() => setIng(null)} />
       <ComponentDialog vendorId={vendorId} value={comp} onClose={() => setComp(null)} />
 
-      {/* 小盤商 */}
+      {/* Small suppliers */}
       <Dialog open={!!sup} onOpenChange={(o) => !o && setSup(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>{tr("小盤商", "Supplier")}</DialogTitle></DialogHeader>
@@ -534,7 +534,7 @@ export default function VendorPortalRecipes() {
         </DialogContent>
       </Dialog>
 
-      {/* 定式模板 */}
+      {/* Preset templates */}
       <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
         <DialogContent>
           <DialogHeader>

@@ -41,7 +41,7 @@ interface Line {
   deliveries?: { date: string; units: number }[];
   unit_price?: number;
   est_cost: number;
-  /** 需求來源：哪些品項用到、各幾份（舊叫貨單沒有） */
+  /** Demand source: which items use it and how many portions each (older supplier orders lack this) */
   sources?: { menu_item_id: string; name: string; confirmed: number; forecast: number; amount: number }[];
 }
 interface PurchaseList {
@@ -57,12 +57,12 @@ interface PurchaseList {
 }
 interface Shortage { ingredient_id: string; name: string; unit: string; need: number; have: number; short: number }
 
-/** 久放品項不夠時一次補幾週（跟 functions/src/purchasing.js 的 LONG_LIVED_WEEKS 一致） */
+/** How many weeks to restock at once when a long-shelf-life item runs short (matches LONG_LIVED_WEEKS in functions/src/purchasing.js) */
 const LONG_LIVED_WEEKS = 4;
 const WD = ["日", "一", "二", "三", "四", "五", "六"];
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-/** 頂部數字卡 */
+/** Top stat cards */
 function StatCard({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <Card className="flex-1 min-w-[10rem]">
@@ -74,7 +74,7 @@ function StatCard({ label, children }: { label: ReactNode; children: ReactNode }
   );
 }
 
-/** 下週訂單小長條圖：實心＝已訂，淺色＝預測 */
+/** Mini bar chart of next week's orders: solid = ordered, light = forecast */
 function BoardBars({ board }: { board: NonNullable<PurchaseList["board"]> }) {
   const max = Math.max(1, ...board.map((b) => b.confirmed + b.forecast));
   return (
@@ -100,12 +100,12 @@ function BoardBars({ board }: { board: NonNullable<PurchaseList["board"]> }) {
 }
 
 /**
- * 採購叫貨（規格 §5；簡化提案 §5.3）：一頁只回答「要買什麼」。
- * - 頂部三張數字卡：要買總額、下週訂單小長條圖、叫貨截止時間
- * - 依供應商分組的購物清單，一個供應商一張卡、一顆「傳 LINE」
- * - 每列三件事：冰箱還剩（− ＋ 就是盤點）、要買多少、買到了沒（勾了劃線）；庫存夠就灰色「夠了」
- * - 盤點不再是獨立步驟：沒調整的照理論庫存算，有調整的存起來會自動重算叫貨單
- * 每日備料截單後的缺料出現在最上面的「臨時補貨」。
+ * Purchasing (spec §5; simplification proposal §5.3): the page only answers "what do I buy".
+ * - Top: three stat cards: total to spend, mini bar chart of next week's orders, supplier order deadline
+ * - Shopping list grouped by supplier: one card and one "Send via LINE" button per supplier
+ * - Each row does three things: what's left in the fridge (− + is the stock count), how much to buy, and bought or not (ticked = struck through); grey "Enough" when stock covers it
+ * - Stock counting is no longer a separate step: unadjusted items use theoretical stock; saving adjustments recalculates the supplier order
+ * Shortages from daily prep after cut-off show at the top under "Urgent restock".
  */
 export default function VendorPortalPurchasing() {
   const { data: vendor } = useMyVendor();
@@ -118,9 +118,9 @@ export default function VendorPortalPurchasing() {
   const nextMonday = addDaysStr(thisMonday, 7);
   const [week, setWeek] = useState(nextMonday);
   const [weekly, setWeekly] = useState<PurchaseList | null>(null);
-  // 目前所選週的叫貨單是否已讀回（切換週時重新顯示載入中）
+  // Whether the selected week's supplier order has loaded (switching weeks shows loading again)
   const [loadedWeek, setLoadedWeek] = useState<string | null>(null);
-  /** 調整過的冰箱存量（原物料單位）；沒調整的照理論值 */
+  /** Adjusted fridge stock (in ingredient units); unadjusted items use the theoretical value */
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [counted, setCounted] = useState<{ counted?: boolean; counts?: Record<string, number> } | null>(null);
   const [bought, setBought] = useState<Record<string, boolean>>({});
@@ -128,7 +128,7 @@ export default function VendorPortalPurchasing() {
   const [openLine, setOpenLine] = useState<string | null>(null);
   const [showOthers, setShowOthers] = useState(false);
   const [restock, setRestock] = useState<Record<string, Shortage[]>>({});
-  // 盤點值只影響「下週」叫貨單（週六盤點記在本週，產生下週的單時使用）
+  // Stock counts only affect "next week's" supplier order (the Saturday count is stored on this week and used when generating next week's order)
   const editable = week === nextMonday;
   const prepDates = useMemo(() => {
     const today = todayStr();
@@ -149,12 +149,12 @@ export default function VendorPortalPurchasing() {
     if (!vendorId) return;
     return onSnapshot(doc(db, "vendors", vendorId, "inventory", thisMonday), (s) => setCounted(s.exists() ? s.data() : null), () => setCounted(null));
   }, [vendorId, thisMonday]);
-  // 買到了沒：存在 inventory/bought_{週一}（店主可寫），換手機也看得到
+  // Bought or not: stored in inventory/bought_{monday} (vendor owner can write), so it shows on any phone
   useEffect(() => {
     if (!vendorId) return;
     return onSnapshot(doc(db, "vendors", vendorId, "inventory", `bought_${week}`), (s) => setBought(s.exists() ? (s.data().items ?? {}) : {}), () => setBought({}));
   }, [vendorId, week]);
-  // 臨時補貨：今天、下一個營業日的備料缺料
+  // Urgent restock: prep shortages for today and the next business day
   useEffect(() => {
     if (!vendorId) return;
     const unsubs = prepDates.map((d) => onSnapshot(doc(db, "vendors", vendorId, "prepPlans", d), (s) => {
@@ -169,7 +169,7 @@ export default function VendorPortalPurchasing() {
   const stockOf = (id: string) => (editable && counts[id] !== undefined ? counts[id] : theoretical(id));
   const changed = Object.keys(counts).length;
 
-  /** 要買幾個採購單位：沒調整存量就用叫貨單算好的；調整了照同一套規則現算 */
+  /** How many purchase units to buy: unadjusted stock uses the supplier order's figure; adjusted stock is recomputed with the same rules */
   const unitsOf = (l: Line) => {
     if (!editable || counts[l.ingredient_id] === undefined) return l.order_units;
     const have = counts[l.ingredient_id];
@@ -222,7 +222,7 @@ export default function VendorPortalPurchasing() {
     await setDoc(doc(db, "vendors", vendorId, "inventory", `bought_${week}`), { items: next, updated_at: new Date() }).catch((err) => toast({ variant: "destructive", title: (err as Error).message }));
   }
 
-  /** 存盤點（沒改的用理論值）→ 自動重算下週叫貨單 */
+  /** Save stock count (unchanged items use the theoretical value) → automatically recalculates next week's supplier order */
   async function saveCount() {
     if (!vendorId || !catalog) return;
     const out: Record<string, number> = {};
@@ -240,7 +240,7 @@ export default function VendorPortalPurchasing() {
     await regenerate();
   }
 
-  /** − ＋ 調整「冰箱還剩多少」，一格＝一個採購單位 */
+  /** − + adjusts "what's left in the fridge"; one step = one purchase unit */
   const stepper = (id: string, size: number, label: string) => {
     const s = size > 0 ? size : 1;
     const v = stockOf(id);
@@ -263,7 +263,7 @@ export default function VendorPortalPurchasing() {
     );
   };
 
-  // 叫貨截止：這張單的前一個週六 12:00（叫貨單在那時鎖定）
+  // Supplier order deadline: 12:00 on the Saturday before this order's week (the order locks then)
   const deadline = new Date(`${addDaysStr(week, -2)}T12:00:00`);
   const msLeft = deadline.getTime() - Date.now();
   const left = msLeft > 0 ? (() => {
@@ -347,7 +347,7 @@ export default function VendorPortalPurchasing() {
           </div>
         </div>
 
-        {/* 臨時補貨：每日備料截單後算出的缺料 */}
+        {/* Urgent restock: shortages computed after the daily prep cut-off */}
         {restockDays.map((d) => (
           <Card key={d} className="border-danger/40 print:hidden">
             <CardContent className="p-3 space-y-2">
@@ -361,7 +361,7 @@ export default function VendorPortalPurchasing() {
           </Card>
         ))}
 
-        {/* 頂部三張數字卡 */}
+        {/* Top three stat cards */}
         {weekly && (
           <div className="flex flex-wrap gap-3 print:hidden">
             <StatCard label={tr(`${week === thisMonday ? "這週" : "下週"}要買`, week === thisMonday ? "This week" : "Next week")}>
@@ -380,7 +380,7 @@ export default function VendorPortalPurchasing() {
           </div>
         )}
 
-        {/* 冰箱存量改了：存起來重算 */}
+        {/* Fridge stock changed: save and recalculate */}
         {editable && weekly && (
           <div className={cn("flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-sm print:hidden", changed > 0 ? "border-brand bg-accent" : "border-border bg-card")}>
             <ClipboardCheck className="w-4 h-4 text-accent-foreground" />
@@ -436,7 +436,7 @@ export default function VendorPortalPurchasing() {
           </div>
         )}
 
-        {/* 不在叫貨單上的原物料（這週用不到、或久放品項還夠）也可以改存量 */}
+        {/* Ingredients not on the supplier order (not used this week, or long-shelf-life items with enough stock) can still have their stock edited */}
         {editable && others.length > 0 && (
           <Card className="print:hidden">
             <CardContent className="p-0">
