@@ -32,7 +32,7 @@ Diners pay ahead to lock a meal — the earlier, the cheaper — so small eateri
 
 Small eateries near campuses and offices buy ingredients before anyone orders. Guess high and food is thrown away; guess low and customers are turned away. Diners queue every day with no guarantee and no reward for deciding early. Even a prepaid meal is wasted when its owner's plans change, because nobody else knows it is available.
 
-The scale is global: in 2022 the world wasted **1.05 billion tonnes of food (19% of all food available to consumers), and 290 million tonnes of that was wasted in food service** (restaurants, canteens, eateries), according to UNEP's *Food Waste Index Report 2024*. [Optional: add one Taiwan figure from Ministry of Environment (環境部) statistics, with its source.]
+The scale is global: in 2022 the world wasted **1.05 billion tonnes of food (19% of all food available to consumers), and 290 million tonnes of that was wasted in food service** (restaurants, canteens, eateries), according to UNEP's *Food Waste Index Report 2024*. [Optional: add one Taiwan figure from Taiwan Ministry of Environment statistics, with its source.]
 
 ### Solution
 
