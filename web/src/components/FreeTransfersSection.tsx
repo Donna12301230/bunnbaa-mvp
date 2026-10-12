@@ -12,6 +12,7 @@ import { useVendors } from "@/hooks/useVendors";
 import { useItemImages } from "@/hooks/useItemImages";
 import { useSelectedArea, vendorInArea } from "@/lib/location";
 import { isFreeTransfer, newShareToken, resaleDeadlineOf, takeOverLock } from "@/lib/transfers";
+import { isSlotEnded } from "@/lib/pickupSlots";
 import { tr, loc } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import type { Lock } from "@/types";
@@ -49,7 +50,7 @@ export default function FreeTransfersSection() {
   const free = useMemo(
     () =>
       locks
-        .filter((l) => l.buyer_uid !== uid && isFreeTransfer(l, now) && (!area || vendorInArea(vendors.find((v) => v.id === l.vendor_id), area)))
+        .filter((l) => l.buyer_uid !== uid && isFreeTransfer(l, now) && !isSlotEnded(l.pickup_date, l.pickup_window, new Date(now)) && (!area || vendorInArea(vendors.find((v) => v.id === l.vendor_id), area)))
         .sort((a, b) => a.pickup_date.localeCompare(b.pickup_date) || a.pickup_window.localeCompare(b.pickup_window)),
     [locks, uid, now, area, vendors]
   );

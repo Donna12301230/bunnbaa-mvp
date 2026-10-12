@@ -164,6 +164,12 @@ export function isSlotStarted(pickupDate: string, pickupWindow: string, now: Dat
   return new Date(`${pickupDate}T${start}:00+08:00`).getTime() <= now.getTime();
 }
 
+/** 時段已經結束：已經不可能去取餐（例如過期的免費領取不該再列出來） */
+export function isSlotEnded(pickupDate: string, pickupWindow: string, now: Date = new Date()): boolean {
+  const end = pickupWindow.split("-")[1] || pickupWindow.split("-")[0];
+  return new Date(`${pickupDate}T${end}:00+08:00`).getTime() <= now.getTime();
+}
+
 /** 這天還能訂的時段（不能訂回傳空陣列）；給 item／period 會限縮到品項供應的餐期。 */
 export function openWindowsOn(
   vendor: MaybeSchedule,
