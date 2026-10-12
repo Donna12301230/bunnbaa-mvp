@@ -4,15 +4,15 @@ import { cx } from '../_shared/cx';
 import './Field.css';
 
 export interface FieldProps {
-  /** 對應控制項的 id（label 的 htmlFor） */
+  /** id of the associated control (the label's htmlFor) */
   id: string;
   label?: ReactNode;
-  /** 說明文字；有 error 時會被錯誤訊息取代 */
+  /** Helper text; replaced by the error message when there is an error */
   helperText?: ReactNode;
-  /** 錯誤訊息；有值即代表錯誤狀態 */
+  /** Error message; any value means the error state */
   error?: ReactNode;
   required?: boolean;
-  /** 右上角附註，例如字數計數 */
+  /** Note in the top-right corner, e.g. a character count */
   aside?: ReactNode;
   className?: string;
   children: ReactNode;
@@ -22,14 +22,14 @@ export function hasFieldError(error: ReactNode): boolean {
   return error != null && error !== false && error !== '';
 }
 
-/** 控制項用來串 aria-describedby 的 id */
+/** id the control uses for aria-describedby */
 export function fieldDescribedBy(id: string, hasHelper: boolean, hasError: boolean): string | undefined {
   if (hasError) return `${id}-error`;
   if (hasHelper) return `${id}-helper`;
   return undefined;
 }
 
-/** 表單欄位外框：label + 控制項 + helper / error。Input、Select、Textarea 共用。 */
+/** Form field frame: label + control + helper / error. Shared by Input, Select and Textarea. */
 export function Field({ id, label, helperText, error, required, aside, className, children }: FieldProps) {
   return (
     <div className={cx('bb-field', className)}>

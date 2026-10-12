@@ -11,9 +11,9 @@ const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const round = (n: number) => Math.max(0, Math.round(n));
 
 /**
- * 需求預測（BigQuery AI.FORECAST，每天由後端寫進 vendors/{id}/forecast）：
- * 大數字是下一個有預測的日子，旁邊是未來 7 天的長條。跟「預估取餐區間」同一個原則——只給參考，不是備料指令。
- * 還沒有預測資料時只留一行說明，不佔版面。
+ * Demand forecast (BigQuery AI.FORECAST, written daily by the backend to vendors/{id}/forecast):
+ * the big number is the next day with a forecast, with bars for the next 7 days beside it. Same principle as the "estimated pickup range": for reference only, not a prep instruction.
+ * With no forecast data yet, only a one-line note is shown so it doesn't take up space.
  */
 export default function ForecastCard({ vendorId }: { vendorId: string | undefined }) {
   const { data: forecast = [], isLoading } = useDemandForecast(vendorId);
@@ -30,7 +30,7 @@ export default function ForecastCard({ vendorId }: { vendorId: string | undefine
 
   const today = todayStr();
   const tomorrow = addDaysStr(today, 1);
-  // 大數字優先講明天；今天已經截單，明天沒有預測（例如公休）就用最近的一天
+  // The big number prefers tomorrow; today is already past cut-off, and if tomorrow has no forecast (e.g. a closed day) use the nearest day
   const head = forecast.find((f) => f.date === tomorrow) ?? forecast.find((f) => f.date > today) ?? forecast[0];
   const dayName = (date: string) => (date === today ? tr("今天", "Today") : date === tomorrow ? tr("明天", "Tomorrow") : tr(`${date.slice(5).replace("-", "/")}（${WEEKDAYS_ZH[weekdayOf(date)]}）`, `${WEEKDAYS_EN[weekdayOf(date)]} ${date.slice(5).replace("-", "/")}`));
   const max = Math.max(1, ...forecast.map((f) => f.upper ?? f.predicted));

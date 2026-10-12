@@ -1,4 +1,4 @@
-/* ── Tabs：膠囊式分段控制 ─────────────────────────────────────────────── */
+/* ── Tabs: pill-style segmented control ─────────────────────────────────────────────── */
 .bb-tabs {
   position: relative;
   display: inline-flex;
@@ -22,7 +22,7 @@
   opacity: 0.55;
 }
 
-/* 白色選中塊：以 transform 滑動 */
+/* White selected indicator: slides via transform */
 .bb-tabs__indicator {
   position: absolute;
   top: 4px;
@@ -60,7 +60,7 @@
 .bb-tabs--full .bb-tabs__tab {
   flex: 1;
 }
-/* 視覺 40px，點擊區補到 44px */
+/* 40px visually, hit area padded to 44px */
 .bb-tabs__tab::after {
   content: '';
   position: absolute;

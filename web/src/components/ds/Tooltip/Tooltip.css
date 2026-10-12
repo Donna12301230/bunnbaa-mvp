@@ -20,7 +20,7 @@
   box-shadow: var(--shadow-md);
   pointer-events: none;
 }
-/* 關閉時不渲染：隱藏的泡泡若仍佔版面，靠近螢幕邊緣時會撐出水平捲軸 */
+/* Not rendered when closed: a hidden bubble that still takes up layout causes a horizontal scrollbar near the screen edge */
 .bb-tooltip__bubble[data-state='closed'] {
   display: none;
 }
@@ -28,7 +28,7 @@
   animation: bb-fade-in var(--duration-fast) var(--ease-standard);
 }
 
-/* 小三角 */
+/* Small arrow */
 .bb-tooltip__bubble::after {
   content: '';
   position: absolute;

@@ -7,9 +7,9 @@ import { EMPTY_COMP, EMPTY_ING } from "@/components/CatalogEditors";
 import { portionTextFor } from "@/components/BentoEditor";
 import type { Component, Ingredient, MenuItem } from "@/types";
 
-// AI 一次補完（簡化提案 §3-2）：把菜單上還沒有組成的菜，一次用 draftRecipe 產生配方草稿並接回品項。
-// 同名的菜只產生一次（多道便當共用的配菜自動變成同一個半成品）；同名原物料沿用既有的。
-// 草稿標 ai_draft，單價一律留 0 讓店家自己填（成本不會假裝算得出來）。
+// AI fill-in (simplification proposal §3-2): for menu dishes that have no composition yet, generate recipe drafts in one go with draftRecipe and link them back to the items.
+// Dishes with the same name are generated once (sides shared by several bentos become one semi-finished component); ingredients with an existing name are reused.
+// Drafts are marked ai_draft and unit prices are always left at 0 for the vendor to fill in (costs aren't faked).
 
 interface Catalog {
   ingredients: Ingredient[];
@@ -23,20 +23,20 @@ interface Draft {
   ingredients: (Omit<Ingredient, "id"> & { grams: number })[];
 }
 
-/** 品項上一道菜的位置，補完後用來把新的 component_id 寫回去 */
+/** Position of a dish in an item, used to write the new component_id back after filling */
 type Ref =
   | { kind: "main"; i: number }
   | { kind: "fixed"; i: number }
   | { kind: "slot"; i: number }
   | { kind: "cand"; i: number; j: number }
-  | { kind: "rice" } // 白飯配方沒原物料：原地補，不用改品項
-  | { kind: "whole" }; // 單品完全沒有組成：用品項名稱建一個
+  | { kind: "rice" } // the rice recipe has no ingredients: fill in place, no item change needed
+  | { kind: "whole" }; // a single item with no composition at all: create one from the item name
 
 interface Target { item: MenuItem; ref: Ref; name: string; componentId: string | null }
 
 const isBentoItem = (item: MenuItem) => (item.item_type ? item.item_type === "bento" : (item.slots?.length ?? 0) > 0);
 
-/** 品項裡還需要配方的菜（未接、配方被刪、配方沒原物料）；缺單價不算，AI 補不了價格 */
+/** Dishes in an item that still need a recipe (not linked, recipe deleted, recipe without ingredients); a missing unit price doesn't count since AI can't fill prices */
 export function recipeTargets(item: MenuItem, catalog: Catalog): Target[] {
   const out: Target[] = [];
   const push = (ref: Ref, name: string, componentId: string | null | undefined) => {
@@ -82,11 +82,11 @@ async function runPool<T>(tasks: (() => Promise<T>)[], size: number, onDone: () 
 export interface FillResult { drafted: number; linked: number; items: number; failed: string[] }
 
 /**
- * 補完 items 裡所有缺配方的菜。onProgress(已完成, 總數) 用來畫進度。
+ * Fills every dish in items that lacks a recipe. onProgress(done, total) is used to draw progress.
  */
 export async function aiFillMenu(vendorId: string, items: MenuItem[], catalog: Catalog, onProgress?: (done: number, total: number) => void): Promise<FillResult> {
   const targets = items.flatMap((item) => recipeTargets(item, catalog));
-  // 要產生草稿的菜：既有半成品沒原物料→以 id 為鍵補進去；沒接→同名的既有半成品有配方就直接接上，否則以名稱為鍵新建
+  // Dishes to draft: an existing component without ingredients → fill it, keyed by id; not linked → link to an existing component with the same name if it has a recipe, otherwise create one keyed by name
   const byName = new Map(catalog.components.map((c) => [c.name.trim(), c]));
   const jobs = new Map<string, { name: string; componentId: string | null }>();
   const resolved = new Map<string, string>(); // job key → component id
@@ -110,7 +110,7 @@ export async function aiFillMenu(vendorId: string, items: MenuItem[], catalog: C
   const call = httpsCallable(functions, "draftRecipe");
   const drafts = await runPool(entries.map(([, job]) => async () => (await call({ vendor_id: vendorId, name: job.name })).data as Draft), 3, () => onProgress?.(++done, entries.length));
 
-  // 寫入依序做，同名原物料才不會重複建
+  // Writes happen sequentially so ingredients with the same name aren't created twice
   const ingByName = new Map(catalog.ingredients.map((i) => [i.name.trim(), i]));
   const newIngredients: Record<string, Ingredient> = {};
   const newComponents: Record<string, Component> = {};
@@ -143,7 +143,7 @@ export async function aiFillMenu(vendorId: string, items: MenuItem[], catalog: C
     resolved.set(key, id);
   }
 
-  // 把新的 component_id 寫回品項（份量文字一起更新）
+  // Write the new component_id back to the items (portion text is updated too)
   const compById = { ...catalog.componentsById, ...newComponents };
   const ingById = { ...catalog.ingredientsById, ...newIngredients };
   const pt = (id: string | null | undefined, name: string) => portionTextFor(id ? compById[id] : undefined, ingById, name);
@@ -152,7 +152,7 @@ export async function aiFillMenu(vendorId: string, items: MenuItem[], catalog: C
     const id = resolved.get(keyOf(t));
     if (id && id !== t.componentId) linkedIds.set(t, id);
   }
-  // 只改有換 component_id 的品項；原地補配方的不用動品項
+  // Only touch items whose component_id changed; recipes filled in place need no item change
   const touched = new Set([...linkedIds.keys()].map((t) => t.item));
   let itemCount = 0;
   for (const item of touched) {

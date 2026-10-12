@@ -23,13 +23,13 @@ export const storage = getStorage(app);
 
 // Point at local emulators during development.
 // Set VITE_USE_EMULATORS=true in a .env.local to enable.
-// 限定 DEV：vite build 也會讀 .env.local，不擋的話正式站會誤連 localhost。
+// DEV only: vite build also reads .env.local, and without this guard production would connect to localhost.
 if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true") {
   connectFirestoreEmulator(db, "localhost", 8080);
   connectFunctionsEmulator(functions, "localhost", 5001);
   connectStorageEmulator(storage, "localhost", 9199);
-  // disableWarnings: 關掉 Firebase Auth SDK 預設會在畫面底部注入的
-  // 「Running in emulator mode. Do not use with production credentials.」
-  // 警示橫幅（純 UI 提示，不影響 emulator 連線本身）。
+  // disableWarnings: turns off the "Running in emulator mode. Do not use with production credentials."
+  // warning banner the Firebase Auth SDK injects at the bottom of the page by default
+  // (purely a UI notice; doesn't affect the emulator connection itself).
   connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
 }

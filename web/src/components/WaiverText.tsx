@@ -5,8 +5,8 @@ import type { MaybeSchedule } from "@/lib/pickupSlots";
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
- * 結帳前的消保法聲明（購物車、加入計畫共用；2026-10-09 統一成同一份）。
- * 規則全部讀 lib/policy.ts（平台參數），跟 FAQ、服務須知同一套說法。
+ * Consumer Protection Act notice shown before checkout (shared by the cart and joining a meal plan; unified into one version on 2026-10-09).
+ * All rules come from lib/policy.ts (platform settings), with the same wording as the FAQ and terms of service.
  */
 export default function WaiverText({ vendor }: { vendor?: MaybeSchedule }) {
   return (

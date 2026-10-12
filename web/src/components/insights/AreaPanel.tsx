@@ -29,7 +29,7 @@ interface Insight {
 }
 interface Tally { id: string; name: string; count: number; notified?: boolean; listed?: boolean }
 
-/** 一列長條：名稱、色條、數值 */
+/** One bar row: name, colored bar, value */
 function Bar({ label, value, max, text, cls = "bg-brand" }: { label: string; value: number; max: number; text: string; cls?: string }) {
   return (
     <div className="grid grid-cols-[6rem_1fr_auto] items-center gap-2 text-sm">
@@ -41,8 +41,8 @@ function Bar({ label, value, max, text, cls = "bg-brand" }: { label: string; val
 }
 
 /**
- * 區域洞察（規格 §10.2）：取餐點方圓 1 公里、近 30 天，統計人數少於 20 人不顯示。
- * 只有匿名彙總：你的店的許願（進度條到「參考名單」門檻）、附近口味占比、供需缺口、許願排行、「不要」率。
+ * Area insights (spec §10.2): within 1 km of the pickup point, last 30 days; stats with fewer than 20 people are hidden.
+ * Anonymous aggregates only: wishes for your store (progress bar to the "reference list" threshold), nearby taste shares, supply-demand gaps, wish ranking, "don't want" rate.
  */
 export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {
   const { data: vendor } = useMyVendor();
@@ -64,7 +64,7 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
     const u2 = onSnapshot(collection(db, "vendors", vendorId, "wishTally"), (s) => { setTally(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Tally).filter((t) => t.count > 0).sort((a, b) => b.count - a.count)); setTallyLoaded(true); }, () => { setTally([]); setTallyLoaded(true); });
     return () => { u1(); u2(); };
   }, [vendorId]);
-  // 還沒讀到資料前回 null，分頁卡顯示載入中而不是 0
+  // Return null until data is loaded so the tab card shows loading instead of 0
   useEffect(() => { onHeadline?.(tallyLoaded ? tally.reduce((s, t) => s + t.count, 0) : null); }, [tally, tallyLoaded]);
 
   async function rebuild() {
@@ -103,7 +103,7 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
         <Button variant="ghost" size="sm" className="ml-auto" onClick={rebuild} disabled={busy}><RefreshCw className={cn(busy && "animate-spin")} /> {tr("重新統計", "Refresh")}</Button>
       </div>
 
-      {/* 你的店的許願：進度條到參考名單門檻 */}
+      {/* Wishes for your store: progress bar to the reference-list threshold */}
       <Card className="border-2">
         <CardContent className="p-4 space-y-3">
           <p className="font-semibold flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-accent-foreground" />{tr("客人想吃什麼（向你的店許願）", "What customers wish you'd make")}</p>

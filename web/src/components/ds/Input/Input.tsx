@@ -9,19 +9,19 @@ import './Input.css';
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: ReactNode;
   helperText?: ReactNode;
-  /** 錯誤訊息；有值即顯示錯誤樣式並設 aria-invalid */
+  /** Error message; any value shows the error style and sets aria-invalid */
   error?: ReactNode;
-  /** 欄位前的 icon */
+  /** Icon before the field */
   leftIcon?: ReactNode;
-  /** 欄位尾端的自訂內容（單位等）；type="password" 時會改為眼睛切換鈕 */
+  /** Custom content at the end of the field (units, etc.); becomes the eye toggle when type="password" */
   rightSlot?: ReactNode;
-  /** 右側顯示 spinner（例如非同步驗證中） */
+  /** Show a spinner on the right (e.g. during async validation) */
   loading?: boolean;
-  /** md 44px（預設）/ lg 52px */
+  /** md 44px (default) / lg 52px */
   size?: 'md' | 'lg';
-  /** 外層（含 label）的 className；className 則套在 <input> */
+  /** className for the wrapper (including the label); className goes on the <input> */
   containerClassName?: string;
-  /** 僅供預覽頁強制呈現狀態 */
+  /** Only for forcing states on the preview page */
   forceState?: 'hover' | 'focus';
 }
 

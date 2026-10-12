@@ -1,5 +1,5 @@
 /* ── Button ─────────────────────────────────────────────────────────────
-   .is-hover / .is-active / .is-focus 只供設計系統預覽頁強制呈現狀態使用。 */
+   .is-hover / .is-active / .is-focus are only for forcing states on the design-system preview page. */
 
 .bb-btn {
   --btn-bg: transparent;
@@ -115,7 +115,7 @@
   font-size: var(--font-body-sm-size);
   gap: 6px;
 }
-/* 視覺 36px，但點擊區維持 44px */
+/* 36px visually, but the hit area stays 44px */
 .bb-btn--sm::after {
   content: '';
   position: absolute;

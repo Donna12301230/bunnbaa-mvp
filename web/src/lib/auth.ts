@@ -16,14 +16,14 @@ import { ADMIN_EMAILS } from "./adminAuth";
 import type { UserProfile } from "@/types";
 import { tr } from "./i18n";
 
-// 平台登入改接真正的 Firebase Auth（email/密碼），取代原本的 mockAuth.ts。
-// 角色判斷：
-//   - admin：email 在 ADMIN_EMAILS 白名單（跟 firestore.rules / Functions 同一份）
-//   - vendor：有某個 vendors/{id}.owner_uid 等於這個 uid（跟 assertAdminOrVendorOwner 同一套）
-//   - 其他帳號都是 customer
-// 2026-09-24 起不再使用匿名登入：鎖定／下單／轉讓都要先登入（firestore.rules
-// isSignedInUser()、Functions assertSignedInUser() 也會擋匿名身分）。
-// 前端的角色只影響 UI；真正的權限邊界仍是 firestore.rules 與 Functions。
+// Platform sign-in now uses real Firebase Auth (email/password), replacing the old mockAuth.ts.
+// Role resolution:
+//   - admin: email is on the ADMIN_EMAILS allowlist (same list as firestore.rules / Functions)
+//   - vendor: some vendors/{id}.owner_uid equals this uid (same logic as assertAdminOrVendorOwner)
+//   - every other account is a customer
+// Since 2026-09-24 anonymous sign-in is no longer used: lock / order / resale all require sign-in (firestore.rules
+// isSignedInUser() and Functions assertSignedInUser() also block anonymous identities).
+// Roles on the frontend only affect the UI; the real permission boundary is still firestore.rules and Functions.
 
 interface AuthState {
   user: UserProfile | null;
@@ -43,12 +43,12 @@ async function resolveProfile(u: User): Promise<UserProfile> {
   let role: UserProfile["role"] = "customer";
   let vendorId: string | undefined;
 
-  // 手機門號登入沒有 email，admin 一定是 email 白名單，所以這裡不會誤判；
-  // vendor 一樣靠 owner_uid 查，跟 email/phone 登入方式無關。
+  // Phone-number sign-in has no email, and admin is always the email allowlist, so this can't misidentify;
+  // vendor is likewise looked up by owner_uid, regardless of email/phone sign-in.
   if (email && ADMIN_EMAILS.includes(email)) {
     role = "admin";
   } else {
-    // vendors 是公開可讀，直接查 owner_uid；查失敗就當一般使用者，不擋登入
+    // vendors is publicly readable, so query owner_uid directly; if the query fails treat them as a regular user and don't block sign-in
     try {
       const snap = await getDocs(query(collection(db, "vendors"), where("owner_uid", "==", u.uid), limit(1)));
       if (!snap.empty) {
@@ -60,8 +60,8 @@ async function resolveProfile(u: User): Promise<UserProfile> {
     }
   }
 
-  // users/{uid} 是註冊時寫的個人資料（電話、學校、科系），沒有也不影響登入。
-  // orderBanned/noPickupCount 是舊制未取餐停權寫的；donated_count 是捐愛心餐時 Functions 寫的。
+  // users/{uid} is the profile written at sign-up (phone, school, department); sign-in works without it.
+  // orderBanned/noPickupCount were written by the old no-show suspension rule; donated_count is written by Functions when donating a charity meal.
   let extra: {
     display_name?: string;
     phone?: string;
@@ -102,8 +102,8 @@ async function resolveProfile(u: User): Promise<UserProfile> {
   };
 }
 
-// 異常偵測（規格 §9.5「同一裝置 > 2 個帳號領券」）：瀏覽器本機的隨機裝置 id，登入時記到
-// users/{uid}.device_id。只用於平台異常標記，不做其他用途；讀寫失敗（無痕模式）就略過。
+// Abuse detection (spec §9.5 "more than 2 accounts claiming coupons on the same device"): a random device id stored locally in the browser, recorded at sign-in to
+// users/{uid}.device_id. Used only for platform abuse flags, nothing else; skipped if reads/writes fail (private mode).
 function recordDevice(uid: string) {
   try {
     let id = localStorage.getItem("bunnbaa.device");
@@ -113,7 +113,7 @@ function recordDevice(uid: string) {
     }
     setDoc(doc(db, "users", uid), { device_id: id }, { merge: true }).catch(() => undefined);
   } catch {
-    // 沒有 localStorage 就不記
+    // Without localStorage, don't record it
   }
 }
 
@@ -121,7 +121,7 @@ let _resolveSeq = 0;
 async function refresh(u: User | null) {
   const seq = ++_resolveSeq;
   if (!u || u.isAnonymous) {
-    // 之前留在瀏覽器裡的匿名身分直接登出，不再沿用
+    // Sign out any anonymous identity left in the browser; it is no longer reused
     if (u?.isAnonymous) signOut(auth).catch(console.error);
     setState({ user: null, loading: false });
     return;
@@ -129,7 +129,7 @@ async function refresh(u: User | null) {
   setState({ user: _state.user, loading: true });
   const profile = await resolveProfile(u);
   recordDevice(u.uid);
-  // 期間如果又換了帳號，丟掉這次比較舊的結果
+  // If the account changed in the meantime, discard this older result
   if (seq === _resolveSeq) setState({ user: profile, loading: false });
 }
 onAuthStateChanged(auth, refresh);
@@ -163,13 +163,13 @@ function friendlyAuthError(err: unknown): Error {
   return new Error(messages[code] ?? (err as Error)?.message ?? tr("發生未知錯誤", "Something went wrong"));
 }
 
-// 表單欄位一律去掉前後空白；只有空白的欄位視同沒填。
+// Form fields are always trimmed; a field with only whitespace counts as empty.
 function clean(value?: string): string {
   return (value ?? "").trim();
 }
 
-// 密碼不 trim（會改到使用者真正設定的密碼），但註冊時擋掉全空白和前後空白，
-// 避免不小心多打一個空格、之後怎麼登都登不進去。
+// Passwords aren't trimmed (that would change the password the user actually set), but sign-up rejects all-whitespace and leading/trailing spaces
+// so an accidental extra space doesn't leave them unable to sign in later.
 function assertValidNewPassword(password: string) {
   if (!password.trim()) throw new Error(tr("請輸入密碼", "Please enter a password"));
   if (password !== password.trim()) throw new Error(tr("密碼前後不能有空白", "Password can't start or end with a space"));
@@ -206,7 +206,7 @@ export async function register(input: {
       department: clean(input.department),
       created_at: serverTimestamp(),
     });
-    // onAuthStateChanged 在寫入顯示名稱／個人資料之前就觸發了，手動再解析一次
+    // onAuthStateChanged fired before the display name / profile were written, so resolve once more manually
     await refresh(user);
   } catch (err) {
     throw friendlyAuthError(err);
@@ -214,8 +214,8 @@ export async function register(input: {
 }
 
 /**
- * 廠商申請：建立帳號（角色先是 customer）＋寫一筆 vendor_applications/{uid}，
- * 管理員在 /admin/vendors 核准時才會把 vendors/{id}.owner_uid 綁到這個帳號。
+ * Vendor application: creates the account (role starts as customer) + writes vendor_applications/{uid};
+ * vendors/{id}.owner_uid is bound to this account only when an admin approves it at /admin/vendors.
  */
 export async function applyAsVendor(input: {
   email: string;
@@ -224,7 +224,7 @@ export async function applyAsVendor(input: {
   phone?: string;
 }): Promise<void> {
   const storeName = clean(input.storeName);
-  // 先檢查再建帳號，不然會留下一個沒有申請單的空帳號
+  // Check before creating the account, otherwise an empty account without an application is left behind
   if (!storeName) throw new Error(tr("請填寫店家名稱", "Please enter a store name"));
   await register({ email: input.email, password: input.password, displayName: storeName, phone: input.phone });
   const user = auth.currentUser;
@@ -252,14 +252,14 @@ export async function logout(): Promise<void> {
 }
 
 /* ------------------------------------------------------------------ *
- * 手機門號 OTP 登入（草圖 Login.dc.html 的兩段式流程）：先送簡訊驗證碼，
- * 再輸入驗證碼完成登入。號碼跟密碼登入是同一個 Firebase Auth 專案，但
- * provider 不同——沒有 email 時的角色判斷已經在上面的 resolveProfile 處理。
+ * Phone-number OTP sign-in (the two-step flow from the Login.dc.html mockup): send an SMS code first,
+ * then enter the code to sign in. Phone and password sign-in use the same Firebase Auth project, but
+ * a different provider; role resolution without an email is already handled in resolveProfile above.
  * ------------------------------------------------------------------ */
 
 let _recaptchaVerifier: RecaptchaVerifier | null = null;
 
-/** invisible reCAPTCHA 綁在指定的 DOM 節點上，同一個 verifier 可以重複用來送不同號碼。 */
+/** Invisible reCAPTCHA bound to the given DOM node; the same verifier can be reused to send to different numbers. */
 function getRecaptchaVerifier(containerId: string): RecaptchaVerifier {
   if (!_recaptchaVerifier) {
     _recaptchaVerifier = new RecaptchaVerifier(auth, containerId, { size: "invisible" });
@@ -267,7 +267,7 @@ function getRecaptchaVerifier(containerId: string): RecaptchaVerifier {
   return _recaptchaVerifier;
 }
 
-/** "0912-345-678" / "0912345678" -> "+886912345678"；已經是 +886 開頭就原樣送出。 */
+/** "0912-345-678" / "0912345678" -> "+886912345678"; numbers already starting with +886 are sent as is. */
 export function toE164TaiwanPhone(input: string): string {
   const digits = input.trim().replace(/[\s-]/g, "");
   if (digits.startsWith("+")) return digits;
@@ -281,7 +281,7 @@ export async function sendOtp(phoneInput: string, recaptchaContainerId: string):
   try {
     return await signInWithPhoneNumber(auth, phone, getRecaptchaVerifier(recaptchaContainerId));
   } catch (err) {
-    // 送出失敗（例如格式被 Firebase 拒絕）就重建 verifier，避免同一個 widget 卡死不能重試
+    // If sending fails (e.g. Firebase rejects the format), rebuild the verifier so the same widget doesn't get stuck and can retry
     _recaptchaVerifier?.clear();
     _recaptchaVerifier = null;
     throw friendlyAuthError(err);
@@ -292,7 +292,7 @@ export async function confirmOtp(confirmation: ConfirmationResult, code: string)
   if (!code.trim()) throw new Error(tr("請輸入驗證碼", "Please enter the verification code"));
   try {
     const { user } = await confirmation.confirm(code.trim());
-    // 手機登入沒有註冊表單可以先寫 users/{uid}，第一次登入時順手建一筆（沒有就建，已存在就跳過）。
+    // Phone sign-in has no sign-up form to write users/{uid} first, so create one on first sign-in (create if missing, skip if it exists).
     const ref = doc(db, "users", user.uid);
     const snap = await getDoc(ref);
     if (!snap.exists()) {

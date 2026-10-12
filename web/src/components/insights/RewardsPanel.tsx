@@ -41,8 +41,8 @@ const STATUS: Record<string, { zh: string; en: string; cls: string }> = {
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString()}`;
 
 /**
- * 回饋券（規格 §8、§9.3、§9.4）：累積淨營業額滿 1 萬元時以其中 5% 生成回饋池，拆成折價券抽獎，人人有獎；券發出後規則不可變更。
- * 一眼看：流通中負債（大字）、距離開池進度、券的去向色條、本期各券種剩餘、每週回饋池長條；查詢、匯出、暫停收在「工具」。
+ * Reward coupons (spec §8, §9.3, §9.4): when cumulative net sales reach NT$10,000, 5% of it forms a reward pool, split into coupons for a draw where everyone wins; rules can't change once coupons are issued.
+ * At a glance: outstanding liability (large), progress to opening the pool, a color bar of where coupons went, remaining coupons per type this period, weekly reward-pool bars; lookup, export and pause are under "Tools".
  */
 export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {
   const { data: vendor } = useMyVendor();
@@ -70,7 +70,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
   const current = periods.find((p) => p.status === "pooled") ?? periods.find((p) => p.status === "closed");
   const m = useMemo(() => {
     const sum = (list: Coupon[]) => list.reduce((s, c) => s + (c.discount || 0), 0);
-    // 取消換券的券（tier refund）不屬於回饋池：沒有 pool_period，不算「退回回饋池」，另外列出
+    // Coupons from cancel-for-coupon (tier refund) aren't part of the reward pool: no pool_period, not counted as "returned to the reward pool", listed separately
     const owned = coupons.filter((c) => c.status === "owned");
     const pool = coupons.filter((c) => c.tier !== "refund");
     const redeemed = coupons.filter((c) => c.status === "redeemed");
@@ -89,7 +89,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
   const found = lookup.trim() ? coupons.filter((c) => c.id === lookup.trim() || c.lock_id === lookup.trim()) : [];
 
   function exportCsv() {
-    // 回饋池的券依期別篩；取消換券的券沒有期別，用發券日篩
+    // Reward-pool coupons are filtered by period; cancel-for-coupon coupons have no period, so filter by issue date
     const periodOf = (c: Coupon) => c.pool_period || (millis((c as { created_at?: unknown }).created_at) ? new Date(millis((c as { created_at?: unknown }).created_at)).toISOString().slice(0, 10) : "");
     const rows = coupons.filter((c) => (!from || periodOf(c) >= from) && (!to || periodOf(c) <= to));
     const header = ["coupon_id", "pool_period", "tier", "discount", "status", "expires_at", "lock_id"];
@@ -181,7 +181,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
         </Card>
       </div>
 
-      {/* 券的去向 */}
+      {/* Where coupons went */}
       <Card className="border-2">
         <CardContent className="p-4 space-y-2">
           <p className="font-semibold">{tr("發出去的券後來怎麼了", "Where issued coupons went")}</p>
@@ -237,7 +237,7 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
         </Card>
       </div>
 
-      {/* 工具：查詢、匯出、暫停 */}
+      {/* Tools: lookup, export, pause */}
       <Card className="border-2">
         <CardContent className="p-0">
           <button type="button" className="w-full flex items-center gap-1.5 px-4 py-3 text-left text-sm font-semibold" onClick={() => setTools((v) => !v)} aria-expanded={tools}>

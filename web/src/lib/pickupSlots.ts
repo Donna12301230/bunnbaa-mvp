@@ -3,19 +3,19 @@ import type { BusinessHour, MealPeriod, MenuItem, Vendor } from "@/types";
 import { DEFAULT_PLATFORM_CONFIG, liveConfig } from "@/lib/platformConfig";
 import { EARLY_BIRD_TIERS } from "@/lib/pricing";
 
-// 取餐時段——跟 functions/src/pricing.js 是同一套規則（伺服器會再驗證一次），要改兩邊一起改。
-// 1002 規格：早／中／晚三個餐期（依取餐時段開始時間歸類）、只做自取、營業日週一至週五、
-// 取餐日前一天 20:00 截單（店家可提前）、預訂最遠 30 天。店家可以在後台「店家設定」自訂
-// pickup_windows（每個餐期一段、以 30 分鐘為一格，每段最長 2 小時）／business_hours／holidays。
-// window 用 ASCII 連字號（寫進 locks.pickup_window），畫面顯示用 slotLabel() 換成 en dash。
-// 日期一律以台北時間計（規格 §13）。
+// Pickup slots: the same rules as functions/src/pricing.js (the server validates again); change both together.
+// 1002 spec: three meal periods, breakfast / lunch / dinner (classified by slot start time), pickup only, business days Monday to Friday,
+// cut-off at 20:00 the day before pickup (vendors can set it earlier), bookings up to 30 days ahead. Vendors can customize in the portal's "Store settings"
+// pickup_windows (one range per meal period, in 30-minute steps, each up to 2 hours) / business_hours / holidays.
+// window uses an ASCII hyphen (written to locks.pickup_window); slotLabel() swaps it for an en dash on screen.
+// Dates are always in Taipei time (spec §13).
 export const DEFAULT_PICKUP_WINDOWS = ["11:00-11:30", "11:30-12:00", "12:00-12:30", "12:30-13:00"];
 
 export function slotLabel(window: string): string {
   return window.replace("-", "–");
 }
 
-// 商家後台可設定的上限，跟 firestore.rules 一致
+// Upper limits configurable in the vendor portal, matching firestore.rules
 export const MAX_PICKUP_WINDOWS = 12;
 export const MAX_HOLIDAYS = 100;
 export const MAX_PICKUP_RANGE_MINUTES = DEFAULT_PLATFORM_CONFIG.maxPickupWindowMinutes;
@@ -23,7 +23,7 @@ export const MAX_PICKUP_RANGE_MINUTES = DEFAULT_PLATFORM_CONFIG.maxPickupWindowM
 const WINDOW_PATTERN = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-/** "11:30-12:00" 這種格式，而且結束晚於開始。 */
+/** Format like "11:30-12:00", with the end after the start. */
 export function isValidWindow(window: string): boolean {
   if (!WINDOW_PATTERN.test(window)) return false;
   const [start, end] = window.split("-");
@@ -33,21 +33,21 @@ export function isValidWindow(window: string): boolean {
 type ScheduleSource = Pick<Vendor, "pickup_windows" | "business_hours" | "holidays"> & Partial<Pick<Vendor, "cutoff_time" | "disaster_dates">>;
 export type MaybeSchedule = ScheduleSource | null | undefined;
 
-/** 這家店的取餐時段（依開始時間排序）；沒設定就用預設。 */
+/** This store's pickup slots (sorted by start time); defaults if not set. */
 export function vendorWindows(vendor: MaybeSchedule): string[] {
   const own = vendor?.pickup_windows?.filter(isValidWindow) ?? [];
   const list = own.length > 0 ? own : DEFAULT_PICKUP_WINDOWS;
   return [...list].sort((a, b) => toMinutes(a.split("-")[0]) - toMinutes(b.split("-")[0]));
 }
 
-// ── 餐期（§2 餐期範圍） ──
+// ── Meal periods (§2 meal period ranges) ──
 export const MEAL_PERIODS: MealPeriod[] = ["breakfast", "lunch", "dinner"];
 
 export function mealPeriodLabel(period: MealPeriod): string {
   return { breakfast: tr("早餐", "Breakfast"), lunch: tr("午餐", "Lunch"), dinner: tr("晚餐", "Dinner") }[period];
 }
 
-/** 取餐時段屬於哪個餐期：依開始時間；都不在範圍內就歸最近的那一個 */
+/** Which meal period a pickup slot belongs to: by start time; if none matches, the nearest one */
 export function mealPeriodOf(window: string): MealPeriod {
   const start = toMinutes(window.split(/[-–]/)[0]);
   let best: MealPeriod = "lunch";
@@ -64,12 +64,12 @@ export function mealPeriodOf(window: string): MealPeriod {
   return best;
 }
 
-/** 品項供應的餐期；沒設（舊資料）＝店家所有時段 */
+/** Meal periods an item is served in; not set (legacy data) = all of the vendor's slots */
 export function itemMealPeriods(item: Pick<MenuItem, "meal_periods"> | null | undefined): MealPeriod[] {
   return (item?.meal_periods || []).filter((p): p is MealPeriod => MEAL_PERIODS.includes(p));
 }
 
-/** 品項可選的取餐時段（限品項供應的餐期；給 period 再限縮到該餐期） */
+/** Pickup slots selectable for an item (limited to the item's meal periods; with period, narrowed to that period) */
 export function itemWindows(vendor: MaybeSchedule, item?: Pick<MenuItem, "meal_periods"> | null, period?: MealPeriod | null): string[] {
   const periods = itemMealPeriods(item);
   return vendorWindows(vendor).filter((w) => {
@@ -78,19 +78,19 @@ export function itemWindows(vendor: MaybeSchedule, item?: Pick<MenuItem, "meal_p
   });
 }
 
-/** 品項是否供應某餐期（首頁依餐期分類） */
+/** Whether an item is served in a given meal period (the home page groups by meal period) */
 export function servesPeriod(vendor: MaybeSchedule, item: Pick<MenuItem, "meal_periods"> | null | undefined, period: MealPeriod): boolean {
   return itemWindows(vendor, item, period).length > 0;
 }
 
-/** 截單時間：店家只能比平台早 */
+/** Cut-off time: vendors can only set it earlier than the platform's */
 export function vendorCutoffTime(vendor: MaybeSchedule): string {
   const own = vendor?.cutoff_time;
   const platform = liveConfig().cutoffTime;
   return typeof own === "string" && TIME_PATTERN.test(own) && own < platform ? own : platform;
 }
 
-/** 某取餐日的截單時間點（前一天 20:00，台北時間） */
+/** Cut-off moment for a pickup date (20:00 the day before, Taipei time) */
 export function cutoffAt(pickupDate: string, vendor?: MaybeSchedule): Date {
   return new Date(`${addDaysStr(pickupDate, -1)}T${vendorCutoffTime(vendor)}:00+08:00`);
 }
@@ -99,12 +99,12 @@ export function isPastCutoff(pickupDate: string, vendor?: MaybeSchedule, now: Da
   return now.getTime() >= cutoffAt(pickupDate, vendor).getTime();
 }
 
-/** 0=日 … 6=六 */
+/** 0 = Sun … 6 = Sat */
 export function weekdayOf(dateStr: string): number {
   return new Date(`${dateStr}T00:00:00Z`).getUTCDay();
 }
 
-/** 營業日文字：週一至週五／Mon–Fri（依平台參數） */
+/** Business-day text: 週一至週五 / Mon–Fri (from platform settings) */
 export function businessDaysText(): string {
   const days = [...liveConfig().businessWeekdays].sort();
   const zh = ["日", "一", "二", "三", "四", "五", "六"];
@@ -114,7 +114,7 @@ export function businessDaysText(): string {
   return tr(days.map((d) => `週${zh[d]}`).join("、"), days.map((d) => en[d]).join(", "));
 }
 
-/** 這天店家有沒有休息：非營業日（週末）、特定公休日、每週營業時段裡那天沒開、停班停課。 */
+/** Whether the vendor is closed that day: non-business day (weekend), a specific closed day, not open that day in the weekly hours, or a work-suspension day. */
 export function vendorClosedReason(vendor: MaybeSchedule, pickupDate: string): string | null {
   const weekday = weekdayOf(pickupDate);
   if (!liveConfig().businessWeekdays.includes(weekday)) return tr(`營業日是${businessDaysText()}`, `Open ${businessDaysText()} only`);
@@ -125,7 +125,7 @@ export function vendorClosedReason(vendor: MaybeSchedule, pickupDate: string): s
   return null;
 }
 
-/** 台北時間的今天 YYYY-MM-DD */
+/** Today in Taipei time, YYYY-MM-DD */
 export function todayStr(now: Date = new Date()): string {
   return now.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
 }
@@ -136,18 +136,18 @@ export function addDaysStr(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** 那一週的週一 */
+/** Monday of that week */
 export function mondayOf(dateStr: string): string {
   const wd = weekdayOf(dateStr);
   return addDaysStr(dateStr, wd === 0 ? -6 : 1 - wd);
 }
 
-/** 最遠可以預約到哪天：30 天後（規格 §2 預訂開放範圍） */
+/** Furthest bookable date: 30 days out (spec §2 booking window) */
 export function maxPickupDateStr(now: Date = new Date()): string {
   return addDaysStr(todayStr(now), liveConfig().bookingRangeDays);
 }
 
-/** 這天還能不能訂（營業、還沒截單、在預訂範圍內）；不能訂時回傳原因 */
+/** Whether the day can still be booked (open, before cut-off, within the booking window); returns the reason when it can't */
 export function bookingProblem(vendor: MaybeSchedule, pickupDate: string, now: Date = new Date()): string | null {
   if (pickupDate < todayStr(now) || pickupDate > maxPickupDateStr(now)) return tr(`最遠只能預訂 ${liveConfig().bookingRangeDays} 天內`, `You can book up to ${liveConfig().bookingRangeDays} days ahead`);
   const closed = vendorClosedReason(vendor, pickupDate);
@@ -158,13 +158,13 @@ export function bookingProblem(vendor: MaybeSchedule, pickupDate: string, now: D
   return null;
 }
 
-/** 時段已經開始（或已過）。截單早於取餐日，正常下單不會碰到；給已下單的顯示用。 */
+/** The slot has started (or passed). Cut-off is before the pickup date, so normal ordering never hits this; it's for displaying existing orders. */
 export function isSlotStarted(pickupDate: string, pickupWindow: string, now: Date = new Date()): boolean {
   const start = pickupWindow.split("-")[0];
   return new Date(`${pickupDate}T${start}:00+08:00`).getTime() <= now.getTime();
 }
 
-/** 這天還能訂的時段（不能訂回傳空陣列）；給 item／period 會限縮到品項供應的餐期。 */
+/** Slots still bookable that day (empty array if not bookable); with item / period, narrowed to the item's meal periods. */
 export function openWindowsOn(
   vendor: MaybeSchedule,
   pickupDate: string,
@@ -176,7 +176,7 @@ export function openWindowsOn(
   return itemWindows(vendor, item, period);
 }
 
-/** 可預訂的日期清單（今天～30 天後，只含營業日；不管截單，截單的由 bookingProblem 標示） */
+/** Bookable dates (today to 30 days out, business days only; ignores cut-off, which bookingProblem flags) */
 export function bookableDateRange(now: Date = new Date()): string[] {
   const out: string[] = [];
   const last = maxPickupDateStr(now);
@@ -186,7 +186,7 @@ export function bookableDateRange(now: Date = new Date()): string[] {
   return out;
 }
 
-/** 最近一個還能訂的日期＋時段（會跳過截單、公休）。整個預約範圍都訂不到時回傳 null。 */
+/** The nearest date + slot that can still be booked (skips cut-off and closed days). Returns null if nothing in the booking window can be booked. */
 export function nextAvailablePickup(vendor?: MaybeSchedule, now: Date = new Date()): { date: string; window: string } | null {
   for (const date of bookableDateRange(now)) {
     const open = openWindowsOn(vendor, date, now);
@@ -196,9 +196,9 @@ export function nextAvailablePickup(vendor?: MaybeSchedule, now: Date = new Date
 }
 
 /**
- * 計畫型（多日方案）的取餐日：從 startDate 起、同一個時段，跳過不能訂的日子（遇公休順延），湊滿 days 天。
- * 跟 functions/src/pricing.js 的 planPickupDates 同一套規則，這裡只給確認視窗預覽用。
- * 起始日不能訂、或到 30 天後湊不滿時回傳 null。postponed＝因公休往後順延的日期。
+ * Pickup dates for a meal plan (multi-day plan): from startDate, same slot, skipping unbookable days (postponed past closed days), until days days are filled.
+ * Same rules as planPickupDates in functions/src/pricing.js; this is only for the confirmation dialog preview.
+ * Returns null if the start date can't be booked or the days can't be filled within 30 days. postponed = dates pushed back because of closed days.
  */
 export function planPickupDates(
   vendor: MaybeSchedule,
@@ -239,7 +239,7 @@ export function toMinutes(hhmm: string): number {
   return h * 60 + m;
 }
 
-/** 兩個時段有沒有重疊，例如舊資料的 12:00-13:00 跟 12:00-12:30 算重疊。 */
+/** Whether two slots overlap, e.g. legacy 12:00-13:00 and 12:00-12:30 overlap. */
 export function windowsOverlap(a: string, b: string): boolean {
   const [aStart, aEnd] = a.split(/[-–]/);
   const [bStart, bEnd] = b.split(/[-–]/);
@@ -247,7 +247,7 @@ export function windowsOverlap(a: string, b: string): boolean {
   return toMinutes(aStart) < toMinutes(bEnd) && toMinutes(bStart) < toMinutes(aEnd);
 }
 
-/** 取餐時段整段長度（分鐘），店家設定每個餐期要 ≤ 2 小時；回傳各餐期中最長的那段 */
+/** Full length of a pickup slot (minutes); vendor settings require ≤ 2 hours per meal period; returns the longest across meal periods */
 export function pickupRangeMinutes(windows: string[]): number {
   const valid = windows.filter(isValidWindow);
   if (valid.length === 0) return 0;
@@ -262,7 +262,7 @@ export function pickupRangeMinutes(windows: string[]): number {
   return longest;
 }
 
-/** 價格日期列（§4.5）：明天起 30 天，每天的早鳥折數、能不能訂 */
+/** Price date strip (§4.5): 30 days from tomorrow, each day's early-bird discount and whether it's bookable */
 export interface PriceDay {
   date: string;
   discountPercent: number;
@@ -280,7 +280,7 @@ export function priceDays(vendor: MaybeSchedule, now: Date = new Date()): PriceD
   return out;
 }
 
-// 首頁先選的日期／時段，帶到品項頁（hash router 不方便帶 query string）
+// Date / slot chosen first on the home page, carried to the item page (the hash router makes passing a query string awkward)
 let preferred: { date: string; window: string } | null = null;
 export function setPreferredPickup(p: { date: string; window: string } | null) {
   preferred = p;

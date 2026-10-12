@@ -4,9 +4,9 @@ import { cx } from '../_shared/cx';
 import './Spinner.css';
 
 export interface SpinnerProps {
-  /** icon 尺寸（px），預設 20 */
+  /** Icon size (px), default 20 */
   size?: 16 | 20 | 24;
-  /** 螢幕閱讀器文字；傳 null 代表純裝飾（外層已有說明） */
+  /** Screen-reader text; pass null for purely decorative use (the container already has a label) */
   label?: string | null;
   className?: string;
 }

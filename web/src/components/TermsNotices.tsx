@@ -3,7 +3,7 @@ import { policy } from "@/lib/policy";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// 會員服務須知／廠商申請須知（登入頁註冊、廠商申請分頁用）。中英兩份內容一起維護，改條款時兩邊都要改。
+// Member terms of service / vendor application terms (used on the login page sign-up and the vendor application tab). The Chinese and English versions are maintained together; update both when the terms change.
 
 export function MemberNotice() {
   return getLang() === "en" ? (

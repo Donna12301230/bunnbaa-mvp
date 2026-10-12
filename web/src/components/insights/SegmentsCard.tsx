@@ -5,13 +5,13 @@ import { useCustomerSegments } from "@/lib/analytics";
 import { formatNT } from "@/lib/format";
 import { loc, tr } from "@/lib/i18n";
 
-// 每一群一個顏色，依人數多寡輪流用
+// One color per segment, cycled in order of size
 const SEGMENT_COLORS = ["bg-orange-400", "bg-emerald-500", "bg-sky-500", "bg-violet-400", "bg-rose-400", "bg-stone-400"];
 
 /**
- * 客群（BigQuery ML.KMEANS 分群＋Gemini 產生的一句話描述，後端寫進 vendors/{id}/segments）：
- * 一條色帶看各群占比，下面每群一張小卡。只有彙總數字，沒有任何個人資料。
- * 還沒有資料時整塊不顯示（區域分頁本來就有自己的空狀態）。
+ * Customer segments (BigQuery ML.KMEANS clustering + a one-line description from Gemini, written by the backend to vendors/{id}/segments):
+ * one color strip shows each segment's share, with a small card per segment below. Aggregate numbers only, no personal data.
+ * Hidden entirely when there is no data yet (the area tab already has its own empty state).
  */
 export default function SegmentsCard({ vendorId }: { vendorId: string | undefined }) {
   const { data: segments = [] } = useCustomerSegments(vendorId);

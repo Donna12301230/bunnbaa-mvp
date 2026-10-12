@@ -43,7 +43,7 @@
   width: 100%;
 }
 
-/* 減少動態：停掉掃光，改為靜態底色 */
+/* Reduced motion: stop the shimmer and use a static fill */
 @media (prefers-reduced-motion: reduce) {
   .bb-skeleton::after {
     display: none;

@@ -3,9 +3,9 @@ import { functions } from "@/lib/firebase";
 import type { Lock } from "@/types";
 import { tr } from "@/lib/i18n";
 
-// 訂單狀態的文字與顏色——全站唯一一份（2026-10-09：原本我的餐點、會員中心、管理頁各有一套，用詞與顏色都不同）。
-// 顏色讀 index.css 的 --status-* 變數（含暗色版本）。adminZh／adminEn：管理頁需要更精確的說法時才填。
-// 類別名稱要完整寫出來，Tailwind 才掃得到（不能用字串組）
+// Order status text and colors: the single site-wide source (2026-10-09: My meals, the member center and the admin pages each had their own set, with different wording and colors).
+// Colors read the --status-* variables in index.css (including dark versions). adminZh / adminEn: only set when the admin pages need more precise wording.
+// Class names must be written out in full so Tailwind can find them (no string concatenation)
 const TONE: Record<string, string> = {
   locked: "bg-[var(--status-locked-bg)] text-[var(--status-locked)]",
   resale: "bg-[var(--status-resale-bg)] text-[var(--status-resale)]",
@@ -29,33 +29,33 @@ const STATUS_STYLE: Record<string, { zh: string; en: string; adminZh?: string; a
   cancelled: { zh: "已取消", en: "Cancelled", className: tone("muted") },
 };
 
-/** 狀態文字與顏色；admin=true 用管理頁的說法 */
+/** Status text and colors; admin=true uses the admin pages' wording */
 export function lockStatus(status: string, admin = false): { label: string; className: string } {
   const s = STATUS_STYLE[status];
   if (!s) return { label: status, className: tone("muted") };
   return { label: admin ? tr(s.adminZh ?? s.zh, s.adminEn ?? s.en) : tr(s.zh, s.en), className: s.className };
 }
 
-/** 狀態標籤（依目前語言）＋顏色；每次讀都重新依語言組字串 */
+/** Status label (in the current language) + colors; the string is rebuilt for the language on every read */
 export const LOCK_STATUS_STYLE: Record<string, { label: string; className: string }> = new Proxy({} as Record<string, { label: string; className: string }>, {
   get(_, key: string) {
     return STATUS_STYLE[key] ? lockStatus(key) : undefined;
   },
 });
 
-// 還沒取餐、可以核銷的狀態（跟 functions completePickup 的伺服器檢查一致）
+// Statuses that haven't been picked up yet and can be redeemed (matches the server check in functions completePickup)
 export const REDEEMABLE_STATUSES = new Set(["locked", "for_resale", "for_gift"]);
 export const PENDING_STATUSES = new Set(["locked", "for_resale", "for_gift"]);
 export const DONE_STATUSES = new Set(["fulfilled", "resold_and_fulfilled"]);
-// 營收口徑＝撥款口徑（2026-10-09，跟 functions/src/pricing.js revenueOf 一致）：全額預付的照實付算（未取餐、轉愛心餐也不退）；
-// 顧客取消換券時留下的款項（kept_amount）也算；停班停課、店家未出餐退成點數的不算。
+// Revenue basis = payout basis (2026-10-09, matches revenueOf in functions/src/pricing.js): fully prepaid locks count at the amount paid (no-shows and charity-meal conversions aren't refunded);
+// money kept when a diner cancels for a coupon (kept_amount) also counts; refunds to points for work-suspension days or vendor no-service don't.
 export const REVENUE_STATUSES = new Set(["locked", "for_resale", "for_gift", "fulfilled", "resold_and_fulfilled", "charity", "no_show"]);
 export function revenueOf(lock: Pick<Lock, "status" | "locked_price"> & { kept_amount?: number }): number {
   if (lock.status === "cancelled") return Number(lock.kept_amount) || 0;
   return REVENUE_STATUSES.has(lock.status) ? Number(lock.locked_price) || 0 : 0;
 }
 
-/** 取餐號：4 碼（第一階段規格）；舊資料沒有就用 lock id 末 8 碼 */
+/** Pickup number: 4 digits (phase 1 spec); legacy records without one use the last 8 characters of the lock id */
 export function pickupCode(lock: Pick<Lock, "id" | "pickup_code">): string {
   return lock.pickup_code ?? lock.id.slice(-8).toUpperCase();
 }
@@ -83,9 +83,9 @@ export interface PickupSummary {
 }
 
 /**
- * 取餐核銷一律走 Cloud Function completePickup（firestore.rules 擋直接寫）：
- * 掃 QR（token）、備援（4 碼取餐號＋手機末三碼），或在今日訂單列表當面核對（lock_id）。
- * preview=true 只看內容不核銷。
+ * Pickup redemption always goes through the Cloud Function completePickup (firestore.rules blocks direct writes):
+ * scanning the QR (token), the fallback (4-digit pickup number + last three digits of the phone), or checking face to face in today's order list (lock_id).
+ * preview=true only shows the contents without redeeming.
  */
 export async function completePickup(args: { token?: string; pickup_code?: string; phone_last3?: string; lock_id?: string; preview?: boolean }) {
   const res = await httpsCallable(functions, "completePickup")(args);

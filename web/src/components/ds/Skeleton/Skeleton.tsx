@@ -3,21 +3,21 @@ import { cx } from '../_shared/cx';
 import './Skeleton.css';
 
 export interface SkeletonProps extends HTMLAttributes<HTMLSpanElement> {
-  /** text：一行字高度；rect：區塊（圖片、卡片）；circle：頭像 */
+  /** text: one line of text height; rect: block (image, card); circle: avatar */
   variant?: 'text' | 'rect' | 'circle';
   width?: number | string;
   height?: number | string;
-  /** variant="text" 時的行數；最後一行自動縮短為 60% */
+  /** Number of lines when variant="text"; the last line is shortened to 60% */
   lines?: number;
-  /** 覆寫圓角 */
+  /** Override the border radius */
   radius?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
 }
 
 const toSize = (v: number | string | undefined) => (typeof v === 'number' ? `${v}px` : v);
 
 /**
- * 載入骨架。骨架本身 aria-hidden；請在外層容器加 aria-busy="true"
- * 並提供一段 .bb-sr-only 的「載入中」文字。
+ * Loading skeleton. The skeleton itself is aria-hidden; set aria-busy="true" on the outer container
+ * and provide a .bb-sr-only "Loading" text.
  */
 export function Skeleton({
   variant = 'text',

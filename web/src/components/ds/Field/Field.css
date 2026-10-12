@@ -47,8 +47,8 @@
   animation: bb-fade-in var(--duration-base) var(--ease-standard);
 }
 
-/* ── 控制項共用外框（Input / Select / Textarea） ─────────────────────────
-   .is-hover / .is-focus 只供預覽頁強制呈現狀態使用。 */
+/* ── Shared control frame (Input / Select / Textarea) ─────────────────────────
+   .is-hover / .is-focus are only for forcing states on the preview page. */
 .bb-control {
   position: relative;
   display: flex;

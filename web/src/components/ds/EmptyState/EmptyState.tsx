@@ -4,17 +4,17 @@ import { cx } from '../_shared/cx';
 import './EmptyState.css';
 
 export interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
-  /** 插圖位置：傳入 <img> / SVG；未提供時顯示預設 icon 圓底 */
+  /** Illustration slot: pass an <img> / SVG; without it a default icon on a circle is shown */
   illustration?: ReactNode;
-  /** 未提供 illustration 時使用的 icon，預設 Inbox */
+  /** Icon used when no illustration is given, default Inbox */
   icon?: ReactNode;
   title: ReactNode;
   description?: ReactNode;
-  /** 主要行動（通常是一個 Button） */
+  /** Primary action (usually a Button) */
   action?: ReactNode;
-  /** 次要行動（例如 text 按鈕） */
+  /** Secondary action (e.g. a text button) */
   secondaryAction?: ReactNode;
-  /** compact：放在卡片或列表內；default：整頁空狀態 */
+  /** compact: inside a card or list; default: full-page empty state */
   size?: 'compact' | 'default';
 }
 

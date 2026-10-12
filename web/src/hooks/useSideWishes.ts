@@ -12,8 +12,8 @@ export interface SideWishCount {
 }
 
 /**
- * 某家店某一週的候選菜許願計數（sideWishes，公開可讀、只有數字）。
- * 給品項頁顯示「地瓜葉 7/10」進度與「本週已滿」。
+ * Wish counts for candidate sides at one vendor for one week (sideWishes, publicly readable, numbers only).
+ * Lets the item page show progress like "Sweet potato leaves 7/10" and "Full this week".
  */
 export function useSideWishes(vendorId: string | undefined, pickupDate: string | undefined) {
   const week = pickupDate ? mondayOf(pickupDate) : "";

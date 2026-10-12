@@ -11,14 +11,14 @@ import { dateLocale, tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Lock, Vendor } from "@/types";
 
-/** 時段明細頁的網址參數：取餐日＋時段 */
+/** URL params for the slot detail page: pickup date + slot */
 export function slotKey(date: string, window: string): string {
   return encodeURIComponent(`${date}__${window}`);
 }
 
 /**
- * 訂餐時段：一週七天 × 這家店的取餐時段，像熱度圖——越滿顏色越深；有設份數上限就顯示「剩幾份」的進度條。
- * 公休整欄灰掉。點格子看該時段明細。時段、公休、份數上限在「店家設定」改。
+ * Pickup slots: seven days × this store's pickup slots, like a heat map (fuller is darker); with a portion cap set, shows a "portions left" progress bar.
+ * Closed days are grayed out as a whole column. Tap a cell for that slot's details. Slots, closed days and portion caps are changed in "Store settings".
  */
 export default function SlotsPanel({ vendor, locks, loading }: { vendor: Vendor | null | undefined; locks: Lock[]; loading: boolean }) {
   const [weekOffset, setWeekOffset] = useState(0);
@@ -28,7 +28,7 @@ export default function SlotsPanel({ vendor, locks, loading }: { vendor: Vendor 
   const windows = vendorWindows(vendor);
   const capacity = vendor?.slot_capacity && vendor.slot_capacity > 0 ? vendor.slot_capacity : null;
 
-  // date__window → { total, pending }（未取餐的不算進已訂份數）
+  // date__window → { total, pending } (no-shows aren't counted toward booked portions)
   const counts = useMemo(() => {
     const map = new Map<string, { total: number; pending: number }>();
     for (const l of locks) {

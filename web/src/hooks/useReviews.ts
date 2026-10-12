@@ -8,7 +8,7 @@ export interface RatingSummary {
   count: number;
 }
 
-/** 最近的公開評分（首頁計畫評分、店家排序、Landing 同學評價共用） */
+/** Recent public ratings (shared by home page meal-plan ratings, vendor sorting and Landing student reviews) */
 export function useReviews() {
   return useQuery({
     queryKey: ["reviews"],
@@ -20,7 +20,7 @@ export function useReviews() {
   });
 }
 
-/** 依 key（vendor_id 或 meal_plan_id）算平均星數，沒有評分的 key 不會出現 */
+/** Average stars per key (vendor_id or meal_plan_id); keys without ratings are omitted */
 export function summarizeRatings(reviews: Review[], keyOf: (r: Review) => string | null): Map<string, RatingSummary> {
   const sums = new Map<string, { total: number; count: number }>();
   for (const r of reviews) {

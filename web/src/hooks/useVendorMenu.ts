@@ -3,7 +3,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { MenuItem } from "@/types";
 
-/** 店家的全部品項（含下架），依分類排序。菜單管理、配方（用在哪些菜）、備料預估、設定進度條共用同一個快取 */
+/** All of the vendor's items (including unlisted), sorted by category. Menu management, recipes (where used), prep estimates and the setup progress bar share this cache */
 export function useVendorMenu(vendorId: string | undefined) {
   return useQuery({
     queryKey: ["vendorMenu", vendorId],

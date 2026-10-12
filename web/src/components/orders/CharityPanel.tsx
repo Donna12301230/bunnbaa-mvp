@@ -22,10 +22,10 @@ export const CHARITY_STATUS: Record<string, { zh: string; en: string; dot: strin
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 
 /**
- * 愛心餐（規格 §7）：取餐時段結束 30 分後未取餐的便當自動轉入，也包含消費者主動捐出的。
- * 預約者到場出示 QR，在「取餐」分頁掃；未預約的現場先到先領（點卡片「送出」）。
- * 截止（時段結束後 2 小時）後用 − ＋ 填現場送出份數，其餘記為報廢；報廢數用於修正下週預測。
- * 店家看不到預約者的個人資料。
+ * Charity meals (spec §7): bentos not picked up 30 minutes after the pickup slot ends are moved here automatically, along with ones diners donated themselves.
+ * Diners who reserved one show a QR on arrival, scanned in the "Pickup" tab; unreserved ones are first come, first served on site (tap "Hand out" on the card).
+ * After the deadline (2 hours after the slot ends), enter the number handed out on site with − +; the rest is recorded as waste, which is used to correct next week's forecast.
+ * Vendors can't see the reserving diner's personal data.
  */
 export default function CharityPanel({ meals, result, onGoScan }: {
   meals: CharityMeal[];
@@ -81,7 +81,7 @@ export default function CharityPanel({ meals, result, onGoScan }: {
         {minsLeft !== null && <span className={cn("ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold", closed ? "bg-border text-foreground" : "bg-charity-soft text-charity")}><Clock className="w-4 h-4" />{closed ? tr("已截止", "Closed") : tr(`還有 ${minsLeft} 分鐘截止`, `${minsLeft} min left`)}</span>}
       </div>
 
-      {/* 去向色條 */}
+      {/* Where they went: color bar */}
       <Card className="border-2">
         <CardContent className="p-4 space-y-2">
           <div className="flex h-7 overflow-hidden rounded-lg" role="img" aria-label={order.map((k) => `${tr(CHARITY_STATUS[k].zh, CHARITY_STATUS[k].en)} ${counts[k] ?? 0}`).join("，")}>
@@ -96,7 +96,7 @@ export default function CharityPanel({ meals, result, onGoScan }: {
         </CardContent>
       </Card>
 
-      {/* 每份一張卡：等人領的點「送出」 */}
+      {/* One card per meal: tap "Hand out" for ones waiting to be claimed */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {sorted.map((m) => {
           const s = CHARITY_STATUS[m.status];
@@ -119,7 +119,7 @@ export default function CharityPanel({ meals, result, onGoScan }: {
         })}
       </div>
 
-      {/* 截止後結算 */}
+      {/* Settlement after the deadline */}
       <Card className={cn("border-2", closed && !result && "border-charity/40")}>
         <CardContent className="p-4 space-y-3">
           <p className="font-semibold">{tr("收攤：今天現場一共送出幾份？", "Closing: how many did you give on site?")}</p>

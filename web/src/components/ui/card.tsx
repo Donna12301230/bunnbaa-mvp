@@ -2,7 +2,7 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-// 設計系統 Card：白底、細框、柔和陰影；interactive 時 hover 上浮 2px、陰影加深
+// Design-system Card: white background, thin border, soft shadow; when interactive, lifts 2px on hover with a deeper shadow
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { interactive?: boolean }

@@ -3,10 +3,10 @@ import type { ExtraSideChoice, MenuItem, RiceOption, SlotChoice } from "@/types"
 import { authStore } from "@/lib/auth";
 import { vendorBlockedToast } from "@/hooks/useRequireLogin";
 
-// 購物車（存在 localStorage）。第一階段規格：每一行是一份（或多份同樣配置的）便當，
-// 各自帶取餐日期、時段、主菜、配菜選擇（含第四道）、飯量、折價券——可預訂 30 天內，一次結帳可以
-// 跨好幾天，但只能同一家店（折價券只能在發券店家用）。
-// _v3：2026-09-30 改成便當格式，舊版購物車（沒有日期／配菜）直接丟掉。
+// Shopping cart (stored in localStorage). Phase 1 spec: each line is one bento (or several with the same configuration),
+// each with its own pickup date, pickup slot, main dish, side choices (including the fourth side), rice amount and coupon. Bookable up to 30 days ahead; one checkout can
+// span several days, but only one vendor (coupons can only be used at the issuing vendor).
+// _v3: switched to the bento format on 2026-09-30; old carts (no date / sides) are discarded.
 const CART_KEY = "bento_cart_v3";
 
 export interface CartLine {
@@ -16,9 +16,9 @@ export interface CartLine {
   pickupDate: string;
   pickupWindow: string;
   choices: SlotChoice[];
-  mainIndex?: number | null; // 選的主菜（menu_items.mains 的 index）
-  extraSide?: ExtraSideChoice | null; // 第四道：備案或加菜
-  customPicks?: number[]; // 店家自訂欄位：每個欄位選的選項 index
+  mainIndex?: number | null; // chosen main dish (index into menu_items.mains)
+  extraSide?: ExtraSideChoice | null; // fourth side: fallback or extra dish
+  customPicks?: number[]; // vendor custom fields: chosen option index per field
   rice: RiceOption;
   quantity: number;
   note: string;
@@ -41,7 +41,7 @@ function save() {
   try {
     localStorage.setItem(CART_KEY, JSON.stringify(_lines));
   } catch {
-    // 存不了就只在這次瀏覽有效
+    // If it can't be saved, it only lasts for this visit
   }
   _listeners.forEach((fn) => fn());
 }
@@ -58,7 +58,7 @@ export const cartStore = {
   get vendorId() { return _lines[0]?.vendorId ?? null; },
   get count() { return _lines.reduce((s, l) => s + l.quantity, 0); },
 
-  /** 加入一行；別家店的品項會清空購物車（一次只跟一家店預購）。廠商帳號不能下單，回傳 false */
+  /** Add a line; an item from another vendor clears the cart (pre-order from one vendor at a time). Vendor accounts can't order; returns false */
   add(line: Omit<CartLine, "key">): boolean {
     if (authStore.getSnapshot().user?.role === "vendor") {
       vendorBlockedToast();

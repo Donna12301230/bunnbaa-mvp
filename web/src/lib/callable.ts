@@ -2,8 +2,8 @@ import { httpsCallable as rawHttpsCallable, type Functions, type HttpsCallable, 
 import { getLang } from "@/lib/i18n";
 
 /**
- * 跟 firebase/functions 的 httpsCallable 一樣，但每次呼叫都在 data 裡帶上目前語言
- * （lang: "zh" | "en"），Functions 端（functions/src/i18n.js）依此回中文或英文的錯誤訊息。
+ * Same as httpsCallable from firebase/functions, but every call adds the current language to data
+ * (lang: "zh" | "en") so Functions (functions/src/i18n.js) returns error messages in Chinese or English.
  */
 export function httpsCallable<RequestData = unknown, ResponseData = unknown>(
   functions: Functions,
