@@ -1,5 +1,5 @@
 import { tr, useI18n } from "@/lib/i18n";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Switch, Route, Link, Router, Redirect, useLocation } from "wouter";
@@ -12,57 +12,75 @@ import { SiteThemeRoot } from "@/lib/siteLook";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlatformConfig } from "@/lib/platformConfig";
 
-const VendorRedeemPage = lazy(() => import("./pages/VendorRedeemPage"));
-const PaymentConfirmPage = lazy(() => import("./pages/PaymentConfirmPage"));
-const PaymentCancelPage = lazy(() => import("./pages/PaymentCancelPage"));
+/**
+ * 部署後，開著的舊分頁要載入的頁面檔（帶 hash 的 chunk）已經不在 Hosting 上，會拿到 index.html 而載入失敗，
+ * 整頁變白。載入失敗時重新整理一次拿新版；一分鐘內又失敗就照常拋錯，不會一直重整。
+ */
+function lazyPage<T extends ComponentType<any>>(load: () => Promise<{ default: T }>) {
+  return lazy(() =>
+    load().catch((err) => {
+      const KEY = "bunnbaa.chunkReloadAt";
+      let last = 0;
+      try { last = Number(sessionStorage.getItem(KEY)) || 0; } catch { /* 無痕模式等讀不到就當沒重整過 */ }
+      if (Date.now() - last < 60_000) throw err;
+      try { sessionStorage.setItem(KEY, String(Date.now())); } catch { /* 同上 */ }
+      window.location.reload();
+      return new Promise<{ default: T }>(() => {});
+    })
+  );
+}
 
-const LoginPage = lazy(() => import("./pages/LoginPage"));
-const HomePage = lazy(() => import("./pages/HomePage"));
-const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
-const ProfilePage = lazy(() => import("./pages/ProfilePage"));
-const MyBookingsPage = lazy(() => import("./pages/MyBookingsPage"));
-const GiftClaimPage = lazy(() => import("./pages/GiftClaimPage"));
-const PickupProxyPage = lazy(() => import("./pages/PickupProxyPage"));
-const RewardsPage = lazy(() => import("./pages/RewardsPage"));
-const CartPage = lazy(() => import("./pages/CartPage"));
-const VendorListPage = lazy(() => import("./pages/VendorListPage"));
-const VendorPage = lazy(() => import("./pages/VendorPage"));
-const MenuItemPage = lazy(() => import("./pages/MenuItemPage"));
-const AboutPage = lazy(() => import("./pages/AboutPage"));
-const ContactPage = lazy(() => import("./pages/ContactPage"));
-const FaqPage = lazy(() => import("./pages/FaqPage"));
-const JoinUsPage = lazy(() => import("./pages/JoinUsPage"));
+const VendorRedeemPage = lazyPage(() => import("./pages/VendorRedeemPage"));
+const PaymentConfirmPage = lazyPage(() => import("./pages/PaymentConfirmPage"));
+const PaymentCancelPage = lazyPage(() => import("./pages/PaymentCancelPage"));
+
+const LoginPage = lazyPage(() => import("./pages/LoginPage"));
+const HomePage = lazyPage(() => import("./pages/HomePage"));
+const FavoritesPage = lazyPage(() => import("./pages/FavoritesPage"));
+const ProfilePage = lazyPage(() => import("./pages/ProfilePage"));
+const MyBookingsPage = lazyPage(() => import("./pages/MyBookingsPage"));
+const GiftClaimPage = lazyPage(() => import("./pages/GiftClaimPage"));
+const PickupProxyPage = lazyPage(() => import("./pages/PickupProxyPage"));
+const RewardsPage = lazyPage(() => import("./pages/RewardsPage"));
+const CartPage = lazyPage(() => import("./pages/CartPage"));
+const VendorListPage = lazyPage(() => import("./pages/VendorListPage"));
+const VendorPage = lazyPage(() => import("./pages/VendorPage"));
+const MenuItemPage = lazyPage(() => import("./pages/MenuItemPage"));
+const AboutPage = lazyPage(() => import("./pages/AboutPage"));
+const ContactPage = lazyPage(() => import("./pages/ContactPage"));
+const FaqPage = lazyPage(() => import("./pages/FaqPage"));
+const JoinUsPage = lazyPage(() => import("./pages/JoinUsPage"));
 import CustomerLayout from "./components/CustomerLayout";
 import MarketplaceHeader from "./components/MarketplaceHeader";
 import SiteFooter from "./components/SiteFooter";
 import CartPreview from "./components/CartPreview";
 import { RequireVendorSignIn } from "./components/RequireRealAdmin";
-const AdminVendorsPage = lazy(() => import("./pages/admin/AdminVendorsPage"));
-const AdminAppealsPage = lazy(() => import("./pages/admin/AdminAppealsPage"));
-const AdminLocksPage = lazy(() => import("./pages/admin/AdminLocksPage"));
-const AdminPayoutsPage = lazy(() => import("./pages/admin/AdminPayoutsPage"));
-const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
-const AdminPlatformPage = lazy(() => import("./pages/admin/AdminPlatformPage"));
-const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
-const AdminDishesPage = lazy(() => import("./pages/admin/AdminDishesPage"));
-const AdminAnomaliesPage = lazy(() => import("./pages/admin/AdminEventsPage").then((m) => ({ default: m.AdminAnomaliesPage })));
-const AdminDisastersPage = lazy(() => import("./pages/admin/AdminEventsPage").then((m) => ({ default: m.AdminDisastersPage })));
-const VendorPortalDashboard = lazy(() => import("./pages/vendor-portal/VendorPortalDashboard"));
-const VendorPortalMenu = lazy(() => import("./pages/vendor-portal/VendorPortalMenu"));
-const VendorPortalOrders = lazy(() => import("./pages/vendor-portal/VendorPortalOrders"));
-const VendorPortalPrep = lazy(() => import("./pages/vendor-portal/VendorPortalPrep"));
-const VendorPortalGrowth = lazy(() => import("./pages/vendor-portal/VendorPortalGrowth"));
-const VendorPortalReports = lazy(() => import("./pages/vendor-portal/VendorPortalReports"));
-const VendorPortalSessions = lazy(() => import("./pages/vendor-portal/VendorPortalSessions"));
-const VendorPortalSessionSummary = lazy(() => import("./pages/vendor-portal/VendorPortalSessionSummary"));
-const VendorPortalSettings = lazy(() => import("./pages/vendor-portal/VendorPortalSettings"));
-const VendorPortalRecipes = lazy(() => import("./pages/vendor-portal/VendorPortalRecipes"));
-const VendorPortalPurchasing = lazy(() => import("./pages/vendor-portal/VendorPortalPurchasing"));
-const VendorPortalCharity = lazy(() => import("./pages/vendor-portal/VendorPortalCharity"));
-const VendorPortalInsights = lazy(() => import("./pages/vendor-portal/VendorPortalInsights"));
+const AdminVendorsPage = lazyPage(() => import("./pages/admin/AdminVendorsPage"));
+const AdminAppealsPage = lazyPage(() => import("./pages/admin/AdminAppealsPage"));
+const AdminLocksPage = lazyPage(() => import("./pages/admin/AdminLocksPage"));
+const AdminPayoutsPage = lazyPage(() => import("./pages/admin/AdminPayoutsPage"));
+const AdminSettingsPage = lazyPage(() => import("./pages/admin/AdminSettingsPage"));
+const AdminPlatformPage = lazyPage(() => import("./pages/admin/AdminPlatformPage"));
+const AdminAnalyticsPage = lazyPage(() => import("./pages/admin/AdminAnalyticsPage"));
+const AdminDishesPage = lazyPage(() => import("./pages/admin/AdminDishesPage"));
+const AdminAnomaliesPage = lazyPage(() => import("./pages/admin/AdminEventsPage").then((m) => ({ default: m.AdminAnomaliesPage })));
+const AdminDisastersPage = lazyPage(() => import("./pages/admin/AdminEventsPage").then((m) => ({ default: m.AdminDisastersPage })));
+const VendorPortalDashboard = lazyPage(() => import("./pages/vendor-portal/VendorPortalDashboard"));
+const VendorPortalMenu = lazyPage(() => import("./pages/vendor-portal/VendorPortalMenu"));
+const VendorPortalOrders = lazyPage(() => import("./pages/vendor-portal/VendorPortalOrders"));
+const VendorPortalPrep = lazyPage(() => import("./pages/vendor-portal/VendorPortalPrep"));
+const VendorPortalGrowth = lazyPage(() => import("./pages/vendor-portal/VendorPortalGrowth"));
+const VendorPortalReports = lazyPage(() => import("./pages/vendor-portal/VendorPortalReports"));
+const VendorPortalSessions = lazyPage(() => import("./pages/vendor-portal/VendorPortalSessions"));
+const VendorPortalSessionSummary = lazyPage(() => import("./pages/vendor-portal/VendorPortalSessionSummary"));
+const VendorPortalSettings = lazyPage(() => import("./pages/vendor-portal/VendorPortalSettings"));
+const VendorPortalRecipes = lazyPage(() => import("./pages/vendor-portal/VendorPortalRecipes"));
+const VendorPortalPurchasing = lazyPage(() => import("./pages/vendor-portal/VendorPortalPurchasing"));
+const VendorPortalCharity = lazyPage(() => import("./pages/vendor-portal/VendorPortalCharity"));
+const VendorPortalInsights = lazyPage(() => import("./pages/vendor-portal/VendorPortalInsights"));
 
-const DesignSystemPreview = lazy(() => import("./pages/DesignSystemPreview"));
-const LandingPage = lazy(() => import("./pages/LandingPage"));
+const DesignSystemPreview = lazyPage(() => import("./pages/DesignSystemPreview"));
+const LandingPage = lazyPage(() => import("./pages/LandingPage"));
 
 function NotFound() {
   return (
