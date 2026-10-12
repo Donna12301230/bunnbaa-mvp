@@ -85,8 +85,8 @@
 B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家與管理後台的測試不受 rules 部署影響。
 
 ### 10/12–10/13 Google Cloud 補強收尾
-- [ ] **預測卡重複**：營收頁同時放了 `ForecastCard` 和 `DemandForecastCard`（都讀 `vendors/{v}/forecast`），留一張
-- [ ] **客群卡永遠是空的**：`SegmentsCard`（區域分頁）讀 `vendors/{v}/segments/{id}` 集合，後端寫的是 `vendors/{v}/analytics/segments` 單一文件（陣列、欄位 `label`）。改讀正確位置，或直接刪掉、只留 `CustomerInsightsCard`；`analytics.ts` 跟著清掉沒用的型別與查詢。正式站用仁和雅確認卡片有資料、手機版面正常
+- [x] **預測卡重複**（10/12 `64f884c`）：拿掉 `ForecastCard`（讀 `date`／`predicted`，跟後端格式對不上），營收頁只留 `DemandForecastCard`
+- [x] **客群卡永遠是空的**（10/12 `64f884c`）：拿掉 `SegmentsCard`，客群只由 `CustomerInsightsCard` 顯示（讀 `vendors/{v}/analytics/segments`）
 - [ ] **Looker Studio 報表**（只能手動）：管理後台 `/admin/analytics` 按「在 Looker Studio 建立報表」→ 加入 `dash_forecast_vs_actual`、`dash_forecast_next`、`dash_segments` 三個 view → 排圖表（每日鎖定量、預測 vs. 實際、救回份數＝轉讓＋愛心餐、客群分布）→ 檔案 → 嵌入報表 → 開啟嵌入，把嵌入網址貼回管理後台存檔，正式站確認嵌入有顯示
 
 ### 10/12–10/13 正式站設定
