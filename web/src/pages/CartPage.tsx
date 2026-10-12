@@ -7,7 +7,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { CalendarDays, MapPin, Minus, Plus, ShoppingCart, Ticket, Trash2, UtensilsCrossed } from "lucide-react";
 import { httpsCallable } from "@/lib/callable";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
-import { useCart, type CartLine } from "@/hooks/useCart";
+import { cartStore, useCart, type CartLine } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -91,7 +91,7 @@ export default function CartPage() {
         use_points: usePoints && points.balance > 0,
       });
       const { order_id: orderId, payment_url: paymentUrl, free } = result.data as { order_id: string; payment_url: string; free?: boolean };
-      clearCart();
+      cartStore.stashForPayment(orderId);
       if (free) navigate(`/payment/confirm/${orderId}`);
       else window.location.href = paymentUrl;
     } catch (err) {
@@ -115,7 +115,14 @@ export default function CartPage() {
               icon={<ShoppingCart size={32} />}
               title={tr("購物車還是空的", "Your cart is empty")}
               description={tr("越早訂，越開心：提前預約享早鳥價。", "Book early, save more.")}
-              action={<Button onClick={() => navigate("/home")}>{tr("去預購餐點", "Pre-order a meal")}</Button>}
+              action={
+                <div className="flex flex-wrap justify-center gap-3">
+                  {cartStore.hasPending && (
+                    <Button variant="outline" onClick={() => cartStore.restoreAfterCancel()}>{tr("放回上次沒付完的餐點", "Restore your unpaid items")}</Button>
+                  )}
+                  <Button onClick={() => navigate("/home")}>{tr("去預購餐點", "Pre-order a meal")}</Button>
+                </div>
+              }
             />
           </div>
         ) : (

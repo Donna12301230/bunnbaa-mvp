@@ -8,6 +8,9 @@ import { vendorBlockedToast } from "@/hooks/useRequireLogin";
 // 跨好幾天，但只能同一家店（折價券只能在發券店家用）。
 // _v3：2026-09-30 改成便當格式，舊版購物車（沒有日期／配菜）直接丟掉。
 const CART_KEY = "bento_cart_v3";
+// 結帳跳去 LINE Pay 前先清空購物車（付完回來才不會重複下單），但把內容暫存在這裡：
+// 付款取消／失敗回到取消頁時放回購物車，付款成功才丟掉。2026-10-12 修：以前取消付款購物車就沒了。
+const PENDING_KEY = "bento_cart_pending_payment";
 
 export interface CartLine {
   key: string;
@@ -85,6 +88,45 @@ export const cartStore = {
   clear() {
     _lines = [];
     save();
+  },
+  /** 前往付款前呼叫：暫存這次結帳的內容再清空購物車 */
+  stashForPayment(orderId: string) {
+    try {
+      localStorage.setItem(PENDING_KEY, JSON.stringify({ orderId, lines: _lines }));
+    } catch {
+      // 存不了就只是取消後要重新加入購物車
+    }
+    this.clear();
+  },
+  /** 付款取消：把同一筆訂單暫存的內容放回購物車（不給 orderId 就放回最近一筆，例如 LINE Pay 頁面直接關掉沒回到取消頁） */
+  restoreAfterCancel(orderId?: string) {
+    try {
+      const pending = JSON.parse(localStorage.getItem(PENDING_KEY) ?? "null") as { orderId: string; lines: CartLine[] } | null;
+      if (!pending || (orderId && pending.orderId !== orderId)) return;
+      localStorage.removeItem(PENDING_KEY);
+      if (_lines.length === 0 && pending.lines.length > 0) {
+        _lines = pending.lines;
+        save();
+      }
+    } catch {
+      // 讀不到暫存就算了
+    }
+  },
+  /** 有沒有上次沒付完的暫存（購物車空的時候提示放回） */
+  get hasPending() {
+    try {
+      return !!JSON.parse(localStorage.getItem(PENDING_KEY) ?? "null")?.lines?.length;
+    } catch {
+      return false;
+    }
+  },
+  /** 付款成功：丟掉暫存 */
+  discardPending() {
+    try {
+      localStorage.removeItem(PENDING_KEY);
+    } catch {
+      // ignore
+    }
   },
   subscribe(fn: () => void) {
     _listeners.add(fn);

@@ -10,6 +10,7 @@ import { auth, db, functions } from "../lib/firebase";
 import { registerForPickupReminders } from "../lib/messaging";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { Button } from "@/components/ui/button";
+import { cartStore } from "@/hooks/useCart";
 import { customOptionTexts, extraSideText, riceLabel, slotText } from "@/lib/bento";
 import { vendorCutoffTime } from "@/lib/pickupSlots";
 import type { Lock } from "@/types";
@@ -48,6 +49,7 @@ export default function PaymentConfirmPage() {
         const result = await httpsCallable(functions, "confirmLinePayPayment")({ order_id: orderId });
         const { lock_ids: ids, kind } = result.data as { lock_ids: string[]; kind?: string };
         setIsResale(kind === "resale");
+        cartStore.discardPending();
         // 付款已成功，讀不到細節也不能讓頁面變成「付款確認失敗」
         const docs = await Promise.all(ids.map((id) => getDoc(doc(db, "locks", id)).catch(() => null)));
         setLocks(docs.filter((d) => d?.exists()).map((d) => ({ id: d!.id, ...d!.data() }) as Lock));
