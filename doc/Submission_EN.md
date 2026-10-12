@@ -124,7 +124,7 @@ Record on the live site. Prepare beforehand: a diner account and a vendor accoun
 | 2:25–2:40 | **Pickup.** Diner shows QR; vendor scans with camera; "picked up". Briefly show the charity-meal tab | "At the counter, a signed QR code is scanned. Any meal still unclaimed becomes a free charity meal, so it still feeds someone." |
 | 2:40–3:00 | **Admin → Analytics** (Looker Studio: meals saved, forecast vs. actual), architecture slide, closing slide | "Every booking streams into BigQuery, so we can show meals saved and how close the forecast was. BunnBaa runs entirely on Google Cloud: Gemini on Vertex AI, Cloud Run functions, Firestore with vector search, BigQuery AI and Looker Studio — and we test the assistant with Vertex AI's evaluation service. Cook what's ordered. Eat what's cooked." |
 
-Tips: record at 1080p, keep the browser zoomed so text is readable, cut waiting time (LINE Pay redirects, push delivery), and add English captions.
+Tips: record at 1080p, keep the browser zoomed so text is readable, cut waiting time (LINE Pay redirects, push delivery), and add English captions. A first-draft caption file built from the voice-over above is in [`demo_captions.srt`](demo_captions.srt); re-time it to the final cut (most editors and YouTube Studio can import and shift `.srt` files).
 
 ---
 

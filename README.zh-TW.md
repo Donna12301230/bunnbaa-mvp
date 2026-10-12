@@ -22,6 +22,17 @@
 | 🎬 **展示影片（3 分鐘）** | [YouTube 連結] |
 | 📑 **提案簡報** | [PDF 連結] |
 
+### 試用
+
+打開線上版即可。瀏覽器是中文就顯示中文，其他語言顯示英文（網址加 `?lang=zh`／`?lang=en` 可切換）。瀏覽菜單不用登入；預購、轉讓與商家後台需要帳號：
+
+| 角色 | Email | 密碼 |
+|---|---|---|
+| 消費者 | [demo 消費者 email] | [密碼] |
+| 商家 | [demo 商家 email] | [密碼] |
+
+付款走 LINE Pay **Sandbox**，不會真的扣款。
+
 ---
 
 ## 要解決的問題
@@ -40,6 +51,10 @@
 ---
 
 ## 系統架構
+
+![BunnBaa architecture on Google Cloud](assets/architecture.png)
+
+<sub>原始檔：[`assets/architecture.html`](assets/architecture.html)。下面是同一套分層的 Mermaid 版：</sub>
 
 ```mermaid
 flowchart TB

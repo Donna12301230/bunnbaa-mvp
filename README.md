@@ -22,6 +22,17 @@
 | 🎬 **Demo video (3 min)** | [YouTube link] |
 | 📑 **Proposal deck** | [PDF link] |
 
+### Try it
+
+Open the live prototype. The interface is in English unless your browser is set to Chinese (`?lang=zh` / `?lang=en` switches it). Browsing menus needs no account; booking, reselling and the vendor portal need one:
+
+| Role | Email | Password |
+|---|---|---|
+| Diner | [demo diner email] | [password] |
+| Vendor | [demo vendor email] | [password] |
+
+Payments run in the LINE Pay **sandbox**, so no real money moves.
+
 ---
 
 ## The problem
@@ -42,6 +53,10 @@ Vendors pay no monthly fee. The platform keeps 5% of each meal sold, deducted at
 ---
 
 ## Architecture
+
+![BunnBaa architecture on Google Cloud](assets/architecture.png)
+
+<sub>Source: [`assets/architecture.html`](assets/architecture.html). The same layers as a diagram GitHub renders:</sub>
 
 ```mermaid
 flowchart TB
