@@ -336,7 +336,7 @@ async function newContext(request) {
 
 /**
  * Cart checkout. lines: [{ menu_item_id, pickup_date, pickup_window, slots:[{choice}], rice,
- * quantity, note, coupon_id }]. Lines may have different pickup dates (bookable through next Friday).
+ * quantity, note, coupon_id }]. Lines may have different pickup dates (bookable up to bookingRangeDays, 30 days, ahead).
  */
 exports.createCartLinePayReservation = onCall({}, async (request) => {
   assertSignedInUser(request, "結帳");
