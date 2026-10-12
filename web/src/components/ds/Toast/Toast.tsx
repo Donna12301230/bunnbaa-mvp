@@ -107,7 +107,7 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 /** Show a notification: const { toast } = useToast(); toast({ tone: 'success', title: 'Added to cart' }) */
 export function useToast(): ToastContextValue {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast() 必須在 <ToastProvider> 之內使用');
+  if (!ctx) throw new Error('useToast() must be used inside <ToastProvider>');
   return ctx;
 }
 

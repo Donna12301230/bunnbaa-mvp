@@ -22,7 +22,7 @@ Items in `[brackets]` must be filled in before submitting.
 
 **Proposal PDF:** [attach the PDF exported from the deck]
 
-**Code repository:** [GitHub link, if required]
+**Code repository (public):** https://github.com/Donna12301230/bunnbaa-mvp
 
 ### One-line pitch
 
@@ -72,7 +72,7 @@ Every Firestore write streams into **BigQuery** (official *Stream Firestore to B
 - **Numbers are code.** Portions, prices, discounts, payouts, prize draws and the vendor accuracy rate behind the "reliable" badge are deterministic functions; the model only explains numbers it is given.
 - **Drafts, not decisions.** Every AI output carries a `disclaimer` field. Owners confirm menus; vendors decide how much to cook — AI-drafted recipes stay flagged until the owner saves them, and the prep, purchasing and cost screens warn (and ask before sending a supplier order) while any are unconfirmed. The assistant never places an order.
 - **Server-side guards.** The assistant can only show items its own search tools returned in that turn, the user's allergens are filtered on the server both in search and again on the final cards, and prices are recomputed at checkout. An empty allergen field means "not labelled", never "free of": the assistant must say so and avoid dishes that very likely contain the allergen (for example battered fried chicken for a gluten allergy).
-- **Measured, not assumed.** A 24-question test set (budgets, allergies, vegetarian, meal times, multi-day plans, English, an unsupported area, "just order it for me") runs the production assistant end to end. Rule checks pass 24/24 with zero allergen violations, and the **Vertex AI Gen AI Evaluation Service** (pointwise custom rubrics, `gemini-2.5-pro` judge) scores fulfillment 4.96/5 and groundedness 4.92/5. The evaluation found real problems — "no allergen listed" read as "allergen-free", a breakfast-shop plan offered for lunch, an empty answer when the tool budget ran out — and they were fixed before these scores.
+- **Measured, not assumed.** A 24-question test set (budgets, allergies, vegetarian, meal times, multi-day plans, English, an unsupported area, "just order it for me") runs the production assistant end to end. Rule checks pass 24/24 with zero allergen violations, and the **Vertex AI Gen AI Evaluation Service** (pointwise custom rubrics, `gemini-2.5-pro` judge) scores fulfillment 4.79/5 and groundedness 4.96/5 (12 Oct 2026; full results in [`assistant-evaluation.md`](assistant-evaluation.md)). The evaluation found real problems — "no allergen listed" read as "allergen-free", a breakfast-shop plan offered for lunch, an empty answer when the tool budget ran out — and they were fixed before these scores.
 - **Calm and bounded.** No urgency marketing; 30 assistant questions per user per day with a 10-minute cache; at most 2 resale alerts per person per day, nobody more than 10 km away, one-tap opt-out.
 
 ### Technical implementation (Google Cloud)
@@ -96,7 +96,7 @@ Every Firestore write streams into **BigQuery** (official *Stream Firestore to B
 
 - **Running on Google Cloud today**: https://bunnbaa-mvp-5474.web.app, with 79 Cloud Functions (2nd gen, on Cloud Run) and daily BigQuery AI jobs, deployed automatically from GitHub Actions.
 - **All three roles are built end to end**: diner app (pre-order, pay, resell, gift, donate, QR pickup), vendor portal (photo-to-menu, prep and purchase lists, forecast, QR scanning, payouts), and admin console (vendor approval, platform settings, impact dashboard).
-- **Tested**: 64 business-logic tests, 144 Cloud Functions tests, 65 Firestore security-rule tests, and a 24-question evaluation of the AI assistant (24/24 rule checks; Vertex AI Gen AI Evaluation Service scores 4.96/5 fulfillment, 4.92/5 groundedness).
+- **Tested**: 64 business-logic tests, 144 Cloud Functions tests, 65 Firestore security-rule tests, and a 24-question evaluation of the AI assistant (24/24 rule checks; Vertex AI Gen AI Evaluation Service scores 4.79/5 fulfillment, 4.96/5 groundedness).
 - **Real-world constraints handled**: LINE Pay request, confirm and refund flows; time-zone-aware cut-offs; refunds as platform points; usage limits on the AI assistant.
 - **Low adoption cost**: a vendor onboards with one photo of a paper menu and pays no monthly fee, only 5% per meal sold.
 
@@ -130,28 +130,29 @@ Tips: record at 1080p, keep the browser zoomed so text is readable, cut waiting 
 
 ## 3. Pre-submission checklist
 
-- [ ] Fill in the bracketed placeholders in the deck (team names, food-waste statistic, video link) and in this file
+- [ ] Fill in the bracketed placeholders in the deck (team names on the cover, video link on the last slide) and in this file (video link, PDF)
 - [ ] Export the deck to PDF (Share › Export › PDF)
 - [x] Deploy the latest Functions and Hosting (10 Oct: Vertex AI, BigQuery sync, forecast, segments, assistant insights tool)
-- [ ] Run `backfillMenuEmbeddings` once so resale matching works on existing items (embeddings now come from Vertex AI)
+- [x] Run `backfillMenuEmbeddings` once so resale matching works on existing items (12 Oct)
 - [ ] Build the Looker Studio report from Admin → Analytics, enable embedding and paste the embed URL back
-- [ ] Ask the pre-order assistant one question on the live site (first live call through Vertex AI)
-- [ ] Screenshot the evaluation summary (`doc/評估/預購助理回答品質評估.md`) for the deck
-- [ ] Update the architecture slide: Firestore →(extension)→ BigQuery → BigQuery AI / Looker Studio, forecasts written back to Firestore → vendor portal
+- [x] Ask the pre-order assistant one question on the live site (first live call through Vertex AI, 12 Oct)
+- [ ] Screenshot the evaluation summary ([`assistant-evaluation.md`](assistant-evaluation.md)) for the deck
+- [x] Update the architecture slide: Firestore →(extension)→ BigQuery → BigQuery AI / Looker Studio, forecasts written back to Firestore → vendor portal
 - [ ] Check the four AI features on the live site (see `TODO.md`)
 - [ ] Record and upload the 3-minute video as public / unlisted-with-link
 - [ ] Make sure the live site works without logging in as an admin (judges will open it)
+- [ ] Run the admin console's "Backfill translations" so vendor and dish names show in English on production (the English UI otherwise shows Chinese names)
 
 ### Against the official requirements
 
 | Requirement | Where it is covered | Status |
 |---|---|---|
-| Proposal: vision, problem, community benefit | Deck + §1 Problem / Solution / Impact | Deck needs the statistic above and the team slide |
-| Proposal: feasibility and scalability | §1 Feasibility, Scalability and roadmap | Copy both into the deck |
+| Proposal: vision, problem, community benefit | Deck + §1 Problem / Solution / Impact | Done (UNEP statistic on slide 2); team names still a placeholder on the cover |
+| Proposal: feasibility and scalability | §1 Feasibility, Scalability and roadmap | Done (slides 13 and 15) |
 | Proposal exported as **PDF** | Deck → Share › Export › PDF | [ ] |
 | Working prototype using Google Cloud AI, deployed on Cloud Run / GCP / Firebase | Gemini on **Vertex AI** (service account, no API key) + BigQuery AI; Firebase Hosting + Cloud Functions 2nd gen (Cloud Run) | Done. Say "Cloud Functions 2nd gen run on Cloud Run" on the architecture slide and in the video |
 | Public 3-minute video (YouTube / Vimeo / public Google Drive) | §2 script | [ ] Upload, then test the link in a logged-out window |
 | Category stated | §1: **Sustainability** | [ ] Tick only Sustainability on the form |
-| Everything in English: code, docs, presentation | README, this file, deck, video (narration + captions) are English; the UI defaults to English for non-Chinese browsers and `?lang=en` forces it | Code comments translated to English (263 files, comment-only; the Chinese left in comments is text the code outputs or matches, on-screen labels, the brand name and Chinese doc file names). UI strings stay bilingual by design. **Remaining gap:** Chinese-only developer docs in `doc/`; move them out of the public repo or label them as internal notes |
-| Judges can try all three roles | Demo accounts | [ ] Create English-named demo accounts (diner, vendor, admin-read-only if possible) on the live site and put them in the form's notes field; don't publish real admin credentials |
-| Repository accessible | GitHub | [ ] Repo is private: make it public or add the judges, then fill in the README link |
+| Everything in English: code, docs, presentation | README, this file, deck, video (narration + captions) are English; the UI defaults to English for non-Chinese browsers and `?lang=en` forces it | Code comments translated to English (263 files, comment-only; the Chinese left in comments is text the code outputs or matches, on-screen labels, the brand name and Chinese doc file names). UI strings stay bilingual by design. **Remaining gap:** Chinese-only developer docs in `doc/` (specs, test plan, developer guide, TODO, ISMS); move them out of the public repo or label them as internal notes. English versions exist for the evaluation report (`assistant-evaluation.md`) and `bigquery/README.md` |
+| Judges can try all three roles | Login page "Demo accounts" button; README Try it | Diner: done (`customer@bunnbaa.test`). [ ] Vendor: no production demo account yet, so judges can't open the vendor portal (photo-to-menu, prep lists, forecast). Admin: deliberately not offered |
+| Repository accessible | GitHub | Done: public at https://github.com/Donna12301230/bunnbaa-mvp |

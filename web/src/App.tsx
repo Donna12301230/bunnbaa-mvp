@@ -153,7 +153,7 @@ function useSyncUserLang(lang: "zh" | "en") {
     if (saved.current?.uid !== user.id) saved.current = { uid: user.id, lang: user.lang };
     if (saved.current.lang === lang) return;
     saved.current.lang = lang;
-    setDoc(doc(db, "users", user.id), { lang }, { merge: true }).catch((err) => console.warn("儲存語言設定失敗", err));
+    setDoc(doc(db, "users", user.id), { lang }, { merge: true }).catch((err) => console.warn("Failed to save language setting", err));
   }, [user?.id, user?.lang, lang]);
 }
 

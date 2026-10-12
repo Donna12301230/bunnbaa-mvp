@@ -1,27 +1,29 @@
-# BigQuery 分析資料（`bunnbaa_analytics`）
+# BigQuery analytics (`bunnbaa_analytics`)
 
-Firestore 用官方 extension **Stream Firestore to BigQuery** 同步到 BigQuery（`doc/GoogleCloud改動建議.md` P0）。
+**English** | [中文](README.zh-TW.md)
 
-- 實例設定：`firebase.json` 的 `extensions` ＋ `extensions/bq-*.env`（`locks`、`menu_items`、`vendors`、`payment_intents` 各一個）
-- Dataset：`bunnbaa_analytics`（`asia-east1`），每個集合一張 `{collection}_raw_changelog` 和一個 `{collection}_raw_latest` view
-- 去個資：extension 寫入前會呼叫 `bqTransform`（`functions/src/bigqueryExport.js`），拿掉手機、備註、交易序號、取餐碼等欄位；`payment_intents` 只留金額、狀態和時間
-- 有型別的 view：`schemas/*.json` → `{collection}_schema_{collection}_latest`（例如 `locks_schema_locks_latest`），後面的 SQL 都查這些 view
+Firestore is synced to BigQuery with the official **Stream Firestore to BigQuery** extension (`doc/GoogleCloud改動建議.md`, P0).
 
-## 部署（用專案擁有者帳號，一次性）
+- Instance config: `extensions` in `firebase.json` plus `extensions/bq-*.env` (one each for `locks`, `menu_items`, `vendors`, `payment_intents`)
+- Dataset: `bunnbaa_analytics` (`asia-east1`), with one `{collection}_raw_changelog` table and one `{collection}_raw_latest` view per collection
+- Personal data removed: before writing, the extension calls `bqTransform` (`functions/src/bigqueryExport.js`), which drops phone numbers, notes, transaction ids, pickup codes and similar fields; `payment_intents` keeps only amount, status and timestamps
+- Typed views: `schemas/*.json` → `{collection}_schema_{collection}_latest` (for example `locks_schema_locks_latest`); all later SQL queries these views
 
-> 2026-10-10 已全部完成：四個 extension 實例、回填（vendors 21、menu_items 261、payment_intents 608、locks 3,659 筆，已查核沒有個資欄位）、schema view、需求預測 SQL 與回測、`demandForecast` 排程。
+## Deploy (project owner account, one time)
+
+> Done on 2026-10-10: four extension instances, backfill (vendors 21, menu_items 261, payment_intents 608, locks 3,659 rows, checked for no personal-data fields), schema views, demand-forecast SQL and backtest, and the `demandForecast` schedule.
 
 ```bash
-# 1. 先部署 transform function：extension 安裝時就會開始呼叫它
+# 1. Deploy the transform function first: the extension starts calling it as soon as it is installed
 firebase deploy --only functions:bqTransform
 
-# 2. 安裝 4 個 extension 實例（第一次要同意 Extensions 服務條款）
+# 2. Install the 4 extension instances (the first time you must accept the Extensions terms of service)
 firebase deploy --only extensions
 ```
 
-## 回填既有資料
+## Backfill existing data
 
-extension 只同步安裝之後的寫入。舊資料要用匯入腳本回填，而且要帶 transform function，不然個資會寫進 BigQuery：
+The extension only syncs writes made after installation. Backfill older data with the import script, and always pass the transform function, or personal data will land in BigQuery:
 
 ```bash
 for c in locks menu_items vendors payment_intents; do
@@ -32,7 +34,7 @@ for c in locks menu_items vendors payment_intents; do
 done
 ```
 
-## 產生有型別的 view
+## Generate the typed views
 
 ```bash
 cd bigquery
@@ -44,29 +46,29 @@ for c in locks menu_items vendors payment_intents; do
 done
 ```
 
-新增分析需要的欄位時，改 `schemas/*.json` 再跑一次即可。被 `bqTransform` 拿掉的欄位不要加進 schema，因為那些欄位不會出現在資料裡。
+To add a field for analysis, edit `schemas/*.json` and run this again. Don't add fields that `bqTransform` removes: they never appear in the data.
 
-## 需求預測（P1）
+## Demand forecast (P1)
 
-1. 在 BigQuery 主控台執行 `sql/01_demand_forecast.sql`：建立模擬背景需求 `demand_history_sim`、每店每日需求 view `daily_demand`、預測結果表 `demand_forecast`、Looker 用的 `forecast_vs_actual`，最後一段回測會補上過去 14 天的預測（要跑幾分鐘）。
-2. 給 functions 服務帳號 BigQuery 權限，讓排程函式能查詢和寫入：
+1. Run `sql/01_demand_forecast.sql` in the BigQuery console. It creates the simulated background demand `demand_history_sim`, the per-vendor daily demand view `daily_demand`, the forecast table `demand_forecast` and `forecast_vs_actual` for Looker; the last part backfills forecasts for the past 14 days as a backtest (takes a few minutes).
+2. Give the functions service account BigQuery access so the scheduled function can query and write:
    ```bash
    SA=<PROJECT_NUMBER>-compute@developer.gserviceaccount.com
    gcloud projects add-iam-policy-binding bunnbaa-mvp-5474 --member="serviceAccount:$SA" --role="roles/bigquery.jobUser"
    ```
-   再到 BigQuery 主控台 → `bunnbaa_analytics` → 共用 → 權限，把同一個服務帳號加成「BigQuery 資料編輯者」（只給這個 dataset，不開整個專案）。
-3. 部署 `demandForecast`（每天 05:00）與 `triggerDemandForecastNow`（管理員手動重跑），跑一次後商家後台「報表與洞察 → 營收」會出現「未來 7 天預估份數」。
+   Then in the BigQuery console → `bunnbaa_analytics` → Sharing → Permissions, add the same service account as **BigQuery Data Editor** (on this dataset only, not the whole project).
+3. Deploy `demandForecast` (daily at 05:00) and `triggerDemandForecastNow` (manual rerun for admins). After one run, the vendor portal's Reports & insights → Revenue shows the 7-day forecast.
 
-模擬資料只是展示用：真實資料夠長後執行 `DROP TABLE bunnbaa_analytics.demand_history_sim`，`daily_demand` 就只剩真實份數。
+The simulated data is for demonstration only: once there is enough real history, run `DROP TABLE bunnbaa_analytics.demand_history_sim` and `daily_demand` will contain real portions only.
 
-## 購物籃與客戶分群（P1）
+## Basket analysis and customer segments (P1)
 
-SQL 在 `functions/src/customerInsights.sql`（函式部署時一起打包），由 `customerInsights` 每週一 04:00 執行，產生 `basket_pairs`、`buyer_features`、`buyer_segments_model`（K-means）、`buyer_segments`、`segment_profiles`（含 `AI.GENERATE` 群組描述）、`vendor_segment_mix`。也可以直接貼到 BigQuery 主控台跑。
+The SQL is in `functions/src/customerInsights.sql` (bundled with the functions). `customerInsights` runs it every Monday at 04:00 and produces `basket_pairs`, `buyer_features`, `buyer_segments_model` (k-means), `buyer_segments`, `segment_profiles` (with `AI.GENERATE` segment descriptions) and `vendor_segment_mix`. It can also be pasted into the BigQuery console.
 
-## Looker Studio 儀表板（P1）
+## Looker Studio dashboard (P1)
 
-執行 `sql/02_dashboard.sql` 建立儀表板用的 view（已於 2026-10-10 執行）。報表從管理後台「數據儀表板」的連結建立，嵌入網址貼回同一頁。
+Run `sql/02_dashboard.sql` to create the dashboard views (run on 2026-10-10). Create the report from the link on the admin console's Dashboard page, then paste the embed URL back on the same page.
 
-## 權限
+## Access
 
-`bunnbaa_analytics` 只開給管理員（BigQuery Data Viewer），Looker Studio 用管理員帳號連線。資料流描述同步寫在 `doc/ISMS_管理制度文件.md`。
+`bunnbaa_analytics` is shared with admins only (BigQuery Data Viewer); Looker Studio connects with an admin account. The data flow is also described in `doc/ISMS_管理制度文件.md`.

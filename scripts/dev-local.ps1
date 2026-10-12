@@ -28,17 +28,17 @@ $repo = Split-Path $PSScriptRoot -Parent
 $dataDir = Join-Path $repo ".emulator-data"
 
 if (-not (Test-Path $Junction)) {
-  Write-Host "找不到 junction $Junction，請先在 cmd 執行：" -ForegroundColor Red
+  Write-Host "Junction $Junction not found. Create it first in cmd with:" -ForegroundColor Red
   Write-Host "  mklink /J $Junction `"$repo`""
   exit 1
 }
 if (-not (Test-Path (Join-Path $repo "scripts\node_modules"))) {
-  Write-Host "安裝種子腳本相依套件…" -ForegroundColor Cyan
+  Write-Host "Installing seed script dependencies..." -ForegroundColor Cyan
   npm --prefix (Join-Path $repo "scripts") install
 }
 
 if ($Reset -and (Test-Path $dataDir)) {
-  Write-Host "清除本機 emulator 資料 $dataDir" -ForegroundColor Yellow
+  Write-Host "Clearing local emulator data $dataDir" -ForegroundColor Yellow
   Remove-Item -Recurse -Force $dataDir
 }
 
@@ -47,7 +47,7 @@ $hasExport = Test-Path (Join-Path $dataDir "firebase-export-metadata.json")
 $importArg = if ($hasExport) { "--import=.emulator-data" } else { "" }
 $emuCmd = "Set-Location '$Junction'; firebase emulators:start --only functions,firestore,auth --project $ProjectId $importArg --export-on-exit=.emulator-data"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $emuCmd | Out-Null
-Write-Host "emulator 啟動中（另一個視窗；關閉請在該視窗按 Ctrl+C，資料才會存檔）…" -ForegroundColor Cyan
+Write-Host "Starting the emulator in another window (stop it with Ctrl+C in that window so the data is saved)..." -ForegroundColor Cyan
 
 # ── 2. Wait for the Firestore / Auth emulators to be ready ──
 function Wait-Port([int]$port, [int]$timeoutSec = 120) {
@@ -64,41 +64,41 @@ function Wait-Port([int]$port, [int]$timeoutSec = 120) {
 }
 foreach ($port in 8080, 9099) {
   if (-not (Wait-Port $port)) {
-    Write-Host "emulator 在 port $port 逾時沒有回應，請看 emulator 視窗的錯誤訊息。" -ForegroundColor Red
+    Write-Host "The emulator did not respond on port $port in time; check the emulator window for errors." -ForegroundColor Red
     exit 1
   }
 }
-Write-Host "emulator 已就緒（UI：http://localhost:4000）" -ForegroundColor Green
+Write-Host "Emulator ready (UI: http://localhost:4000)" -ForegroundColor Green
 
 # ── 3. Seed data when there is no snapshot ──
 if (-not $hasExport) {
-  Write-Host "灌種子資料到 emulator…" -ForegroundColor Cyan
+  Write-Host "Seeding the emulator..." -ForegroundColor Cyan
   $env:FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080"
   $env:FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099"
   $env:GCLOUD_PROJECT = $ProjectId
   $env:GOOGLE_APPLICATION_CREDENTIALS = ""
   node (Join-Path $repo "scripts\seed.js")
   if ($LASTEXITCODE -ne 0) {
-    Write-Host "種子資料沒有灌入（若訊息是 locks already exist 代表已經有資料，可忽略）。" -ForegroundColor Yellow
+    Write-Host "Seed data was not loaded (if the message is 'locks already exist', the data is already there and this can be ignored)." -ForegroundColor Yellow
   }
   # 20 vendors × 10–20 items + orders from 100 members (on top of seed.js)
   node (Join-Path $repo "scripts\seed-scale.js")
   if ($LASTEXITCODE -ne 0) {
-    Write-Host "擴充種子資料沒有灌入（若訊息是 seed-user-001 already exists 代表已經有資料，可忽略）。" -ForegroundColor Yellow
+    Write-Host "Extra seed data was not loaded (if the message is 'seed-user-001 already exists', the data is already there and this can be ignored)." -ForegroundColor Yellow
   }
   # Phase 1 spec: templates, recipes, bentos, order history, wishes, reward pool (fixed ids, safe to rerun)
   node (Join-Path $repo "scripts\seed-phase1.js")
   if ($LASTEXITCODE -ne 0) {
-    Write-Host "第一階段種子資料沒有灌入，請看上面的錯誤訊息。" -ForegroundColor Yellow
+    Write-Host "Phase-1 seed data was not loaded; see the error above." -ForegroundColor Yellow
   }
 } else {
-  Write-Host "沿用上次存檔的 emulator 資料（要重灌請加 -Reset）" -ForegroundColor Green
+  Write-Host "Reusing the saved emulator data (add -Reset to reseed)" -ForegroundColor Green
 }
 
 # ── 4. Check the frontend points at the emulator, then start Vite on the Chinese path ──
 $envLocal = Join-Path $repo "web\.env.local"
 if (-not ((Test-Path $envLocal) -and (Select-String -Path $envLocal -Pattern "^VITE_USE_EMULATORS=true" -Quiet))) {
-  Write-Host "提醒：web\.env.local 沒有 VITE_USE_EMULATORS=true，前端會連正式站而不是 emulator。" -ForegroundColor Yellow
+  Write-Host "Note: web\.env.local does not set VITE_USE_EMULATORS=true, so the frontend will connect to production, not the emulator." -ForegroundColor Yellow
 }
 Set-Location (Join-Path $repo "web")
 npx vite

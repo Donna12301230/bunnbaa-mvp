@@ -14,12 +14,12 @@ param(
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path $Junction)) {
   $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-  Write-Host "找不到 junction $Junction，請先在 cmd 執行：mklink /J $Junction `"$repo`"" -ForegroundColor Red
+  Write-Host "Junction $Junction not found. Create it first in cmd with: mklink /J $Junction `"$repo`"" -ForegroundColor Red
   exit 1
 }
 # Config is firebase.test.json at the repo root (rules/functions paths can't be outside the config file's directory)
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$Junction'; firebase emulators:start --config firebase.test.json --only functions,firestore,auth --project demo-bunnbaa-test" | Out-Null
-Write-Host "測試 emulator 啟動中（另一個視窗）…" -ForegroundColor Cyan
+Write-Host "Starting the test emulator in another window..." -ForegroundColor Cyan
 
 $deadline = (Get-Date).AddSeconds(180)
 while ((Get-Date) -lt $deadline) {
@@ -35,4 +35,4 @@ Remove-Item Env:GOOGLE_APPLICATION_CREDENTIALS -ErrorAction SilentlyContinue
 Push-Location (Join-Path $Junction "scripts")
 node seed-phase1.js --catalog-only
 Pop-Location
-Write-Host "菜單與配方已灌入，可以跑 npm run test:functions。" -ForegroundColor Green
+Write-Host "Menus and recipes seeded; you can run npm run test:functions." -ForegroundColor Green

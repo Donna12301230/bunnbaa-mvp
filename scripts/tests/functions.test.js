@@ -161,7 +161,7 @@ const counterId = (v, d, w) => `slot_counters/${v}__${d}__${w}`;
 
 (async () => {
   // make sure the emulator is running
-  try { await db.doc("_ping/x").get(); } catch (e) { console.error(`連不到 Firestore emulator ${HOST}:${PORTS.firestore}，請先 npm run emulator`); process.exit(2); }
+  try { await db.doc("_ping/x").get(); } catch (e) { console.error(`Cannot reach the Firestore emulator at ${HOST}:${PORTS.firestore}; run npm run emulator first`); process.exit(2); }
 
   const uids = {
     A: await ensureUser("zz-a@bunnbaa.test"), B: await ensureUser("zz-b@bunnbaa.test"), C: await ensureUser("zz-c@bunnbaa.test"),

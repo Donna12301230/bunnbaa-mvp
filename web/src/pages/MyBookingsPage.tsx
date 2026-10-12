@@ -200,7 +200,7 @@ export default function MyBookingsPage() {
         snap.docs.forEach((d) => found.add(d.id));
       }
       if (!cancelled) setReviewedIds(found);
-    })().catch((err) => console.error("讀取評分紀錄失敗", err));
+    })().catch((err) => console.error("Failed to read ratings", err));
     return () => {
       cancelled = true;
     };

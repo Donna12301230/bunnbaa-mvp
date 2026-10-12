@@ -243,7 +243,7 @@ gcloud projects add-iam-policy-binding <your-project-id> \
 ### 1. Configure
 
 ```bash
-git clone [repo URL] && cd BunnBaa
+git clone https://github.com/Donna12301230/bunnbaa-mvp.git && cd bunnbaa-mvp
 firebase login
 firebase use <your-project-id>
 
@@ -297,7 +297,7 @@ npm run test:functions && npm run test:functions:more
 
 Results as of 12 Oct 2026: all 64 business-logic tests, all 65 Firestore security-rule tests and all 144 Cloud Functions tests pass (tests that depend on the time of day are skipped when run too early, e.g. the two-cutoff `lockOrders` test needs to run after 20:00 Taipei time).
 
-Pre-order assistant quality (`node scripts/eval/assistantEval.js`, 24 questions covering budgets, allergies, vegetarian, meal times, multi-day plans and English, 10 Oct 2026): 24/24 pass the rule checks (budget, allergens, excluded ingredients, meal period, weekday, no urgency wording) and the **Vertex AI Gen AI Evaluation Service** scores fulfillment 4.96/5 and groundedness 4.92/5. Report: [`doc/評估/預購助理回答品質評估.md`](doc/評估/預購助理回答品質評估.md).
+Pre-order assistant quality (`node scripts/eval/assistantEval.js`, 24 questions covering budgets, allergies, vegetarian, meal times, multi-day plans and English, 12 Oct 2026): 24/24 pass the rule checks (budget, allergens, excluded ingredients, meal period, weekday, no urgency wording) with zero allergen violations, and the **Vertex AI Gen AI Evaluation Service** scores fulfillment 4.79/5 and groundedness 4.96/5. Report: [`doc/assistant-evaluation.md`](doc/assistant-evaluation.md).
 
 ---
 

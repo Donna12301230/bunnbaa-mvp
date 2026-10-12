@@ -56,7 +56,7 @@ async function resolveProfile(u: User): Promise<UserProfile> {
         vendorId = snap.docs[0].id;
       }
     } catch (err) {
-      console.error("查詢店家綁定失敗", err);
+      console.error("Failed to look up vendor binding", err);
     }
   }
 
@@ -78,7 +78,7 @@ async function resolveProfile(u: User): Promise<UserProfile> {
     const snap = await getDoc(doc(db, "users", u.uid));
     if (snap.exists()) extra = snap.data();
   } catch (err) {
-    console.error("讀取個人資料失敗", err);
+    console.error("Failed to read profile", err);
   }
 
   const phone = extra.phone || u.phoneNumber || undefined;

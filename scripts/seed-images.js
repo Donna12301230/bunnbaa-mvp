@@ -142,7 +142,7 @@ async function searchPexels(query) {
     if (res.status === 429) {
       const reset = Number(res.headers.get("x-ratelimit-reset")) * 1000;
       const wait = Math.max(60_000, reset ? reset - Date.now() + 5_000 : 0);
-      console.log(`Pexels 額度用完，等 ${Math.round(wait / 60000)} 分鐘…`);
+      console.log(`Pexels quota used up, waiting ${Math.round(wait / 60000)} min...`);
       await sleep(wait);
       continue;
     }
@@ -203,7 +203,7 @@ async function resolveImage(manifest, used, key, query, vendorId) {
   if (!entry) {
     const photo = pickPhoto(await searchPexels(query), query, used);
     if (!photo) {
-      console.warn(`  ✗ ${key}：「${query}」找不到可用的圖`);
+      console.warn(`  ✗ ${key}: no usable image for "${query}"`);
       return null;
     }
     used.add(photo.id);
@@ -226,7 +226,7 @@ async function resolveImage(manifest, used, key, query, vendorId) {
 
 async function main() {
   if (!API_KEY) {
-    console.error("請先設定 PEXELS_API_KEY（https://www.pexels.com/api/ 免費申請）");
+    console.error("Set PEXELS_API_KEY first (free at https://www.pexels.com/api/)");
     process.exit(1);
   }
   const manifest = loadManifest();
@@ -265,11 +265,11 @@ async function main() {
   }
 
   if (DRY_RUN) {
-    console.log(`\n挑圖完成（dry run，沒有上傳也沒有寫 Firestore）：manifest 共 ${Object.keys(manifest).length} 筆。`);
+    console.log(`\nImages picked (dry run, nothing uploaded or written to Firestore): ${Object.keys(manifest).length} manifest entries.`);
     process.exit(0);
   }
-  console.log(`\n完成：${vendorCount} 家店家封面、${itemCount} 個品項圖。`);
-  if (missing.length) console.log(`沒有配到圖（${missing.length}）：${missing.join(", ")}`);
+  console.log(`\nDone: ${vendorCount} vendor covers, ${itemCount} item images.`);
+  if (missing.length) console.log(`No image matched (${missing.length}): ${missing.join(", ")}`);
   process.exit(0);
 }
 

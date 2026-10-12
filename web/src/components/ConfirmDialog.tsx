@@ -88,12 +88,12 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 
 export function useConfirm(): ConfirmFn {
   const confirm = useContext(ConfirmContext);
-  if (!confirm) throw new Error("useConfirm 必須在 <ConfirmProvider> 之內使用");
+  if (!confirm) throw new Error("useConfirm must be used inside <ConfirmProvider>");
   return confirm;
 }
 
 export function usePrompt(): PromptFn {
   const prompt = useContext(PromptContext);
-  if (!prompt) throw new Error("usePrompt 必須在 <ConfirmProvider> 之內使用");
+  if (!prompt) throw new Error("usePrompt must be used inside <ConfirmProvider>");
   return prompt;
 }

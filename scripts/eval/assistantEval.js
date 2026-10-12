@@ -209,7 +209,7 @@ async function pool(list, n, fn) {
     while (next < list.length) {
       const i = next++;
       out[i] = await fn(list[i]);
-      console.log(`${list[i].id} 完成（${out[i].seconds}s）違規 ${out[i].violations.length}、符合度 ${out[i].fulfillment.score}、有據性 ${out[i].grounded.score}`);
+      console.log(`${list[i].id} done (${out[i].seconds}s) violations ${out[i].violations.length}, fulfillment ${out[i].fulfillment.score}, groundedness ${out[i].grounded.score}`);
     }
   }));
   return out;
@@ -274,6 +274,6 @@ function report(results, startedAt) {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.writeFileSync(path.join(OUT_DIR, "assistant_eval_results.json"), JSON.stringify({ startedAt, results }, null, 2));
   fs.writeFileSync(path.join(OUT_DIR, "預購助理回答品質評估.md"), report(results, startedAt) + "\n");
-  console.log(`\n寫入 ${path.join(OUT_DIR, "預購助理回答品質評估.md")}`);
+  console.log(`\nWrote ${path.join(OUT_DIR, "預購助理回答品質評估.md")}`);
   process.exit(0);
 })();

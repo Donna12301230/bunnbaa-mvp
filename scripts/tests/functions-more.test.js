@@ -217,7 +217,7 @@ function geohash(lat, lng, precision = 7) {
 }
 
 (async () => {
-  try { await db.doc("_ping/x").get(); } catch { console.error(`連不到 Firestore emulator ${HOST}:${PORTS.firestore}，請先 npm run emulator`); process.exit(2); }
+  try { await db.doc("_ping/x").get(); } catch { console.error(`Cannot reach the Firestore emulator at ${HOST}:${PORTS.firestore}; run npm run emulator first`); process.exit(2); }
   OWNER_UID = await ensureUser("zz-owner@bunnbaa.test");
   const OWNER = await client("zz-owner@bunnbaa.test");
   console.log(`RUN=${RUN} TODAY=${TODAY} ${NOW_HM} OPEN_DAY=${OPEN_DAY}\n`);
