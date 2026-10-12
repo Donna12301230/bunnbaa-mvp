@@ -74,7 +74,7 @@
   - `customer@bunnbaa.test` 名下「A方案：五日輕食計畫」5 筆 locks：`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`（no_show，會被算進校準報告）、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`
   - `ban_appeals/lI5dGTVtIBfByBIUTy3W`
   - 仁和雅店主名下的份數測試訂單 `EJEL6PRO`（可選）
-- [ ] README 的數字：Functions 數量（README 寫 74，10/12 實數 79；最後再數一次：在 `functions/` 執行 `node -e "console.log(Object.keys(require('./src/index.js')).length)"`）、測試數字（logic 61、Functions 141，最後一次跑測試後更新）
+- [ ] README 的數字（**10/12 已更新一次**：README、Submission_EN、簡報都改成 Functions 79 支；測試 logic 61/61、rules 65/65、Functions 143/144（F-19 只能 20:00 後跑而跳過），是 emulator 實跑結果。之後再改程式要重數）：Functions 數量（最後再數一次：在 `functions/` 執行 `node -e "console.log(Object.keys(require('./src/index.js')).length)"`）、測試數字（logic 61、Functions 141，最後一次跑測試後更新）
 - [ ] 最後一次合併後確認 GitHub Actions 的 Hosting、Functions 部署都成功
 - [ ] **repo 目前是 private**：設成公開（或確認評審有權限），把 repo 網址給 B 填進 `Submission_EN.md`、README 與報名表單
 
@@ -174,7 +174,7 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 - [ ] 個資與內部文件：本檔有管理員 Email、成員本名與分工，`ISMS_管理制度文件.md`、`ISO27001_落差分析.md` 也是內部文件——公開前移出 repo 或至少拿掉 Email
 - [ ] `doc/` 的中文規格書、開發指南、`.docx`：移到私人位置，或在 README 註明 "internal notes, in Chinese"
 - [x] 程式碼註解翻成英文（`claude/amazing-dijkstra-uv5zcu`，263 個檔案；只動註解，去掉註解後的程式碼逐 token 比對相同；註解裡剩下的中文是程式實際輸出或比對的文字、畫面標籤、品牌名與中文檔名路徑）。**A、B 各自的分支要先合併 master，衝突都只會在註解行**
-- [ ] README 方括號：影片連結、PDF 連結、repo 網址；Functions 數量（README 寫 74，10/12 實數 79）、測試數字
+- [ ] README 方括號：影片連結、PDF 連結、repo 網址、demo 帳密（Functions 數量與測試數字 10/12 已更新）
 - [ ] 設成 public
 
 ### 送出前最後確認

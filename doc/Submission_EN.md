@@ -84,7 +84,7 @@ Every Firestore write streams into **BigQuery** (official *Stream Firestore to B
 - Analytics: **BigQuery** (`bunnbaa_analytics`, asia-east1) fed by the *Stream Firestore to BigQuery* extension; **BigQuery AI** `AI.FORECAST`, `ML.KMEANS`, `AI.GENERATE`; **Looker Studio** dashboard; forecasts and segments are written back to Firestore so the apps stay real-time.
 - Evaluation: **Vertex AI Gen AI Evaluation Service** (`evaluateInstances`) on a 24-question assistant test set.
 - Payments: LINE Pay request / confirm / refund (sandbox).
-- Quality: 61/61 business-logic tests and 141 Cloud Functions tests passing with none failing (as of 9 Oct 2026; 2 date-dependent tests are skipped when the next day is not a business day), plus Firestore security-rule tests.
+- Quality (12 Oct 2026): 61/61 business-logic tests, 65/65 Firestore security-rule tests, and 143 Cloud Functions tests passing with none failing (1 time-dependent test skipped: it needs to run after 20:00 Taipei time).
 
 ### Impact
 
@@ -96,7 +96,7 @@ Every Firestore write streams into **BigQuery** (official *Stream Firestore to B
 
 - **Running on Google Cloud today**: https://bunnbaa-mvp-5474.web.app, with 79 Cloud Functions (2nd gen, on Cloud Run) and daily BigQuery AI jobs, deployed automatically from GitHub Actions.
 - **All three roles are built end to end**: diner app (pre-order, pay, resell, gift, donate, QR pickup), vendor portal (photo-to-menu, prep and purchase lists, forecast, QR scanning, payouts), and admin console (vendor approval, platform settings, impact dashboard).
-- **Tested**: 61 business-logic tests, 141 Cloud Functions tests, Firestore security-rule tests, and a 24-question evaluation of the AI assistant (24/24 rule checks; Vertex AI Gen AI Evaluation Service scores 4.96/5 fulfillment, 4.92/5 groundedness).
+- **Tested**: 61 business-logic tests, 143 Cloud Functions tests, 65 Firestore security-rule tests, and a 24-question evaluation of the AI assistant (24/24 rule checks; Vertex AI Gen AI Evaluation Service scores 4.96/5 fulfillment, 4.92/5 groundedness).
 - **Real-world constraints handled**: LINE Pay request, confirm and refund flows; time-zone-aware cut-offs; refunds as platform points; usage limits on the AI assistant.
 - **Low adoption cost**: a vendor onboards with one photo of a paper menu and pays no monthly fee, only 5% per meal sold.
 
