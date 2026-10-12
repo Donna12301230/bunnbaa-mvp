@@ -41,7 +41,7 @@ const STATUS: Record<string, { zh: string; en: string; cls: string }> = {
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString()}`;
 
 /**
- * 回饋券（規格 §8、§9.3、§9.4）：累積淨營業額滿 1 萬元時以其中 5% 生成回饋池，拆成折價券抽獎，人人有獎；券發出後規則不可變更。
+ * 回饋券（規格 §8、§9.3、§9.4）：累積淨營業額滿 1 萬元時以其中 10% 生成回饋池，拆成折價券抽獎，人人有獎；券發出後規則不可變更。
  * 一眼看：流通中負債（大字）、距離開池進度、券的去向色條、本期各券種剩餘、每週回饋池長條；查詢、匯出、暫停收在「工具」。
  */
 export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {
@@ -130,10 +130,10 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
     }
   }
 
-  const rewardPct = Math.round((config?.rewardRate ?? 0.05) * 100);
+  const rewardPct = Math.round((config?.rewardRate ?? 0.1) * 100);
   const minRevenue = status?.min_revenue ?? config?.minRevenueToOpen ?? 10000;
   const revenueSoFar = status?.revenue_so_far ?? Math.max(0, minRevenue - (status?.amount_to_open ?? minRevenue));
-  const preview = allocatePool(Math.floor(100000 * (config?.rewardRate ?? 0.05)), 800);
+  const preview = allocatePool(Math.floor(100000 * (config?.rewardRate ?? 0.1)), 800);
   const flow = [
     { key: "redeemed", label: tr("已兌現", "Redeemed"), v: m.redeemedAll, cls: "bg-success-strong" },
     { key: "owned", label: tr("還在客人手上", "Outstanding"), v: m.liability, cls: "bg-brand" },

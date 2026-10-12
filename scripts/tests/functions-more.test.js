@@ -329,7 +329,7 @@ function geohash(lat, lng, precision = 7) {
     eq((await get(`vendors/${VR}/rewardPeriods/${mondayOf(TODAY)}`)).carried_tickets, 60, "重跑不應再結轉一次");
   });
 
-  await test("C-RWD-04 C-RWD-17", "100,000 元、1,000 張實際開池（回饋 5%）：回饋池 5,000 剛好是保底、全部九五折券；重跑不重複發券", async () => {
+  await test("C-RWD-04 C-RWD-17", "§8.4 範例（100,000 元、1,000 張，回饋 10%）實際開池：分配、leftover、發 1,000 張券；重跑不重複發券", async () => {
     const VP = await mkVendor(vid("pool"));
     let batch = db.batch();
     for (let i = 0; i < 1000; i++) {
@@ -340,8 +340,8 @@ function geohash(lat, lng, precision = 7) {
     await db.doc(`vendors/${VP}/rewardPeriods/${P}`).set({ period_id: P, net_revenue: 100000, tickets: 1000 });
     eq(expectOk(await OWNER.call("triggerRewardPeriodNow", { vendor_id: VP, period_id: P }))[VP], "pooled");
     const p = await get(`vendors/${VP}/rewardPeriods/${P}`);
-    eq(p.pool, 5000); eq(p.leftover, 0);
-    eq(Object.fromEntries(Object.entries(p.allocation).sort()), { free: 0, t50: 0, t95: 1000 });
+    eq(p.pool, 10000); eq(p.leftover, 20);
+    eq(Object.fromEntries(Object.entries(p.allocation).sort()), { free: 15, t50: 79, t95: 906 });
     const issued = await db.collection("coupons").where("vendor_id", "==", VP).where("pool_period", "==", P).get();
     eq(issued.size, 1000, "發出的券");
     const drawable = await db.collection("rewardTickets").where("vendor_id", "==", VP).where("status", "==", "drawable").get();

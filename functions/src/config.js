@@ -27,8 +27,9 @@ const DEFAULT_PLATFORM_CONFIG = {
   candidateMinQty: 10, // 店家可調
   openWishThreshold: 20, // 近 30 天 20 人
   openWishWindowDays: 30,
-  // 成長獎勵（2026-10-05 改版）：累積淨營業額滿 1 萬元開池，回饋 5% 變成折價券給持抽獎券的人抽
-  rewardRate: 0.05,
+  // 成長獎勵（2026-10-05 改版）：累積淨營業額滿 1 萬元開池，回饋 10% 變成折價券給持抽獎券的人抽
+  // （回饋比例 10/05 曾討論改 5%，2026-10-12 決定維持 10%）
+  rewardRate: 0.1,
   ticketUnit: 100, // 每 100 元一張抽獎券
   minRevenueToOpen: 10000,
   drawWindowDays: 7,
