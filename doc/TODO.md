@@ -144,9 +144,9 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 
 ### 簡報素材
 - [ ] 團隊頁：三位成員英文拼音姓名＋角色（照片可選）
-- [ ] 架構圖 `assets/architecture.png`：Google Cloud 官方圖示，標明「Cloud Functions 2nd gen on Cloud Run」
-- [ ] 剩食數據：UNEP *Food Waste Index Report 2024*（10.5 億噸、19%、餐飲服務業 2.9 億噸）核對原文；要加台灣數據的話附出處
-- [ ] Feasibility、Scalability 兩頁：內容照 `Submission_EN.md` 第 1 節
+- [x] 架構圖 `assets/architecture.png`（原始檔 `assets/architecture.html`，已嵌進兩份 README）：五層架構，標明「79 Cloud Functions, 2nd gen」跑在 Cloud Run。沒有用官方圖示（這裡抓不到）；要換官方圖示版再用 Google Cloud 架構圖工具重畫
+- [ ] 剩食數據：UNEP *Food Waste Index Report 2024*（10.5 億噸、19%、餐飲服務業 2.9 億噸）**已放進簡報第 2 頁與 README**，請核對原文；要加台灣數據的話附出處
+- [x] Feasibility、Scalability 兩頁：簡報第 13、15 頁已有；封面與結尾頁領域已改成 Sustainability
 - [ ] 截圖（下方清單）
 
 ### 截圖清單（簡報與 README 共用，存 `assets/`）
@@ -157,7 +157,7 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 - [ ] `assets/demo.gif`（約 10 秒）
 
 ### 影片
-- [ ] 英文旁白（自錄或 TTS）＋英文字幕 `.srt`（從腳本旁白改）
+- [ ] 英文旁白（自錄或 TTS）＋英文字幕：初稿 `doc/demo_captions.srt` 已從腳本產生，剪完片要重新對時間
 - [ ] 錄影前準備：紙本／手寫菜單一張（拍照建菜單用）、兩支手機（QR 掃碼、轉讓推播）
 - [ ] 帳號：消費者 A、消費者 B（先鎖一份類似的菜，轉讓媒合才會觸發）、商家
 - [ ] 至少一筆「明天」的已鎖定訂單（備料清單才有東西）、LINE Pay Sandbox 付款帳號
@@ -166,7 +166,7 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 
 ### 評審用 demo 帳號（正式站）
 - [ ] 建 Demo Diner（消費者）、Demo Vendor（商家，綁一家有菜單與訂單的店），英文名稱；**不給管理員帳號**（可改平台參數、觸發退款）
-- [ ] 帳密寫進表單備註或 README 的「Try it」段落
+- [ ] 帳密寫進表單備註或 README 的「Try it」段落（兩份 README 的段落已建好，只剩填帳密）
 - [ ] 無痕視窗、未登入狀態把三個角色流程各走一次
 
 ### repo 公開前
