@@ -152,6 +152,9 @@ export default function VendorPortalSettings() {
       if (!Number.isInteger(capacity) || capacity < 0 || capacity > 10000) {
         throw new Error(tr("份數上限請填 0～10000 的整數（空白或 0 代表不限）", "The limit must be a whole number from 0 to 10000 (blank or 0 means no limit)"));
       }
+      // firestore.rules only accepts https cover URLs; check here first, otherwise the user only sees PERMISSION_DENIED
+      if (coverImage && !coverImage.trim().startsWith("https://")) throw new Error(tr("封面圖網址要以 https:// 開頭", "The cover image URL must start with https://"));
+      if (coverImage.length > 500) throw new Error(tr("封面圖網址太長（最多 500 字）", "The cover image URL is too long (500 characters max)"));
       if (holidays.length > MAX_HOLIDAYS) throw new Error(tr(`公休日最多 ${MAX_HOLIDAYS} 天`, `At most ${MAX_HOLIDAYS} closing days`));
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoffTime) || cutoffTime > liveConfig().cutoffTime) {
         throw new Error(tr(`截單時間只能提前，不能晚於前一天 ${liveConfig().cutoffTime}`, `Cutoff can only be earlier than ${liveConfig().cutoffTime}`));

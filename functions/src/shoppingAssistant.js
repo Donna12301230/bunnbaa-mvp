@@ -58,6 +58,28 @@ const S = (description) => ({ type: "STRING", description });
 const N = (description) => ({ type: "NUMBER", description });
 const LIST = (description) => ({ type: "ARRAY", items: { type: "STRING" }, description });
 
+// Card recommendation reasons: at most 20 characters in Chinese or 40 in English; urgency or marketing wording is always rejected
+const REASON_MAX = { zh: 20, en: 40 };
+const PRESSURE = /手刀|快搶|搶購|限時|趕快|錯過|售完|最後機會|很多人訂|熱銷|爆單|hurry|don't miss|limited|selling fast|popular/i;
+
+/** The chat bubble is plain text: the model sometimes uses Markdown (**bold**, # headings), so strip the symbols */
+const plainText = (text) => String(text || "")
+  .replace(/\*\*(.+?)\*\*/g, "$1")
+  .replace(/__(.+?)__/g, "$1")
+  .replace(/^#{1,6}\s+/gm, "")
+  .replace(/^\s*[*-]\s+/gm, "・");
+
+/**
+ * Recommendation reasons from the model. Accepted only for vendors where getVendorInsights actually found data this turn (forecast or frequently bought together);
+ * reasons for other vendors aren't backed by tool data and are dropped; overlong or urgent ones are dropped too, and the card shows no reason.
+ */
+function cardReason(text, vendorId, insightVendors, lang) {
+  const reason = plainText(text).trim();
+  if (!reason || !insightVendors?.has(vendorId)) return null;
+  if ([...reason].length > (REASON_MAX[lang] || REASON_MAX.zh) || PRESSURE.test(reason)) return null;
+  return reason;
+}
+
 const FUNCTION_DECLARATIONS = [
   {
     name: "searchMenuItems",
@@ -127,6 +149,18 @@ const FUNCTION_DECLARATIONS = [
         suggestedDates: LIST("建議的取餐日期 YYYY-MM-DD（依使用者需求，可空）"),
         suggestedWindow: S("建議的取餐時段，例如「12:00-12:30」（可空）"),
         mealPeriod: S(`${PERIOD_ARG}（使用者有指定餐期時填）`),
+        reasons: {
+          type: "ARRAY",
+          description: "（可空）品項卡上的一句推薦理由，只能根據 getVendorInsights 查到的資料：預估比平常少（vs_usual 是 quieter）、常一起買的配對。沒有根據就不要給",
+          items: {
+            type: "OBJECT",
+            properties: {
+              id: S("menuItemIds 裡的品項 id"),
+              reason: S("中文 20 字內、英文 40 字元內，例如「預估比平常不擁擠」「常跟滷蛋一起點」；不催促"),
+            },
+            required: ["id", "reason"],
+          },
+        },
       },
       required: ["reply"],
     },
@@ -141,12 +175,13 @@ function systemInstruction({ lang, today, dates, area, taste, config }) {
 - 只推薦工具查到的品項與方案，不要編造店名、價格、id；查不到就老實說，並建議放寬哪個條件。
 - 你不能幫使用者下單或付款，只提供候選；價格以結帳時伺服器計算為準。
 - 語氣平實，不催促、不使用行銷語句（例如「手刀」「快搶」「限時」）。
+- reply 是純文字，畫面不支援 Markdown：不要用 **粗體**、# 標題；要列點就用「・」或「1.」。
 - 有指定日期時，用 checkAvailability 確認推薦的品項那幾天能訂（最多查 3 個品項）；額滿、公休或已截單的要避開或說明。
 - 「不吃牛」之類的需求用 excludeKeywords 帶具體詞（牛肉、牛腩、牛排）；素食用 dietaryTags。
 - searchMenuItems 一次把已知條件帶齊（地區、預算、餐期、星期、不吃的食材），換關鍵字最多再查 3 次，不要一個條件查一次。
 - 「一週／連續幾天」的需求，也查 searchMealPlans；方案也要符合使用者要的餐期（看方案內容與 vendor_focus，例如早餐店、飲料店的方案不適合當午餐正餐）。
 - 「常一起買」是兩個特定品項的配對，只能套用在配對裡的那兩個品項，不要套到同店的其他品項。
-- 候選來自好幾家店、而且有指定日期時，可以用 getVendorInsights 看各店當天的預估份數與常一起買的品項：差不多的候選可以把預估份數相對平常較少的店排前面，或補一句常一起點的品項。預估只是參考，不要說成一定，也不要用「很多人訂」來催促。
+- 候選來自好幾家店、而且有指定日期時，可以用 getVendorInsights 看各店當天的預估份數與常一起買的品項：差不多的候選可以把預估份數相對平常較少的店排前面，或補一句常一起點的品項。預估只是參考，不要說成一定，也不要用「很多人訂」來催促。有查 getVendorInsights 的話，presentCandidates 可以用 reasons 給卡片一句推薦理由（例如預估比平常不擁擠、常跟某品項一起點），只寫工具資料有的事；理由用${lang === "en" ? "英文" : "繁體中文"}。
 - 使用者說早餐、午餐、晚餐（或「明天晚上」「早上」）時，searchMenuItems、checkAvailability、presentCandidates 都要帶 mealPeriod；沒說就不要帶。
 - 使用者在對話裡提到的過敏或不吃的東西，要用 excludeKeywords 帶具體食材詞；查到的 allergens 欄位跟他說的過敏原相符就不要推薦。
 - allergens 是空陣列代表「店家沒有標示」，不是「不含」：不能說某品項不含某過敏原。使用者有過敏時，優先推薦有標示過敏原、而且不含他的過敏原的品項；按常識很可能含有的不要推薦（例如麩質過敏不推麵衣炸物、麵、麵包，大豆過敏不推醬油滷味、豆製品，蛋過敏不推蛋餅、滷蛋）；沒有把握的選項要說清楚需向店家確認，找不到確定安全的就老實說。
@@ -281,7 +316,7 @@ async function checkDates(item, vendor, dates, config, now = new Date(), period 
   return out;
 }
 
-function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set() }) {
+function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set(), insightVendors = new Set() }) {
   return {
     async searchMenuItems(args) {
       const period = periodArg(args.mealPeriod);
@@ -345,6 +380,8 @@ function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set
           vendorRef.collection("analytics").doc("basket").get(),
         ]);
         const forecast = forecastSnap.docs.map((d) => d.data());
+        // Only vendors with a forecast or pairs found can carry a recommendation reason on their cards (cardReason)
+        if (forecast.length || basketSnap.data()?.pairs?.length) insightVendors.add(vendorId);
         // "Relative to usual": compared with this vendor's 7-day forecast average, so the model doesn't have to compute it
         const avg = forecast.length ? forecast.reduce((sum, f) => sum + (f.forecast || 0), 0) / forecast.length : null;
         const byName = new Map();
@@ -411,12 +448,13 @@ function toolHandlers({ loadCatalog, taste, config, availability, seen = new Set
  * 2026-10-09 added two guards: only accept items that searchMenuItems actually returned this turn (seen),
  * and filter the member's allergens once more, rather than relying on the model to remember.
  */
-async function buildCards(finish, loadCatalog, availability, lang, config, now = new Date(), { seen = null, taste = null } = {}) {
+async function buildCards(finish, loadCatalog, availability, lang, config, now = new Date(), { seen = null, taste = null, insightVendors = null } = {}) {
   const { vendors, items, plans } = await loadCatalog();
   const en = lang === "en";
   const pick = (v, key) => (en && v?.[`${key}_en`]) || v?.[key] || "";
   const suggestedDates = (Array.isArray(finish.suggestedDates) ? finish.suggestedDates : []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
   const period = periodArg(finish.mealPeriod);
+  const reasonOf = new Map((Array.isArray(finish.reasons) ? finish.reasons : []).filter((r) => r && r.id).map((r) => [String(r.id), r.reason]));
   const cards = [];
   for (const id of [...new Set(Array.isArray(finish.menuItemIds) ? finish.menuItemIds : [])]) {
     const item = items.get(String(id));
@@ -453,6 +491,7 @@ async function buildCards(finish, loadCatalog, availability, lang, config, now =
       early_bird_percent: earlyBird?.discountPercent ?? 0,
       open_dates: open.map((c) => c.date),
       closed_dates: checked.filter((c) => !c.available).map((c) => c.date),
+      reason: cardReason(reasonOf.get(item.id), item.vendor_id, insightVendors, lang),
     });
   }
   for (const id of [...new Set(Array.isArray(finish.mealPlanIds) ? finish.mealPlanIds : [])].slice(0, 3)) {
@@ -525,7 +564,8 @@ async function runAssistant({ messages, lang, area, taste, now = new Date(), onT
   const loadCatalog = catalogLoader();
   const availability = new Map();
   const seen = new Set(); // item ids returned by the search tool this turn
-  const handlers = toolHandlers({ loadCatalog, taste, config, availability, seen });
+  const insightVendors = new Set(); // vendors getVendorInsights found data for this turn
+  const handlers = toolHandlers({ loadCatalog, taste, config, availability, seen, insightVendors });
   if (onToolCall) {
     for (const [name, fn] of Object.entries(handlers)) {
       handlers[name] = async (args) => {
@@ -547,8 +587,8 @@ async function runAssistant({ messages, lang, area, taste, now = new Date(), onT
   });
 
   const finish = result.finish || { reply: result.text, menuItemIds: [], mealPlanIds: [] };
-  const cards = await buildCards(finish, loadCatalog, availability, lang, config, now, { seen, taste });
-  const reply = String(finish.reply || "").trim().slice(0, 1200)
+  const cards = await buildCards(finish, loadCatalog, availability, lang, config, now, { seen, taste, insightVendors });
+  const reply = plainText(finish.reply).trim().slice(0, 1200)
     || t("抱歉，這次沒找到合適的選項，可以換個條件再問一次。", "Sorry, I couldn't find a good match. Try different conditions.");
   return { reply, cards, config, loadCatalog };
 }
@@ -599,4 +639,4 @@ exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" },
   return { reply, cards, disclaimer };
 });
 
-module.exports.helpers = { toolHandlers, buildCards, checkDates, basePrice, catalogLoader, runAssistant, loadTaste, itemText };
+module.exports.helpers = { toolHandlers, buildCards, cardReason, plainText, checkDates, basePrice, catalogLoader, runAssistant, loadTaste, itemText };

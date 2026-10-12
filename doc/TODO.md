@@ -34,18 +34,23 @@
 ## 🔴 工程師 A：消費者端＋後端／Google Cloud
 
 ### 10/12–10/13 正式站資料（先做，C-MY-03 等測試要等這步）
-- [ ] **部署 `firestore:rules,firestore:indexes`**：10/05 之後的規則都還沒手動部署過——BUG-9 轉讓期限 31 天（沒部署前上架 24 小時以後的餐點會 PERMISSION_DENIED）、轉讓價 `resale_price`、目錄分類、`wallets`／代領碼 `proxyCodes` 規則、`holds` collectionGroup 索引、`menu_embeddings` 向量索引
-- [ ] 部署索引後，管理員呼叫一次 `backfillMenuEmbeddings`（轉讓媒合才找得到既有品項）
+- [x] **部署 `firestore:rules,firestore:indexes`**：10/05 之後的規則都還沒手動部署過——BUG-9 轉讓期限 31 天（沒部署前上架 24 小時以後的餐點會 PERMISSION_DENIED）、轉讓價 `resale_price`、目錄分類、`wallets`／代領碼 `proxyCodes` 規則、`holds` collectionGroup 索引、`menu_embeddings` 向量索引（10/12 完成：rules 其實已是最新版、這次上的是索引；18 個索引全部 READY）
+- [x] 部署索引後，管理員呼叫一次 `backfillMenuEmbeddings`（轉讓媒合才找得到既有品項）（10/12 完成：updated 253、unchanged 8、failed 0）
 - [ ] 正式站灌 `node scripts/seed-phase1.js`（或 `--catalog-only` 只灌模板與配方）——需要服務帳號金鑰
 - [ ] 確認 09-29 的補設定資料做過沒：`$env:GOOGLE_APPLICATION_CREDENTIALS="金鑰檔路徑"; node scripts/seed.js --config-only`（沒做的話 Landing「近期活動」是空的）
-- [ ] Firebase Console 確認排程都有啟用並成功跑過：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`、`closeRewardPeriod`、`buildWeeklyPurchase`、`pollDisasterFeeds`、`releaseStalePointHolds`、`settleVendorPayouts`、`dailyCalibration`、`demandForecast`（每天 05:00）、`customerInsights`（週一 04:00）
-- [ ] BigQuery：四個 extension 的 changelog 有最新時間的資料；`bunnbaa_analytics` dataset 權限只給管理員
-- [ ] 刪掉 `functions/.env` 的 `GEMINI_API_KEY`，`gh secret set FUNCTIONS_ENV < functions/.env`；`doc/AI功能設計.md`、`doc/測試文件.md` 裡還提到 `GEMINI_API_KEY` 的地方改成 Vertex 說法
+- [x] ~~Firebase Console 確認排程都有啟用並成功跑過~~（10/12 查 Cloud Scheduler：21 個排程都 ENABLED、最近都有跑；`dailyCalibration` 顯示 code 4 是因為整輪約 11 分鐘超過 Scheduler 等待期限，21 家報告其實都有產生）：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`、`closeRewardPeriod`、`buildWeeklyPurchase`、`pollDisasterFeeds`、`releaseStalePointHolds`、`settleVendorPayouts`、`dailyCalibration`、`demandForecast`（每天 05:00）、`customerInsights`（週一 04:00）
+- [x] BigQuery：四個 extension 的 changelog 有最新時間的資料；`bunnbaa_analytics` dataset 權限只給管理員（10/12 查：locks 當天有同步；dataset 只有專案擁有者 2 人與服務帳號）
+- [x] 刪掉 `functions/.env` 的 `GEMINI_API_KEY`（10/12 本機已刪、文件已改成 Vertex 說法），**還沒做**：`gh secret set FUNCTIONS_ENV < functions/.env`（正式站 log 仍出現「API key from the environment variables」）（10/12 完成：`FUNCTIONS_ENV` secret 已更新並重新部署）
 
 ### 10/12–10/13 Google Cloud 補強收尾
-- [ ] **常一起買**（目前不會出現：前端讀 `menu_items/{id}.often_with`，後端沒寫）：`customerInsights.js` 寫完 `analytics/basket` 後，把每個品項的配對（依 `buyers` 排序、同店、最多 5 個 id）寫到 `menu_items/{id}.often_with`；內容沒變就不要寫（會觸發翻譯與向量觸發器的檢查），配對消失時要清掉。補單元測試，重跑 `triggerCustomerInsightsNow`，到正式站品項頁確認有出現
-- [ ] **助理推薦理由**（目前不會出現：`presentCandidates` 沒有這個參數）：加參數（例如 `reasons`：`[{ id, reason }]`，每則 20 字內、不催促），`buildCards` 填進卡片的 `reason`；只放有工具資料根據的理由（busier／quieter、常一起買）。前端標籤 `ShoppingAssistant.tsx` 已經有。改完重跑 `scripts/eval/assistantEval.js`，規則檢查要仍是 24/24，更新 `doc/評估/預購助理回答品質評估.md`
-- [ ] 正式站實際問一次預購助理（「想挑比較不會排隊的店，順便推薦加點」），確認走 Vertex、卡片有推薦理由
+- [x] **常一起買**（10/12 程式＋單元測試 F-24 完成；**還沒做**：合併部署後重跑 `triggerCustomerInsightsNow`、正式站品項頁確認）（原本不會出現：前端讀 `menu_items/{id}.often_with`，後端沒寫）：`customerInsights.js` 寫完 `analytics/basket` 後，把每個品項的配對（依 `buyers` 排序、同店、最多 5 個 id）寫到 `menu_items/{id}.often_with`；內容沒變就不要寫（會觸發翻譯與向量觸發器的檢查），配對消失時要清掉。補單元測試，重跑 `triggerCustomerInsightsNow`，到正式站品項頁確認有出現（10/12 完成：重算後 152 個品項有 often_with，正式站品項頁已出現）
+- [x] **助理推薦理由**（10/12 完成：`reasons` 參數＋伺服器 `cardReason` 把關，C-AST-20；評估 24/24、13 張卡片有理由，抽查都對得上真實配對）（原本不會出現：`presentCandidates` 沒有這個參數）：加參數（例如 `reasons`：`[{ id, reason }]`，每則 20 字內、不催促），`buildCards` 填進卡片的 `reason`；只放有工具資料根據的理由（busier／quieter、常一起買）。前端標籤 `ShoppingAssistant.tsx` 已經有。改完重跑 `scripts/eval/assistantEval.js`，規則檢查要仍是 24/24，更新 `doc/評估/預購助理回答品質評估.md`
+- [x] 正式站實際問一次預購助理（「想挑比較不會排隊的店，順便推薦加點」），確認走 Vertex、卡片有推薦理由（10/12 完成：正式站卡片出現「常跟火雞肉飯一起點」等理由）
+
+### B 測試時發現、交給 A（2026-10-12）
+- [ ] **已從店家設定移除的取餐時段，上面的訂單不進備料時間軸**：示範店 10/12 有 2 筆 17:30–18:30（晚餐）訂單，但店家目前沒有晚餐時段，`prepPlans.timelines` 只有早餐、午餐，這 2 筆沒有排進任何時間軸（`order_count` 有算到）。商家後台的時段格子 B 已改成照樣列出並標「已停用」
+- [ ] **模板候選菜數量**：「經典便當」模板說明寫每格 3 道候選菜，套用後第二格 0 道、第三格 1 道（`seed-phase1.js` 的模板資料）
+- [ ] **常一起買要轉成品項 id**：`analytics/basket` 的 `item_a`／`item_b` 是品項名稱，品項頁讀的 `menu_items.often_with` 要的是品項 id，寫入時要對回 id
 
 ### 10/13–10/15 消費者端測試（[測試文件.md](測試文件.md)，測完直接改該案例的結果欄）
 - [ ] **P0**：C-AST-01／02（正式站；現在不需要 Gemini 金鑰）
@@ -74,7 +79,7 @@
   - `customer@bunnbaa.test` 名下「A方案：五日輕食計畫」5 筆 locks：`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`（no_show，會被算進校準報告）、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`
   - `ban_appeals/lI5dGTVtIBfByBIUTy3W`
   - 仁和雅店主名下的份數測試訂單 `EJEL6PRO`（可選）
-- [ ] README 的數字（**10/12 已更新一次**：README、Submission_EN、簡報都改成 Functions 79 支；測試 logic 61/61、rules 65/65、Functions 143/144（F-19 只能 20:00 後跑而跳過），是 emulator 實跑結果。之後再改程式要重數）：Functions 數量（最後再數一次：在 `functions/` 執行 `node -e "console.log(Object.keys(require('./src/index.js')).length)"`）、測試數字（logic 61、Functions 141，最後一次跑測試後更新）
+- [ ] README 的數字（10/12 已更新：Functions 79、logic 64、rules 65、Functions 測試 144；README、Submission_EN、簡報都已改。最後一次跑測試後再核對）：Functions 數量（最後再數一次：在 `functions/` 執行 `node -e "console.log(Object.keys(require('./src/index.js')).length)"`）、測試數字
 - [ ] 最後一次合併後確認 GitHub Actions 的 Hosting、Functions 部署都成功
 - [ ] **repo 目前是 private**：設成公開（或確認評審有權限），把 repo 網址給 B 填進 `Submission_EN.md`、README 與報名表單
 
@@ -85,21 +90,22 @@
 B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家與管理後台的測試不受 rules 部署影響。
 
 ### 10/12–10/13 Google Cloud 補強收尾
-- [ ] **預測卡重複**：營收頁同時放了 `ForecastCard` 和 `DemandForecastCard`（都讀 `vendors/{v}/forecast`），留一張
-- [ ] **客群卡永遠是空的**：`SegmentsCard`（區域分頁）讀 `vendors/{v}/segments/{id}` 集合，後端寫的是 `vendors/{v}/analytics/segments` 單一文件（陣列、欄位 `label`）。改讀正確位置，或直接刪掉、只留 `CustomerInsightsCard`；`analytics.ts` 跟著清掉沒用的型別與查詢。正式站用仁和雅確認卡片有資料、手機版面正常
+- [x] **預測卡重複**（10/12 `64f884c`）：拿掉 `ForecastCard`（讀 `date`／`predicted`，跟後端格式對不上），營收頁只留 `DemandForecastCard`
+- [x] **客群卡永遠是空的**（10/12 `64f884c`）：拿掉 `SegmentsCard`，客群只由 `CustomerInsightsCard` 顯示（讀 `vendors/{v}/analytics/segments`）
 - [ ] **Looker Studio 報表**（只能手動）：管理後台 `/admin/analytics` 按「在 Looker Studio 建立報表」→ 加入 `dash_forecast_vs_actual`、`dash_forecast_next`、`dash_segments` 三個 view → 排圖表（每日鎖定量、預測 vs. 實際、救回份數＝轉讓＋愛心餐、客群分布）→ 檔案 → 嵌入報表 → 開啟嵌入，把嵌入網址貼回管理後台存檔，正式站確認嵌入有顯示
 
 ### 10/12–10/13 正式站設定
-- [ ] **檢查 `platformConfig/global`**（文件裡的值會蓋過程式預設）：`rewardRate` 0.05、`minRevenueToOpen` 10000、`cancelHoursBefore` 48、`cancelCouponRate` 0.3、`commissionRate` 0.05；不對就到管理後台「平台參數」改
+- [x] **檢查 `platformConfig/global`**（2026-10-12 查正式站）：`rewardRate` 是 0.1，**SU 決定維持 10%**，程式預設值、規格、測試已改回 10%；`minRevenueToOpen` 10000、`cancelHoursBefore` 48、`cancelCouponRate` 0.3、`commissionRate` 0.05 文件裡沒存，走程式預設，管理後台顯示的值都正確。舊欄位 `minTicketsToOpen: 100` 還留在文件裡，已不使用
 - [ ] 補翻既有資料：管理後台 → 系統設定 →「補翻既有資料」，有失敗筆數就再按一次；做完切英文看店名／菜名
 - [ ] 幫一家店設公休日（A 測「加入計畫」預覽要用）
 
 ### 10/13–10/15 商家與管理後台測試（[測試文件.md](測試文件.md)，測完直接改該案例的結果欄）
 - [ ] **P0**：V-MNU-08／09（正式站；現在不需要 Gemini 金鑰）、V-RDM-10（正式站）
-- [ ] **整區沒測**：4.4 菜單管理（V-MNU-01～05、07～15、17）、4.5 店家設定（V-SET-01、04～08、11、12）、4.7 配方（V-RCP-01～08）、4.3 時段與訂單（V-SES-01／02、V-ORD-01～03、V-PRP-04／06／07／08／10／12／16）、5 管理後台（A-VND、A-SET、A-AUD、A-DSH）
-- [ ] 前景分頁複測畫面：V-RPT-01 圖表總額＝卡片、V-PRP-01 另一視窗下單後份數自動 +1
-- [ ] **v4 改版待重測**：V-PRP-17（伺服器＋畫面）
-- [ ] **伺服器 PASS、畫面待測**：V-PRP-11、V-CHR-03、V-INS-02（要一家附近不到 20 人的店）、V-SET-03（上限 12 個）、A-CFG-01（前台文字跟著變）
+- [x] **整區沒測**（2026-10-12 emulator 補測）：V-SES-01／02、V-ORD-01～03、V-PRP-01／06／08／10／12／16、V-MNU-02／04／05／07、V-SET-06／07／11／12、V-RCP-06～08 PASS。過程修了 3 個 bug：時段格子漏掉已停用時段的訂單、封面網址只顯示權限錯誤、改單價沒有重算候選菜份量級距
+- [ ] **還沒測（emulator 關閉 Gemini，要在正式站測）**：V-MNU-03（自動翻譯）、V-MNU-08～13（拍照上架）、V-MNU-17（向量）、V-RCP-04（AI 配方草稿）、V-PRP-07（what-if 追問）；其餘：V-MNU-15（權限）、V-RCP-05（自動標籤）、V-PRP-04（同星期幾）、V-SET-08（設定生效時機）
+- [x] 前景分頁複測畫面：V-RPT-01 圖表總額＝卡片、V-PRP-01 另一視窗下單後份數自動 +1（2026-10-12 emulator PASS）
+- [x] **v4 改版待重測**：V-PRP-17（伺服器＋畫面）（2026-10-12 emulator PASS；已移除時段上的訂單不進時間軸，已轉給 A）
+- [x] **伺服器 PASS、畫面待測**：V-CHR-03、V-INS-02、A-CFG-01 前台文字（2026-10-12 emulator PASS）；V-PRP-11 畫面只核對了飯量、V-SET-03 上限 12 只做程式確認
 - [ ] **只能在正式站測**：V-RDM-13／14／16、V-MNU-10、V-PUR-08、V-REV-06、A-SET-02、A-AUD-01、A-DIS-08
 - [ ] **需要第二家店主**（目前正式站只有仁和雅有店主帳號；綁法：廠商申請 → `/admin/vendors` 核准）：
   - V-ACC-02、V-RDM-09、V-MNU-06；第二家店主看商家後台各頁只看得到自己的資料
@@ -194,7 +200,7 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 - [ ] **取消留在店家的款項（`locks.kept_amount`）怎麼入帳**：目前會跟著撥款撥給店家並照抽 5%，但**不算進收益看板與統計報表的營收**（那邊只算沒取消的訂單）。要不要算、要不要抽成
 - [ ] **取消不退現金的法律面**：現做餐點可排除 7 天猶豫期，但「取餐 48 小時前取消也不退現金」是否符合消保法與定型化契約規範，上線前確認；條款文字在 `TermsNotices.tsx`（10/09 起退款一律改成平台點數，條款要跟著核對）
 - [ ] **轉讓價高於轉讓人實付時**：多出來的錢留在店家（LINE Pay 退款不能超過原付款額），轉讓人不會獲利。如果希望轉讓人拿到差額，要另外做撥款給個人的機制
-- [ ] **開池時的券種**：回饋 5% 下，1 萬元營業額的回饋池是 500 元；抽獎券接近 100 張時幾乎全部只夠發保底九五折券，免費餐券、半價券要營業額明顯高於抽獎券數 × 100 才會出現。要不要調整券種或保底面額
+- [x] **開池時的券種**：回饋比例維持 10%（2026-10-12 SU 決定），1 萬元營業額的回饋池是 1,000 元，保底之外有預算升級免費餐券與半價券，這個問題不存在了
 - [ ] `ckchildlikekid@gmail.com` 開 2FA；GitHub `master` branch protection（會改變推 master 自動部署的流程）
 
 ---

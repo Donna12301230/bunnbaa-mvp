@@ -11,7 +11,8 @@ import { useVendorCatalog } from "@/hooks/useVendorCatalog";
 import { useVendorMenu } from "@/hooks/useVendorMenu";
 import { componentPortionsForLock, portionsCost } from "@/lib/prep";
 import { queryClient } from "@/lib/queryClient";
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
+import { httpsCallable } from "@/lib/callable";
 import { componentCost, rawAmount } from "@/lib/bento";
 import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,19 @@ export type ComponentDraft = Omit<Component, "id"> & { id?: string };
 export type IngredientDraft = Omit<Ingredient, "id"> & { id?: string };
 
 /** Save a semi-finished item / ingredient / supplier; returns the document id */
+/**
+ * After an ingredient's unit price changes, ask the backend to recompute the portion tiers of candidate dishes for dates not yet past cut-off (functions/src/disaster.js recalcPortionLevels).
+ * A failure doesn't undo the saved price; the portion tiers just stay as they were until the next price change or a platform dish-price event recomputes them.
+ */
+export async function recalcPortionLevelsAfterPrice(vendorId: string): Promise<number | null> {
+  try {
+    const res = await httpsCallable<{ vendor_id: string }, { changed: number }>(functions, "recalcPortionLevels")({ vendor_id: vendorId });
+    return res.data?.changed ?? 0;
+  } catch {
+    return null;
+  }
+}
+
 export async function saveCatalogDoc(vendorId: string, kind: "ingredients" | "components" | "suppliers", data: Record<string, unknown> & { id?: string }): Promise<string> {
   const { id, ...rest } = data;
   let docId = id;
@@ -128,8 +142,11 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
   async function save() {
     if (!vendorId || !ing) return;
     try {
+      const before = ing.id ? catalog?.ingredientsById[ing.id]?.unit_price : undefined;
       const id = await saveCatalogDoc(vendorId, "ingredients", ing);
       toast({ title: tr("已儲存", "Saved"), description: ing.name });
+      // Unit price changed: recompute the portion tiers too (this is the "recalculated automatically after saving" step the dialog mentions)
+      if (before !== undefined && before !== ing.unit_price) void recalcPortionLevelsAfterPrice(vendorId);
       onSaved?.(id);
       onClose();
     } catch (err) {

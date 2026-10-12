@@ -82,7 +82,7 @@ BunnBaa 本身已經回應了題目中的需求預測與庫存：消費者先付
 
 ## 架構、可行性與可擴展性
 
-新功能都只是在 `functions/src/` 多加模組，共用現有的 `gemini.js`（已有 503／429 重試），不需要改資料架構。`gemini.js` 目前仍用 `@google/generative-ai`＋`GEMINI_API_KEY`（AI Studio），預計改走 Vertex AI，並把 Firestore 同步到 BigQuery，細節見 [GoogleCloud改動建議.md](GoogleCloud改動建議.md)。
+新功能都只是在 `functions/src/` 多加模組，共用現有的 `gemini.js`（已有 503／429 重試），不需要改資料架構。`gemini.js` 已改走 Vertex AI（`@google/genai`，Functions 服務帳號認證，不需要 API key），Firestore 也已同步到 BigQuery，細節見 [GoogleCloud改動建議.md](GoogleCloud改動建議.md)。
 
 ```mermaid
 flowchart LR
@@ -122,7 +122,7 @@ flowchart LR
 
 （以下為 09-29 規劃時的風險評估；功能 1–4 已於 09-30 實作完成，目前狀態見文末。）
 
-- **限流**：Gemini 目前用 API key（AI Studio），多輪對話加 function calling 容易碰到 429。已加上每人每天 30 次上限與 10 分鐘快取（見「實作紀錄」），根本解法是改走 Vertex AI（服務帳號認證、按量計費）
+- **限流**：Gemini 已改走 Vertex AI（服務帳號認證、按量計費，2026-10-10），不再有 AI Studio 免費層的 429 問題；每人每天 30 次上限與 10 分鐘快取（見「實作紀錄」）仍保留，用來控制成本
 - **時程**：10/18 前還有不少正式站驗證項目（見 `TODO.md`），AI 功能不能排擠整合測試與錄 Demo
 - **統計數字**：Proposal 中台灣餐飲浪費量等數字要找有出處的資料，不要自行估計
 
@@ -175,7 +175,7 @@ flowchart LR
 還沒做：
 
 - [ ] **部署**：正式站停在 10/05 的 `abdb4c4`，10/09 的 AI 修正未上線；`firestore.indexes.json`（含 `menu_embeddings` 向量索引）與 rules 也要一起部署，再由管理員呼叫一次 `backfillMenuEmbeddings`
-- [ ] **正式站實測**：預購助理、拍照上架的測試案例（C-AST-01／02、V-MNU-08／09）在 emulator 因沒有 `GEMINI_API_KEY` 卡住，要到正式站測；轉讓媒合、預估取餐區間也要實際點過一次
+- [ ] **正式站實測**：預購助理、拍照上架的測試案例（C-AST-01／02、V-MNU-08／09）在 emulator 因 `functions/.env.local` 設了 `GEMINI_DISABLED=1` 而測不到 Gemini（本機要測就移除它並 `gcloud auth application-default login`），或到正式站測；轉讓媒合、預估取餐區間也要實際點過一次
 - [ ] **英文 Proposal**：投影片初稿與 `Submission_EN.md` 已有，方括號處待補，尚未匯出 PDF
 - [ ] **Google Cloud 補強**（選做，見 [GoogleCloud改動建議.md](GoogleCloud改動建議.md)）：Vertex AI 遷移、BigQuery 同步與預測、Looker Studio；做了之後本文件的架構圖與技術棧要再更新
 

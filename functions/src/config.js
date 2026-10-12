@@ -27,8 +27,9 @@ const DEFAULT_PLATFORM_CONFIG = {
   candidateMinQty: 10, // vendor-adjustable
   openWishThreshold: 20, // 20 people within the last 30 days
   openWishWindowDays: 30,
-  // Growth rewards (revised 2026-10-05): once cumulative net revenue reaches NT$10,000 the pool opens, and 5% is returned as coupons drawn among draw-ticket holders
-  rewardRate: 0.05,
+  // Growth rewards (revised 2026-10-05): once cumulative net revenue reaches NT$10,000 the pool opens, and 10% is returned as coupons drawn among draw-ticket holders
+  // (lowering the rate to 5% was discussed on 10/05; on 2026-10-12 it was decided to keep 10%)
+  rewardRate: 0.1,
   ticketUnit: 100, // one draw ticket per NT$100
   minRevenueToOpen: 10000,
   drawWindowDays: 7,

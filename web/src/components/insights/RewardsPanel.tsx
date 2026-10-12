@@ -41,7 +41,7 @@ const STATUS: Record<string, { zh: string; en: string; cls: string }> = {
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString()}`;
 
 /**
- * Reward coupons (spec §8, §9.3, §9.4): when cumulative net sales reach NT$10,000, 5% of it forms a reward pool, split into coupons for a draw where everyone wins; rules can't change once coupons are issued.
+ * Reward coupons (spec §8, §9.3, §9.4): when cumulative net sales reach NT$10,000, 10% of it forms a reward pool, split into coupons for a draw where everyone wins; rules can't change once coupons are issued.
  * At a glance: outstanding liability (large), progress to opening the pool, a color bar of where coupons went, remaining coupons per type this period, weekly reward-pool bars; lookup, export and pause are under "Tools".
  */
 export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {
@@ -130,10 +130,10 @@ export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: strin
     }
   }
 
-  const rewardPct = Math.round((config?.rewardRate ?? 0.05) * 100);
+  const rewardPct = Math.round((config?.rewardRate ?? 0.1) * 100);
   const minRevenue = status?.min_revenue ?? config?.minRevenueToOpen ?? 10000;
   const revenueSoFar = status?.revenue_so_far ?? Math.max(0, minRevenue - (status?.amount_to_open ?? minRevenue));
-  const preview = allocatePool(Math.floor(100000 * (config?.rewardRate ?? 0.05)), 800);
+  const preview = allocatePool(Math.floor(100000 * (config?.rewardRate ?? 0.1)), 800);
   const flow = [
     { key: "redeemed", label: tr("已兌現", "Redeemed"), v: m.redeemedAll, cls: "bg-success-strong" },
     { key: "owned", label: tr("還在客人手上", "Outstanding"), v: m.liability, cls: "bg-brand" },

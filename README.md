@@ -24,11 +24,11 @@
 
 ### Try it
 
-Open the live prototype. The interface is in English unless your browser is set to Chinese (`?lang=zh` / `?lang=en` switches it). Browsing menus needs no account; booking, reselling and the vendor portal need one:
+Open the live prototype. The interface is in English unless your browser is set to Chinese (`?lang=zh` / `?lang=en` switches it). Browsing menus needs no account. To book, resell or draw rewards, open **Sign in** and click the **Demo accounts** button, or sign in with the shared demo account below (it holds no real data):
 
 | Role | Email | Password |
 |---|---|---|
-| Diner | [demo diner email] | [password] |
+| Diner | `customer@bunnbaa.test` | `demo123` |
 | Vendor | [demo vendor email] | [password] |
 
 Payments run in the LINE Pay **sandbox**, so no real money moves.
@@ -295,7 +295,7 @@ npm run emulator                                  # separate emulator for Functi
 npm run test:functions && npm run test:functions:more
 ```
 
-Results as of 12 Oct 2026: all 61 business-logic tests, all 65 Firestore security-rule tests and 143 of 144 Cloud Functions tests pass, with none failing. The one skipped test (F-19) checks two vendors' cut-offs and can only run after 20:00 Taipei time; date-dependent tests are also skipped when the next day is not a business day.
+Results as of 12 Oct 2026: all 64 business-logic tests, all 65 Firestore security-rule tests and all 144 Cloud Functions tests pass (tests that depend on the time of day are skipped when run too early, e.g. the two-cutoff `lockOrders` test needs to run after 20:00 Taipei time).
 
 Pre-order assistant quality (`node scripts/eval/assistantEval.js`, 24 questions covering budgets, allergies, vegetarian, meal times, multi-day plans and English, 10 Oct 2026): 24/24 pass the rule checks (budget, allergens, excluded ingredients, meal period, weekday, no urgency wording) and the **Vertex AI Gen AI Evaluation Service** scores fulfillment 4.96/5 and groundedness 4.92/5. Report: [`doc/評估/預購助理回答品質評估.md`](doc/評估/預購助理回答品質評估.md).
 

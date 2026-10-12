@@ -1,4 +1,3 @@
-import SegmentsCard from "@/components/insights/SegmentsCard";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
@@ -184,7 +183,6 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
           </div>
         </>
       )}
-      <SegmentsCard vendorId={vendorId} />
     </div>
   );
 }

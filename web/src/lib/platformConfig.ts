@@ -25,7 +25,7 @@ export const DEFAULT_PLATFORM_CONFIG = {
   candidateMinQty: 10,
   openWishThreshold: 20,
   openWishWindowDays: 30,
-  rewardRate: 0.05,
+  rewardRate: 0.1,
   ticketUnit: 100,
   minRevenueToOpen: 10000,
   drawWindowDays: 7,

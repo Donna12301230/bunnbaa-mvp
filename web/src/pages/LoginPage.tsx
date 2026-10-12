@@ -14,10 +14,11 @@ import { useMutation } from "@tanstack/react-query";
 import { login, register, applyAsVendor, requestPasswordReset, sendOtp, confirmOtp } from "@/lib/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { takeReturnPath } from "@/lib/returnPath";
+import { demoAccounts, type DemoAccount } from "@/lib/demoAccounts";
 import type { ConfirmationResult } from "firebase/auth";
 import TAIWAN_UNIV_DEPTS from "@/constants/taiwanUnivDepts.json";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ShoppingBag, Clock, Tag, Store, Eye, EyeOff, Smartphone, Mail } from "lucide-react";
+import { ShoppingBag, Clock, Tag, Store, Eye, EyeOff, Smartphone, Mail, ShieldCheck, UserRound, Zap } from "lucide-react";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/landing.tsx.
 // Sign-in / sign-up / forgot password use real Firebase Auth (@/lib/auth); sign-in is by email.
@@ -87,6 +88,13 @@ export default function LoginPage() {
     mutationFn: () => login(username, password),
     onSuccess: () => setSignedIn(true),
     onError: (err: Error) => toast({ variant: "destructive", title: tr("登入失敗", "Sign-in failed"), description: err.message }),
+  });
+
+  // Demo-account one-click sign-in (lib/demoAccounts.ts): same path as a normal sign-in, then redirects by role
+  const demoLoginMutation = useMutation({
+    mutationFn: (account: DemoAccount) => login(account.email, account.password),
+    onSuccess: () => setSignedIn(true),
+    onError: (err: Error) => toast({ variant: "destructive", title: tr("體驗帳號登入失敗", "Demo sign-in failed"), description: err.message }),
   });
 
   const sendOtpMutation = useMutation({
@@ -244,11 +252,6 @@ export default function LoginPage() {
                       <Button type="submit" className="w-full" disabled={isPendingLogin}>
                         {isPendingLogin ? tr("登入中…", "Signing in…") : tr("登入", "Sign in")}
                       </Button>
-                      {import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true" && (
-                        <p className="text-center text-caption text-muted-foreground">
-                          本機 emulator：測試帳號見 TODO.md「測試帳號」
-                        </p>
-                      )}
                       <Button
                         type="button"
                         variant="link"
@@ -316,6 +319,29 @@ export default function LoginPage() {
                   )}
                   {/* Invisible reCAPTCHA, needed to send the phone OTP code; always mounted, it doesn't affect the layout */}
                   <div id="recaptcha-container" />
+                  {/* Demo accounts: one click signs in, no registration needed (the accounts are shared; see lib/demoAccounts.ts) */}
+                  <div className="mt-5 max-w-xs mx-auto border-t border-border pt-4">
+                    <p className="flex items-center justify-center gap-1.5 text-sm font-semibold">
+                      <Zap className="w-4 h-4 text-brand" aria-hidden="true" /> {tr("體驗帳號，點一下直接登入", "Demo accounts — one tap to sign in")}
+                    </p>
+                    <div className="mt-2 grid gap-2">
+                      {demoAccounts().map((account) => {
+                        const Icon = account.key === "vendor" ? Store : account.key === "admin" ? ShieldCheck : UserRound;
+                        const busy = demoLoginMutation.isPending && demoLoginMutation.variables?.key === account.key;
+                        return (
+                          <Button key={account.key} type="button" variant="outline" className="h-auto w-full justify-start gap-3 px-3 py-2 text-left"
+                            disabled={demoLoginMutation.isPending || isPendingLogin} onClick={() => demoLoginMutation.mutate(account)}>
+                            <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                            <span className="min-w-0">
+                              <span className="block text-sm font-semibold">{busy ? tr("登入中…", "Signing in…") : tr(`以${account.label}身分體驗`, `Try it as a ${account.label.toLowerCase()}`)}</span>
+                              <span className="block truncate text-caption font-normal text-muted-foreground">{account.hint}</span>
+                            </span>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-center text-caption text-muted-foreground">{tr("體驗帳號是公開共用的，請不要填寫真實個人資料。", "Demo accounts are shared and public — please don't enter real personal details.")}</p>
+                  </div>
                 </TabsContent>
 
                 {/* Member sign-up */}

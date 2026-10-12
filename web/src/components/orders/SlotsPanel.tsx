@@ -25,7 +25,12 @@ export default function SlotsPanel({ vendor, locks, loading }: { vendor: Vendor 
   const today = todayStr();
   const weekStart = startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 1 });
   const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
-  const windows = vendorWindows(vendor);
+  const configured = vendorWindows(vendor);
+  // After a vendor changes pickup slots, orders on old slots are still listed (marked "disabled"); otherwise they wouldn't show in the grid
+  const retired = [...new Set(locks
+    .filter((l) => weekDates.includes(l.pickup_date) && l.status !== "no_show" && l.status !== "cancelled" && l.pickup_window && !configured.includes(l.pickup_window))
+    .map((l) => l.pickup_window))];
+  const windows = [...configured, ...retired].sort((a, b) => a.localeCompare(b));
   const capacity = vendor?.slot_capacity && vendor.slot_capacity > 0 ? vendor.slot_capacity : null;
 
   // date__window → { total, pending } (no-shows aren't counted toward booked portions)
@@ -80,7 +85,10 @@ export default function SlotsPanel({ vendor, locks, loading }: { vendor: Vendor 
             ))}
             {windows.map((w) => (
               <div key={w} className="contents">
-                <div className="border-b border-border p-2 text-xs font-mono font-semibold flex items-center">{slotLabel(w)}</div>
+                <div className="border-b border-border p-2 text-xs font-mono font-semibold flex flex-col justify-center">
+                  {slotLabel(w)}
+                  {retired.includes(w) && <span className="font-sans font-normal text-[11px] text-warning-text" title={tr("這個時段已從店家設定移除，但還有訂單", "Removed from store settings but still has orders")}>{tr("已停用", "Retired")}</span>}
+                </div>
                 {weekDates.map((d) => {
                   const closed = vendorClosedReason(vendor, d);
                   const row = counts.get(`${d}__${w}`);

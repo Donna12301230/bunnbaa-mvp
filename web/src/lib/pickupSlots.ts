@@ -164,6 +164,12 @@ export function isSlotStarted(pickupDate: string, pickupWindow: string, now: Dat
   return new Date(`${pickupDate}T${start}:00+08:00`).getTime() <= now.getTime();
 }
 
+/** The slot has ended: pickup is no longer possible (e.g. expired free claims shouldn't be listed any more) */
+export function isSlotEnded(pickupDate: string, pickupWindow: string, now: Date = new Date()): boolean {
+  const end = pickupWindow.split("-")[1] || pickupWindow.split("-")[0];
+  return new Date(`${pickupDate}T${end}:00+08:00`).getTime() <= now.getTime();
+}
+
 /** Slots still bookable that day (empty array if not bookable); with item / period, narrowed to the item's meal periods. */
 export function openWindowsOn(
   vendor: MaybeSchedule,

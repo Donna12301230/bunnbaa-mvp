@@ -96,6 +96,7 @@ function ruleCheck(c, out, items, config) {
       if (!ok) violations.push(`${label} 不是${e.dietary}`);
     }
     if (e.period && card.window && mealPeriodOf(card.window, config) !== e.period) violations.push(`${label} 時段 ${card.window} 不是指定餐期`);
+    if (card.reason && PRESSURE.test(card.reason)) violations.push(`${label} 推薦理由有催促字眼：${card.reason}`);
     if (e.weekday && card.date && weekdayOf(card.date) !== e.weekday) violations.push(`${label} 日期 ${card.date} 不是週${"日一二三四五六"[e.weekday]}`);
   }
   if (PRESSURE.test(out.reply)) violations.push(`回覆有催促字眼：${out.reply.match(PRESSURE)[0]}`);
@@ -158,7 +159,7 @@ async function evaluate(template, instance) {
 function describeResponse(out) {
   const cards = out.cards.map((c) => c.type === "plan"
     ? `- 方案：${c.vendor_name}「${c.name}」${c.days} 天，每餐 ${c.price_per_meal} 元`
-    : `- ${c.vendor_name}「${c.name}」原價 ${c.list_price} 元${c.date ? `，${c.date} ${c.window || ""} 預估 ${c.estimated_price} 元` : ""}${c.allergens?.length ? `，過敏原：${c.allergens.join("、")}` : ""}${c.dietary_tags?.length ? `，標記：${c.dietary_tags.join("、")}` : ""}`);
+    : `- ${c.vendor_name}「${c.name}」原價 ${c.list_price} 元${c.date ? `，${c.date} ${c.window || ""} 預估 ${c.estimated_price} 元` : ""}${c.allergens?.length ? `，過敏原：${c.allergens.join("、")}` : ""}${c.dietary_tags?.length ? `，標記：${c.dietary_tags.join("、")}` : ""}${c.reason ? `，推薦理由：${c.reason}` : ""}`);
   return `${out.reply}\n推薦卡片：\n${cards.join("\n") || "（沒有卡片）"}`;
 }
 
@@ -170,7 +171,7 @@ function toolContext(calls, cards) {
     }
     return { tool: name, args, result };
   });
-  const verified = cards.map((c) => ({ id: c.id, vendor: c.vendor_name, name: c.name, list_price: c.list_price, date: c.date, window: c.window, estimated_price: c.estimated_price, open_dates: c.open_dates, price_per_meal: c.price_per_meal, days: c.days }));
+  const verified = cards.map((c) => ({ id: c.id, vendor: c.vendor_name, name: c.name, list_price: c.list_price, date: c.date, window: c.window, estimated_price: c.estimated_price, open_dates: c.open_dates, reason: c.reason, price_per_meal: c.price_per_meal, days: c.days }));
   return JSON.stringify({ tool_calls: slim, server_verified_cards: verified }).slice(0, 18000);
 }
 
@@ -230,7 +231,7 @@ function report(results, startedAt) {
     "",
     "- 助理：正式環境同一套流程（`runAssistant`，Gemini on Vertex AI `gemini-3.6-flash`，function calling 讀正式 Firestore 目錄）",
     `- 評分：Vertex AI Gen AI Evaluation Service（\`evaluateInstances\`，pointwise 自訂評分標準，評分模型 \`gemini-2.5-pro\`，${EVAL_LOCATION}）`,
-    "- 規則檢查：預算、會員過敏原、不吃的食材、素食／辣、餐期、星期、催促字眼、應查不到卻推薦",
+    "- 規則檢查：預算、會員過敏原、不吃的食材、素食／辣、餐期、星期、催促字眼（回覆與卡片推薦理由）、應查不到卻推薦",
     "",
     "## 總結",
     "",
@@ -241,6 +242,7 @@ function report(results, startedAt) {
     `| 需求符合度（1–5，平均） | ${avg(results.map((r) => r.fulfillment.score))} |`,
     `| 有據性（1–5，平均） | ${avg(results.map((r) => r.grounded.score))} |`,
     `| 推薦卡片總數 | ${cards} |`,
+    `| 帶推薦理由的卡片 | ${results.reduce((s, r) => s + (r.cards || []).filter((c) => c.reason).length, 0)} 張（只收有 getVendorInsights 資料根據的店） |`,
     `| 平均回應時間 | ${avg(results.map((r) => r.seconds))} 秒 |`,
     "",
     "## 各題結果",

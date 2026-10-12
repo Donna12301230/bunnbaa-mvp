@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { auth, db, functions } from "@/lib/firebase";
 import { isClean } from "@/lib/searchFilter";
 import { isFreeTransfer, refundOnTakeover, resaleDeadlineOf, resalePrice } from "@/lib/transfers";
+import { isSlotEnded } from "@/lib/pickupSlots";
 import type { Lock } from "@/types";
 import { useVendors } from "@/hooks/useVendors";
 import { useItemImages } from "@/hooks/useItemImages";
@@ -139,7 +140,8 @@ export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => 
   );
   // $0 items (custom 0 or opened up for free after the timeout) aren't listed in the market; they're on the "Nearby charity meals" tab (FreeTransfersSection)
   const activeListings = forResale.filter((l) => !isFreeTransfer(l, now));
-  const freeCount = forResale.length - activeListings.length;
+  // Free meals whose slot has ended can no longer be claimed; like FreeTransfersSection, don't count them
+  const freeCount = forResale.filter((l) => isFreeTransfer(l, now) && !isSlotEnded(l.pickup_date, l.pickup_window, new Date(now))).length;
   const myListings = useMemo(
     () => locks.filter((l) => l.status === "for_resale" && l.buyer_uid === uid),
     [locks, uid]
