@@ -1,19 +1,19 @@
-// AI 功能 4：備料預測區間（doc/AI功能設計.md，強化現有校準）。
-// 「已鎖定 42 份，依過去的取餐紀錄，預估實際取餐 38–41 份」——區間用一般統計算：
-// 過去每天「實際取餐 ÷ 鎖定份數」的比率，資料夠就取 10%／90% 分位數，不夠就用平均 ± 1.28 標準差。
-// 數字不交給 LLM；白話說明沿用每日校準報告（Gemini），追問走 askCalibrationScenario。
-// 預付制下每一份都要做，這個區間是讓店家預期大概有幾份會轉成愛心餐，不是叫店家少做。
+// AI feature 4: prep forecast range (doc/AI功能設計.md, strengthening the existing calibration).
+// "42 locked; based on past pickups, 38–41 expected to be picked up". The range uses plain statistics:
+// the daily ratio "actually picked up ÷ locked portions"; with enough data, the 10%/90% percentiles, otherwise mean ± 1.28 standard deviations.
+// Numbers are never handed to the LLM; the plain-language explanation reuses the daily calibration report (Gemini), and follow-ups go through askCalibrationScenario.
+// Under prepayment every portion is made; this range tells vendors roughly how many will become charity meals, it doesn't tell them to make fewer.
 const { db, onCall, HttpsError, t, callerVendorId } = require("./common");
 const { taipeiToday, addDays, weekdayOf } = require("./calendar");
 
 const LOOKBACK_DAYS = 60;
-const MIN_LOCKS_PER_DAY = 3; // 份數太少的日子比率太跳，不列入
+const MIN_LOCKS_PER_DAY = 3; // days with too few portions have jumpy ratios, so they're excluded
 const MIN_DAYS = 3;
 const QUANTILE_MIN_DAYS = 8;
 const SAME_WEEKDAY_MIN_DAYS = 4;
 
 const PICKED = new Set(["fulfilled", "resold_and_fulfilled"]);
-const NOT_PICKED = new Set(["no_show", "charity"]); // 未取餐轉入或主動捐出，都不是原買家取走
+const NOT_PICKED = new Set(["no_show", "charity"]); // converted after a no-show or voluntarily donated; either way not picked up by the original buyer
 const PENDING = new Set(["locked", "for_resale", "for_gift"]);
 
 function quantile(sorted, q) {
@@ -24,8 +24,8 @@ function quantile(sorted, q) {
 }
 
 /**
- * rates：過去每天的取餐率（0–1）；locked：這天鎖定份數。
- * 回傳 { low, high, expected, rate_low, rate_high, mean_rate, method }。
+ * rates: past daily pickup rates (0–1); locked: locked portions for this day.
+ * Returns { low, high, expected, rate_low, rate_high, mean_rate, method }.
  */
 function pickupRange(rates, locked) {
   const sorted = [...rates].sort((a, b) => a - b);
@@ -56,7 +56,7 @@ function pickupRange(rates, locked) {
   };
 }
 
-/** 過去每天的取餐率：[{ date, weekday, locked, picked, rate }] */
+/** Past daily pickup rates: [{ date, weekday, locked, picked, rate }] */
 function dailyRates(locks, today) {
   const since = addDays(today, -LOOKBACK_DAYS);
   const byDate = new Map();
@@ -76,8 +76,8 @@ function dailyRates(locks, today) {
 }
 
 /**
- * data: { vendor_id?, date }。回傳這天鎖定份數、預估實際取餐區間與計算依據。
- * 資料不足時 enough=false，前端只顯示鎖定份數。
+ * data: { vendor_id?, date }. Returns this day's locked portions, the forecast pickup range and how it was computed.
+ * With too little data enough=false, and the frontend shows only the locked portions.
  */
 exports.getPickupForecast = onCall({}, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);

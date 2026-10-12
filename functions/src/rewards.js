@@ -1,17 +1,17 @@
-// 成長獎勵（規格 §8）：回饋池分配演算法與不放回抽樣。純函式，給 closeRewardPeriod／
-// drawTicket 用；web/src/lib/rewards.ts 有同一份（試算顯示用）。
+// Growth rewards (spec §8): reward pool allocation algorithm and sampling without replacement. Pure functions used by closeRewardPeriod /
+// drawTicket; web/src/lib/rewards.ts has the same code (for preview calculations).
 
 const { COUPON_TIERS, BASE_TIER } = require("./config");
 
 /**
- * 分配演算法（§8.4）
- * 1. 每張抽獎券先配一張保底券：成本 N × 保底折抵
- * 2. 升級預算 B = P − N × 保底折抵
- * 3. 各等級升級張數 = floor(B × 權重 ÷ 升級成本)
- * 4. 頭獎保證：免費餐券為 0 且剩餘預算 ≥ 95 時，先配 1 張
- * 5. 剩餘預算繼續升級半價券，直到不足 45
- * 6. 保底張數 = N − 高階張數；未分配餘額回歸店家
- * 高階總張數不會超過 N（券數不能多於抽獎券）。
+ * Allocation algorithm (§8.4)
+ * 1. Every draw ticket first gets a base coupon: cost N × base discount
+ * 2. Upgrade budget B = P − N × base discount
+ * 3. Upgrades per tier = floor(B × weight ÷ upgrade cost)
+ * 4. Grand-prize guarantee: if free-meal coupons are 0 and remaining budget ≥ 95, allocate 1 first
+ * 5. Keep upgrading to half-price coupons with the remaining budget until it drops below 45
+ * 6. Base coupons = N − higher-tier coupons; any unallocated balance goes back to the vendor
+ * The total of higher-tier coupons never exceeds N (no more coupons than draw tickets).
  */
 function allocatePool(pool, tickets, tiers = COUPON_TIERS, base = BASE_TIER) {
   const N = Math.max(0, Math.floor(tickets));
@@ -20,7 +20,7 @@ function allocatePool(pool, tickets, tiers = COUPON_TIERS, base = BASE_TIER) {
   if (N === 0) return { counts: { ...counts, [base.code]: 0 }, spent: 0, leftover: P };
   const baseCost = N * base.discount;
   if (baseCost > P) {
-    // 回饋池連保底都不夠（規格限制保底 ≤ 100 × 回饋比例，正常不會發生）：能發幾張保底就發幾張
+    // The reward pool can't even cover base coupons (the spec caps base ≤ 100 × reward rate, so this shouldn't happen): issue as many base coupons as it can
     const baseCount = Math.floor(P / base.discount);
     return { counts: { ...counts, [base.code]: baseCount }, spent: baseCount * base.discount, leftover: P - baseCount * base.discount };
   }
@@ -50,7 +50,7 @@ function allocatePool(pool, tickets, tiers = COUPON_TIERS, base = BASE_TIER) {
   return { counts, spent, leftover: remaining };
 }
 
-/** 各等級剩餘張數加權隨機（不放回：呼叫端抽中後把該等級減一） */
+/** Weighted random pick by remaining count per tier (without replacement: the caller decrements that tier after a draw) */
 function pickTier(remaining, random = Math.random) {
   const entries = Object.entries(remaining).filter(([, n]) => n > 0);
   const total = entries.reduce((s, [, n]) => s + n, 0);

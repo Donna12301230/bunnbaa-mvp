@@ -1,16 +1,16 @@
-// 訂單（沿用 locks）生命週期：下單計價 → LINE Pay → 截單判定許願 → QR 取餐。
-// 規格 §4、§6；保留既有「鎖定早鳥折扣＋轉讓」（使用者 2026-09-30 決定）。
+// Order lifecycle (still stored as locks): pricing → LINE Pay → cut-off wish decisions → QR pickup.
+// Spec §4, §6; keeps the existing "lock the early-bird discount + resale" model (user decision, 2026-09-30).
 //
-// locks 新增欄位：
+// Fields added to locks:
 //   menu_item_id, slots[{ category, default_dish, default_component_id, removed, wished,
 //     wished_component_id, candidate_index, resolved, portion_level }], rice: add|normal|less
-//   list_price（品項原價）, adjust_amount（加減）, early_bird_amount, coupon_discount,
-//   locked_price（實付）, coupon_id, payer_uid（付款人，抽獎券歸他；付費接手後換成接手者）
-//   paid_amount（payer 在 transaction_id 實付的金額，退款以它為準；免費領取把 locked_price 改 0 也不動它）
-//   resale_hold{ uid, intent_id, expires_at }（有人正在付款接手）, transfers[]（付費接手紀錄）
-//   payment_intent_id, transaction_id, pickup_code（4 碼）, phone_last3, qr_nonce, share_token
-//   cutoff_done（截單已判定）, charity_source: noshow|donated
-// 狀態：locked → for_resale / for_gift → fulfilled / resold_and_fulfilled / charity / cancelled
+//   list_price (item list price), adjust_amount (adjustments), early_bird_amount, coupon_discount,
+//   locked_price (amount paid), coupon_id, payer_uid (payer; owns the draw tickets; becomes the taker after a paid takeover)
+//   paid_amount (what the payer actually paid in transaction_id; refunds are based on it; a free claim sets locked_price to 0 but leaves this alone)
+//   resale_hold{ uid, intent_id, expires_at } (someone is paying to take it over), transfers[] (paid takeover history)
+//   payment_intent_id, transaction_id, pickup_code (4 digits), phone_last3, qr_nonce, share_token
+//   cutoff_done (cut-off decision made), charity_source: noshow|donated
+// Status: locked → for_resale / for_gift → fulfilled / resold_and_fulfilled / charity / cancelled
 const crypto = require("crypto");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { Timestamp } = require("firebase-admin/firestore");
@@ -34,8 +34,8 @@ const wallet = require("./wallet").helpers;
 const APP_BASE_URL = () => process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
 const MAX_CART_UNITS = 50;
 
-// Repeated no-shows used to set users/{uid}.orderBanned (舊制，現在未取餐改轉愛心餐、
-// 不再停權)；舊資料被停權的帳號仍擋下單，申訴核准後解除。
+// Repeated no-shows used to set users/{uid}.orderBanned (old scheme; no-shows now become charity meals
+// and nobody is banned); accounts banned under the old data are still blocked from ordering until an appeal is approved.
 async function assertNotBanned(uid) {
   const snap = await db().collection("users").doc(uid).get();
   if (snap.exists && snap.data().orderBanned) {
@@ -77,7 +77,7 @@ function sideWishId(vendorId, date, itemId, slot, candidate) {
   return `${vendorId}_${date}_${itemId}_${slot}_${candidate}`;
 }
 
-/** 候選菜本週已許願份數（週供應上限用） */
+/** Wished portions of a candidate dish this week (for the weekly supply cap) */
 async function weeklyWishCount(vendorId, week, itemId, slot, candidate) {
   const snap = await db().collection("sideWishes")
     .where("vendor_id", "==", vendorId).where("week", "==", week).get();
@@ -87,7 +87,7 @@ async function weeklyWishCount(vendorId, week, itemId, slot, candidate) {
     .reduce((s, d) => s + (d.count || 0), 0);
 }
 
-/** 可用的折價券：本人持有、同一家店、未過期 */
+/** Usable coupon: held by the user, same vendor, not expired */
 async function loadUsableCoupon(couponId, uid, vendorId) {
   const snap = await db().collection("coupons").doc(couponId).get();
   const c = snap.exists ? snap.data() : null;
@@ -104,9 +104,9 @@ async function loadUsableCoupon(couponId, uid, vendorId) {
 }
 
 /**
- * 驗證並展開一份便當的選擇（主菜、飯量、配菜、第四道、店家自訂欄位），下單與截單前修改共用。
- * 回傳 { rice, resolved, extra, custom, main, listPrice, adjust }；不合法丟 HttpsError。
- * keptCustom：截單前修改沒動自訂欄位時，直接沿用訂單上記錄的選擇與金額（店家之後刪改選項也不影響舊訂單）。
+ * Validate and expand a bento's choices (main, rice, sides, fourth side, vendor custom fields); shared by ordering and pre-cut-off edits.
+ * Returns { rice, resolved, extra, custom, main, listPrice, adjust }; throws HttpsError if invalid.
+ * keptCustom: when a pre-cut-off edit doesn't touch the custom fields, reuse the choices and amounts recorded on the order (so later vendor edits to options don't affect old orders).
  */
 function resolveOrderChoices(item, line, config, keptCustom = null) {
   const bento = isBento(item);
@@ -126,7 +126,7 @@ function resolveOrderChoices(item, line, config, keptCustom = null) {
   return { rice, resolved, extra, custom: customPick.custom, main: mainPick.main, listPrice: mainPick.price, adjust };
 }
 
-/** 這份便當的許願：每格選的候選菜＋第四道（候選菜）。sideWishes 計數、週上限都用這份 */
+/** This bento's wishes: candidate dishes chosen per slot + the fourth side (if a candidate). Used for sideWishes counts and the weekly cap */
 function wishedEntries(slots, extra) {
   const out = [];
   (slots || []).forEach((slot, slotIdx) => {
@@ -136,7 +136,7 @@ function wishedEntries(slots, extra) {
   return out;
 }
 
-/** sideWishes 計數 ±delta（下單 +1、取消／修改 −1） */
+/** Adjust sideWishes counts by ±delta (+1 on order, −1 on cancel/edit) */
 function bumpWishes(batch, lock, delta) {
   for (const w of wishedEntries(lock.slots, lock.extra_side)) {
     batch.set(db().collection("sideWishes").doc(sideWishId(lock.vendor_id, lock.pickup_date, lock.menu_item_id, w.slot, w.candidate)), {
@@ -147,8 +147,8 @@ function bumpWishes(batch, lock, delta) {
 }
 
 /**
- * 購物車一行 → 一份（或多份）鎖定草稿。價格：
- *   (品項原價 × 早鳥折數) ＋ 加減金額 − 折價券（每筆限一張，折抵 ≤ 小計）
+ * One cart line → one (or more) lock drafts. Price:
+ *   (item list price × early-bird rate) + adjustments − coupon (one per lock, discount ≤ subtotal)
  */
 async function buildDrafts(line, ctx) {
   const quantity = Number.isInteger(line?.quantity) && line.quantity > 0 ? line.quantity : 1;
@@ -175,7 +175,7 @@ async function buildDrafts(line, ctx) {
   const choice = resolveOrderChoices(item, line, ctx.config);
   const { rice, resolved, extra, custom, main, listPrice, adjust } = choice;
 
-  // 候選菜週供應上限（§4.3）；第四道選候選菜也算
+  // Weekly supply cap for candidate dishes (§4.3); a candidate chosen as the fourth side counts too
   const week = mondayOf(pickupDate);
   for (const w of wishedEntries(resolved.slots, extra)) {
     const cand = item.slots[w.slot].candidates[w.candidate];
@@ -266,8 +266,8 @@ async function assertSlotsHaveRoom(drafts, vendorCache) {
 }
 
 /**
- * 建立付款意圖；use_points＝先用平台點數折抵（wallet.js），剩下的才走 LINE Pay。
- * 要付的現金為 0（折價券或點數全額折抵）時不經 LINE Pay，確認頁直接建立鎖定。
+ * Create a payment intent; use_points = apply platform points first (wallet.js), and only the rest goes through LINE Pay.
+ * When the cash due is 0 (fully covered by coupons or points), LINE Pay is skipped and the confirmation page creates the locks directly.
  */
 async function reserve(request, drafts, productName) {
   const total = drafts.reduce((s, d) => s + d.locked_price, 0);
@@ -278,7 +278,7 @@ async function reserve(request, drafts, productName) {
   let transactionId = null;
   let paymentUrl = `${APP_BASE_URL()}/#/payment/confirm/${orderId}`;
   if (amount > 0) {
-    // LINE Pay 的 products 金額加總要等於 amount；同價的合併成一行。有用點數折抵時合成一行「折抵後金額」
+    // LINE Pay's products must sum to amount; lines with the same price are merged. When points are applied, everything becomes one "amount after points" line
     const byPrice = new Map();
     for (const d of drafts) {
       const key = `${productName(d)}|${d.locked_price}`;
@@ -335,8 +335,8 @@ async function newContext(request) {
 }
 
 /**
- * 購物車結帳。lines: [{ menu_item_id, pickup_date, pickup_window, slots:[{choice}], rice,
- * quantity, note, coupon_id }]。一行可以是不同取餐日（預訂到下週五）。
+ * Cart checkout. lines: [{ menu_item_id, pickup_date, pickup_window, slots:[{choice}], rice,
+ * quantity, note, coupon_id }]. Lines may have different pickup dates (bookable through next Friday).
  */
 exports.createCartLinePayReservation = onCall({}, async (request) => {
   assertSignedInUser(request, "結帳");
@@ -344,7 +344,7 @@ exports.createCartLinePayReservation = onCall({}, async (request) => {
   const lines = request.data?.lines ?? request.data?.items;
   if (!Array.isArray(lines) || lines.length === 0) throw new HttpsError("invalid-argument", "lines must be a non-empty array");
   const ctx = await newContext(request);
-  // 舊版購物車只送 pickup_date/window 在外層
+  // Older carts send pickup_date/window only at the top level
   const drafts = [];
   for (const line of lines) {
     drafts.push(...(await buildDrafts({
@@ -357,9 +357,9 @@ exports.createCartLinePayReservation = onCall({}, async (request) => {
 });
 
 /**
- * 計畫型（多日方案，§4.4）：同一時段連續 N 個營業日（遇公休順延）。每一天是獨立的 locks，
- * 早鳥依各自天數計算（方案價 price_per_meal 當原價）；之後可在「我的餐點」個別改時段。
- * preview=true 只回傳每天日期與價格（確認視窗用），不建立付款。
+ * Meal plans (multi-day plans, §4.4): N consecutive business days in the same pickup slot (closed days are pushed back). Each day is a separate lock;
+ * early-bird pricing is computed per day (plan price price_per_meal is the list price); each day's slot can be changed later under "My meals".
+ * preview=true only returns each day's date and price (for the confirmation dialog) without creating a payment.
  */
 exports.createPlanLinePayReservation = onCall({}, async (request) => {
   assertSignedInUser(request, "加入計畫");
@@ -436,7 +436,7 @@ function randomCode(digits) {
   return String(crypto.randomInt(0, 10 ** digits)).padStart(digits, "0");
 }
 
-/** 4 碼取餐號，同一家店同一天不重複（§6.2 備援核對） */
+/** 4-digit pickup number, unique per vendor per day (§6.2 fallback verification) */
 async function allocatePickupCodes(drafts) {
   const taken = new Map();
   const codes = [];
@@ -487,7 +487,7 @@ exports.confirmLinePayPayment = onCall({}, async (request) => {
   const lockRefs = drafts.map(() => db().collection("locks").doc());
   const couponIds = drafts.map((d) => d.coupon_id).filter(Boolean);
 
-  // 1) 在交易內預留份數、鎖住折價券，並把意圖改成 confirming（避免重複確認）。還沒扣款。
+  // 1) Inside a transaction, reserve portions, lock coupons and set the intent to confirming (prevents double confirmation). Not charged yet.
   const slots = groupDraftsBySlot(drafts);
   const counterRefs = slots.map((g) => slotCounterRef(g.vendorId, g.pickupDate, g.pickupWindow));
   const outcome = await db().runTransaction(async (tx) => {
@@ -535,7 +535,7 @@ exports.confirmLinePayPayment = onCall({}, async (request) => {
     throw new HttpsError("failed-precondition", couponGoneDuringPayment());
   }
 
-  // 2) 扣款；失敗就把份數、折價券（與點數保留）還回去，讓買家可以重試同一筆
+  // 2) Charge; on failure, release the portions and coupons (and the points hold) so the buyer can retry the same intent
   const rollbackReservation = async (status) => {
     const rollback = db().batch();
     slots.forEach((g, i) => rollback.update(counterRefs[i], { count: FieldValue.increment(-g.count) }));
@@ -560,10 +560,10 @@ exports.confirmLinePayPayment = onCall({}, async (request) => {
     }
   }
   await wallet.commitHold(request.auth.uid, orderId);
-  // 點數折抵依序分給每一份；每份記下還能退的錢來自哪裡（funding，wallet.js）
+  // Points applied are allocated across portions in order; each portion records where its refundable money came from (funding, wallet.js)
   const shares = wallet.splitFunding(drafts.map((d) => d.locked_price), intent.transaction_id, intent.points_sources || []);
 
-  // 3) 建立鎖定、候選菜許願計數
+  // 3) Create locks and candidate-dish wish counts
   const codes = await allocatePickupCodes(drafts);
   const last3 = await phoneLast3(request);
   const config = await loadPlatformConfig(db());
@@ -599,18 +599,18 @@ exports.confirmLinePayPayment = onCall({}, async (request) => {
 });
 
 /* ------------------------------------------------------------------ *
- * 截單前取消／修改；取餐時段內捐為愛心餐
+ * Cancel/edit before cut-off; donate as a charity meal during the pickup slot
  * ------------------------------------------------------------------ */
 
-/** 付款人在這筆交易實付的金額；舊資料沒有 paid_amount 就用 locked_price */
+/** What the payer actually paid in this transaction; legacy data without paid_amount uses locked_price */
 function paidAmountOf(lock) {
   return Number.isFinite(lock.paid_amount) ? lock.paid_amount : lock.locked_price || 0;
 }
 
 /**
- * 取消並全額退款（停班停課自動退款用；消費者自己取消改走 cancelForCoupon 發折價券）。
- * 2026-10-09 起退款一律退成平台點數給付款人（wallet.js），會員可自己退回 LINE Pay。
- * 折價券退回並保留原到期日，已過期則不退；份數與許願計數扣回。
+ * Cancel with a full refund (used for automatic refunds on work-suspension days; diner-initiated cancels go through cancelForCoupon, which issues a coupon).
+ * Since 2026-10-09 all refunds go to the payer as platform points (wallet.js); members can refund them to LINE Pay themselves.
+ * The coupon is returned with its original expiry (not returned if already expired); portions and wish counts are rolled back.
  */
 async function cancelAndRefund(lockRef, reason) {
   return db().runTransaction(async (tx) => {
@@ -666,10 +666,10 @@ exports.cancelLock = onCall({}, async (request) => {
 });
 
 /**
- * 消費者取消（2026-10-05 改版）：不退現金，改發一張本店折價券（原價 30%、效期 couponValidDays 天）。
- * 款項留在店家（kept_amount）；下單時用掉的折價券照舊退回（已過期不退），份數與許願計數扣回。
- * 整段在交易內，連按兩次只會發一張。停班停課等非消費者因素的取消仍走 cancelAndRefund 全額退款。
- * 這張券能不能跟其他折扣疊加還沒定案（doc/TODO.md）：目前跟一般折價券一樣，每份餐點限用一張、早鳥照算。
+ * Diner cancellation (revised 2026-10-05): no cash refund; instead a coupon for this vendor (30% of the list price, valid for couponValidDays days).
+ * The money stays with the vendor (kept_amount); any coupon used on the order is still returned (not if expired); portions and wish counts are rolled back.
+ * The whole thing runs in a transaction, so a double click issues only one coupon. Cancellations not caused by the diner (e.g. work-suspension days) still use cancelAndRefund for a full refund.
+ * Whether this coupon stacks with other discounts is still undecided (doc/TODO.md): for now it's like a regular coupon, one per meal, with early-bird pricing still applied.
  */
 async function cancelForCoupon(lockRef, config) {
   const couponRef = db().collection("coupons").doc();
@@ -705,18 +705,18 @@ async function cancelForCoupon(lockRef, config) {
 }
 
 /* ------------------------------------------------------------------ *
- * 轉讓市集付費接手（規格 §4.1：接手者付款後成為新持有人）
- * 接手者付「轉讓價」給 LINE Pay：轉讓人上架時自訂（locks.resale_price，0 ～ 原價），沒填就是早鳥價（折價券前）。
- * 成功後原付款人自動退款，金額＝他實付與轉讓價取小的（LINE Pay 退款不能超過原付款額）：
- *   - 賣得比實付低：差額由轉讓人吸收；賣得比實付高：多的留在店家，轉讓人不會因此獲利。
- * 同一份餐店家至少收到原本那筆錢，只是付錢的人換了。原付款人用掉的折價券不退回。
- * 抽獎券跟著真正付錢的人走：接手後 payer_uid 換成接手者。
- * 逾時沒人接手仍照 firestore.rules 開放 $0 免費領取（原付款人不退款）。
+ * Paid takeover in the resale market (spec §4.1: the taker becomes the new holder after paying)
+ * The taker pays the "resale price" via LINE Pay: set by the seller when listing (locks.resale_price, 0 to list price); if unset, the early-bird price (before coupons).
+ * On success the original payer is refunded automatically, the smaller of what they paid and the resale price (a LINE Pay refund can't exceed the original payment):
+ *   - Sold below what they paid: the seller absorbs the difference; sold above: the excess stays with the vendor, so the seller can't profit.
+ * The vendor still receives at least the original amount for the meal; only the payer changes. Coupons used by the original payer are not returned.
+ * Draw tickets follow whoever actually paid: after a takeover, payer_uid becomes the taker.
+ * If nobody takes it over in time, firestore.rules still opens a $0 free claim (the original payer isn't refunded).
  * ------------------------------------------------------------------ */
 
 const RESALE_HOLD_MS = 15 * 60 * 1000;
 
-/** 預設接手價＝早鳥價＋加減（折價券前）；舊資料沒有拆欄位就用實付＋券折抵 */
+/** Default takeover price = early-bird price + adjustments (before coupons); legacy data without split fields uses amount paid + coupon discount */
 function defaultResalePriceOf(lock) {
   if (Number.isFinite(lock.list_price) && Number.isFinite(lock.early_bird_amount)) {
     return Math.max(0, lock.list_price - lock.early_bird_amount + (lock.adjust_amount || 0));
@@ -724,12 +724,12 @@ function defaultResalePriceOf(lock) {
   return Math.max(0, (lock.locked_price || 0) + (lock.coupon_discount || 0));
 }
 
-/** 轉讓價上限＝原價（品項原價＋加減項，不含早鳥折扣）；舊資料沒有原價就用預設接手價 */
+/** Resale price cap = list price (item list price + adjustments, excluding the early-bird discount); legacy data without a list price uses the default takeover price */
 function resaleCapOf(lock) {
   return Number.isFinite(lock.list_price) ? Math.max(0, lock.list_price + (lock.adjust_amount || 0)) : defaultResalePriceOf(lock);
 }
 
-/** 接手價：轉讓人自訂的 resale_price（夾在 0 ～ 原價），沒填用預設接手價。web/src/lib/transfers.ts 同一套 */
+/** Takeover price: the seller's resale_price (clamped to 0 to list price), or the default takeover price if unset. Same logic as web/src/lib/transfers.ts */
 function resalePriceOf(lock) {
   if (Number.isInteger(lock.resale_price) && lock.resale_price >= 0) return Math.min(lock.resale_price, resaleCapOf(lock));
   return defaultResalePriceOf(lock);
@@ -737,7 +737,7 @@ function resalePriceOf(lock) {
 
 const millisOf = (ts) => (ts && typeof ts.toMillis === "function" ? ts.toMillis() : 0);
 
-/** 這份還能不能由 uid 付款接手；回傳錯誤訊息或 null */
+/** Whether uid can still pay to take this over; returns an error message or null */
 function resaleProblem(lock, uid, now = Date.now()) {
   if (!lock || lock.status !== "for_resale") return t("這份已經被接走或取消轉讓了", "This meal is no longer up for transfer");
   if (lock.buyer_uid === uid) return t("不能接手自己轉讓的餐點", "You can't take over your own listing");
@@ -750,7 +750,7 @@ function resaleProblem(lock, uid, now = Date.now()) {
   return null;
 }
 
-/** 「我要接手」：先保留這份 15 分鐘，再向 LINE Pay 請款（0 元直接到確認頁） */
+/** "Take over" (我要接手): hold this meal for 15 minutes, then request payment from LINE Pay (NT$0 goes straight to the confirmation page) */
 exports.createResaleLinePayReservation = onCall({}, async (request) => {
   assertSignedInUser(request, "接手轉讓");
   await assertNotBanned(request.auth.uid);
@@ -809,20 +809,20 @@ exports.createResaleLinePayReservation = onCall({}, async (request) => {
   return { order_id: orderId, payment_url: paymentUrl, free: amount === 0, amount, total, points_used: points.used };
 });
 
-/** confirmLinePayPayment 的接手分支：先換人（賣家就不能再取消轉讓）→ 扣款 → 退款給原付款人 */
+/** Takeover branch of confirmLinePayPayment: change holder first (so the seller can no longer cancel the listing) → charge → refund the original payer */
 async function confirmResale(request, intentRef, intent) {
   const orderId = intentRef.id;
   const lockRef = db().collection("locks").doc(intent.lock_id);
   const uid = request.auth.uid;
 
-  // 1) 交易內檢查還能接手，先把持有人換成接手者並標記「付款中」；還沒扣款
+  // 1) Inside a transaction, check it can still be taken over, switch the holder to the taker and mark it "paying"; not charged yet
   const prev = await db().runTransaction(async (tx) => {
     const fresh = (await tx.get(intentRef)).data();
     if (fresh.status !== "pending") {
       throw new HttpsError("failed-precondition", t("這筆付款正在處理中，請稍候重新整理", "This payment is still being processed."));
     }
     const lock = (await tx.get(lockRef)).data();
-    // 自己的保留過期了但沒人搶，照樣可以接手；別人正在付款（保留未過期）就不行
+    // If our own hold expired but nobody else claimed it, we can still take it over; not if someone else is paying (hold not expired)
     const problem = resaleProblem(lock, uid);
     if (problem) {
       tx.update(intentRef, { status: "gone", gone_reason: problem });
@@ -855,7 +855,7 @@ async function confirmResale(request, intentRef, intent) {
     throw new HttpsError("failed-precondition", prev.gone);
   }
 
-  // 2) 扣款；失敗就把餐點還給賣家、意圖回 pending（點數保留也放回），接手者可以重試
+  // 2) Charge; on failure, return the meal to the seller and set the intent back to pending (also releasing the points hold) so the taker can retry
   const rollbackTakeover = async (status) => {
     const rollback = db().batch();
     rollback.update(lockRef, {
@@ -896,10 +896,10 @@ async function confirmResale(request, intentRef, intent) {
 
   await wallet.commitHold(uid, orderId);
 
-  // 3) 接手者成為付款人；換掉代領連結與 QR，原持有人手上的截圖立即失效
+  // 3) The taker becomes the payer; replace the proxy pickup link and QR so screenshots held by the previous holder stop working immediately
   const lock = (await lockRef.get()).data();
-  const price = Number.isFinite(intent.total) ? intent.total : intent.amount; // 舊意圖沒有 total（沒有點數折抵）
-  // 退給原付款人的金額：實付與轉讓價取小的（自訂轉讓價可能低於或高於他實付）；2026-10-09 起退成點數
+  const price = Number.isFinite(intent.total) ? intent.total : intent.amount; // older intents have no total (no points applied)
+  // Refund to the original payer: the smaller of what they paid and the resale price (a custom resale price may be lower or higher than what they paid); refunded as points since 2026-10-09
   const refund = wallet.refundSources({ funding: prev.funding || [] }, Math.min(prev.paid_amount, price));
   const refundAmount = refund.amount;
   const [share] = wallet.splitFunding([price], intent.transaction_id, intent.points_sources || []);
@@ -922,11 +922,11 @@ async function confirmResale(request, intentRef, intent) {
       refund_uid: prev.payer_uid, refund_amount: refundAmount, at: Timestamp.now(),
     }),
   });
-  batch.delete(db().collection("lock_tokens").doc(intent.lock_id)); // 原持有人的取餐提醒
+  batch.delete(db().collection("lock_tokens").doc(intent.lock_id)); // previous holder's pickup reminder
   batch.update(intentRef, { status: "confirmed", lock_ids: [intent.lock_id] });
   await batch.commit();
 
-  // 4) 原付款人的款項退成平台點數（可折抵或到會員中心退回 LINE Pay）
+  // 4) Refund the original payer as platform points (usable at checkout or refundable to LINE Pay from the member center)
   let refundStatus = "none";
   if (refundAmount > 0) {
     try {
@@ -949,7 +949,7 @@ async function confirmResale(request, intentRef, intent) {
       : t(`「${lock.item_name}」已由別人付款接手。`, `${lock.item_name} was taken over.`),
     link: refundStatus === "done" && prev.payer_uid === prev.buyer_uid ? "/profile?tab=points" : "/my-bookings",
   }).catch((err) => logger.warn("notify seller failed", err));
-  // 贈送或免費領取來的餐點再轉讓：錢退給當初真正付款的人
+  // Reselling a meal that was itself gifted or claimed for free: refund whoever originally paid
   if (refundStatus === "done" && prev.payer_uid !== prev.buyer_uid) {
     await notifyUser(prev.payer_uid, {
       kind: "transfer",
@@ -958,12 +958,12 @@ async function confirmResale(request, intentRef, intent) {
       link: "/profile?tab=points",
     }).catch((err) => logger.warn("notify payer failed", err));
   }
-  // AI 轉讓媒合的影響指標：接手的人是不是被通知的會員（失敗不影響接手）
+  // Impact metric for AI resale matching: was the taker a notified member (failures don't affect the takeover)
   await recordMatchedClaim(intent.lock_id, uid).catch((err) => logger.warn(`recordMatchedClaim ${intent.lock_id}`, err));
   return { lock_ids: [intent.lock_id], kind: "resale", refund_status: refundStatus };
 }
 
-/** 鎖定目前的選擇 → resolveOrderChoices 吃的格式（沒送的欄位沿用原本的） */
+/** A lock's current choices → the format resolveOrderChoices takes (fields not sent keep their current values) */
 function currentChoices(lock) {
   return {
     rice: lock.rice || "normal",
@@ -974,9 +974,9 @@ function currentChoices(lock) {
 }
 
 /**
- * 截單前修改（§4.1）：主菜、配菜、飯量、第四道與取餐時段（同一天）。
- * 金額以下單時的早鳥折數重算：變便宜就退差額（LINE Pay 部分退款）；變貴要補差額，
- * 第一階段請取消後重訂。計畫的每一天也用這支改時段。
+ * Edit before cut-off (§4.1): main, sides, rice, fourth side and pickup slot (same day).
+ * The amount is recomputed at the early-bird rate from the original order: if cheaper, refund the difference (LINE Pay partial refund); if more expensive,
+ * phase 1 requires cancelling and re-ordering. Each day of a meal plan also changes its slot through this.
  */
 exports.updateLockChoices = onCall({}, async (request) => {
   assertSignedInUser(request, "修改訂單");
@@ -992,14 +992,14 @@ exports.updateLockChoices = onCall({}, async (request) => {
   const item = itemSnap.exists ? { id: itemSnap.id, ...itemSnap.data() } : null;
   const data = request.data || {};
 
-  // 取餐時段
+  // Pickup slot
   const newWindow = typeof data.pickup_window === "string" && data.pickup_window ? data.pickup_window : lock.pickup_window;
   if (newWindow !== lock.pickup_window) {
     const problem = validatePickup(lock.pickup_date, newWindow, vendor, config, new Date(), item);
     if (problem) throw new HttpsError("invalid-argument", problem);
   }
 
-  // 便當內容（計畫的每日餐點沒有選項，只能改時段）
+  // Bento contents (daily meals in a meal plan have no options; only the slot can change)
   const changesChoices = ["slots", "rice", "main_index", "extra_side", "custom_picks"].some((k) => k in data);
   const patch = { pickup_window: newWindow, meal_period: mealPeriodOf(newWindow, config) };
   let newLocked = lock.locked_price;
@@ -1039,7 +1039,7 @@ exports.updateLockChoices = onCall({}, async (request) => {
     next = { ...lock, ...patch };
   }
 
-  // 變便宜：差額退成平台點數給付款人（wallet.js），寫進同一個交易
+  // Cheaper: refund the difference to the payer as platform points (wallet.js), in the same transaction
   const refund = lock.locked_price - newLocked;
   let refundCredit = null;
   if (refund > 0) {
@@ -1051,7 +1051,7 @@ exports.updateLockChoices = onCall({}, async (request) => {
     }
   }
 
-  // 換時段要搬份數（有上限的店家先檢查新時段還有沒有位子）
+  // Changing slots moves the portion count (for vendors with a cap, first check the new slot has room)
   await db().runTransaction(async (tx) => {
     if (newWindow !== lock.pickup_window) {
       const toRef = slotCounterRef(lock.vendor_id, lock.pickup_date, newWindow);
@@ -1079,7 +1079,7 @@ exports.updateLockChoices = onCall({}, async (request) => {
 });
 
 /* ------------------------------------------------------------------ *
- * QR 取餐（§6）：伺服器簽章一次性憑證（id + 到期 + nonce + HMAC）
+ * QR pickup (§6): server-signed one-time token (id + expiry + nonce + HMAC)
  * ------------------------------------------------------------------ */
 
 const QR_TTL_MS = 10 * 60 * 1000;
@@ -1088,7 +1088,7 @@ function qrSecret() {
   const secret = process.env.PICKUP_QR_SECRET;
   if (secret) return secret;
   if (isEmulator()) return "local-dev-secret";
-  // 沒設就用固定字串會讓偽造變容易；正式環境一定要設
+  // Falling back to a fixed string would make forgery easier; production must set it
   logger.error("PICKUP_QR_SECRET is not set; using a derived fallback");
   return `bunnbaa:${process.env.GCLOUD_PROJECT || "local"}:qr`;
 }
@@ -1113,13 +1113,13 @@ function parseQrToken(token) {
 }
 
 /**
- * 產生取餐 QR。持有人本人，或拿到代領連結（share_token）的人都可以。
- * 每次產生都換 nonce，舊截圖立即失效。愛心餐預約（kind=R）也走這裡。
+ * Generate a pickup QR. Either the holder, or anyone with the proxy pickup link (share_token), can do this.
+ * Each call issues a new nonce, so old screenshots stop working immediately. Charity meal reservations (kind=R) also go through here.
  */
-// 代領碼（2026-10-09）：代領連結點開常被要求登入、登入後又跳走，改成可以輸入的 8 碼代領碼。
-// 存在 proxyCodes/{code}（規則全擋，只有 Admin SDK 讀寫；不能放在 locks 上——轉讓中／贈送中的 locks 是公開可讀的），
-// 記下產生當時的 share_token：轉讓／贈送接手會換 share_token，舊代領碼跟舊連結一起失效。
-// 字母表去掉容易看錯的 0/O、1/I/L。
+// Proxy pickup codes (2026-10-09): opening a proxy pickup link often asked for login and then navigated away, so we switched to an 8-character code that can be typed in.
+// Stored in proxyCodes/{code} (rules deny everything; only the Admin SDK reads/writes; it can't live on locks, since locks being resold/gifted are publicly readable),
+// recording the share_token at creation time: a resale/gift takeover changes share_token, so the old proxy pickup code dies along with the old link.
+// The alphabet drops easily confused 0/O and 1/I/L.
 const PROXY_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const PROXY_CODE_LENGTH = 8;
 
@@ -1132,7 +1132,7 @@ function randomProxyCode() {
   return Array.from(bytes, (b) => PROXY_CODE_ALPHABET[b % PROXY_CODE_ALPHABET.length]).join("");
 }
 
-/** 持有人取得（或第一次產生）這份餐點的代領碼 */
+/** The holder gets (or generates for the first time) the proxy pickup code for this meal */
 exports.getProxyPickupCode = onCall({}, async (request) => {
   assertSignedInUser(request, "產生代領碼");
   const lockId = request.data?.lock_id;
@@ -1156,7 +1156,7 @@ exports.getProxyPickupCode = onCall({}, async (request) => {
       await db().collection("proxyCodes").doc(code).create({ lock_id: lockId, share_token: shareToken, created_at: FieldValue.serverTimestamp() });
       return { code, share_token: shareToken };
     } catch (err) {
-      if (err.code !== 6) throw err; // 6 = ALREADY_EXISTS：撞碼就換一組
+      if (err.code !== 6) throw err; // 6 = ALREADY_EXISTS: on collision, try another code
     }
   }
   throw new HttpsError("internal", t("代領碼產生失敗，請再試一次", "Couldn't create a proxy code. Please try again."));
@@ -1177,7 +1177,7 @@ exports.issuePickupQr = onCall({}, async (request) => {
   }
   let codeToken = null;
   if (proxyCode != null) {
-    // 代領碼不用登入；碼錯、已轉手一律同一句話，不透露訂單存不存在
+    // Proxy pickup codes need no login; a wrong code and an already transferred meal get the same message, so we don't reveal whether the order exists
     const normalized = normalizeProxyCode(proxyCode);
     const codeSnap = normalized.length === PROXY_CODE_LENGTH ? await db().collection("proxyCodes").doc(normalized).get() : null;
     if (!codeSnap?.exists) throw new HttpsError("not-found", t("代領碼不正確或已失效，請跟朋友確認", "That proxy code is wrong or no longer valid. Check with your friend."));
@@ -1191,7 +1191,7 @@ exports.issuePickupQr = onCall({}, async (request) => {
   const lock = snap.data();
   const owner = request.auth && lock.buyer_uid === request.auth.uid;
   const presented = codeToken || shareToken;
-  // 代領只限沒在轉讓／贈送的餐點：for_resale／for_gift 的 locks 公開可讀（含 share_token），不能拿來代領
+  // Proxy pickup only for meals not being resold/gifted: for_resale / for_gift locks are publicly readable (including share_token), so they can't be used for proxy pickup
   const proxy = !!presented && !!lock.share_token && presented === lock.share_token && lock.status === "locked";
   if (!owner && !proxy) {
     if (codeToken) throw new HttpsError("not-found", t("代領碼不正確或已失效，請跟朋友確認", "That proxy code is wrong or no longer valid. Check with your friend."));
@@ -1208,7 +1208,7 @@ exports.issuePickupQr = onCall({}, async (request) => {
     item_name: lock.item_name,
     pickup_date: lock.pickup_date,
     pickup_window: lock.pickup_window,
-    // 代領畫面要顯示是哪一份、哪家店（不含任何持有人個資）
+    // The proxy pickup screen shows which meal and which vendor (no holder personal data)
     ...(proxy && !owner ? { item_name_en: lock.item_name_en || null, vendor_id: lock.vendor_id } : {}),
   };
 });
@@ -1239,15 +1239,15 @@ function lockSummary(id, lock, extra = {}) {
 }
 
 /**
- * 店家掃碼（或備援：4 碼取餐號＋手機末三碼）確認取餐。只有該店店主／管理員能核銷。
- * preview=true 只回傳內容不核銷（畫面先顯示再按「完成取餐」）。
+ * Vendor scans the code (or fallback: 4-digit pickup number + last 3 phone digits) to confirm pickup. Only that vendor's owner / admins can redeem.
+ * preview=true only returns the content without redeeming (the screen shows it first, then "Complete pickup" is pressed).
  */
 exports.completePickup = onCall({}, async (request) => {
   const { token, pickup_code: code, phone_last3: last3, preview, vendor_id: requestedVendor, lock_id: lockId } = request.data || {};
   const vendorId = await callerVendorId(request, requestedVendor);
   const today = taipeiToday();
 
-  // 店家在今日訂單列表當面核對後直接按「確認取餐」（只限本店、今天的單）
+  // Vendor checks in person in today's order list and presses "Confirm pickup" directly (own vendor, today's orders only)
   if (lockId) return completeLock(db().collection("locks").doc(String(lockId)), vendorId, today, preview, null);
 
   if (token) {
@@ -1284,7 +1284,7 @@ async function completeLock(ref, vendorId, today, preview, nonce) {
     }
     const summary = lockSummary(ref.id, lock);
     if (preview) return summary;
-    // 轉讓過的餐點：免費領取／贈送（付款人還是原訂購人）或付費接手（transfers 有紀錄、付款人已換成接手者）
+    // Transferred meals: free claim / gift (payer is still the original buyer) or paid takeover (recorded in transfers, payer switched to the taker)
     const transferred = (lock.payer_uid || lock.buyer_uid) !== lock.buyer_uid || (lock.transfers || []).length > 0;
     const status = transferred ? "resold_and_fulfilled" : "fulfilled";
     tx.update(ref, { status, qr_nonce: FieldValue.delete(), fulfilled_at: FieldValue.serverTimestamp() });
@@ -1314,14 +1314,14 @@ async function completeCharityReservation(parsed, vendorId, preview) {
 }
 
 /* ------------------------------------------------------------------ *
- * 截單（§4.3、§5.4）：判定候選菜許願、產生每日備料與出餐標籤、缺料警示
+ * Cut-off (§4.3, §5.4): decide candidate-dish wishes, generate daily prep and pickup labels, shortage warnings
  * ------------------------------------------------------------------ */
 
 /**
- * 截單後的當日需求 vs 本週理論庫存 → 缺料清單。
- * 期初庫存＝上週六的盤點（記在 inventory/{上週一}，跟 purchasing.js currentStock 同一個語意）；
- * 沒盤點就用本週叫貨單產生時採用的庫存（lines[].stock）。再加本週到貨、扣掉這天之前的備料用量。
- * web/src/hooks/useStockOnHand.ts 用同一套算法，要一起改。
+ * Demand for the day after cut-off vs this week's theoretical stock → shortage list.
+ * Opening stock = last Saturday's stocktake (stored at inventory/{last Monday}, same meaning as currentStock in purchasing.js);
+ * without a stocktake, the stock used when this week's supplier order was generated (lines[].stock). Then add this week's deliveries and subtract prep usage before this day.
+ * web/src/hooks/useStockOnHand.ts uses the same algorithm; change both together.
  */
 async function shortageFor(vendorId, date, needs, ingredientsById) {
   const week = mondayOf(date);
@@ -1353,7 +1353,7 @@ async function shortageFor(vendorId, date, needs, ingredientsById) {
 }
 
 /**
- * 截單並產生 prepPlans/{date}。冪等：prepPlans 已有 locked_at 就跳過（以日期為鍵）。
+ * Cut off and generate prepPlans/{date}. Idempotent: skipped if prepPlans already has locked_at (keyed by date).
  */
 async function runLockOrders(vendor, date, { force = false } = {}) {
   const vendorRef = db().collection("vendors").doc(vendor.id);
@@ -1369,7 +1369,7 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
   const catalog = await loadVendorCatalog(vendor.id);
   const minDefault = Number(vendor.candidate_min_qty) > 0 ? Number(vendor.candidate_min_qty) : config.candidateMinQty;
 
-  // 判定許願（§4.3）：達最低量者拿到許願菜；未達者有備案換備案，沒有則換回預設菜並通知（預設菜照做）
+  // Decide wishes (§4.3): candidates that reach the minimum quantity are served; those that don't switch to the backup if there is one, otherwise back to the default dish with a notification (the default dish is made as usual)
   const batch = db().batch();
   const failedWishes = new Map(); // uid -> [message]
   const wishResults = {};
@@ -1378,7 +1378,7 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
     const cand = item?.slots?.[slotIdx]?.candidates?.[candIdx];
     const minQty = Number(cand?.min_qty) > 0 ? Number(cand.min_qty) : minDefault;
     const count = wishCounts.get(key) || 0;
-    // 候選菜被停用（天災、菜價暴漲不得列為候選）＝沒供應
+    // Candidate dish disabled (disaster, ingredient price spike: not allowed as a candidate) = not served
     const ok = !cand?.disabled && count >= minQty;
     wishResults[key] = { dish, count, min_qty: minQty, ok };
     return { ok, count, minQty, cand };
@@ -1394,7 +1394,7 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
       if (slot.removed) return slot;
       if (slot.wished == null) return { ...slot, resolved: slot.default_dish };
       const { ok, count, minQty, cand } = judge(item, slotIdx, slot.candidate_index, slot.wished);
-      // 份量級距以截單當下的品項設定為準（菜價變動後會重算，§11），截單後鎖定
+      // Portion level is taken from the item settings at cut-off time (recomputed after price changes, §11) and locked after cut-off
       if (ok) return { ...slot, resolved: slot.wished, portion_level: cand?.portion_level ?? slot.portion_level ?? 1 };
       const short = Math.max(0, minQty - count);
       if (backupFree) {
@@ -1409,7 +1409,7 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
     let extraSide = extra;
     if (extra) {
       if (extra.mode === "addon") {
-        // 加菜選的候選菜沒成立：改放那一格的預設菜（一樣是第四道，不退價差）
+        // Add-on candidate didn't go ahead: use that slot's default dish instead (still the fourth side, no price difference refunded)
         const fallback = item?.slots?.[extra.slot]?.default;
         extraSide = extraJudge.ok
           ? { ...extra, resolved: extra.dish }
@@ -1427,7 +1427,7 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
 
   const portions = componentPortions(locks, catalog.itemsById, catalog.componentsById, config);
   const needs = rawNeeds(portions, catalog.componentsById, catalog.ingredientsById);
-  // 時間軸依每個餐期的取餐開始時間分別往回推（§5.2）
+  // The timeline is worked backwards separately from each meal period's pickup start time (§5.2)
   const periodRanges = vendorPeriodRanges(vendor, config);
   const timelines = {};
   for (const period of MEAL_PERIODS) {
@@ -1482,12 +1482,12 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
   return { order_count: locks.length, shortages: shortages.length };
 }
 
-/** 每 10 分鐘看每家店：明天（或最近的取餐日）截單時間到了就截單 */
+/** Every 10 minutes, per vendor: cut off when tomorrow's (or the next pickup date's) cut-off time arrives */
 exports.lockOrders = onSchedule({ schedule: "every 10 minutes", timeZone: "Asia/Taipei", region: REGION }, async () => {
   const config = await loadPlatformConfig(db());
   const today = taipeiToday();
   await forEachVendor("lockOrders", async (vendor) => {
-    // 今天與明天：今天通常在昨晚就截過，漏跑時補做
+    // Today and tomorrow: today is usually cut off last night; catch up if a run was missed
     for (const date of [today, addDays(today, 1)]) {
       if (!config.businessWeekdays.includes(new Date(`${date}T00:00:00Z`).getUTCDay())) continue;
       if (isPastCutoff(date, vendor, config)) await runLockOrders(vendor, date);
@@ -1495,7 +1495,7 @@ exports.lockOrders = onSchedule({ schedule: "every 10 minutes", timeZone: "Asia/
   });
 });
 
-/** 手動截單（demo／漏跑時），可強制重算 */
+/** Manual cut-off (demo / missed runs); can force a recompute */
 exports.triggerLockOrdersNow = onCall({}, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const date = request.data?.date || addDays(taipeiToday(), 1);
@@ -1504,10 +1504,10 @@ exports.triggerLockOrdersNow = onCall({}, async (request) => {
 });
 
 /* ------------------------------------------------------------------ *
- * 取餐提醒（取餐時段結束前 30 分）
+ * Pickup reminders (30 minutes before the pickup slot ends)
  * ------------------------------------------------------------------ */
 
-/** 某天、某店還要出餐的鎖定；給 period 就只取那個餐期的 */
+/** Locks a vendor still has to serve on a given day; with period, only that meal period */
 async function activeLocksOn(vendorId, date, period = null, config = null) {
   const snap = await db().collection("locks").where("vendor_id", "==", vendorId).where("pickup_date", "==", date).get();
   return snap.docs.filter((d) => {
@@ -1517,7 +1517,7 @@ async function activeLocksOn(vendorId, date, period = null, config = null) {
   });
 }
 
-/** 這家店今天各餐期的取餐時段起訖時間點：[{ period, label, start, end }]（早、中、晚各自計算，§7） */
+/** Start/end instants of each meal period's pickup slot today for this vendor: [{ period, label, start, end }] (breakfast, lunch and dinner computed separately, §7) */
 function periodRangesOn(vendor, date, config) {
   return Object.entries(vendorPeriodRanges(vendor, config || undefined)).map(([period, range]) => {
     const { start, end } = splitWindow(range);
@@ -1525,7 +1525,7 @@ function periodRangesOn(vendor, date, config) {
   });
 }
 
-/** 某個取餐時段所屬餐期的起訖時間點（捐出、轉愛心餐依這個判斷） */
+/** Start/end instants of the meal period a pickup slot belongs to (used to judge donations and charity conversions) */
 function todayRange(vendor, date, window = null, config = null) {
   const ranges = periodRangesOn(vendor, date, config);
   const period = window ? mealPeriodOf(window, config || undefined) : null;
@@ -1548,7 +1548,7 @@ exports.pickupReminder = onSchedule({ schedule: "every 5 minutes", timeZone: "As
       const endsAt = endText;
       for (const doc of await activeLocksOn(vendor.id, today, period, config)) {
         const lock = doc.data();
-        // 排程不在請求內，依收件人的 users.lang 決定語言
+        // Schedules aren't inside a request, so the language follows the recipient's users.lang
         const lang = (await db().collection("users").doc(lock.buyer_uid).get()).data()?.lang;
         await inLang(lang, () => notifyUser(lock.buyer_uid, {
           kind: "pickup",

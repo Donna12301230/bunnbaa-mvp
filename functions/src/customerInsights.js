@@ -1,8 +1,8 @@
-// 購物籃與客戶分群（doc/GoogleCloud改動建議.md P1）：每週在 BigQuery 跑 customerInsights.sql
-// （常一起買的品項配對、ML.KMEANS 會員分群、AI.GENERATE 寫群組描述），再把每家店的結果寫回 Firestore：
+// Basket analysis and customer segments (doc/GoogleCloud改動建議.md P1): runs customerInsights.sql in BigQuery weekly
+// (frequently-bought-together item pairs, ML.KMEANS member segments, AI.GENERATE segment descriptions), then writes each vendor's results back to Firestore:
 //   vendors/{vendorId}/analytics/basket    { pairs: [{ item_a, item_b, buyers, confidence }] }
 //   vendors/{vendorId}/analytics/segments  { segments: [{ segment_id, label, description, label_en, description_en, customers }] }
-// 商家只看得到彙總（群名、人數），看不到是哪些會員。
+// Vendors only see aggregates (segment name, headcount), never which members are in them.
 const fs = require("fs");
 const path = require("path");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -42,7 +42,7 @@ async function runCustomerInsights() {
     if (!p) continue;
     entry(r.vendor_id).segments.push({
       segment_id: r.segment_id,
-      // AI.GENERATE 失敗時 label 是 null，前端改顯示「客群 N」
+      // When AI.GENERATE fails, label is null and the frontend shows "Segment N" instead
       label: p.label ?? null, description: p.description ?? null,
       label_en: p.label_en ?? null, description_en: p.description_en ?? null,
       customers: r.customers,
@@ -68,7 +68,7 @@ exports.customerInsights = onSchedule(
   }
 );
 
-/** 展示／測試用：不等排程，立刻重算（只限管理員） */
+/** For demos/testing: recompute now without waiting for the schedule (admins only) */
 exports.triggerCustomerInsightsNow = onCall({ timeoutSeconds: 540, memory: "512MiB" }, async (request) => {
   assertAdminOrEmulator(request);
   return runCustomerInsights();

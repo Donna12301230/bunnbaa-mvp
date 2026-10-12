@@ -1,13 +1,13 @@
-// 備料與採購的確定性計算（規格 §5）。純函式：份數、生料用量、流程時間軸、出餐標籤、
-// 叫貨量進位與分日到貨。AI 不參與任何數量運算，Gemini 只把結果轉成口語提示。
+// Deterministic prep and purchasing calculations (spec §5). Pure functions: portions, raw ingredient amounts, process timeline, pickup labels,
+// rounding of order quantities and split-day deliveries. AI does no quantity math; Gemini only turns the results into spoken-style hints.
 
 const { rawAmount } = require("./bento");
 const { toMinutes, fromMinutes } = require("./calendar");
 
-const PACKING_MINUTES = 20; // 取餐開始前留給裝盒、貼標籤
-const OVERNIGHT_ADVANCE_HOURS = 8; // 可提前 ≥ 8 小時的半成品排到「前一晚」
+const PACKING_MINUTES = 20; // reserved before pickup starts for boxing and labeling
+const OVERNIGHT_ADVANCE_HOURS = 8; // components that can be made ≥ 8 hours ahead go to "the night before"
 
-/** 這些狀態的鎖定都要出餐（轉讓中也還是要做） */
+/** Locks in these statuses all need to be cooked (still made while listed for resale) */
 const ACTIVE_LOCK_STATUSES = ["locked", "for_resale", "for_gift"];
 
 function add(map, key, amount) {
@@ -16,17 +16,17 @@ function add(map, key, amount) {
 }
 
 /**
- * 一筆鎖定要用到哪些半成品、各幾份（份＝該半成品的 portion_grams）。
- * 回傳 Map<component_id, portions>。
+ * Which components a lock uses, and how many portions of each (portion = that component's portion_grams).
+ * Returns Map<component_id, portions>.
  */
 function componentPortionsForLock(lock, item, componentsById, config) {
   const out = new Map();
   if (!item) return out;
-  // 主菜：訂單選的（mains 各自定價）優先，舊資料用品項的固定主菜
+  // Main: the one chosen on the order (mains are priced separately) takes priority; legacy data uses the item's fixed main
   const mainId = lock.main_component_id || item.main?.component_id || (Array.isArray(item.mains) ? item.mains[0]?.component_id : null);
   if (mainId) add(out, mainId, 1);
-  if (!mainId && item.component_id) add(out, item.component_id, 1); // 單品（非便當）
-  // 備料組成／固定附餐（例：經典便當的滷蛋、蛋餅的餅皮＋蛋），portions 沒設＝1 份
+  if (!mainId && item.component_id) add(out, item.component_id, 1); // single item (not a bento)
+  // Prep components / fixed sides (e.g. the braised egg in the classic bento, the wrapper + egg of a danbing); portions unset = 1 portion
   for (const f of item.fixed || []) add(out, f.component_id, Number(f.portions) > 0 ? Number(f.portions) : 1);
   const riceId = item.rice_component_id;
   if (riceId) {
@@ -35,14 +35,14 @@ function componentPortionsForLock(lock, item, componentsById, config) {
     if (lock.rice === "add") portions += riceGrams > 0 ? (config.riceAddGrams || 100) / riceGrams : 0.5;
     add(out, riceId, portions);
   }
-  // 預測用的虛擬訂單、舊資料沒有 slots：一律當成全部預設配菜
+  // Virtual orders used for forecasts, and legacy data, have no slots: treat them as all default sides
   const slots = Array.isArray(lock.slots) && lock.slots.length > 0
     ? lock.slots
     : (item.slots || []).map((s) => ({ removed: false, wished: null, default_component_id: s.default?.component_id }));
   slots.forEach((slot, i) => {
     if (slot.removed) return;
     if (slot.backup_used) {
-      add(out, slot.resolved_component_id, slot.portion_level ?? 1); // 許願未成立，遞補備案
+      add(out, slot.resolved_component_id, slot.portion_level ?? 1); // wish didn't go ahead, fill in with the backup
       return;
     }
     const wishedOk = slot.wished && slot.resolved === slot.wished;
@@ -51,13 +51,13 @@ function componentPortionsForLock(lock, item, componentsById, config) {
       : slot.default_component_id || item.slots?.[i]?.default?.component_id;
     add(out, componentId, wishedOk ? slot.portion_level ?? 1 : 1);
   });
-  // 第四道「加菜」：四道都放進便當（「備案」只在遞補時用到，上面已算）
+  // Fourth side as "add-on": all four go into the bento ("backup" is only used when filling in, already counted above)
   const extra = lock.extra_side;
   if (extra?.mode === "addon") add(out, extra.resolved_component_id || extra.component_id, extra.portion_level ?? 1);
   return out;
 }
 
-/** 多筆鎖定合計的半成品份數 */
+/** Total component portions across several locks */
 function componentPortions(locks, itemsById, componentsById, config) {
   const total = new Map();
   for (const lock of locks) {
@@ -67,7 +67,7 @@ function componentPortions(locks, itemsById, componentsById, config) {
   return total;
 }
 
-/** 半成品份數 → 各原物料生料用量（原物料的 unit，例如 g 或 個） */
+/** Component portions → raw amount of each ingredient (in the ingredient's unit, e.g. g or pieces) */
 function rawNeeds(portionsByComponent, componentsById, ingredientsById) {
   const needs = new Map();
   for (const [componentId, portions] of portionsByComponent) {
@@ -83,11 +83,11 @@ function rawNeeds(portionsByComponent, componentsById, ingredientsById) {
 }
 
 /**
- * 流程時間軸（§5.4）：從取餐開始時間往回推。倒推＋設備容量貪婪分配：
- * 1. 取餐前 PACKING_MINUTES 分鐘裝盒貼標籤。
- * 2. 可提前 ≥ 8 小時的半成品排到「前一晚」。
- * 3. 其餘依總工時由長到短，每道菜拆成 ceil(份數 / 每批容量) 批，
- *    每批排在該設備目前最晚可用時間之前（同設備不重疊，不同設備可並行）。
+ * Process timeline (§5.4): worked backwards from the pickup start time. Backward scheduling + greedy allocation by equipment capacity:
+ * 1. Boxing and labeling in the PACKING_MINUTES minutes before pickup.
+ * 2. Components that can be made ≥ 8 hours ahead go to "the night before".
+ * 3. The rest, ordered by total work time from longest to shortest; each dish is split into ceil(portions / batch capacity) batches,
+ *    each placed before the latest free time of its equipment (no overlap on the same equipment; different equipment can run in parallel).
  */
 function buildTimeline(portionsByComponent, componentsById, pickupStart) {
   const packStart = toMinutes(pickupStart) - PACKING_MINUTES;
@@ -135,7 +135,7 @@ function buildTimeline(portionsByComponent, componentsById, pickupStart) {
   };
 }
 
-/** 出餐標籤（§6.3）：每盒一張，不印姓名 */
+/** Pickup labels (§6.3): one per box, no names printed */
 function buildLabels(locks, itemsById) {
   return locks
     .map((lock) => {
@@ -161,7 +161,7 @@ function buildLabels(locks, itemsById) {
     .sort((a, b) => a.pickup_code.localeCompare(b.pickup_code));
 }
 
-/** 叫貨量依採購單位無條件進位（例如蛋以盒計）。回傳 { units, amount } */
+/** Order quantity rounded up to the purchase unit (e.g. eggs by the box). Returns { units, amount } */
 function roundToPurchaseUnit(amount, ingredient) {
   const size = Number(ingredient?.purchase_unit_size) > 0 ? Number(ingredient.purchase_unit_size) : 1;
   const units = amount > 0 ? Math.ceil(amount / size - 1e-9) : 0;
@@ -169,8 +169,8 @@ function roundToPurchaseUnit(amount, ingredient) {
 }
 
 /**
- * 分日到貨（§5.3）：保存天數 ≤ 3 天（葉菜類）建議分批，每批最多涵蓋 shelf_days 天；
- * 其他一次在週一到。byDay: [{ date, amount }]（週一到週五）。
+ * Split-day delivery (§5.3): items with shelf life ≤ 3 days (leafy greens) are best delivered in batches, each covering at most shelf_days days;
+ * everything else arrives once on Monday. byDay: [{ date, amount }] (Monday to Friday).
  */
 function splitDeliveries(byDay, ingredient) {
   const shelf = Number(ingredient?.shelf_days) || 0;
