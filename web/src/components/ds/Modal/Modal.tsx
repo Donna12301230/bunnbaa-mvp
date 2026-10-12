@@ -13,22 +13,22 @@ export interface ModalProps {
   title: ReactNode;
   description?: ReactNode;
   children?: ReactNode;
-  /** 底部按鈕列；手機寬度會自動改為上下堆疊、撐滿 */
+  /** Bottom button row; stacks vertically and fills the width on mobile */
   footer?: ReactNode;
-  /** sm 400 / md 520（預設）/ lg 720 */
+  /** sm 400 / md 520 (default) / lg 720 */
   size?: 'sm' | 'md' | 'lg';
-  /** 點遮罩是否關閉，預設 true；重要確認框建議關掉 */
+  /** Whether clicking the backdrop closes it, default true; turn off for important confirmations */
   closeOnOverlay?: boolean;
-  /** 隱藏右上角關閉鈕 */
+  /** Hide the close button in the top-right corner */
   hideClose?: boolean;
-  /** 送出中：關閉鈕與遮罩暫停作用 */
+  /** Submitting: the close button and backdrop are paused */
   loading?: boolean;
   className?: string;
 }
 
 const EXIT_MS = 200;
 
-/** 置中對話框。桌機與平板使用；手機上較長的內容請改用 BottomSheet。 */
+/** Centered dialog for desktop and tablet; on mobile use BottomSheet for longer content. */
 export function Modal({
   open,
   onClose,
@@ -49,7 +49,7 @@ export function Modal({
   const safeClose = () => {
     if (!loading) onClose();
   };
-  // 等面板真的掛載後才啟用（聚焦、焦點鎖、捲動鎖）
+  // Only enable once the panel has actually mounted (focus, focus trap, scroll lock)
   useDialogBehavior(panelRef, open && mounted, safeClose, !loading);
 
   if (!mounted) return null;

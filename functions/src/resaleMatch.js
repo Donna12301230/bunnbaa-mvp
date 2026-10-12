@@ -1,15 +1,15 @@
-// AI 功能 3：轉讓智慧媒合（doc/AI功能設計.md）。鎖定轉成 for_resale 時，找出可能想接手的
-// 會員並推播，讓有人不能取餐的那份便當有人接手，不用變成愛心餐或浪費。
+// AI feature 3: smart resale matching (doc/AI功能設計.md). When a lock becomes for_resale, find members likely to want it
+// and push to them, so a bento whose owner can't pick it up finds a taker instead of becoming a charity meal or waste.
 //
-// menu_embeddings/{menuItemId}：vendor_id, embedding（Gemini 向量，768 維）, src（算向量用的文字）
-//   只給伺服器讀寫（firestore.rules），品項頁不用多載一大串向量。menu_items 內容一變就重算。
-// resale_matches/{lockId}：這次上架通知了誰（notified_uids）、是否由被通知的人接手
-//   （claimed_by_match，claimResoldLock 寫）。只給伺服器與管理員讀，用來算「媒合救回幾份」。
+// menu_embeddings/{menuItemId}: vendor_id, embedding (Gemini vector, 768 dims), src (text the embedding was computed from)
+//   Read/written only by the server (firestore.rules), so item pages don't load a long vector. Recomputed whenever menu_items content changes.
+// resale_matches/{lockId}: who this listing notified (notified_uids) and whether a notified user took it over
+//   (claimed_by_match, written by claimResoldLock). Readable only by the server and admins; used to compute "portions rescued by matching".
 //
-// 比對：Firestore 原生 KNN 找出相似品項（同縣市的店）→ 過去鎖定過這些品項的會員 →
-// 依品項相似度、同一家店、取餐時段相近、常用地點距離加權排序 → 取前幾名推播。
-// 排除：轉讓者本人、曾經持有這份的人、當天已經有訂這家店的人、關掉這類通知的人、
-// 今天已收過 2 則媒合通知的人。
+// Matching: Firestore native KNN finds similar items (vendors in the same county/city) → members who locked those items before →
+// ranked by weighted item similarity, same vendor, nearby pickup slot and distance from their usual location → push to the top few.
+// Excluded: the seller, anyone who has held this lock before, anyone who already ordered from this vendor that day, anyone who turned these notifications off,
+// and anyone who already received 2 match notifications today.
 const crypto = require("crypto");
 const { onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const {
@@ -18,13 +18,13 @@ const {
 const { embedText } = require("./gemini");
 const { taipeiToday, toMinutes, splitWindow } = require("./calendar");
 
-const NEIGHBOURS = 10; // KNN 取幾個相似品項（含自己；Firestore `in` 最多 30）
+const NEIGHBOURS = 10; // how many similar items KNN returns (including itself; Firestore `in` allows at most 30)
 const MAX_NOTIFY = 5;
 const DAILY_CAP = 2;
-const RELIST_COOLDOWN_MS = 12 * 3600 * 1000; // 取消後重新上架，12 小時內不重複通知
-const FAR_METERS = 10000; // 常用地點離店超過 10 公里就不通知
+const RELIST_COOLDOWN_MS = 12 * 3600 * 1000; // relisted after a cancel: don't notify again within 12 hours
+const FAR_METERS = 10000; // don't notify if the usual location is more than 10 km from the vendor
 
-/** 算向量用的文字：品名、分類、說明、主菜、配菜與候選菜、飲食標記 */
+/** Text for the embedding: name, category, description, main, sides and candidate dishes, dietary tags */
 function embeddingSource(item) {
   const sides = (item.slots || []).flatMap((s) => [s.default?.name, ...(s.candidates || []).map((c) => c.name)]);
   return [
@@ -63,12 +63,12 @@ exports.embedMenuItem = onDocumentWritten({ document: "menu_items/{itemId}", reg
   try {
     await upsertEmbedding(itemId, after.data());
   } catch (err) {
-    // 沒有向量時媒合退回「同品項」比對，不影響上架
+    // Without an embedding, matching falls back to same-item comparison; listing is unaffected
     logger.warn(`Embedding failed for menu_items/${itemId}`, err);
   }
 });
 
-/** 管理員補算：觸發器只在新寫入時跑，既有品項用這支補 */
+/** Admin backfill: the trigger only runs on new writes, so this fills in existing items */
 exports.backfillMenuEmbeddings = onCall({ timeoutSeconds: 540 }, async (request) => {
   assertAdminOrEmulator(request);
   const snap = await db().collection("menu_items").get();
@@ -85,7 +85,7 @@ exports.backfillMenuEmbeddings = onCall({ timeoutSeconds: 540 }, async (request)
   return counts;
 });
 
-/** 相似品項：Map<menu_item_id, 相似度 0–1>，只留同縣市的店；自己一定在裡面（相似度 1） */
+/** Similar items: Map<menu_item_id, similarity 0–1>, only vendors in the same county/city; the item itself is always included (similarity 1) */
 async function similarItems(menuItemId, county) {
   const similar = new Map([[menuItemId, 1]]);
   const own = await db().collection("menu_embeddings").doc(menuItemId).get();
@@ -105,7 +105,7 @@ async function similarItems(menuItemId, county) {
       if (d.id === menuItemId) continue;
       const vendorCounty = countyOfVendor.get(d.data().vendor_id);
       if (county && vendorCounty && vendorCounty !== county) continue;
-      const score = Math.max(0, 1 - (Number(d.data().distance) || 0)); // cosine distance → 相似度
+      const score = Math.max(0, 1 - (Number(d.data().distance) || 0)); // cosine distance → similarity
       if (score > 0.5) similar.set(d.id, score);
     }
   } catch (err) {
@@ -121,7 +121,7 @@ function windowGapMinutes(a, b) {
   return Math.abs(toMinutes(sa) - toMinutes(sb));
 }
 
-/** 依過去鎖定打分：Map<uid, { score, sameDay }> */
+/** Score by past locks: Map<uid, { score, sameDay }> */
 function scoreCandidates(pastLocks, similar, resale) {
   const byUid = new Map();
   for (const lock of pastLocks) {
@@ -148,8 +148,8 @@ async function hasLockThatDay(uid, vendorId, date) {
 }
 
 /**
- * 預扣今天的媒合通知額度；關掉通知、今天已達上限、常用地點離店太遠都回傳 null，
- * 否則回傳 { lang }（推播用哪種語言）。
+ * Reserve one of today's match notifications; returns null if notifications are off, today's limit is reached, or the usual location is too far from the vendor,
+ * otherwise returns { lang } (the language for the push).
  */
 async function takeDailySlot(uid, today, vendorPos) {
   const ref = db().collection("users").doc(uid);
@@ -179,8 +179,8 @@ async function matchResale(lockId, lock) {
   const county = countyOf(vendor.address);
 
   const similar = lock.menu_item_id ? await similarItems(lock.menu_item_id, county) : new Map();
-  // 同店的近期訂單一定查；有相似品項再加查訂過相似品項的。2026-10-12 前是二選一，
-  // 但舊訂單（含種子資料）沒有 menu_item_id，補完向量後反而只剩幾筆可比、候選人變 0
+  // Always query the vendor's recent orders; when there are similar items, also query orders for those. Before 2026-10-12 it was one or the other,
+  // but older orders (seed data included) have no menu_item_id, so after the embedding backfill only a few could be compared and there were 0 candidates
   const queries = [db().collection("locks").where("vendor_id", "==", lock.vendor_id).orderBy("created_at", "desc").limit(400)];
   if (similar.size > 0) queries.push(db().collection("locks").where("menu_item_id", "in", [...similar.keys()].slice(0, 30)).limit(400));
   const pastById = new Map();
@@ -237,8 +237,8 @@ async function matchResale(lockId, lock) {
 exports.matchResaleLock = onDocumentUpdated({ document: "locks/{lockId}", region: REGION }, async (event) => {
   const before = event.data.before.data();
   const after = event.data.after.data();
-  // 取消轉讓／取消贈送（同一個人收回）：上架期間 lock 公開可讀、share_token 可能被看過，換一組新的，
-  // 舊代領連結與代領碼（proxyCodes 記的是舊 token）一起失效（orders.js issuePickupQr）
+  // Resale/gift cancelled (taken back by the same person): while listed the lock was publicly readable and share_token may have been seen, so issue a new one;
+  // the old proxy pickup link and proxy pickup code (proxyCodes stores the old token) are invalidated with it (orders.js issuePickupQr)
   if (["for_resale", "for_gift"].includes(before.status) && after.status === "locked" && before.buyer_uid === after.buyer_uid && after.share_token) {
     await event.data.after.ref.update({ share_token: crypto.randomBytes(12).toString("hex") }).catch((err) => logger.error("Rotate share_token failed", err));
     return;
@@ -252,7 +252,7 @@ exports.matchResaleLock = onDocumentUpdated({ document: "locks/{lockId}", region
   }
 });
 
-/** claimResoldLock 接手成功後呼叫：接手的人是被媒合通知的會員就記下來（影響指標） */
+/** Called after claimResoldLock succeeds: if the taker was a member notified by matching, record it (affects metrics) */
 async function recordMatchedClaim(lockId, uid) {
   const ref = db().collection("resale_matches").doc(lockId);
   const snap = await ref.get();

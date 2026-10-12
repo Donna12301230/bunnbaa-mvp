@@ -1,6 +1,6 @@
 import { InsightsHub } from "@/pages/vendor-portal/VendorPortalReports";
 
-// 成長獎勵・券負債看板併進「看數據」頁的「回饋券」分頁（2026-10-06），保留路徑讓舊連結可用。
+// The growth reward / coupon liability board was merged into the "Coupons" tab of the "Insights" page (2026-10-06); the path is kept so old links still work.
 export default function VendorPortalGrowth() {
   return <InsightsHub initial="rewards" />;
 }

@@ -1,55 +1,59 @@
 /**
- * 擴充版種子資料：在 seed.js 的 4 家商家之上補成「20 家商家 × 每家 10–20 個品項
- * （多個分類）＋ 100 位虛擬會員 × 每人 1–10 筆訂單」。seed.js 先跑、再跑這支。
+ * Scaled-up seed data: on top of the 4 vendors in seed.js, fills out to "20 vendors × 10–20 items each
+ * (several categories) + 100 fake members × 1–10 orders each". Run seed.js first, then this.
  *
- * ── 設計 ─────────────────────────────────────────────────────────────
- * 商家（vendors，20 家）
- *   - 既有 4 家（cafe-renheya-demo／wang-mama-biandang／ajia-friedchicken／
- *     zaoan-sandwich）的商家文件、歷史 locks、payouts、校準報告完全不動，
- *     只補菜單：沿用 seed.js 寫好的 `${id}-item-1`，這裡從 item-2 往下補。
- *   - 新增 16 家（嘉義市、嘉大／中正周邊），各自有 pickup_windows、訂閱狀態，
- *     reliability_tone 依這支產生的訂單履約率算（≥90% stable，其餘 variable）。
- *     不寫 accuracy_reports——等 dailyCalibration 依真實 locks 產生。
- *   - 新商家各有 A／B 兩個計畫方案（meal_plans），跟 seed.js 同一個規則。
+ * ── Design ───────────────────────────────────────────────────────────
+ * Vendors (vendors, 20)
+ *   - The existing 4 (cafe-renheya-demo / wang-mama-biandang / ajia-friedchicken /
+ *     zaoan-sandwich) keep their vendor docs, historical locks, payouts and calibration reports
+ *     untouched; only their menus are extended: seed.js already wrote `${id}-item-1`, so this
+ *     continues from item-2.
+ *   - 16 new vendors (Chiayi City, around NCYU / CCU), each with pickup_windows and a subscription
+ *     status; reliability_tone comes from the fulfillment rate of the orders generated here
+ *     (≥90% stable, otherwise variable). No accuracy_reports are written; dailyCalibration
+ *     produces them from real locks.
+ *   - Each new vendor has two meal plans, A and B (meal_plans), following the same rule as seed.js.
  *
- * 品項（menu_items，每家 10–20 個，至少 3 個分類）
- *   - doc id `${vendorId}-item-${n}`，重跑是覆寫同一筆（merge），不會重複。
+ * Items (menu_items, 10–20 per vendor, at least 3 categories)
+ *   - doc id `${vendorId}-item-${n}`; reruns overwrite the same doc (merge), no duplicates.
  *
- * 會員（users，100 位）
- *   - uid `seed-user-001`…`seed-user-100`，欄位同註冊流程（display_name／phone／
- *     school／department／lang），學校＋系所取自 taiwanUnivDepts.json 有的名字。
- *   - emulator 才會另外建 Firebase Auth 帳號：seed001@bunnbaa.test … 密碼 demo1234，
- *     可以直接登入看「我的餐點」。正式站只有 Firestore 資料，登不進去。
+ * Members (users, 100)
+ *   - uid `seed-user-001`…`seed-user-100`, with the same fields as sign-up (display_name / phone /
+ *     school / department / lang); school + department names come from taiwanUnivDepts.json.
+ *   - Only on the emulator are Firebase Auth accounts also created: seed001@bunnbaa.test … password
+ *     demo1234, so you can sign in and see "My meals". Production only gets the Firestore data and
+ *     these accounts can't sign in.
  *
- * 訂單（payment_intents＋locks）
- *   - 一筆「訂單」＝一次結帳＝一個 payment_intents（id `seed-order-00001`，
- *     status confirmed），裡面 1–3 個品項、每個 1–2 份；跟正式流程一樣，一份餐
- *     一筆 lock，lock_ids 記在 payment_intents 上。同一筆訂單只會在同一家店、
- *     同一天、同一個取餐時段。
- *   - 每位會員 1–10 筆訂單；每人有 2–3 家常去的店（七成機率挑常去的）。
- *   - 取餐日：約 85% 在過去 60 天、15% 在今天～14 天後。價格照早鳥級距
- *     （當天/隔天 95 折、2–13 天 8 折、14–30 天 7 折，同 pricing.ts）。
- *   - 過去的訂單：fulfilled／resold_and_fulfilled（轉讓給另一位會員取餐）／
- *     no_show（見下一點）。未來的訂單：locked／for_resale／for_gift。
- *   - 固定 6 位會員被封鎖（no_show 達 2 份，同 markLockOutcome 門檻），每人的
- *     未取餐原因（no_show_note）都不同；其他會員最多 1 份 no_show，不會被封鎖。
- *     被封鎖的會員不會有未來訂單；其中 2 位附一筆 pending 的 ban_appeals。
- *   - 取餐日在 2 天前以前的成功 locks 依「商家＋取餐日」結算成 payouts，
- *     昨天的留著給 triggerSettlementNow 現場結算（同 seed.js）。
- *   - 未來的 locks 累加到 slot_counters（份數上限用）。
- *   - 約 35% 已取餐的訂單有一則 reviews（1–5 星），部分 locks 有 consumer_feedback。
+ * Orders (payment_intents + locks)
+ *   - One "order" = one checkout = one payment_intents doc (id `seed-order-00001`,
+ *     status confirmed) with 1–3 items, 1–2 servings each; as in the real flow, each serving is
+ *     one lock, and lock_ids are recorded on the payment_intents doc. An order is always for one
+ *     vendor, one day and one pickup slot.
+ *   - 1–10 orders per member; each member has 2–3 regular vendors (picked 70% of the time).
+ *   - Pickup dates: about 85% in the past 60 days, 15% from today to 14 days ahead. Prices follow
+ *     the early-bird tiers (same/next day 5% off, 2–13 days 20% off, 14–30 days 30% off, as in pricing.ts).
+ *   - Past orders: fulfilled / resold_and_fulfilled (transferred to another member who picked it up) /
+ *     no_show (see next point). Future orders: locked / for_resale / for_gift.
+ *   - A fixed 6 members are banned (2 no-shows, the markLockOutcome threshold), each with a
+ *     different no-show reason (no_show_note); other members have at most 1 no-show and aren't banned.
+ *     Banned members have no future orders; 2 of them have a pending ban_appeals entry.
+ *   - Successful locks with a pickup date 2 or more days ago are settled into payouts per
+ *     "vendor + pickup date"; yesterday's are left for triggerSettlementNow to settle live (same as seed.js).
+ *   - Future locks are added to slot_counters (for capacity limits).
+ *   - About 35% of picked-up orders have a review (1–5 stars); some locks have consumer_feedback.
  *
- * Gemini：這支不會觸發任何 Gemini 呼叫。translate* 觸發器看到 *_en＋i18n_src
- * 都已經有值就直接略過；onLockCreated 用的 discount_explanations 快取在寫
- * locks 之前先補齊（含英文），已經存在的快取不覆寫。
+ * Gemini: this script triggers no Gemini calls. The translate* triggers skip docs whose *_en and
+ * i18n_src are already set; the discount_explanations cache used by onLockCreated is filled in
+ * (including English) before locks are written, and existing cache entries are not overwritten.
  *
- * 亂數用固定種子，每次跑出來的會員、訂單內容都一樣（日期相對於執行當天）。
+ * Random numbers use a fixed seed, so every run produces the same members and orders (dates are
+ * relative to the run day).
  *
- * 用法：
- *   node scripts/seed.js                       # 先跑原本的種子
- *   node scripts/seed-scale.js                 # 已經有 seed-user-001 就拒絕重跑
- *   node scripts/seed-scale.js --force         # 照樣寫（locks／payouts 會重複）
- *   node scripts/seed-scale.js --catalog-only  # 只寫商家＋菜單＋計畫方案，可重跑
+ * Usage:
+ *   node scripts/seed.js                       # run the original seed first
+ *   node scripts/seed-scale.js                 # refuses to rerun if seed-user-001 exists
+ *   node scripts/seed-scale.js --force         # write anyway (locks/payouts will be duplicated)
+ *   node scripts/seed-scale.js --catalog-only  # only vendors + menus + meal plans, safe to rerun
  */
 const admin = require("firebase-admin");
 
@@ -950,7 +954,7 @@ const REVIEW_COMMENTS = {
 function pickupDateFor(offsetDays) {
   return isoDate(daysAgo(offsetDays));
 }
-// 第一階段只在週一至週五營業（規格 §2）：落在週六、週日的取餐日往前挪到週五
+// Phase 1 only operates Monday to Friday (spec §2): pickup dates on Saturday or Sunday move back to Friday
 function weekdayOffset(offsetDays) {
   const day = daysAgo(offsetDays).getDay();
   return day === 6 ? offsetDays + 1 : day === 0 ? offsetDays + 2 : offsetDays;
@@ -1066,7 +1070,7 @@ function resolveOrders(orders, users) {
         const lock = {
           id: autoId(),
           vendor_id: o.vendorId,
-          menu_item_id: item.id, // 材料成本、備料都靠它對到配方
+          menu_item_id: item.id, // ingredient cost and prep both use this to find the recipe
           item_name: item.name,
           item_name_en: item.name_en ?? null,
           pickup_window: o.window,

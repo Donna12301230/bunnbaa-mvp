@@ -13,17 +13,17 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePlatformConfig } from "@/lib/platformConfig";
 
 /**
- * 部署後，開著的舊分頁要載入的頁面檔（帶 hash 的 chunk）已經不在 Hosting 上，會拿到 index.html 而載入失敗，
- * 整頁變白。載入失敗時重新整理一次拿新版；一分鐘內又失敗就照常拋錯，不會一直重整。
+ * After a deploy, an old open tab asks for page files (hashed chunks) that are no longer on Hosting, gets index.html back and fails to load,
+ * leaving a blank page. On a load failure, reload once to get the new version; if it fails again within a minute, throw as usual instead of reloading forever.
  */
 function lazyPage<T extends ComponentType<any>>(load: () => Promise<{ default: T }>) {
   return lazy(() =>
     load().catch((err) => {
       const KEY = "bunnbaa.chunkReloadAt";
       let last = 0;
-      try { last = Number(sessionStorage.getItem(KEY)) || 0; } catch { /* 無痕模式等讀不到就當沒重整過 */ }
+      try { last = Number(sessionStorage.getItem(KEY)) || 0; } catch { /* unreadable (e.g. private mode): treat as not reloaded yet */ }
       if (Date.now() - last < 60_000) throw err;
-      try { sessionStorage.setItem(KEY, String(Date.now())); } catch { /* 同上 */ }
+      try { sessionStorage.setItem(KEY, String(Date.now())); } catch { /* same as above */ }
       window.location.reload();
       return new Promise<{ default: T }>(() => {});
     })
@@ -87,7 +87,7 @@ function NotFound() {
     <>
     <MarketplaceHeader />
     <section className="bb-404">
-      {/* 純裝飾大字：數字放在 CSS ::before，不進可及性樹 */}
+      {/* Decorative large text: the digits live in CSS ::before, outside the accessibility tree */}
       <p className="bb-404__code" aria-hidden="true" data-text="404" />
       <h1 className="bb-404__title">{tr("這一頁還沒開飯。", "This page isn't on the menu.")}</h1>
       <p className="bb-404__body">{tr("找不到你要的頁面，可能是連結打錯了，或餐點已經下架。", "We couldn't find that page — the link may be wrong or the item is gone.")}</p>
@@ -100,7 +100,7 @@ function NotFound() {
   );
 }
 
-// 路由拆包（React.lazy）載入中的畫面：品牌標誌輕微呼吸，避免換頁時整片空白
+// Shown while a lazy (React.lazy) route chunk loads: the brand mark pulses gently so page changes don't flash blank
 function RouteFallback() {
   return (
     <div className="bb-route-fallback" role="status" aria-live="polite">
@@ -110,7 +110,7 @@ function RouteFallback() {
   );
 }
 
-// 換頁時捲回頂端（hash 路由不會自己做）。同一頁內的 #anchor 不在這裡處理。
+// Scroll to top on route change (hash routing doesn't do this). In-page #anchor links are not handled here.
 function ScrollToTopOnRouteChange() {
   const [location] = useLocation();
   useEffect(() => {
@@ -119,13 +119,13 @@ function ScrollToTopOnRouteChange() {
   return null;
 }
 
-// 全站共用外框：所有路由都包在這裡，頁尾（SiteFooter）統一在這裡掛一次，
-// 頁面本身（含 CustomerLayout）不用各自處理。/landing 是唯一例外，因為
-// LandingPage 走獨立的 lazy Suspense 路由、不經過這層，自己掛了一份。
+// Shared site shell: every route is wrapped here, and the footer (SiteFooter) is mounted once here,
+// so pages (including CustomerLayout) don't handle it themselves. /landing is the only exception, because
+// LandingPage uses its own lazy Suspense route, skips this layer, and mounts its own footer.
 function MarketplacePage({ children }: { children: React.ReactNode }) {
   return (
     <div className="font-sans antialiased bg-background text-foreground">
-      {/* bb-page-enter：每次換頁內容淡入上移（global.css，尊重 reduced-motion） */}
+      {/* bb-page-enter: content fades in and moves up on every route change (global.css, respects reduced-motion) */}
       <div className="bb-page-enter">{children}</div>
       <SiteFooter />
       <CartPreview />
@@ -133,7 +133,7 @@ function MarketplacePage({ children }: { children: React.ReactNode }) {
   );
 }
 
-// 後台（平台管理 /admin、店家 /vendor-portal、取餐掃碼頁）：同樣外框，但不掛頁尾
+// Back-office pages (platform admin /admin, vendor /vendor-portal, pickup scan page): same shell, no footer
 function BackOfficePage({ children }: { children: React.ReactNode }) {
   return (
     <div className="font-sans antialiased bg-background text-foreground">
@@ -142,23 +142,23 @@ function BackOfficePage({ children }: { children: React.ReactNode }) {
   );
 }
 
-// 登入中的使用者把介面語言存進 users/{uid}.lang，排程推播（取餐提醒）才知道要用哪種語言。
-// 只有跟已存的不同時才寫；失敗不影響使用（下次切換或登入再試）。
+// Store the signed-in user's UI language in users/{uid}.lang so scheduled pushes (pickup reminders) know which language to use.
+// Only write when it differs from the stored value; failures are harmless (retried on the next switch or sign-in).
 function useSyncUserLang(lang: "zh" | "en") {
   const { user } = useAuth();
-  // 記住這次登入期間最後寫進去的值（user.lang 是登入當下讀的，寫完不會自己更新）
+  // Remember the last value written during this session (user.lang is read at sign-in and doesn't update after a write)
   const saved = useRef<{ uid: string; lang?: string } | null>(null);
   useEffect(() => {
     if (!user) return;
     if (saved.current?.uid !== user.id) saved.current = { uid: user.id, lang: user.lang };
     if (saved.current.lang === lang) return;
     saved.current.lang = lang;
-    setDoc(doc(db, "users", user.id), { lang }, { merge: true }).catch((err) => console.warn("儲存語言設定失敗", err));
+    setDoc(doc(db, "users", user.id), { lang }, { merge: true }).catch((err) => console.warn("Failed to save language setting", err));
   }, [user?.id, user?.lang, lang]);
 }
 
-// 平台參數（截單時間、營業日、可訂天數、加飯價…）先讀進來再畫頁面，前端算的日期與金額才會跟伺服器一致
-// （lib/platformConfig.ts liveConfig）。最多等 1.5 秒，讀不到就用預設值照常顯示。
+// Load platform settings (cut-off time, business days, bookable days, extra-rice price…) before rendering, so dates and amounts computed on the frontend match the server
+// (lib/platformConfig.ts liveConfig). Waits at most 1.5 s; if the read fails, render with the defaults.
 function PlatformConfigGate({ children }: { children: React.ReactNode }) {
   const { isPlaceholderData } = usePlatformConfig();
   const [timedOut, setTimedOut] = useState(false);
@@ -170,28 +170,28 @@ function PlatformConfigGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// 會員專用頁（2026-10-09）：廠商帳號只用「上架顯示」與廠商後台，打開這些頁直接導去廠商後台
+// Member-only pages (2026-10-09): vendor accounts only use the public listing and the vendor portal, so these pages redirect them to the vendor portal
 function MemberOnly({ children }: { children: React.ReactNode }) {
   const { isVendor } = useAuth();
   if (isVendor) return <Redirect to="/vendor-portal/dashboard" replace />;
   return <>{children}</>;
 }
 
-// 根路徑：不管有沒有登入都先看品牌形象頁 LandingPage（不是訂購用的
-// HomePage——LandingPage 自己的頁尾／MarketplaceHeader 都把 /landing 標成
-// 「首頁」、/home 標成「今日菜單」）。瀏覽本來就不用登入，登入從
-// LandingPage 上的「登入／註冊」按鈕自己點，/login 路由本身沒有動。
+// Root path: always show the brand page LandingPage first, signed in or not (not the ordering
+// HomePage — LandingPage's own footer and MarketplaceHeader label /landing as
+// "Home" (首頁) and /home as "Today's menu" (今日菜單)). Browsing never required sign-in; users sign in via
+// the "Sign in / Sign up" button on LandingPage, and the /login route itself is unchanged.
 function RootGate() {
   return <LandingPage />;
 }
 
 export default function App() {
-  // 切換語言時整個路由樹重新掛載，元件裡用 tr() 組的字串（toast、狀態標籤、錯誤訊息）才會一起換
+  // Remount the whole route tree on language change so strings built with tr() in components (toasts, status labels, error messages) switch too
   const { lang } = useI18n();
   useSyncUserLang(lang);
   return (
     <QueryClientProvider client={queryClient}>
-      {/* 設計系統 tokens 限定在 .bb-theme 之內；包住全站，頁面才能直接使用 @/components/ds */}
+      {/* Design-system tokens are scoped to .bb-theme; wrapping the whole site lets pages use @/components/ds directly */}
       <SiteThemeRoot>
       <ConfirmProvider>
       <PlatformConfigGate>
@@ -199,15 +199,15 @@ export default function App() {
         <ScrollToTopOnRouteChange />
         <Suspense fallback={<RouteFallback />}>
         <Switch>
-          {/* 根路徑：未登入 = 登入頁，已登入 = 首頁（與 bunnbaa.com 行為一致） */}
-          {/* 不包 MarketplacePage：RootGate 一律顯示 LandingPage，LandingPage 自己有 SiteFooter，
-              包了會變兩份頁尾（跟 /landing 路由一樣直接裸 Suspense） */}
+          {/* Root path: signed out = login page, signed in = home page (same behavior as bunnbaa.com) */}
+          {/* Not wrapped in MarketplacePage: RootGate always shows LandingPage, which has its own SiteFooter;
+              wrapping it would render two footers (same as the /landing route, a bare Suspense) */}
           <Route path="/">
             <RootGate />
           </Route>
 
-          {/* 舊的單品鎖定示範頁（/lock、/lock/vendor）2026-09-30 拿掉：下單改走便當購物車，
-              贈送改 /gift/:lockId。/lock/vendor/redeem 保留為取餐掃碼頁的路徑。 */}
+          {/* The old single-item lock demo pages (/lock, /lock/vendor) were removed on 2026-09-30: ordering now goes through the bento cart,
+              and gifting moved to /gift/:lockId. /lock/vendor/redeem stays as the path of the pickup scan page. */}
           <Route path="/lock">
             <Redirect to="/home" replace />
           </Route>
@@ -237,14 +237,14 @@ export default function App() {
             <MarketplacePage><PaymentCancelPage /></MarketplacePage>
           </Route>
 
-          {/* 搬移自 BunnBaa Parse_Ref 的行銷平台 UI（登入/首頁/後台） */}
+          {/* Marketing platform UI ported from BunnBaa Parse_Ref (login / home / admin) */}
           <Route path="/login">
             <MarketplacePage><LoginPage /></MarketplacePage>
           </Route>
           <Route path="/home">
             <MarketplacePage><HomePage /></MarketplacePage>
           </Route>
-          {/* 預購餐點的「方案」頁（第二排「單點｜方案」是兩個獨立頁面） */}
+          {/* Pre-order "meal plan" page (the second-row "Single | Meal plan" tabs are two separate pages) */}
           <Route path="/plans">
             <MarketplacePage><HomePage /></MarketplacePage>
           </Route>
@@ -254,7 +254,7 @@ export default function App() {
           <Route path="/profile">
             <MarketplacePage><MemberOnly><ProfilePage /></MemberOnly></MarketplacePage>
           </Route>
-          {/* 轉讓市集併入「我的餐點」分頁（1002 規格 §4.5）；舊連結轉過去 */}
+          {/* The resale market was merged into the "My meals" tab (1002 spec §4.5); old links redirect there */}
           <Route path="/marketplace">
             <Redirect to={/tab=charity/.test(window.location.search + window.location.hash) ? "/my-bookings?tab=charity" : "/my-bookings?tab=market"} replace />
           </Route>
@@ -336,7 +336,7 @@ export default function App() {
           <Route path="/vendor-portal/growth">
             <BackOfficePage><VendorPortalGrowth /></BackOfficePage>
           </Route>
-          {/* 舊版 mock 掃碼頁，已由真的核對取餐頁取代，保留路徑避免舊連結 404 */}
+          {/* Old mock scan page, replaced by the real pickup verification page; path kept so old links don't 404 */}
           <Route path="/vendor-portal/scan">
             <Redirect to="/lock/vendor/redeem" replace />
           </Route>
@@ -362,12 +362,12 @@ export default function App() {
             <BackOfficePage><VendorPortalInsights /></BackOfficePage>
           </Route>
 
-          {/* 設計系統預覽（tokens + 元件狀態一覽）；lazy 載入，不增加其他頁面的 bundle */}
+          {/* Design-system preview (tokens + component states); lazy-loaded so it doesn't add to other pages' bundles */}
           <Route path="/design-system">
             <DesignSystemPreview />
           </Route>
 
-          {/* 品牌形象頁（版面參考 cafen，視覺全用設計系統）；lazy 載入 */}
+          {/* Brand page (layout inspired by cafen, visuals entirely from the design system); lazy-loaded */}
           <Route path="/landing">
             <LandingPage />
           </Route>

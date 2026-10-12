@@ -1,38 +1,38 @@
 export interface Vendor {
   id: string;
   name: string;
-  // *_en：Functions 用 Gemini 自動翻的英文版（functions/src/translate.js），英文介面用 loc() 讀
+  // *_en: English versions auto-translated by Functions with Gemini (functions/src/translate.js); the English UI reads them via loc()
   name_en?: string;
   description_en?: string;
   item_focus: string;
   reliability_tone: "new" | "variable" | "stable";
   status?: "active" | "disabled"; // missing = active, for backward compat with seeded data
-  verified?: boolean; // 平台審核後手動認證，跟 reliability_tone（系統自動算）是兩件事；只有 admin 能寫
-  // 瀏覽用的顯示欄位，選填——不是每個商家（例如舊測試商家）都會有值
+  verified?: boolean; // Manually certified after platform review; separate from reliability_tone (computed automatically). Admin-only write
+  // Display fields for browsing, optional — not every vendor (e.g. old test vendors) has them
   description?: string;
   address?: string;
   phone?: string;
-  cover_image?: string; // 店家封面圖（Firebase Storage 下載網址），店主在店家設定頁上傳
-  owner_uid?: string | null; // 平台審核後綁定的真實 Firebase Auth uid，只有 admin 能寫
-  menu_catalogs?: string[]; // 菜單目錄（目錄 > 分類 兩層）的名稱與順序，店主在菜單管理頁維護
-  // 取餐排程（店家設定頁，店主可改），沒設定＝預設時段、每天營業，見 lib/pickupSlots.ts
+  cover_image?: string; // Vendor cover image (Firebase Storage download URL), uploaded by the vendor owner on the vendor settings page
+  owner_uid?: string | null; // Real Firebase Auth uid bound after platform review; admin-only write
+  menu_catalogs?: string[]; // Names and order of menu catalogs (two levels: catalog > category), maintained by the vendor owner on the menu page
+  // Pickup schedule (vendor settings page, editable by the vendor owner); unset = default slots, open every day; see lib/pickupSlots.ts
   pickup_windows?: string[]; // "11:30-12:00"
   business_hours?: BusinessHour[];
   holidays?: string[]; // YYYY-MM-DD
-  slot_capacity?: number; // 每個取餐時段所有餐點合計上限；0／沒設＝不限，已訂數在 slot_counters
-  // 第一階段規格 §2 店家可調參數（沒設＝平台預設）
-  cutoff_time?: string; // 前一天幾點截單，只能比平台（20:00）早
+  slot_capacity?: number; // Cap on all meals combined per pickup slot; 0 / unset = no limit; booked counts live in slot_counters
+  // Phase 1 spec §2 vendor-adjustable settings (unset = platform default)
+  cutoff_time?: string; // Cut-off time on the previous day; can only be earlier than the platform's (20:00)
   safety_stock_rate?: number;
   candidate_min_qty?: number;
-  lat?: number; // 取餐點座標：附近愛心餐、區域洞察
+  lat?: number; // Pickup point coordinates: nearby charity meals, area insights
   lng?: number;
-  forecast_daily?: Record<string, number>; // 新店家前 4 週自填預估：menu_item_id → 每日份數
-  anomaly_weeks?: string[]; // 店家標記的異常週（週一日期），預測時排除
-  disaster_dates?: string[]; // 停班停課日（Functions 寫）
+  forecast_daily?: Record<string, number>; // Self-entered estimates for a new vendor's first 4 weeks: menu_item_id → daily portions
+  anomaly_weeks?: string[]; // Weeks flagged as anomalous by the vendor (Monday dates), excluded from forecasts
+  disaster_dates?: string[]; // Work/school suspension days (written by Functions)
   typhoon_notice?: { dates: string[]; event_id: string } | null;
   menu_locked_week?: string;
   rewards_paused_from?: string;
-  // 收益看板成本參數（§9.3），由 updateVendorCosts 寫，薪資不得低於基本工資
+  // Earnings dashboard cost settings (§9.3), written by updateVendorCosts; wages may not be below minimum wage
   hourly_wage?: number;
   staff_salaries?: number[];
   fixed_costs?: number;
@@ -49,10 +49,10 @@ export interface MenuItem {
   name_en?: string;
   description_en?: string;
   category_en?: string;
-  // 目錄（分類的上一層，選填）：名稱存這裡，順序存 vendors.menu_catalogs，見 lib/menuCatalog.ts
+  // Catalog (level above category, optional): the name is stored here, the order in vendors.menu_catalogs; see lib/menuCatalog.ts
   catalog?: string | null;
   catalog_en?: string;
-  // 常一起買的同店品項 id（BigQuery 購物籃分析，後端寫入，最多取前 3 個顯示在品項頁）
+  // Same-vendor item ids frequently bought together (BigQuery basket analysis, written by the backend; the item page shows the top 3)
   often_with?: string[];
   description: string;
   price: number;
@@ -62,20 +62,20 @@ export interface MenuItem {
   allergens: string[];
   dietary_tags: string[];
   created_at: unknown; // Firestore Timestamp
-  // 便當（第一階段規格 §3）：沒有 slots 的是單品，不能加減飯菜
-  item_type?: "bento" | "single"; // 單品直接點選、不需組合
-  meal_periods?: MealPeriod[]; // 供應餐期（沒設＝店家所有時段）
+  // Bento (Phase 1 spec §3): items without slots are single items, with no adding/removing rice or sides
+  item_type?: "bento" | "single"; // Single items are ordered directly, no assembly
+  meal_periods?: MealPeriod[]; // Meal periods served (unset = all of the vendor's slots)
   template?: string | null;
-  // 可選主菜，各自定價（便當價以所選主菜為準）；沒有 mains 時用 main＋price
+  // Selectable mains, each with its own price (bento price follows the chosen main); without mains, main + price are used
   mains?: BentoMain[];
   main?: { name: string; component_id?: string | null; portion_text?: string | null } | null;
   rice_component_id?: string | null;
-  // 備料組成：每份都有、不能換也不能減的半成品（便當的固定附餐例如滷蛋；單品的全部組成例如蛋餅皮＋蛋）。portions 沒設＝1 份
+  // Prep composition: semi-finished components in every portion that can't be swapped or removed (a bento's fixed side like a braised egg; all of a single item's parts like crepe skin + egg). portions unset = 1
   fixed?: { name: string; component_id?: string | null; portion_text?: string | null; portions?: number }[];
   slots?: BentoSlot[];
-  custom_fields?: BentoCustomField[]; // 配菜下方店家自訂的下拉欄位（例：湯品、飲料、辣度）
-  weekdays?: number[]; // 週菜單輪替：只在這幾天供應（沒設＝每天）
-  component_id?: string | null; // 單品對應的半成品（備料用）
+  custom_fields?: BentoCustomField[]; // Vendor-defined dropdowns below the side dishes (e.g. soup, drink, spice level)
+  weekdays?: number[]; // Weekly menu rotation: only served on these days (unset = every day)
+  component_id?: string | null; // Semi-finished component for a single item (for prep)
 }
 
 export interface BentoMain {
@@ -83,36 +83,36 @@ export interface BentoMain {
   component_id?: string | null;
   price: number;
   image_url?: string | null;
-  portion_text?: string | null; // 材料總和顯示用，例：「雞腿 1 塊」（店家菜單編輯時由配方帶出）
+  portion_text?: string | null; // Display of total ingredients, e.g. "1 chicken leg" (filled from the recipe when the vendor edits the menu)
 }
 
 export interface BentoCandidate {
   name: string;
   component_id?: string | null;
-  image_url?: string | null; // 消費者點圖片選菜（§4.2）
-  portion_text?: string | null; // 材料總和顯示用，例：「苦瓜 60 克」
-  portion_level: number; // 1 全份、0.5 半份（第一階段只分兩級；由成本推算，店家可微調）
-  weekly_cap?: number | null; // 本週供應上限
-  min_qty?: number | null; // 成立最低量（沒設＝店家設定／平台預設）
-  disabled?: boolean; // 成本比例 < 0.5，不得列為候選
+  image_url?: string | null; // Diners pick dishes by tapping the image (§4.2)
+  portion_text?: string | null; // Display of total ingredients, e.g. "60 g bitter melon"
+  portion_level: number; // 1 full portion, 0.5 half portion (Phase 1 has only two levels; derived from cost, the vendor can fine-tune)
+  weekly_cap?: number | null; // Supply cap for this week
+  min_qty?: number | null; // Minimum quantity to go ahead (unset = vendor setting / platform default)
+  disabled?: boolean; // Cost ratio < 0.5; can't be listed as a candidate
 }
 
 export interface BentoSlot {
-  category: string; // 青菜類、肉類配菜、蛋豆類…候選菜只能同類別
+  category: string; // Greens, meat sides, eggs & tofu… candidates must be in the same category
   default: { name: string; component_id?: string | null; image_url?: string | null; portion_text?: string | null };
   candidates: BentoCandidate[];
 }
 
-/** 店家自訂欄位（便當配菜下方的下拉選單）：消費者從選項選一個，第一個是預設；選項可加減價 */
+/** Vendor-defined field (dropdown below a bento's side dishes): the diner picks one option, the first is the default; options can add or subtract from the price */
 export interface BentoCustomOption {
   name: string;
-  price: number; // 加減價（0＝不加價）
+  price: number; // Price adjustment (0 = no extra charge)
 }
 export interface BentoCustomField {
   label: string;
   options: BentoCustomOption[];
 }
-/** 訂單上記錄的自訂欄位選擇 */
+/** Custom field choices recorded on the order */
 export interface LockCustomOption {
   label: string;
   index: number;
@@ -120,11 +120,11 @@ export interface LockCustomOption {
   price: number;
 }
 
-/** 第四道配菜：備案（不加價，前三道沒成立時遞補）或加菜（+10） */
+/** Fourth side dish: backup (no extra charge, fills in when one of the first three doesn't go ahead) or add-on (+10) */
 export type ExtraSideMode = "backup" | "addon";
 export interface ExtraSideChoice {
   slot: number;
-  candidate: number | null; // null＝那一格的預設菜
+  candidate: number | null; // null = that cell's default dish
   mode: ExtraSideMode;
 }
 export interface LockExtraSide {
@@ -140,7 +140,7 @@ export interface LockExtraSide {
 }
 
 export type RiceOption = "add" | "normal" | "less";
-/** 下單時每格的選擇：預設菜、候選菜 index、不要 */
+/** Per-cell choice at order time: default dish, candidate dish index, or none */
 export type SlotChoice = "default" | "none" | number;
 
 export interface LockSlot {
@@ -151,16 +151,16 @@ export interface LockSlot {
   wished: string | null;
   wished_component_id?: string | null;
   candidate_index?: number;
-  resolved: string | null; // 截單判定後的實際配菜
+  resolved: string | null; // Actual side dish decided at cut-off
   portion_level: number | null;
   substituted_from?: string;
-  backup_used?: boolean; // 許願未成立，遞補第四道備案
+  backup_used?: boolean; // Wish didn't go ahead; filled with the fourth backup dish
 }
 
 export interface MealPlan {
   id: string;
   vendor_id: string;
-  label: string; // "A方案" / "B方案"
+  label: string; // e.g. "Plan A" / "Plan B"
   label_en?: string;
   name_en?: string;
   description_en?: string;
@@ -169,8 +169,8 @@ export interface MealPlan {
   description: string;
   price_per_meal: number;
   fastest_booking: string;
-  days: number; // 供餐天數，加入計畫時會生成這麼多筆 locks
-  menu_item_id?: string | null; // 計畫供應的品項（決定餐期與可選時段）
+  days: number; // Number of meal days; joining the meal plan creates this many locks
+  menu_item_id?: string | null; // Item the meal plan serves (determines meal period and available slots)
   created_at: unknown; // Firestore Timestamp
 }
 
@@ -180,16 +180,16 @@ export type LockStatus =
   | "for_gift"
   | "resold_and_fulfilled"
   | "fulfilled"
-  | "no_show" // 舊制（未取餐停權），現在改轉愛心餐
-  | "charity" // 未取餐轉入或主動捐出的愛心餐
+  | "no_show" // Legacy (no-show led to suspension); now converted to a charity meal
+  | "charity" // Charity meal, from a no-show or donated by the diner
   | "cancelling"
-  | "cancelled"; // 消費者取消（取餐 48 小時前，換折價券）、停班停課自動退款
+  | "cancelled"; // Cancelled by the diner (48+ hours before pickup, in exchange for a coupon), or auto-refunded on a work-suspension day
 
 export interface Lock {
   id: string;
   vendor_id: string;
   item_name: string;
-  item_name_en?: string | null; // 下單時從 menu_items.name_en 帶進來
+  item_name_en?: string | null; // Copied from menu_items.name_en at order time
   pickup_window: string;
   pickup_date: string; // YYYY-MM-DD
   discount_percent: number;
@@ -199,25 +199,25 @@ export interface Lock {
   // Set alongside status "for_resale"; a lock past this deadline can be
   // claimed for free (firestore.rules), no scheduled function needed.
   resale_deadline?: unknown; // Firestore Timestamp
-  phone_last3?: string | null; // 下單時手機末三碼，店家核對用（跟 4 碼取餐號一起當核銷碼）
-  resale_price?: number; // 轉讓人自訂的轉讓價（0 ～ 原價）；沒填用早鳥價，見 lib/transfers.ts
+  phone_last3?: string | null; // Last three digits of the phone number at order time, for vendor checks (used with the 4-digit pickup number as the redemption code)
+  resale_price?: number; // Resale price set by the seller (0 to original price); defaults to the early-bird price; see lib/transfers.ts
   no_show_note?: string | null;
-  note?: string; // 消費者下單時的備註（例如「不要香菜」），購物車結帳才會有
+  note?: string; // Diner's note at order time (e.g. "no cilantro"); only set for cart checkout
   consumer_feedback?: string | null;
   buyer_uid: string;
-  // 曾經持有過、後來被別人接手（轉賣／免費領取／贈送）的 uid，接手時追加。
-  // 「我的轉讓」靠這個查回已被接手的項目，原持有人也因此保有讀取權限。
+  // uids that once held this lock and were later taken over by someone else (resale / free claim / gift); appended on takeover.
+  // "My transfers" uses this to find items already taken over, and it also keeps read access for the original holder.
   transferred_from_uids?: string[];
   created_at: unknown; // Firestore Timestamp
   reminder_sent?: boolean; // device token lives in the private lock_tokens/{lockId} doc
-  // 計畫型（訂閱制多日方案）：付款成功後一次生成 N 筆 locks，用同一個 plan_id
-  // 串起來，沒有另外的 plan/subscription collection（見 functions 的
-  // createPlanLinePayReservation）。2026-09-28 起 plan_id＝該次付款的訂單 id，
-  // 之前前端直寫的舊資料是「vendor_id-meal_plans id」。
+  // Meal plan (multi-day subscription): one successful payment creates N locks at once, linked by the same plan_id;
+  // there's no separate plan/subscription collection (see
+  // createPlanLinePayReservation in functions). Since 2026-09-28 plan_id = the order id of that payment;
+  // older data written directly by the frontend uses "vendor_id-<meal_plans id>".
   plan_id?: string;
   plan_label?: string;
-  meal_plan_id?: string; // meal_plans 的 id，2026-09-28 之後加入的計畫才有
-  // 第一階段規格：便當內容、金額拆解、取餐憑證
+  meal_plan_id?: string; // meal_plans id; only on meal plans joined after 2026-09-28
+  // Phase 1 spec: bento contents, amount breakdown, pickup credentials
   menu_item_id?: string | null;
   meal_period?: MealPeriod;
   main_dish?: string | null;
@@ -233,19 +233,19 @@ export interface Lock {
   coupon_id?: string | null;
   coupon_discount?: number;
   payer_uid?: string;
-  paid_amount?: number; // payer 在 transaction_id 實付的金額（退款依據）
-  resale_hold?: { uid: string; intent_id: string; expires_at: unknown } | null; // 有人正在付款接手
+  paid_amount?: number; // Amount the payer actually paid in transaction_id (basis for refunds)
+  resale_hold?: { uid: string; intent_id: string; expires_at: unknown } | null; // Someone is paying to take this over
   transfer_refund?: { uid: string; amount: number; status: "done" | "failed" | "none"; as?: "points" } | null;
-  pickup_code?: string; // 4 碼取餐號
-  share_token?: string; // 代領連結
+  pickup_code?: string; // 4-digit pickup number
+  share_token?: string; // Proxy pickup link
   cutoff_at?: unknown; // Firestore Timestamp
   cutoff_done?: boolean;
   charity_source?: "noshow" | "donated";
   cancel_reason?: "customer" | "disaster";
   refunded_amount?: number;
-  // 消費者取消不退現金，改發折價券（原價 30%）：券的面額與 id；kept_amount 是留在店家的款項
+  // Diner cancellations aren't refunded in cash but get a coupon (30% of original price): coupon value and id; kept_amount is what stays with the vendor
   refund_coupon_amount?: number;
-  /** 2026-10-09 起退款退成平台點數（functions/src/wallet.js）；舊資料沒有＝退回 LINE Pay */
+  /** Since 2026-10-09 refunds go to platform points (functions/src/wallet.js); missing on old data = refunded to LINE Pay */
   refunded_as?: "points";
   points_used?: number;
   refund_coupon_id?: string | null;
@@ -257,9 +257,9 @@ export interface Lock {
 export interface Payout {
   id: string;
   vendor_id: string;
-  amount: number; // 撥給店家的金額（已扣平台抽成）
-  gross_amount?: number; // 消費者實付加總
-  commission_amount?: number; // 平台抽成；2026-10-05 以前的紀錄沒有（當時全額撥款）
+  amount: number; // Amount paid out to the vendor (after platform commission)
+  gross_amount?: number; // Total paid by diners
+  commission_amount?: number; // Platform commission; missing on records before 2026-10-05 (paid out in full then)
   commission_rate?: number;
   lock_count: number;
   status: "pending_manual_export";
@@ -271,7 +271,7 @@ export interface AccuracyReport {
   vendor_id: string;
   horizon: string;
   accuracy_rate: number;
-  error_range: string; // 程式算的（vendorCalibration.calibrationStats），不是 LLM
+  error_range: string; // Computed by code (vendorCalibration.calibrationStats), not the LLM
   error_range_en?: string;
   explanation: string;
   pattern_note: string;
@@ -286,7 +286,7 @@ export interface AccuracyReport {
 //    object representations — kept distinct from the Lock-feature types above) ──
 
 export interface BusinessHour {
-  weekday: number;   // 0=日,1=一,...,6=六
+  weekday: number;   // 0=Sun,1=Mon,...,6=Sat
   open: boolean;
   openTime: string;  // "HH:MM"
   closeTime: string; // "HH:MM"
@@ -298,7 +298,7 @@ export const ALLERGEN_LIST = [
 
 export const DIETARY_TAGS = ["葷食", "素食", "全素", "辣"] as const;
 
-// 過敏原／飲食標籤是固定選項，英文版照這張表翻（資料庫存中文）
+// Allergen / dietary tags are fixed options; the English UI translates them with this table (the database stores Chinese)
 const TAG_EN: Record<string, string> = {
   蛋: "Egg", 奶: "Dairy", 花生: "Peanut", 堅果: "Tree nuts", "小麥/麩質": "Wheat / gluten", 大豆: "Soy", 海鮮: "Seafood", 芝麻: "Sesame",
   葷食: "Meat", 素食: "Vegetarian", 全素: "Vegan", 辣: "Spicy",
@@ -320,47 +320,47 @@ export interface UserProfile {
   studentId?: string;
   department?: string;
   role: "customer" | "vendor" | "admin";
-  vendorId?: string; // role 為 vendor 時，owner_uid 綁定到這個帳號的 vendors/{id}
+  vendorId?: string; // When role is vendor, the vendors/{id} whose owner_uid is bound to this account
   orderBanned?: boolean;
   noPickupCount?: number;
-  lang?: "zh" | "en"; // users/{uid}.lang，取餐提醒推播用哪種語言
-  homeGeo?: string; // 常用地點（粗略 geohash 7 碼）
-  donatedCount?: number; // 主動捐出的愛心餐份數（個人愛心紀錄）
-  mutedKinds?: string[]; // 關掉的通知類型，例如 "charity"
-  charityNearbyPush?: boolean; // 「附近有愛心餐」推播，預設關閉
+  lang?: "zh" | "en"; // users/{uid}.lang: language for pickup reminder push notifications
+  homeGeo?: string; // Usual location (coarse 7-char geohash)
+  donatedCount?: number; // Charity meals donated by the user (personal charity record)
+  mutedKinds?: string[]; // Notification kinds turned off, e.g. "charity"
+  charityNearbyPush?: boolean; // "Charity meals nearby" push notification, off by default
 }
 
-// reviews/{lockId}：消費者對已取餐的鎖定打分，公開可讀，見 firestore.rules
+// reviews/{lockId}: a diner's rating of a picked-up lock, publicly readable; see firestore.rules
 export interface Review {
   id: string; // = lock id
   vendor_id: string;
   meal_plan_id: string | null;
   item_name: string;
   rating: number; // 1–5
-  comment: string; // 空字串＝不公開心得
+  comment: string; // Empty string = review text not public
   reviewer_label: string;
-  // Functions 自動翻的英文（translateReview）
+  // English auto-translated by Functions (translateReview)
   comment_en?: string;
   item_name_en?: string;
   reviewer_label_en?: string;
   created_at: unknown; // Firestore Timestamp
 }
 
-// ── 第一階段規格：配方、採購、獎勵、愛心餐、洞察 ──────────────────────────
+// ── Phase 1 spec: recipes, purchasing, rewards, charity meals, insights ──────────────────────────
 
 export interface Ingredient {
   id: string;
   name: string;
   category: string;
-  unit: string; // g / 個
-  purchase_unit_label: string; // 例：盒、公斤、袋
-  purchase_unit_size: number; // 一個採購單位是多少 unit
-  yield_rate: number; // 熟成率（熟重 / 生重）
+  unit: string; // g / piece
+  purchase_unit_label: string; // e.g. box, kg, bag
+  purchase_unit_size: number; // How many units make one purchase unit
+  yield_rate: number; // Cooked yield (cooked weight / raw weight)
   loss_rate: number;
   shelf_days: number;
   frequency: "monthly" | "weekly" | "daily";
   supplier_id?: string | null;
-  unit_price: number; // 每採購單位
+  unit_price: number; // Per purchase unit
 }
 
 export interface Component {
@@ -374,7 +374,7 @@ export interface Component {
   advance_hours: number;
   method?: string;
   flavors?: string[];
-  /** AI 產生的配方草稿，店家還沒確認過（菜單上會標「AI 草稿」） */
+  /** Recipe draft generated by AI that the vendor hasn't confirmed yet (marked "AI draft" on the menu) */
   ai_draft?: boolean;
 }
 
@@ -416,7 +416,7 @@ export interface RewardStatus {
   id: string;
   vendor_name: string;
   tickets_so_far: number;
-  // 開池門檻改成累積淨營業額（2026-10-05）；舊資料只有 min_tickets，前端用 amount_to_open 回推
+  // Pool-opening threshold changed to cumulative net revenue (2026-10-05); old data only has min_tickets, the frontend derives amount_to_open from it
   revenue_so_far?: number;
   min_revenue?: number;
   min_tickets?: number;

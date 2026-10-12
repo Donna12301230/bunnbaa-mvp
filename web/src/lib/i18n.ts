@@ -1,21 +1,43 @@
 import { useSyncExternalStore } from "react";
 import { enUS, zhTW } from "date-fns/locale";
 
-// 介面語言（中文／英文）。字串直接中英並排寫在元件裡：t("預購餐點", "Pre-order")，
-// 不另外維護 key 對照表——只有兩種語言，並排比較好對照、也不會漏翻。
-// 資料庫內容（店名、菜名、店家簡介）照原文顯示，不翻譯。
-// 選擇記在 localStorage，讀寫失敗（無痕模式）就用中文。
+// UI language (Chinese / English). Strings are written side by side in the components: t("預購餐點", "Pre-order"),
+// with no separate key table: with only two languages, side by side is easier to compare and nothing gets missed.
+// Database content (store names, dish names, vendor descriptions) is shown as written, not translated.
+// Language order: ?lang=en|zh in the URL (also accepted inside the hash, e.g. #/?lang=en; it is
+// remembered) → the choice saved in localStorage → the browser language (zh-* gets Chinese,
+// anything else English, so judges and overseas visitors land on the English UI).
 export type Lang = "zh" | "en";
 
 const STORAGE_KEY = "bunnbaa.lang";
 const listeners = new Set<() => void>();
 
+function langFromUrl(): Lang | null {
+  if (typeof window === "undefined") return null;
+  const hashQuery = window.location.hash.split("?")[1] ?? "";
+  const v =
+    new URLSearchParams(window.location.search).get("lang") ?? new URLSearchParams(hashQuery).get("lang");
+  return v === "en" || v === "zh" ? v : null;
+}
+
+function browserLang(): Lang {
+  if (typeof navigator === "undefined") return "zh";
+  return (navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
 function readLang(): Lang {
+  const fromUrl = langFromUrl();
   try {
-    return localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "zh";
+    if (fromUrl) {
+      localStorage.setItem(STORAGE_KEY, fromUrl);
+      return fromUrl;
+    }
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === "en" || saved === "zh") return saved;
   } catch {
-    return "zh";
+    // Storage unavailable (some private windows): fall through
   }
+  return fromUrl ?? browserLang();
 }
 
 let current: Lang = readLang();
@@ -30,7 +52,7 @@ export function setLang(lang: Lang) {
   try {
     localStorage.setItem(STORAGE_KEY, lang);
   } catch {
-    // 存不了就只在這次瀏覽有效
+    // If it can't be saved, it only lasts for this visit
   }
   applyHtmlLang(lang);
   listeners.forEach((fn) => fn());
@@ -41,16 +63,16 @@ export function getLang(): Lang {
 }
 
 /**
- * 依目前語言挑字串。App.tsx 以語言當 Router 的 key，切換時整棵路由樹重新掛載，
- * 所以元件 render、toast、工具函式裡都可以直接用；useI18n 另外給 date-fns locale。
+ * Picks the string for the current language. App.tsx uses the language as the Router key, so switching remounts the whole route tree;
+ * that makes it safe to use directly in component renders, toasts and utility functions. useI18n also provides the date-fns locale.
  */
 export function tr(zh: string, en: string): string {
   return current === "en" ? en : zh;
 }
 
 /**
- * 資料庫內容的在地化欄位：英文介面優先讀 `${field}_en`（Functions 用 Gemini 自動翻的），
- * 沒有就顯示原本的中文。例：loc(vendor, "name")、loc(lock, "item_name")。
+ * Localized fields for database content: the English UI reads `${field}_en` first (auto-translated by Functions with Gemini),
+ * falling back to the original Chinese. E.g. loc(vendor, "name"), loc(lock, "item_name").
  */
 export function loc<T extends object>(obj: T | null | undefined, field: keyof T & string): string {
   if (!obj) return "";
@@ -62,12 +84,12 @@ export function loc<T extends object>(obj: T | null | undefined, field: keyof T 
   return typeof zh === "string" ? zh : "";
 }
 
-/** 計畫型訂單的品名去掉「・第1/5天」／「 · Day 1/5」，彙總時同一個方案併成一項 */
+/** Strips "・第1/5天" / " · Day 1/5" from meal-plan order item names so one plan merges into a single entry in summaries */
 export function planBaseName(itemName: string): string {
   return itemName.split("・第")[0].split(" · Day ")[0];
 }
 
-/** date-fns 的 locale（依目前語言） */
+/** date-fns locale (for the current language) */
 export function dateLocale() {
   return current === "en" ? enUS : zhTW;
 }
@@ -84,7 +106,7 @@ export function useI18n() {
     lang,
     isEn: lang === "en",
     t: (zh: string, en: string) => (lang === "en" ? en : zh),
-    /** date-fns 的 locale */
+    /** date-fns locale */
     dateLocale: lang === "en" ? enUS : zhTW,
   };
 }

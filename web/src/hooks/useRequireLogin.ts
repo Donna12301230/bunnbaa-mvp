@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast, useToast } from "@/hooks/use-toast";
 import { rememberReturnPath } from "@/lib/returnPath";
 
-/** 廠商帳號只用來看上架顯示與廠商後台（2026-10-09），會員功能（下單、轉讓、收藏、愛心餐…）一律擋下 */
+/** Vendor accounts are only for viewing the storefront and the vendor portal (2026-10-09); member features (ordering, resale, favorites, charity meals...) are all blocked */
 export function vendorBlockedToast() {
   toast({
     title: tr("店家帳號不能使用會員功能", "Vendor accounts can't use member features"),
@@ -13,8 +13,8 @@ export function vendorBlockedToast() {
 }
 
 /**
- * 鎖定／下單／轉讓等動作要先登入（2026-09-24 起不再用匿名身分）。
- * 在動作一開始呼叫 requireLogin()：沒登入就提示並導到登入頁、回傳 false；廠商帳號也回傳 false。
+ * Lock / order / resale actions require sign-in (anonymous identities are no longer used since 2026-09-24).
+ * Call requireLogin() at the start of the action: if signed out it shows a prompt, redirects to the login page and returns false; vendor accounts also return false.
  */
 export function useRequireLogin() {
   const { isAuthenticated, isLoading, isVendor } = useAuth();

@@ -1,12 +1,12 @@
-// 菜單兩層：目錄 > 分類（例：目錄「午餐便當」底下有分類「雞肉」「豬肉」）。
-// 目錄名稱存在 menu_items.catalog（沒填＝未分目錄），目錄的順序存在 vendors.menu_catalogs；
-// 分類沿用 menu_items.category。菜單管理頁與消費者商家頁用同一套分組。
+// Two menu levels: catalog > category (e.g. catalog "Lunch bentos" contains the categories "Chicken" and "Pork").
+// Catalog names are stored in menu_items.catalog (empty = uncataloged), catalog order in vendors.menu_catalogs;
+// categories reuse menu_items.category. Menu management and the diner vendor page use the same grouping.
 
 type WithCatalog = { catalog?: string | null };
 
 export const catalogOf = (item: WithCatalog): string => (item.catalog ?? "").trim();
 
-/** 目錄順序：店家排好的在前，品項上有、但還沒列進清單的接在後面（不含「未分目錄」） */
+/** Catalog order: the vendor's ordered catalogs first, then ones that appear on items but aren't in the list yet (excluding "uncataloged") */
 export function catalogOrder(listed: string[] | undefined, items: WithCatalog[]): string[] {
   const out: string[] = [];
   for (const name of [...(listed ?? []), ...items.map(catalogOf)]) {
@@ -17,13 +17,13 @@ export function catalogOrder(listed: string[] | undefined, items: WithCatalog[])
 }
 
 export interface CatalogGroup<T> {
-  catalog: string; // "" ＝未分目錄
+  catalog: string; // "" = uncataloged
   categories: { category: string; items: T[] }[];
 }
 
 /**
- * 依目錄 > 分類分組：目錄照 catalogOrder，未分目錄排最後；同一目錄內的分類保留品項原本的先後。
- * 沒有品項的目錄不會出現。categoryOf 讓呼叫端決定分類要顯示中文還是英文。
+ * Groups by catalog > category: catalogs follow catalogOrder with uncataloged last; categories within a catalog keep the items' original order.
+ * Catalogs without items are omitted. categoryOf lets the caller decide whether categories are shown in Chinese or English.
  */
 export function groupByCatalog<T extends WithCatalog>(items: T[], listed: string[] | undefined, categoryOf: (item: T) => string): CatalogGroup<T>[] {
   const groups: CatalogGroup<T>[] = [];

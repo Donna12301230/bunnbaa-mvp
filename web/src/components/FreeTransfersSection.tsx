@@ -18,10 +18,10 @@ import { Button } from "@/components/ui/button";
 import type { Lock } from "@/types";
 
 /**
- * 「附近愛心餐」分頁上方的免費轉讓（2026-10-09：$0 的轉讓從轉讓市集移過來）：
- *   - 轉讓人自訂 0 元：還在轉讓期限內 → 走 createResaleLinePayReservation（0 元不經 LINE Pay，直接到確認頁換人）
- *   - 逾時沒人接手：firestore.rules 允許任何登入用戶直接免費領取（locked_price 0）
- * 跟愛心餐不同的是這些是完整的一份訂單，領到後出現在「我的餐點」，照一般取餐流程用 QR 取餐。
+ * Free transfers above the "Charity meals nearby" tab (2026-10-09: $0 transfers moved here from the resale market):
+ *   - Seller set the price to 0 and the resale window is still open → goes through createResaleLinePayReservation (0 skips LINE Pay and goes straight to the confirm page to change holder)
+ *   - Nobody took it over in time: firestore.rules lets any signed-in user claim it for free (locked_price 0)
+ * Unlike charity meals, these are full orders; once claimed they appear in "My meals" and are picked up with a QR code through the normal pickup flow.
  */
 export default function FreeTransfersSection() {
   const { user } = useAuth();
@@ -41,7 +41,7 @@ export default function FreeTransfersSection() {
     return () => clearInterval(t);
   }, []);
 
-  // 跟轉讓市集同一個查詢（只有 for_resale 公開可讀），免費的在前端挑
+  // Same query as the resale market (only for_resale is publicly readable); free ones are filtered on the frontend
   useEffect(() => {
     const q = query(collection(db, "locks"), where("status", "==", "for_resale"), limit(200));
     return onSnapshot(q, (snap) => setLocks(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock)), () => setLocks([]));

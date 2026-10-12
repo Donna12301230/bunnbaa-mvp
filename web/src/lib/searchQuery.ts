@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
-// 頂部搜尋列（§4.5）的關鍵字。MarketplaceHeader 寫、預購餐點頁讀；
-// hash router 不方便帶 query string，跟 setPreferredPickup 一樣用模組層級的 store。
+// Keyword for the top search bar (§4.5). MarketplaceHeader writes it and the pre-order meals page reads it;
+// the hash router makes passing a query string awkward, so like setPreferredPickup it uses a module-level store.
 let current = "";
 const listeners = new Set<() => void>();
 
@@ -21,7 +21,7 @@ export function useSearchQuery() {
   );
 }
 
-/** 不分大小寫、忽略空白的包含比對 */
+/** Case-insensitive, whitespace-insensitive substring match */
 export function matchesQuery(q: string, ...fields: (string | null | undefined)[]): boolean {
   const needle = q.trim().toLowerCase().replace(/\s+/g, "");
   if (!needle) return true;

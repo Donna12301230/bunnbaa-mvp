@@ -1,11 +1,11 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   品牌形象頁（#/、#/landing）— 2026-10-01 編輯式改版
-   以 tokens.css／look-cafe.css 的變數為主；品牌頁專屬的只有：
-   · --lp-ink   深可可棕：文字、按鈕、橘底上的字
-   · --lp-band  溫暖褐色大面積色帶（品牌故事、試算卡）：奶油字 6.2:1、奶油白 7.3:1、橘色大字 3.6:1
-   · --lp-serif 拉丁字與數字用 Fraunces，中文自動落到 Noto Serif TC
-   動態：[data-reveal] 只在 .lp-motion（JS 確認不是 reduced-motion 後才加）底下先藏起來，
-   所以縮圖擷取、JS 沒跑、減少動態偏好時內容一律直接可見。
+   Brand page (#/, #/landing): 2026-10-01 editorial redesign
+   Mostly uses the variables from tokens.css / look-cafe.css; the only brand-page-specific ones are:
+   · --lp-ink   dark cocoa brown: text, buttons, text on orange
+   · --lp-band  warm brown full-width bands (brand story, calculator card): butter text 6.2:1, cream white 7.3:1, large orange text 3.6:1
+   · --lp-serif Fraunces for Latin text and numerals; Chinese falls back to Noto Serif TC automatically
+   Motion: [data-reveal] is only hidden under .lp-motion (added once JS confirms the user is not on reduced-motion),
+   so content is always visible for thumbnail capture, when JS does not run, or with a reduced-motion preference.
    ══════════════════════════════════════════════════════════════════════════ */
 
 .bb-landing {
@@ -66,7 +66,7 @@
 .lp-center { text-align: center; }
 .lp-nowrap { white-space: nowrap; }
 
-/* ── 進場動畫 ─────────────────────────────────────────────────────────── */
+/* ── Entrance animation ───────────────────────────────────────────────── */
 .lp-motion [data-reveal]:not([data-reveal='mask']) {
   opacity: 0;
   transform: translate3d(0, 28px, 0);
@@ -85,7 +85,7 @@
 }
 .lp-motion [data-reveal='mask'].is-in .lp-mask__inner { transform: none; }
 
-/* ── 字級 ─────────────────────────────────────────────────────────────── */
+/* ── Type scale ───────────────────────────────────────────────────────── */
 .lp-display {
   font-feature-settings: 'palt' 1, 'kern' 1;
   margin: 0;
@@ -186,7 +186,7 @@
 .lp-eyebrow--invert { color: color-mix(in srgb, var(--lp-butter) 80%, transparent); }
 .lp-eyebrow--invert .lp-eyebrow__index { color: var(--lp-butter); }
 
-/* ── 按鈕／文字連結 ───────────────────────────────────────────────────── */
+/* ── Buttons / text links ─────────────────────────────────────────────── */
 .lp-pill { border-radius: var(--radius-full); }
 .lp-pill__icon { transition: transform 500ms var(--lp-ease-out); }
 .lp-pill:hover .lp-pill__icon { transform: translateX(4px); }
@@ -282,7 +282,7 @@
   .lp-hero__proof dd { font-size: 24px; }
 }
 
-/* 拼貼：用 translate（獨立屬性）做游標視差，transform 留給進場動畫，兩者不互相覆蓋 */
+/* Collage: cursor parallax uses translate (a separate property), leaving transform to the entrance animation so they don't override each other */
 .lp-hero__visual {
   position: relative;
   aspect-ratio: 1 / 1.02;
@@ -385,7 +385,7 @@
   translate: calc(var(--mx) * 36px) calc(var(--my) * 30px);
   transition: translate 900ms var(--lp-ease-out);
 }
-/* 票券的打孔邊 */
+/* Perforated edge of the ticket */
 .lp-ticket::before,
 .lp-ticket::after {
   content: '';
@@ -471,7 +471,7 @@
   50% { transform: translateY(-10px); }
 }
 
-/* ══ 跑馬燈 ═══════════════════════════════════════════════════════════ */
+/* ══ Marquee ══════════════════════════════════════════════════════════ */
 .lp-ticker {
   overflow: hidden;
   background: var(--lp-orange);
@@ -502,7 +502,7 @@
   to { transform: translateX(-50%); }
 }
 
-/* ══ 品牌故事 ═════════════════════════════════════════════════════════ */
+/* ══ Brand story ══════════════════════════════════════════════════════ */
 .lp-story {
   position: relative;
   margin-top: -14px;
@@ -510,7 +510,7 @@
   color: var(--lp-butter);
   isolation: isolate;
 }
-/* 細緻的顆粒質感（SVG 雜訊，內嵌） */
+/* Fine grain texture (inline SVG noise) */
 .lp-story::before,
 .lp-sim::before {
   content: '';
@@ -575,7 +575,7 @@
   line-height: 1.75;
 }
 
-/* ══ 怎麼運作 ═════════════════════════════════════════════════════════ */
+/* ══ How it works ═════════════════════════════════════════════════════ */
 .lp-steps {
   position: relative;
   display: grid;
@@ -591,7 +591,7 @@
 @media (min-width: 1100px) {
   .lp-steps { grid-template-columns: repeat(4, 1fr); gap: 32px; }
 }
-/* 連接線：桌機橫向、手機直向，跟著捲動畫出來 */
+/* Connector line: horizontal on desktop, vertical on mobile, drawn on scroll */
 .lp-steps__line {
   position: absolute;
   left: 31px;
@@ -638,7 +638,7 @@
 }
 .lp-step .lp-muted { max-width: 30ch; font-size: 16px; line-height: 1.75; }
 
-/* ══ 早鳥試算 ═════════════════════════════════════════════════════════ */
+/* ══ Early-bird calculator ════════════════════════════════════════════ */
 .lp-early { padding-top: 24px; }
 .lp-early__grid { display: grid; gap: 56px; align-items: center; }
 @media (min-width: 1024px) {
@@ -775,7 +775,7 @@
 
 .lp-sim__days {
   display: grid;
-  grid-template-columns: repeat(10, 1fr); /* 30 天排成三排 */
+  grid-template-columns: repeat(10, 1fr); /* 30 days in three rows */
   gap: 4px;
   margin: 16px 0 0;
   padding: 0;
@@ -799,7 +799,7 @@
 .lp-sim__dot { width: 10px; height: 10px; border-radius: 3px; background: color-mix(in srgb, var(--lp-butter) 30%, transparent); }
 .lp-sim__dot.is-best { background: var(--lp-orange); }
 
-/* ══ 菜單 ═════════════════════════════════════════════════════════════ */
+/* ══ Menu ═════════════════════════════════════════════════════════════ */
 .lp-menu {
   max-width: calc(var(--lp-max) + 2 * var(--lp-gutter));
   margin-inline: 12px;
@@ -866,7 +866,7 @@
 .lp-dish__price strong { color: var(--lp-heading); font-family: var(--lp-serif); font-size: 26px; font-weight: 600; }
 .lp-menu__cta { margin-top: 32px; }
 
-/* ══ 活動 ═════════════════════════════════════════════════════════════ */
+/* ══ Events ═══════════════════════════════════════════════════════════ */
 .lp-row-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .lp-arrows { display: flex; gap: 12px; }
 
@@ -907,7 +907,7 @@
 }
 .lp-event__visual svg { width: 64px; height: 64px; stroke-width: 1.25; }
 
-/* ══ 數字 ═════════════════════════════════════════════════════════════ */
+/* ══ Numbers ══════════════════════════════════════════════════════════ */
 .lp-stats-wrap { padding-block: 24px 96px; }
 .lp-stats {
   display: grid;
@@ -942,7 +942,7 @@
 }
 .lp-stat__unit { font-size: 0.32em; letter-spacing: 0; margin-left: 6px; }
 
-/* ══ 圖片牆 ═══════════════════════════════════════════════════════════ */
+/* ══ Photo wall ═══════════════════════════════════════════════════════ */
 .lp-gallery { overflow: hidden; padding-block: 24px 64px; }
 .lp-gallery__track {
   display: flex;
@@ -988,7 +988,7 @@
 .lp-shape--o1 { translate: 0 36px; }
 .lp-shape--o2 { translate: 0 -28px; }
 
-/* ══ 評價 ═════════════════════════════════════════════════════════════ */
+/* ══ Reviews ══════════════════════════════════════════════════════════ */
 .lp-reviews { position: relative; }
 .lp-reviews__row { display: grid; gap: 40px; align-items: center; }
 @media (min-width: 1024px) {
@@ -1040,7 +1040,7 @@
 .lp-reviews__nav { display: flex; align-items: center; gap: 16px; }
 .lp-reviews__count { min-width: 64px; text-align: center; font-family: var(--lp-serif); font-variant-numeric: tabular-nums lining-nums; color: var(--text-secondary); }
 
-/* ══ 合作店家 ═════════════════════════════════════════════════════════ */
+/* ══ Partner vendors ══════════════════════════════════════════════════ */
 .lp-stores-sec { padding-top: 40px; }
 .lp-stores { gap: 20px; }
 .lp-stores__all { margin-top: 40px; }
@@ -1089,7 +1089,7 @@
 .lp-store:hover .lp-store__go { background: var(--lp-butter); rotate: 45deg; }
 .lp-store--skeleton { min-height: 460px; background: var(--skeleton-base); }
 
-/* ══ 收尾 CTA ═════════════════════════════════════════════════════════ */
+/* ══ Closing CTA ══════════════════════════════════════════════════════ */
 .lp-final {
   position: relative;
   isolation: isolate;
@@ -1166,7 +1166,7 @@
 .lp-final .lp-textlink:focus-visible,
 .lp-final .bb-btn:focus-visible { outline-color: var(--lp-ink); }
 
-/* ── 減少動態：關掉所有循環動畫與視差 ─────────────────────────────────── */
+/* ── Reduced motion: turn off all looping animations and parallax ─────── */
 @media (prefers-reduced-motion: reduce) {
   .lp-ticker__track,
   .lp-gallery__track,

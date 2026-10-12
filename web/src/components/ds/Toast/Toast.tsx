@@ -20,9 +20,9 @@ export interface ToastOptions {
   tone?: ToastTone;
   title: ReactNode;
   description?: ReactNode;
-  /** 行動按鈕，例如「復原」 */
+  /** Action button, e.g. "Undo" */
   action?: { label: string; onClick: () => void };
-  /** 毫秒；0 = 不自動關閉。預設 4000，error 預設 6000 */
+  /** Milliseconds; 0 = don't auto-dismiss. Default 4000, 6000 for error */
   duration?: number;
 }
 
@@ -40,15 +40,15 @@ const ICONS: Record<ToastTone, typeof Info> = {
 
 export interface ToastProps extends ToastOptions {
   onClose?: () => void;
-  /** 離場動畫中 */
+  /** Playing the exit animation */
   leaving?: boolean;
-  /** hover 時暫停計時由 Provider 處理；此 prop 給預覽頁靜態呈現 */
+  /** Pausing the timer on hover is handled by the Provider; this prop is for static display on the preview page */
   className?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
 }
 
-/** 單則通知的外觀。一般請用 useToast()；此元件主要供預覽與客製使用。 */
+/** Look of a single notification. Normally use useToast(); this component is mainly for the preview page and customization. */
 export function Toast({
   tone = 'info',
   title,
@@ -104,10 +104,10 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-/** 觸發通知：const { toast } = useToast(); toast({ tone: 'success', title: '已加入購物車' }) */
+/** Show a notification: const { toast } = useToast(); toast({ tone: 'success', title: 'Added to cart' }) */
 export function useToast(): ToastContextValue {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast() 必須在 <ToastProvider> 之內使用');
+  if (!ctx) throw new Error('useToast() must be used inside <ToastProvider>');
   return ctx;
 }
 
@@ -147,11 +147,11 @@ function ToastItem({ record, onDismiss }: { record: ToastRecord; onDismiss: (id:
 
 export interface ToastProviderProps {
   children: ReactNode;
-  /** 同時最多顯示幾則，預設 3 */
+  /** Maximum number shown at once, default 3 */
   max?: number;
 }
 
-/** 放在 <ThemeRoot> 之內。手機顯示於上方置中，≥768px 顯示於右下。 */
+/** Place inside <ThemeRoot>. Shown top-center on mobile, bottom-right at ≥768px. */
 export function ToastProvider({ children, max = 3 }: ToastProviderProps) {
   const [toasts, setToasts] = useState<ToastRecord[]>([]);
   const nextId = useRef(1);

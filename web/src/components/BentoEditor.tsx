@@ -26,10 +26,10 @@ export interface BentoForm {
   mealPeriods: MealPeriod[];
   mains: BentoMain[];
   riceComponentId: string;
-  parts: PrepPart[]; // 備料組成（存成 menu_items.fixed）：單品的全部組成、便當的固定附餐
+  parts: PrepPart[]; // Prep composition (stored as menu_items.fixed): the full composition of a single item, or a bento's fixed sides
   weekdays: number[];
   slots: BentoSlot[];
-  customFields: BentoCustomField[]; // 配菜下方店家自訂的下拉欄位
+  customFields: BentoCustomField[]; // Vendor-defined dropdown fields below the side dishes
 }
 
 export interface PrepPart {
@@ -40,27 +40,27 @@ export interface PrepPart {
 
 export const EMPTY_BENTO: BentoForm = { itemType: "single", mealPeriods: ["lunch"], mains: [], riceComponentId: "", parts: [], weekdays: [], slots: [], customFields: [] };
 
-/** 份數文字：1 份不顯示，其他「×2」「×0.5」 */
+/** Servings text: hidden for 1, otherwise "×2", "×0.5" */
 export const portionsText = (n: number) => (n && n !== 1 ? ` ×${n}` : "");
 
-/** 毛利低於這個比例時提示（成本 ÷ 售價 > 60%） */
+/** Warn when margin falls below this ratio (cost ÷ price > 60%) */
 const LOW_MARGIN = 0.4;
 
 const CATEGORIES = ["青菜類", "肉類配菜", "蛋豆類", "根莖類", "其他"];
-// 配菜類別存中文（別處會比對），英文介面只換顯示文字
+// Side-dish categories are stored in Chinese (compared elsewhere); the English UI only changes the display text
 const CATEGORY_EN: Record<string, string> = { 青菜類: "Greens", 肉類配菜: "Meat sides", 蛋豆類: "Egg & tofu", 根莖類: "Root vegetables", 其他: "Other" };
 const categoryLabel = (c: string) => tr(c, CATEGORY_EN[c] ?? c);
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WD = ["日", "一", "二", "三", "四", "五", "六"];
 
 const PORTION_SKIP_CATEGORIES = ["調味", "包材"];
-// 份量文字會存進 menu_items（portion_text），要跟 functions/src/bento.js 一致，所以固定用中文、不跟介面語言
+// Portion text is saved into menu_items (portion_text) and must match functions/src/bento.js, so it is always Chinese regardless of UI language
 const UNIT_TEXT: Record<string, string> = { g: "克", ml: "毫升" };
 
 /**
- * 材料總和顯示用的份量文字（§4.2），由配方帶出：例「滷雞腿 1 個」「炒高麗菜 80 克」。
- * 取主要原物料：排除調味料、包材；以個／片計的優先於克（「1 個雞腿」比「10 毫升醬油」更代表這道菜），
- * 同一種單位取用量最多的。跟 functions/src/bento.js 的 portionText 同一套規則，要一起改。
+ * Portion text for the materials total (§4.2), derived from the recipe: e.g. "滷雞腿 1 個", "炒高麗菜 80 克".
+ * Uses the main ingredient: excludes seasonings and packaging; piece/slice units win over grams ("1 chicken leg" says more about the dish than "10 ml soy sauce"),
+ * and within one unit the largest quantity wins. Same rules as portionText in functions/src/bento.js; change both together.
  */
 export function portionTextFor(component: Component | undefined, ingredientsById: Record<string, Ingredient>, fallback: string): string {
   const lines = (component?.ingredients ?? []).flatMap((line) => {
@@ -74,7 +74,7 @@ export function portionTextFor(component: Component | undefined, ingredientsById
   return `${fallback} ${Math.round((line.grams || 0) * 10) / 10} ${UNIT_TEXT[ing.unit] ?? ing.unit}`;
 }
 
-/** 表單 → 跟 menu_items 同形狀的品項（給份數計算用） */
+/** Form → an item shaped like menu_items (for servings calculation) */
 function formAsItem(value: BentoForm): MenuItem {
   const isBento = value.itemType === "bento";
   return {
@@ -90,8 +90,8 @@ function formAsItem(value: BentoForm): MenuItem {
 const SELECT_CLASS = selectClass("md", "min-w-0 flex-1");
 
 /**
- * 組合預覽（待修改.docx 第 4 列）：用下拉選單照著上面填的內容組一份（白飯、主菜、配菜、自訂欄位），
- * 下面用合成格子列出這個組合的全部原物料（現有庫存／需要），以及成本、售價、毛利。只是預覽，不會存。
+ * Combination preview (待修改.docx row 4): use dropdowns to build one serving from what's filled in above (rice, main, sides, custom fields);
+ * below, a crafting grid lists all ingredients for this combination (on hand / needed), plus cost, price and margin. Preview only; nothing is saved.
  */
 function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsById, vendorId, orderCount }: {
   value: BentoForm;
@@ -156,7 +156,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
 
   if (chips.length === 0) return null;
 
-  // 一份的半成品份數 → × 份數 → 原物料
+  // Servings of each semi-finished item per meal → × number of meals → ingredients
   const one = componentPortionsForLock({ rice, slots: lockSlots as LockSlot[], extra_side: null, main_component_id: main?.component_id ?? null }, formAsItem(value), componentsById, cfg);
   const scaled = new Map([...one].map(([id, n]) => [id, n * qty]));
   const needs = rawNeeds(scaled, componentsById, ingredientsById);
@@ -223,7 +223,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
         <span className="rounded bg-foreground text-background px-2 py-0.5 font-semibold">{itemName || tr("便當", "Bento")}・NT${finalPrice}</span>
       </div>
 
-      {/* 材料總和（合成格子） */}
+      {/* Materials total (crafting grid) */}
       <div className="pt-2 border-t border-border space-y-2">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="font-semibold">{tr("材料總和（生料）", "All ingredients (raw)")}</span>
@@ -255,14 +255,14 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
 }
 
 /**
- * 品項結構編輯（1002 規格 §3.2、§3.3）：
- * - 品項類型：便當（可自組：白飯＋主菜＋配菜）或單品（直接點選，例如鹹粥、蛋餅）
- * - 供應餐期（早／中／晚，可多選）；取餐時段在店家設定裡依餐期設定
- * - 主菜可列多道、各自定價，便當價格以所選主菜為準；每道菜都要有照片（消費者點圖片選菜）
- * - 每道菜用「菜色欄位」：菜名和配方（半成品）同一格，找不到就直接建，成本算不出來時寫原因、點了去補
- * - 配菜格：預設菜＋最多 3 道候選菜（同類別），候選菜不加價，改以份量平衡成本：
- *   比例 ≥ 0.75 全份、0.5–0.75 半份、低於 0.5 不得列為候選
- * - 自訂欄位：配菜下方再加店家自己的下拉選單（例：湯品、飲料、辣度），選項可加減價，第一個選項是預設
+ * Item structure editor (1002 spec §3.2, §3.3):
+ * - Item type: bento (customizable: rice + main + sides) or single item (ordered as is, e.g. savory congee, egg crepe)
+ * - Meal periods served (breakfast / lunch / dinner, multi-select); pickup slots are set per meal period in vendor settings
+ * - Multiple mains can be listed, each with its own price; the bento price follows the chosen main. Every dish needs a photo (diners pick dishes by image)
+ * - Each dish uses a "dish field": dish name and recipe (semi-finished item) in one field; create it if not found; if cost can't be computed, show why and link to fix it
+ * - Side slots: a default dish + up to 3 alternatives (same category). Alternatives cost no extra; cost is balanced by portion size:
+ *   ratio ≥ 0.75 full portion, 0.5–0.75 half portion, below 0.5 not allowed as an alternative
+ * - Custom fields: extra vendor dropdowns below the sides (e.g. soup, drink, spice level); options can adjust the price, and the first option is the default
  */
 export default function BentoEditor({ value, onChange, components, ingredientsById, vendorId, itemName, itemPrice, orderCount }: {
   itemName?: string;
@@ -272,7 +272,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
   components: Component[];
   ingredientsById: Record<string, Ingredient>;
   vendorId: string | undefined;
-  /** 預覽份數的快捷鍵，例：明天已訂 42 份 */
+  /** Preset servings for the preview, e.g. 42 already ordered for tomorrow */
   orderCount?: { label: string; n: number };
 }) {
   const { toast } = useToast();
@@ -283,13 +283,13 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
   const setMain = (i: number, main: BentoMain) => onChange({ ...value, mains: value.mains.map((m, j) => (j === i ? main : m)) });
   const isBento = value.itemType === "bento";
 
-  // 疊開的配方／原物料視窗；建好後呼叫 assign 把新半成品接回原本那一格
+  // Stacked recipe / ingredient dialog; once created, assign links the new semi-finished item back into the original compartment
   const [compDraft, setCompDraft] = useState<{ draft: ComponentDraft; assign?: (id: string, name: string) => void } | null>(null);
   const [ingDraft, setIngDraft] = useState<IngredientDraft | null>(null);
-  // 「加一格」：先挑或建一道菜，挑好才真的加進去
+  // "Add a compartment": pick or create a dish first; it is only added once chosen
   const [adding, setAdding] = useState<DishValue | null>(null);
   const [advanced, setAdvanced] = useState(value.weekdays.length > 0 || value.customFields.length > 0);
-  // 候選菜的份量級距、週上限、成立最低量多數店家用預設就好（2026-10-09 簡化）：預設收起，有設過才展開
+  // Most vendors are fine with defaults for alternative-dish portion tiers, weekly cap and minimum quantity (simplified 2026-10-09): collapsed by default, expanded only if set
   const [candidateDetails, setCandidateDetails] = useState(() => value.slots.some((sl) => sl.candidates.some((c) => c.weekly_cap != null || c.min_qty != null || c.portion_level < 1)));
 
   async function createComponent(name: string, withRecipe: boolean, assign: (id: string, name: string) => void) {
@@ -307,7 +307,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
     }
   }
 
-  /** 成本：算得出來顯示金額；算不出來寫原因，點了直接去補 */
+  /** Cost: show the amount when computable; otherwise show the reason, and clicking goes straight to fixing it */
   function fixIssue(issue: CostIssue, name: string, assign: (id: string, name: string) => void) {
     if (issue.kind === "unlinked") void createComponent(name || tr("新半成品", "New component"), true, assign);
     else if (issue.kind === "missing") setCompDraft({ draft: { ...EMPTY_COMP, name }, assign });
@@ -343,7 +343,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
     <DishPicker value={v} onChange={set} components={components} placeholder={placeholder} onCreate={(name, withRecipe) => createComponent(name, withRecipe, (id, n) => set({ name: v.name || n, component_id: id }))} />
   );
 
-  // 備料組成：每一樣餐點都能拆成幾個半成品，每份各要幾份；店家每日備料、叫貨都照這裡算
+  // Prep composition: every item breaks down into semi-finished items, with servings of each; the vendor's daily prep and purchasing are computed from this
   const setPart = (i: number, part: PrepPart) => onChange({ ...value, parts: value.parts.map((p, j) => (j === i ? part : p)) });
   const partsEditor = (
     <div className="rounded-md border border-border bg-card p-2 space-y-2">
@@ -368,7 +368,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
     </div>
   );
 
-  // 便當格子：點一格＝改那道菜的組成與份量；沒組成的格子點了直接建配方
+  // Bento compartments: clicking one edits that dish's composition and portion; clicking an empty one creates a recipe directly
   const openCell = (name: string, componentId: string | null | undefined, assign: (id: string, name: string) => void) => {
     const comp = componentId ? byId[componentId] : undefined;
     if (comp) setCompDraft({ draft: comp });

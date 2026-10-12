@@ -11,17 +11,17 @@ export interface DishValue {
 }
 
 /**
- * 菜色欄位：菜名和半成品合成一格（截圖：店家常只打菜名、半成品留「—」，備料就算不到）。
- * - 打字即搜尋既有半成品，選了同時決定菜名和配方
- * - 找不到就「建立『茄子』」（疊開配方視窗）或「只建名稱」（之後再補配方）
- * - 離開欄位時，菜名剛好等於某個半成品名稱就自動接上
- * 顯示給消費者的是輸入框裡的菜名；接的配方另外以小字標出，兩者可以不同（例：招牌雞腿／滷雞腿）。
+ * Dish field: dish name and semi-finished item in one field (screenshot: vendors often type only the dish name and leave the semi-finished item as "—", so prep can't be computed).
+ * - Typing searches existing semi-finished items; choosing one sets both the dish name and the recipe
+ * - If none is found, "Create 'Eggplant'" (opens a stacked recipe dialog) or "Name only" (add the recipe later)
+ * - On blur, if the dish name exactly matches a semi-finished item's name, link it automatically
+ * Diners see the dish name in the input; the linked recipe is shown separately in small text, and the two can differ (e.g. Signature chicken leg / Braised chicken leg).
  */
 export default function DishPicker({ value, onChange, components, onCreate, placeholder, className }: {
   value: DishValue;
   onChange: (v: DishValue) => void;
   components: Component[];
-  /** 建立半成品：withRecipe＝疊開配方視窗填原物料；false＝只存名稱 */
+  /** Create a semi-finished item: withRecipe = open the stacked recipe dialog to fill in ingredients; false = save the name only */
   onCreate: (name: string, withRecipe: boolean) => void;
   placeholder?: string;
   className?: string;

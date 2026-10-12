@@ -61,9 +61,9 @@ async function callLinePay(method, uri, body) {
   return json.info;
 }
 
-// 本機 emulator 沒設 LINE Pay 金鑰時改用假金流，才能在本機點完付款、轉讓接手、退款。
-// 只在 emulator、只認自己發出的 fake- 交易編號；測試故意塞的 tx-fake 之類照樣失敗。
-// 正式站（不是 emulator）或有金鑰時一律走真的 LINE Pay。
+// When the local emulator has no LINE Pay keys, use a fake payment flow so payment, resale takeover and refunds can be clicked through locally.
+// Only in the emulator, and only for fake- transaction ids we issued ourselves; deliberately injected test ids like tx-fake still fail.
+// In production (not the emulator) or when keys are set, always use the real LINE Pay.
 const FAKE_PREFIX = "fake-";
 function fakeMode() {
   return process.env.FUNCTIONS_EMULATOR === "true"
@@ -79,7 +79,7 @@ const isFakeTransaction = (transactionId) => fakeMode() && String(transactionId)
 function requestPayment({ orderId, amount, products, confirmUrl, cancelUrl }) {
   if (fakeMode()) {
     const transactionId = `${FAKE_PREFIX}${Date.now()}${randomUUID().slice(0, 8)}`;
-    // 跟真的 LINE Pay 一樣導回 confirmUrl 並接上 ?transactionId=；只留 #/ 之後，本機才不會跳去 APP_BASE_URL（正式站）
+    // Like real LINE Pay, redirect back to confirmUrl with ?transactionId= appended; keep only the part after #/ so local runs don't jump to APP_BASE_URL (production)
     const hashPath = confirmUrl.includes("#") ? confirmUrl.slice(confirmUrl.indexOf("#")) : confirmUrl;
     return Promise.resolve({ transactionId, paymentUrl: { web: `${hashPath}?transactionId=${transactionId}` } });
   }
@@ -104,7 +104,7 @@ function confirmPayment({ transactionId, amount }) {
  * Refunds a captured payment, fully or partially (refundAmount omitted = full).
  * One cart checkout is one LINE Pay transaction covering several locks, so
  * cancelling a single lock before cutoff is a partial refund of that lock's
- * locked_price. 停班停課自動退款（§11）也走這裡。
+ * locked_price. Automatic refunds for work-suspension days (§11) also go through here.
  */
 function refundPayment({ transactionId, refundAmount }) {
   if (isFakeTransaction(transactionId)) return Promise.resolve({ refundTransactionId: `${transactionId}-refund`, fake: true, refundAmount });

@@ -11,7 +11,7 @@ import { useI18n } from "@/lib/i18n";
 
 const SELECT_CLASS = selectClass("md", "w-full px-3");
 
-/** 頂部列的「選擇地區」按鈕＋選單：縣市 → 鄉鎮市區（選填），選了之後各頁只顯示該區店家 */
+/** Top-bar "Choose area" button + menu: city/county → district (optional); once chosen, pages show only vendors in that area */
 export default function AreaPicker({ className }: { className?: string }) {
   const area = useSelectedArea();
   const { t } = useI18n();

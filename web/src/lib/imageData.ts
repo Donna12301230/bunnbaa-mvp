@@ -1,7 +1,7 @@
 /**
- * 把使用者選的照片轉成 base64 送給 callable（拍照上架菜單）。先用 canvas 縮到長邊 maxSide、
- * 轉 JPEG，手機原圖動輒 5 MB 以上，縮完通常 < 500 KB；瀏覽器解不開（例如非 Safari 的 HEIC）
- * 就直接送原檔。
+ * Converts the photo the user picked to base64 for the callable (photo-to-menu listing). First scales it with canvas so the long side is maxSide
+ * and converts to JPEG: original phone photos are often over 5 MB, and after scaling usually < 500 KB. If the browser can't decode it (e.g. HEIC outside Safari),
+ * the original file is sent as is.
  */
 export async function imageToBase64(file: File, maxSide = 1600): Promise<{ base64: string; mimeType: string }> {
   try {

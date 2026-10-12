@@ -14,19 +14,43 @@
 ![React](https://img.shields.io/badge/React_18-TypeScript-61DAFB?logo=react&logoColor=black)
 ![Node](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 
-**Google AI Builder Cup 2026** · Theme: *Retail & Commerce: Intelligent Customer and Business Experiences* · Domain: Sustainability (food waste) and Social Good (free charity meals)
+**Google AI Builder Cup 2026** · Theme: *Retail & Commerce: Intelligent Customer and Business Experiences* · Domain: **Sustainability** (food waste reduction)
 
 | | |
 |---|---|
-| 🌐 **Live prototype** | https://bunnbaa-mvp-5474.web.app |
+| 🌐 **Live prototype** | https://bunnbaa-mvp-5474.web.app/?lang=en |
 | 🎬 **Demo video (3 min)** | [YouTube link] |
 | 📑 **Proposal deck** | [PDF link] |
 
+### Try it
+
+Open the live prototype. The interface is in English unless your browser is set to Chinese (`?lang=zh` / `?lang=en` switches it). Browsing menus needs no account. To book, resell or draw rewards, open **Sign in** and click the **Demo accounts** button, or sign in with the shared demo account below (it holds no real data):
+
+| Role | Email | Password |
+|---|---|---|
+| Diner | `customer@bunnbaa.test` | `demo123` |
+| Vendor | [demo vendor email] | [password] |
+
+Payments run in the LINE Pay **sandbox**, so no real money moves.
+
 ---
+
+## Screenshots
+
+Diner app (mobile) and vendor portal, English UI. Taken on the local emulators with seeded demo data, so vendor and dish names are not translated yet; on production they are translated by Gemini.
+
+<p>
+  <img src="assets/screenshots/diner-home.png" alt="Diner home" width="190">
+  <img src="assets/screenshots/diner-today.png" alt="Pre-order with early-bird prices" width="190">
+  <img src="assets/screenshots/diner-resale-market.png" alt="Resale market" width="190">
+</p>
+<p><img src="assets/screenshots/vendor-dashboard.png" alt="Vendor portal overview" width="780"></p>
 
 ## The problem
 
 Small eateries near campuses and offices buy ingredients before anyone orders. If they guess high, food gets thrown away. If they guess low, customers get turned away. Diners queue every day with no guaranteed meal and no reward for deciding early. Even a prepaid meal goes to waste when its owner's plans change, because nobody else knows it is available.
+
+This adds up. In 2022 the world wasted 1.05 billion tonnes of food, 19% of all food available to consumers, and 290 million tonnes of it was wasted in food service (UNEP, *Food Waste Index Report 2024*).
 
 ## How BunnBaa works
 
@@ -40,6 +64,10 @@ Vendors pay no monthly fee. The platform keeps 5% of each meal sold, deducted at
 ---
 
 ## Architecture
+
+![BunnBaa architecture on Google Cloud](assets/architecture.png)
+
+<sub>Source: [`assets/architecture.html`](assets/architecture.html). The same layers as a diagram GitHub renders:</sub>
 
 ```mermaid
 flowchart TB
@@ -215,7 +243,7 @@ gcloud projects add-iam-policy-binding <your-project-id> \
 ### 1. Configure
 
 ```bash
-git clone [repo URL] && cd BunnBaa
+git clone https://github.com/Donna12301230/bunnbaa-mvp.git && cd bunnbaa-mvp
 firebase login
 firebase use <your-project-id>
 
@@ -267,9 +295,9 @@ npm run emulator                                  # separate emulator for Functi
 npm run test:functions && npm run test:functions:more
 ```
 
-Results as of 12 Oct 2026: all 63 business-logic tests and all 144 Cloud Functions tests pass (tests that depend on the time of day are skipped when run too early, e.g. the two-cutoff `lockOrders` test needs to run after 20:00). The Firestore security-rule tests also pass.
+Results as of 12 Oct 2026: all 64 business-logic tests, all 65 Firestore security-rule tests and all 144 Cloud Functions tests pass (tests that depend on the time of day are skipped when run too early, e.g. the two-cutoff `lockOrders` test needs to run after 20:00 Taipei time).
 
-Pre-order assistant quality (`node scripts/eval/assistantEval.js`, 24 questions covering budgets, allergies, vegetarian, meal times, multi-day plans and English, 10 Oct 2026): 24/24 pass the rule checks (budget, allergens, excluded ingredients, meal period, weekday, no urgency wording) and the **Vertex AI Gen AI Evaluation Service** scores fulfillment 4.96/5 and groundedness 4.92/5. Report: [`doc/評估/預購助理回答品質評估.md`](doc/評估/預購助理回答品質評估.md).
+Pre-order assistant quality (`node scripts/eval/assistantEval.js`, 24 questions covering budgets, allergies, vegetarian, meal times, multi-day plans and English, 12 Oct 2026): 24/24 pass the rule checks (budget, allergens, excluded ingredients, meal period, weekday, no urgency wording) with zero allergen violations, and the **Vertex AI Gen AI Evaluation Service** scores fulfillment 4.79/5 and groundedness 4.96/5. Report: [`doc/assistant-evaluation.md`](doc/assistant-evaluation.md).
 
 ---
 

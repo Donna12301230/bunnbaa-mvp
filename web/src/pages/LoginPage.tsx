@@ -21,21 +21,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ShoppingBag, Clock, Tag, Store, Eye, EyeOff, Smartphone, Mail, ShieldCheck, UserRound, Zap } from "lucide-react";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/landing.tsx.
-// 登入／註冊／忘記密碼接真正的 Firebase Auth（@/lib/auth），登入用 Email。
-// 「帳號」欄位只當作沒填顯示名稱時的備用名稱。
+// Sign-in / sign-up / forgot password use real Firebase Auth (@/lib/auth); sign-in is by email.
+// The "Account" field is only a fallback name when no display name is given.
 export default function LoginPage() {
-  // 共用登入欄位
+  // Shared sign-in fields
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  // 密碼顯示切換
+  // Password visibility toggle
   const [showPassword, setShowPassword] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirm, setShowRegConfirm] = useState(false);
   const [showVendorPassword, setShowVendorPassword] = useState(false);
   const [showVendorConfirm, setShowVendorConfirm] = useState(false);
 
-  // 會員註冊欄位
+  // Member sign-up fields
   const [regUsername, setRegUsername] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
@@ -45,26 +45,26 @@ export default function LoginPage() {
   const [school, setSchool] = useState("國立嘉義大學");
   const [department, setDepartment] = useState("");
 
-  // 會員註冊流程
+  // Member sign-up flow
   const [memberAgreed, setMemberAgreed] = useState(false);
   const [memberStep, setMemberStep] = useState<"notice" | "form">("notice");
 
-  // 廠商申請流程
+  // Vendor application flow
   const [vendorAgreed, setVendorAgreed] = useState(false);
   const [vendorStep, setVendorStep] = useState<"notice" | "form">("notice");
 
-  // 密碼重設
+  // Password reset
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
-  // 手機門號 OTP 登入（草圖兩段式流程：輸入號碼送驗證碼 -> 輸入驗證碼登入）
+  // Phone OTP sign-in (two-step flow from the mockup: enter number to send code -> enter code to sign in)
   const [loginMode, setLoginMode] = useState<"password" | "phone">("password");
   const [otpStage, setOtpStage] = useState<"phone" | "code">("phone");
   const [otpPhone, setOtpPhone] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpConfirmation, setOtpConfirmation] = useState<ConfirmationResult | null>(null);
 
-  // 廠商申請欄位
+  // Vendor application fields
   const [vendorEmail, setVendorEmail] = useState("");
   const [vendorPassword, setVendorPassword] = useState("");
   const [vendorConfirmPassword, setVendorConfirmPassword] = useState("");
@@ -73,8 +73,8 @@ export default function LoginPage() {
 
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  // 登入成功後等個人資料（角色）讀好再導頁：回到登入前的頁面（lib/returnPath），沒有的話
-  // 廠商帳號進廠商後台、其他人到今日菜單
+  // After sign-in, wait for the profile (role) to load before redirecting: go back to the page before sign-in (lib/returnPath); otherwise
+  // vendor accounts go to the vendor portal and everyone else to today's menu
   const { user, isLoading: authLoading } = useAuth();
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function LoginPage() {
     onError: (err: Error) => toast({ variant: "destructive", title: tr("登入失敗", "Sign-in failed"), description: err.message }),
   });
 
-  // 體驗帳號快速登入（lib/demoAccounts.ts）：跟一般登入走同一條路，登入後依角色導頁
+  // Demo-account one-click sign-in (lib/demoAccounts.ts): same path as a normal sign-in, then redirects by role
   const demoLoginMutation = useMutation({
     mutationFn: (account: DemoAccount) => login(account.email, account.password),
     onSuccess: () => setSignedIn(true),
@@ -140,8 +140,8 @@ export default function LoginPage() {
     mutationFn: async () => {
       if (vendorPassword !== vendorConfirmPassword) throw new Error(tr("兩次輸入的密碼不一致", "Passwords don't match"));
       if (!storeName.trim()) throw new Error(tr("請填寫店家名稱", "Please enter a store name"));
-      // 帳號先以 customer 角色建立並送出 vendor_applications/{uid}，管理員在
-      // /admin/vendors 核准時把 vendors/{id}.owner_uid 綁到這個帳號後才會變成 vendor。
+      // The account is first created with the customer role and vendor_applications/{uid} is submitted; it only becomes
+      // a vendor once an admin approves it at /admin/vendors and binds vendors/{id}.owner_uid to this account.
       return applyAsVendor({ email: vendorEmail, password: vendorPassword, storeName, phone: vendorPhone });
     },
     onSuccess: () => {
@@ -171,7 +171,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background px-3 py-3 md:px-6 md:py-6">
       <div className="mx-auto max-w-[1200px] grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-16 items-center lg:min-h-[calc(100vh-3rem)]">
 
-        {/* 左欄：品牌介紹——沿用原本的大 Logo 風格（奶油底＋置中大標誌＋四張特色卡） */}
+        {/* Left column: brand intro, keeping the original big-logo style (cream background + centered logo + four feature cards) */}
         <div className="flex flex-col gap-8 py-4 md:py-8">
           <Link href="/" className="inline-flex items-center gap-1.5 w-fit text-sm font-semibold text-muted-foreground hover:text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             ← {tr("回首頁", "Back home")}
@@ -208,7 +208,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* 右欄：登入/註冊 */}
+        {/* Right column: sign-in / sign-up */}
         <div className="flex items-center">
           <Card className="w-full rounded-card border border-ink shadow-none bg-card md:p-4">
             <CardHeader className="pb-2">
@@ -317,9 +317,9 @@ export default function LoginPage() {
                       </Button>
                     </div>
                   )}
-                  {/* invisible reCAPTCHA，手機 OTP 送驗證碼要用；一直掛著不影響畫面 */}
+                  {/* Invisible reCAPTCHA, needed to send the phone OTP code; always mounted, it doesn't affect the layout */}
                   <div id="recaptcha-container" />
-                  {/* 體驗帳號：點一下直接登入，不用自己註冊（示範帳號是共用的，見 lib/demoAccounts.ts） */}
+                  {/* Demo accounts: one click signs in, no registration needed (the accounts are shared; see lib/demoAccounts.ts) */}
                   <div className="mt-5 max-w-xs mx-auto border-t border-border pt-4">
                     <p className="flex items-center justify-center gap-1.5 text-sm font-semibold">
                       <Zap className="w-4 h-4 text-brand" aria-hidden="true" /> {tr("體驗帳號，點一下直接登入", "Demo accounts — one tap to sign in")}
@@ -344,16 +344,16 @@ export default function LoginPage() {
                   </div>
                 </TabsContent>
 
-                {/* 會員註冊 */}
+                {/* Member sign-up */}
                 <TabsContent value="register">
                   {memberStep === "notice" ? (
                     <div className="space-y-4">
-                      {/* 會員須知內容 */}
+                      {/* Member terms */}
                       <div className="border rounded-lg p-4 bg-accent/50 space-y-3 max-h-80 overflow-y-auto text-sm text-foreground leading-relaxed">
                         <MemberNotice />
                       </div>
 
-                      {/* 同意勾選 */}
+                      {/* Consent checkbox */}
                       <div className="flex items-start gap-2">
                         <Checkbox
                           id="member-agree"
@@ -423,7 +423,7 @@ export default function LoginPage() {
                         <Input autoComplete="tel" placeholder="09xx-xxx-xxx" value={phone} onChange={e => setPhone(e.target.value)} />
                       </div>
 
-                      {/* 學籍資料群組 */}
+                      {/* Student info group */}
                       <div className="border rounded-lg p-3 space-y-3 bg-accent/50">
                         <p className="text-xs font-semibold text-accent-foreground">{tr("我是學生（選填）", "I'm a student (optional)")}</p>
                         <div>
@@ -464,16 +464,16 @@ export default function LoginPage() {
                   )}
                 </TabsContent>
 
-                {/* 廠商申請 */}
+                {/* Vendor application */}
                 <TabsContent value="vendor">
                   {vendorStep === "notice" ? (
                     <div className="space-y-4">
-                      {/* 須知內容 */}
+                      {/* Terms */}
                       <div className="border rounded-lg p-4 bg-warning-soft/50 space-y-3 max-h-80 overflow-y-auto text-sm text-foreground leading-relaxed">
                         <VendorNotice />
                       </div>
 
-                      {/* 同意勾選 */}
+                      {/* Consent checkbox */}
                       <div className="flex items-start gap-2">
                         <Checkbox
                           id="vendor-agree"
@@ -552,7 +552,7 @@ export default function LoginPage() {
 
       </div>
 
-      {/* 密碼重設 Dialog */}
+      {/* Password reset dialog */}
       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>

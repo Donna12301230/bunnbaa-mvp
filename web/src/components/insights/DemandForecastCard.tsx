@@ -25,8 +25,8 @@ function weekdayLabel(day: string) {
 }
 
 /**
- * 需求預測（functions/src/demandForecast.js 每天 05:00 用 BigQuery AI.FORECAST 寫入 vendors/{id}/forecast）。
- * 只給參考，不下備料指令；還沒有預測（BigQuery 未設定或資料太短）就整張不顯示。
+ * Demand forecast (written daily at 05:00 by functions/src/demandForecast.js using BigQuery AI.FORECAST to vendors/{id}/forecast).
+ * For reference only, not a prep instruction; the whole card is hidden when there is no forecast yet (BigQuery not set up or too little data).
  */
 export default function DemandForecastCard({ vendorId }: { vendorId: string | undefined }) {
   const [days, setDays] = useState<DayForecast[]>([]);

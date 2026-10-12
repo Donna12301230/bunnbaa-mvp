@@ -33,7 +33,7 @@ interface Forecast {
   hourly_wage: number;
   payment_fee: number;
   payment_fee_rate: number;
-  // 平台抽成（每份實付 × 抽成比例）；2026-10-05 以前產生的看板沒有這兩欄，按「重新計算」就會補上
+  // Platform commission (amount paid per meal × commission rate); dashboards generated before 2026-10-05 lack these two fields, pressing "Recalculate" fills them in
   commission_fee?: number;
   commission_rate?: number;
   staff_salary: number;
@@ -61,9 +61,9 @@ function Row({ label, value, minus, strong }: { label: string; value: number; mi
 }
 
 /**
- * 店家後台首頁第一張卡「本月收益看板」（1002 規格 §9.3）：本月要備多少材料、扣掉人工後能淨賺多少。
- * 數字由 Functions buildRevenueForecast（每天 21:00）／refreshRevenueForecast 算，存 vendors/{id}/revenueForecast/{月}；
- * 預估數字僅供參考，月底以實際數字結算。
+ * First card on the vendor portal home, "This month's earnings dashboard" (1002 spec §9.3): how much material to prep this month and how much net profit remains after labor.
+ * Numbers are computed by Functions buildRevenueForecast (daily 21:00) / refreshRevenueForecast and stored in vendors/{id}/revenueForecast/{month};
+ * forecasts are for reference only; the month is settled on actual figures.
  */
 export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null | undefined }) {
   const { toast } = useToast();
@@ -101,7 +101,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
     }
   }
 
-  // 本月還沒有資料（新店家、排程還沒跑）就自動算一次
+  // No data for this month yet (new vendor, schedule hasn't run): compute once automatically
   useEffect(() => {
     if (loaded && !data && vendor?.id && !autoRefreshed.current) {
       autoRefreshed.current = true;
@@ -127,7 +127,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
         {!data ? (
           <div className="h-40 rounded-xl bg-muted animate-pulse" aria-label={tr("計算中", "Calculating")} />
         ) : (() => {
-          // 錢去哪裡：營收拆成各項成本＋淨利，一條色條
+          // Where the money goes: revenue split into cost items + net profit, as one colored bar
           const parts = [
             { key: "mat", label: tr("材料", "Materials"), v: data.material_cost, cls: "bg-danger" },
             { key: "labor", label: tr("備料人工", "Prep labor"), v: data.labor_cost, cls: "bg-warning" },
@@ -154,7 +154,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                   </div>
                 </div>
 
-                {/* 打平進度 */}
+                {/* Break-even progress */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-sm">
                     <span className="font-semibold flex items-center gap-1"><Calculator className="w-4 h-4 text-primary" />{tr("打平固定成本", "Break-even")}</span>
@@ -168,7 +168,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                   <p className="text-xs text-muted-foreground">{tr(`已確定 ${sold} 份`, `${sold} confirmed`)}{beTotal > 0 ? tr(` / 打平要 ${beTotal} 份`, ` / ${beTotal} to break even`) : ""}</p>
                 </div>
 
-                {/* 錢去哪裡 */}
+                {/* Where the money goes */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-sm">
                     <span className="font-semibold">{tr("營收去哪裡", "Where revenue goes")}</span>

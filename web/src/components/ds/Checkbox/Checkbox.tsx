@@ -6,17 +6,17 @@ import './Checkbox.css';
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> {
   label?: ReactNode;
-  /** label 下方的補充說明 */
+  /** Supporting text below the label */
   description?: ReactNode;
-  /** 半選（例如「全選」底下只勾了部分） */
+  /** Indeterminate (e.g. only some items under "Select all" are checked) */
   indeterminate?: boolean;
-  /** 錯誤狀態（例如必須同意條款） */
+  /** Error state (e.g. agreeing to the terms is required) */
   invalid?: boolean;
-  /** 僅供預覽頁強制呈現狀態 */
+  /** Only for forcing states on the preview page */
   forceState?: 'hover' | 'focus';
 }
 
-/** 原生 checkbox + 自訂外觀；整列 label 皆可點，高度至少 44px。 */
+/** Native checkbox + custom look; the whole label row is clickable and at least 44px tall. */
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Checkbox(
   { label, description, indeterminate = false, invalid = false, disabled, className, forceState, ...rest },
   ref,

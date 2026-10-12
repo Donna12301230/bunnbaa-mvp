@@ -4,7 +4,7 @@ import FavoriteButton from "@/components/FavoriteButton";
 import { loc, useI18n } from "@/lib/i18n";
 import type { RewardStatus, Vendor } from "@/types";
 
-/** 店家卡片抬頭：店名、標章、愛心收藏；右側「再 X 元開獎」＋藍色「看店家」（§4.5） */
+/** Vendor card header: name, badges, favorite heart; on the right, "NT$X to the draw" + the blue "View vendor" button (§4.5) */
 export default function VendorCardHeader({ vendor, subtitle, reward }: { vendor: Vendor; subtitle: string; reward?: RewardStatus }) {
   const { t } = useI18n();
   const name = loc(vendor, "name");

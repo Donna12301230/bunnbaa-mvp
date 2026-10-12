@@ -3,7 +3,7 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Vendor } from "@/types";
 
-/** 公開的合作商家清單（排除已停用），首頁／Landing／商家列表／轉讓市集共用同一份快取 */
+/** Public list of partner vendors (excluding disabled ones); home / Landing / vendor list / resale market share this cache */
 export function useVendors() {
   return useQuery({
     queryKey: ["vendors"],

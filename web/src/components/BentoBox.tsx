@@ -8,21 +8,21 @@ import type { Component, Ingredient, MenuItem } from "@/types";
 export interface BentoCell {
   key: string;
   name: string;
-  /** 份量，例「200g」 */
+  /** Portion, e.g. "200g" */
   sub?: string;
   group: FoodGroup;
-  /** 還沒有組成（沒接配方或配方沒原物料）：虛線、問號 */
+  /** No composition yet (no recipe linked, or the recipe has no ingredients): dashed outline, question mark */
   missing?: boolean;
   onClick?: () => void;
 }
 
-/** 一格的份量文字：半成品每份熟重，份數不是 1 時加「×2」 */
+/** Portion text for a compartment: cooked weight per serving of the semi-finished item, with "×2" appended when servings ≠ 1 */
 export function cellSub(comp: Component | undefined, portions = 1): string | undefined {
   if (!comp || !(comp.portion_grams > 0)) return portions !== 1 ? `×${portions}` : undefined;
   return `${Math.round(comp.portion_grams * portions)}g`;
 }
 
-/** 一道菜 → 一格；配方缺漏（未接、沒原物料、被刪）就畫成問號格 */
+/** One dish → one compartment; a missing recipe (not linked, no ingredients, deleted) is drawn as a question-mark compartment */
 export function dishCell(key: string, name: string, componentId: string | null | undefined, componentsById: Record<string, Component>, ingredientsById: Record<string, Ingredient>, portions = 1, rice = false): BentoCell {
   const comp = componentId ? componentsById[componentId] : undefined;
   const issue = costIssue(componentId, componentsById, ingredientsById);
@@ -35,7 +35,7 @@ export function dishCell(key: string, name: string, componentId: string | null |
   };
 }
 
-/** 品項的預設組合（白飯、第一道主菜、固定附餐、各配菜的預設菜）→ 便當格子 */
+/** Item's default combination (rice, first main dish, fixed sides, each side slot's default dish) → bento compartments */
 export function itemCells(item: MenuItem, componentsById: Record<string, Component>, ingredientsById: Record<string, Ingredient>): BentoCell[] {
   const cells: BentoCell[] = [];
   const isBento = item.item_type ? item.item_type === "bento" : (item.slots?.length ?? 0) > 0;
@@ -53,14 +53,14 @@ export function itemCells(item: MenuItem, componentsById: Record<string, Compone
 }
 
 /**
- * 分格便當盒（簡化提案 §5.2）：每格是一道配菜，顏色是食材類別。第一格（通常是白飯）佔左邊兩列。
- * size="thumb" 是菜單卡片上的縮圖；size="edit" 可以點格子改、按「加一格」新增。
+ * Compartment bento box (simplification proposal §5.2): each compartment is a side dish, colored by ingredient category. The first one (usually rice) spans two rows on the left.
+ * size="thumb" is the thumbnail on menu cards; size="edit" lets you click a compartment to edit it or press "Add a compartment".
  */
 export default function BentoBox({ cells, size = "thumb", onAdd, empty }: {
   cells: BentoCell[];
   size?: "thumb" | "edit";
   onAdd?: () => void;
-  /** 完全沒有組成時的「空便當」 */
+  /** "Empty bento" shown when there is no composition at all */
   empty?: boolean;
 }) {
   const thumb = size === "thumb";
@@ -117,7 +117,7 @@ export default function BentoBox({ cells, size = "thumb", onAdd, empty }: {
   );
 }
 
-/** 成本／毛利色條（簡化提案 §5.2）。成本占售價越高越紅 */
+/** Cost / margin bar (simplification proposal §5.2). The higher cost is as a share of price, the redder */
 export function MarginBar({ cost, price }: { cost: number; price: number }) {
   if (!(price > 0) || !(cost > 0)) return null;
   const costPct = Math.min(100, Math.round((cost / price) * 100));

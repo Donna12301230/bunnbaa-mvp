@@ -14,7 +14,7 @@
 ![React](https://img.shields.io/badge/React_18-TypeScript-61DAFB?logo=react&logoColor=black)
 ![Node](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 
-**Google AI Builder Cup 2026** · 賽題：*零售與商業：智慧客戶與商業體驗* · 領域：永續（減少剩食）、社會公益（免費愛心餐）
+**Google AI Builder Cup 2026** · 賽題：*零售與商業：智慧客戶與商業體驗* · 領域：**永續 Sustainability**（減少剩食）
 
 | | |
 |---|---|
@@ -22,7 +22,29 @@
 | 🎬 **展示影片（3 分鐘）** | [YouTube 連結] |
 | 📑 **提案簡報** | [PDF 連結] |
 
+### 試用
+
+打開線上版即可。瀏覽器是中文就顯示中文，其他語言顯示英文（網址加 `?lang=zh`／`?lang=en` 可切換）。瀏覽菜單不用登入；預購、轉讓、抽獎請到「登入」頁按「體驗帳號」一鍵登入，或用下面的共用示範帳號（上面沒有真實資料）：
+
+| 角色 | Email | 密碼 |
+|---|---|---|
+| 消費者 | `customer@bunnbaa.test` | `demo123` |
+| 商家 | [demo 商家 email] | [密碼] |
+
+付款走 LINE Pay **Sandbox**，不會真的扣款。
+
 ---
+
+## 畫面
+
+消費者端（手機）與商家後台，英文介面。在本機 emulator 用示範資料截的，所以店名、菜名還沒翻譯；正式站上由 Gemini 自動翻成英文。
+
+<p>
+  <img src="assets/screenshots/diner-home.png" alt="Diner home" width="190">
+  <img src="assets/screenshots/diner-today.png" alt="Pre-order with early-bird prices" width="190">
+  <img src="assets/screenshots/diner-resale-market.png" alt="Resale market" width="190">
+</p>
+<p><img src="assets/screenshots/vendor-dashboard.png" alt="Vendor portal overview" width="780"></p>
 
 ## 要解決的問題
 
@@ -40,6 +62,10 @@
 ---
 
 ## 系統架構
+
+![BunnBaa architecture on Google Cloud](assets/architecture.png)
+
+<sub>原始檔：[`assets/architecture.html`](assets/architecture.html)。下面是同一套分層的 Mermaid 版：</sub>
 
 ```mermaid
 flowchart TB
@@ -215,7 +241,7 @@ gcloud projects add-iam-policy-binding <your-project-id> \
 ### 1. 設定
 
 ```bash
-git clone [repo URL] && cd BunnBaa
+git clone https://github.com/Donna12301230/bunnbaa-mvp.git && cd bunnbaa-mvp
 firebase login
 firebase use <your-project-id>
 
@@ -267,9 +293,9 @@ npm run emulator                                  # Functions 測試專用的 em
 npm run test:functions && npm run test:functions:more
 ```
 
-2026-10-12 的結果：商業邏輯測試 63 項、Cloud Functions 測試 144 項全部通過（跟時間有關的測試在時間不到時會跳過，例如兩家不同截單時間的 `lockOrders` 要 20:00 後才能跑）。Firestore 安全規則測試也全部通過。
+2026-10-12 的結果：商業邏輯測試 64 項、Firestore 安全規則測試 65 項、Cloud Functions 測試 144 項全部通過（跟時間有關的測試在時間不到時會跳過，例如兩家不同截單時間的 `lockOrders` 要台北時間 20:00 後才能跑）。
 
-預購助理回答品質（`node scripts/eval/assistantEval.js`，24 題，涵蓋預算、過敏、素食、餐期、多日方案與英文提問，2026-10-10）：規則檢查（預算、過敏原、不吃的食材、餐期、星期、不催促）24/24 通過；**Vertex AI Gen AI Evaluation Service** 評分需求符合度 4.96/5、有據性 4.92/5。報告：[`doc/評估/預購助理回答品質評估.md`](doc/評估/預購助理回答品質評估.md)。
+預購助理回答品質（`node scripts/eval/assistantEval.js`，24 題，涵蓋預算、過敏、素食、餐期、多日方案與英文提問，2026-10-12）：規則檢查（預算、過敏原、不吃的食材、餐期、星期、不催促）24/24 通過、過敏原違規 0；**Vertex AI Gen AI Evaluation Service** 評分需求符合度 4.79/5、有據性 4.96/5。報告：[`doc/評估/預購助理回答品質評估.md`](doc/評估/預購助理回答品質評估.md)。
 
 ---
 

@@ -1,11 +1,11 @@
-// 未取餐與愛心餐（規格 §7）。愛心餐顯示在轉讓市集的「愛心餐」分頁（使用者 2026-09-30 決定）。
+// No-shows and charity meals (spec §7). Charity meals appear in the "Charity meals" (愛心餐) tab of the resale market (user decision, 2026-09-30).
 //
-// charityMeals/{id}（公開可讀，不含任何個人資料）：
+// charityMeals/{id} (publicly readable, no personal data at all):
 //   vendor_id, vendor_name, lat, lng, date, source: noshow|donated, status: available|reserved|claimed|given|wasted,
-//   pickup_code（便當上的標籤號，給店家找盒子）, item_name, sides[], deadline（Timestamp）
-// charityReservations/{id}（本人可讀，與 locks 分開存放，保留 30 天）：
+//   pickup_code (label number on the bento box, so the vendor can find it), item_name, sides[], deadline (Timestamp)
+// charityReservations/{id} (readable by the owner, stored separately from locks, kept for 30 days):
 //   user_id, meal_id, vendor_id, date, status: reserved|claimed|expired, expires_at, qr_nonce
-// （舊制 charityBans 已取消：逾時釋出給下一位，不停權）
+// (the old charityBans scheme is gone: expired reservations are released to the next person, no ban)
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { Timestamp } = require("firebase-admin/firestore");
 const {
@@ -27,7 +27,7 @@ function mealFromLock(lockId, lock, vendor, source, deadline) {
     date: lock.pickup_date,
     source,
     status: "available",
-    lock_id: lockId, // 只給後端對帳用；公開頁面不顯示
+    lock_id: lockId, // for backend reconciliation only; not shown on public pages
     pickup_code: lock.pickup_code || null,
     item_name: lock.item_name,
     sides: [
@@ -40,8 +40,8 @@ function mealFromLock(lockId, lock, vendor, source, deadline) {
 }
 
 /**
- * 「附近有愛心餐」推播（§7.3）：預設關閉；只推給開啟的人、常用地點（粗略 geohash）1 公里內、
- * 愛心餐時段內，每人每天最多 2 則。
+ * "Charity meals nearby" push (§7.3): off by default; sent only to users who turned it on, within 1 km of their usual location (coarse geohash),
+ * during the charity meal window, at most 2 per person per day.
  */
 async function notifyNearby(vendor, count) {
   if (!Number.isFinite(vendor.lat) || !Number.isFinite(vendor.lng) || count <= 0) return;
@@ -65,7 +65,7 @@ async function notifyNearby(vendor, count) {
   }
 }
 
-/** 愛心餐截止＝該餐期取餐時段結束後 2 小時（早、中、晚各自計算） */
+/** Charity meal deadline = 2 hours after that meal period's pickup slot ends (breakfast, lunch and dinner computed separately) */
 function charityDeadline(vendor, date, config, window = null) {
   const { end } = helpers.todayRange(vendor, date, window, config);
   return new Date(end.getTime() + config.charityCloseAfterMinutes * 60000);
@@ -75,7 +75,7 @@ function periodDeadline(end, config) {
   return new Date(end.getTime() + config.charityCloseAfterMinutes * 60000);
 }
 
-/** 消費者在取餐日（取餐時段結束前）主動捐出：立即開放領取，計入個人愛心紀錄 */
+/** Diner donates on the pickup day (before the pickup slot ends): opens for claiming immediately and counts toward their charity record */
 exports.donateLock = onCall({}, async (request) => {
   assertSignedInUser(request, "捐出愛心餐");
   const lockId = request.data?.lock_id;
@@ -108,7 +108,7 @@ exports.donateLock = onCall({}, async (request) => {
   return { meal_id: mealRef.id };
 });
 
-/** 取餐時段結束 30 分後，仍未取餐的便當轉愛心餐；不退款、照常發抽獎券 */
+/** 30 minutes after the pickup slot ends, bentos still not picked up become charity meals; no refund, draw tickets issued as usual */
 exports.convertToCharity = onSchedule({ schedule: "every 5 minutes", timeZone: "Asia/Taipei", region: REGION }, async () => {
   const config = await loadPlatformConfig(db());
   const today = taipeiToday();
@@ -157,7 +157,7 @@ exports.convertToCharity = onSchedule({ schedule: "every 5 minutes", timeZone: "
   });
 });
 
-/** 愛心餐截止（取餐時段結束後 2 小時）：關閉領取、提醒店家輸入送出份數 */
+/** Charity meal deadline (2 hours after the pickup slot ends): close claiming and remind the vendor to enter the number given out */
 exports.closeCharity = onSchedule({ schedule: "every 10 minutes", timeZone: "Asia/Taipei", region: REGION }, async () => {
   const config = await loadPlatformConfig(db());
   const today = taipeiToday();
@@ -185,7 +185,7 @@ exports.closeCharity = onSchedule({ schedule: "every 10 minutes", timeZone: "Asi
 });
 
 /**
- * 線上預約（§7.2）：手機驗證帳號、每人每天 1 份、10 分鐘內到場；逾時釋出、不停權。
+ * Online reservation (§7.2): phone-verified account, 1 per person per day, arrive within 10 minutes; released on timeout, no ban.
  */
 exports.reserveCharity = onCall({}, async (request) => {
   assertSignedInUser(request, "預約愛心餐");
@@ -199,7 +199,7 @@ exports.reserveCharity = onCall({}, async (request) => {
   const config = await loadPlatformConfig(db());
   const today = taipeiToday();
   const mine = await db().collection("charityReservations").where("user_id", "==", uid).where("date", "==", today).get();
-  // 逾時釋出的不算（不停權，可以再預約別份）
+  // Expired-and-released reservations don't count (no ban; the user may reserve another)
   if (mine.docs.some((d) => ["reserved", "claimed"].includes(d.data().status))) {
     throw new HttpsError("resource-exhausted", t("每人每天限預約 1 份愛心餐", "One charity meal per person per day"));
   }
@@ -232,7 +232,7 @@ exports.reserveCharity = onCall({}, async (request) => {
   return { reservation_id: resRef.id, expires_at: expires };
 });
 
-/** 逾時未到：釋出該份給下一位（不停權，§7.2）；並清掉 30 天前的預約紀錄 */
+/** No-show after reserving: release the meal to the next person (no ban, §7.2), and clear reservations older than 30 days */
 exports.expireCharityReservation = onSchedule({ schedule: "every 1 minutes", timeZone: "Asia/Taipei", region: REGION }, async () => {
   const config = await loadPlatformConfig(db());
   const expired = await db().collection("charityReservations")
@@ -262,7 +262,7 @@ exports.expireCharityReservation = onSchedule({ schedule: "every 1 minutes", tim
   if (!old.empty) await batch.commit();
 });
 
-/** 店家現場送出一份（未預約、先到先領、不需帳號） */
+/** Vendor hands out one on site (no reservation, first come first served, no account needed) */
 exports.giveCharityOnsite = onCall({}, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const ref = db().collection("charityMeals").doc(String(request.data?.meal_id || "_"));
@@ -276,8 +276,8 @@ exports.giveCharityOnsite = onCall({}, async (request) => {
 });
 
 /**
- * 15:00 後店家輸入現場送出份數，其餘記為報廢（§7.2、§7.5）。報廢數寫進 prepPlans，
- * 下週預測會用到（buildWeeklyPurchase 扣掉報廢份數）。
+ * After 15:00 the vendor enters the number given out on site; the rest are recorded as waste (§7.2, §7.5). Waste goes into prepPlans
+ * and is used by next week's forecast (buildWeeklyPurchase subtracts wasted portions).
  */
 exports.submitCharityResult = onCall({}, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
@@ -305,7 +305,7 @@ exports.submitCharityResult = onCall({}, async (request) => {
     charity_result: { total: meals.size, reserved_claimed: claimed, given_onsite: Math.min(given, open.length), wasted, submitted_at: FieldValue.serverTimestamp() },
   }, { merge: true });
   await batch.commit();
-  // 當日愛心餐全數送出（§7.4）：補發給原訂購人，只發一次
+  // All of the day's charity meals were given out (§7.4): notify the original buyers, only once
   const planRef = db().collection("vendors").doc(vendorId).collection("prepPlans").doc(date);
   const alreadyNotified = (await planRef.get()).data()?.charity_all_given_notified;
   const wastedBefore = meals.docs.filter((d) => d.data().status === "wasted").length;

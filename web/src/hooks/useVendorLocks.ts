@@ -5,8 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import type { Lock } from "@/types";
 
 /**
- * 登入店主這家店最近 max 筆鎖定（即時）。用 vendor_id + created_at 既有索引，
- * 日期／時段／狀態篩選交給前端——商家後台各頁（總覽、備料、訂單、時段、報表）共用。
+ * The latest max locks for the signed-in vendor owner's store (live). Uses the existing vendor_id + created_at index;
+ * date / slot / status filtering is done on the client. Shared by the vendor portal pages (overview, prep, orders, slots, reports).
  */
 export function useVendorLocks(max = 500) {
   const vendorId = useAuth().user?.vendorId;

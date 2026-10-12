@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-/** 同時支援受控（value）與非受控（defaultValue）的狀態。 */
+/** State that supports both controlled (value) and uncontrolled (defaultValue) use. */
 export function useControllableState<T>(
   value: T | undefined,
   defaultValue: T,

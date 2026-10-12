@@ -12,10 +12,10 @@
 const { GoogleGenAI } = require("@google/genai");
 
 const MODEL_NAME = "gemini-3.6-flash";
-// 轉讓媒合用的向量；Firestore 向量索引上限 2048 維，這裡固定 768（firestore.indexes.json 要一致）
+// Embeddings for resale matching; Firestore vector indexes cap at 2048 dimensions, fixed at 768 here (must match firestore.indexes.json)
 const EMBEDDING_MODEL = "gemini-embedding-001";
 const EMBEDDING_DIMENSIONS = 768;
-// 新模型不一定在 asia-east1 上架，預設走 global 端點；要指定區域就設 VERTEX_LOCATION
+// Newer models aren't always available in asia-east1, so default to the global endpoint; set VERTEX_LOCATION to pin a region
 const LOCATION = process.env.VERTEX_LOCATION || "global";
 
 let client;
@@ -83,7 +83,7 @@ async function generateJSON({ systemInstruction, userPrompt, temperature = 0.4 }
   return parseJSON(response.text ?? "");
 }
 
-/** 同 generateJSON，但附一張圖片（base64，不含 data: 前綴） */
+/** Same as generateJSON, but with one image attached (base64, without the data: prefix) */
 async function generateJSONFromImage({ systemInstruction, userPrompt, imageBase64, mimeType, temperature = 0.2 }) {
   const response = await generateJSONContent([
     { role: "user", parts: [
@@ -95,10 +95,10 @@ async function generateJSONFromImage({ systemInstruction, userPrompt, imageBase6
 }
 
 /**
- * Function calling 迴圈：Gemini 要求呼叫工具時，由 handlers[name](args) 在伺服器端執行
- * （Gemini 不直接碰資料庫），結果送回去，直到它回文字或呼叫 finishTool 為止。
- * 回傳 { text, finish }：finish 是 finishTool 的參數（沒呼叫就是 null）。
- * 最後一輪限定只能呼叫 finishTool，工具查太多輪也一定會交出結果。
+ * Function calling loop: when Gemini asks to call a tool, handlers[name](args) runs it on the server
+ * (Gemini never touches the database directly) and the result is sent back, until it replies with text or calls finishTool.
+ * Returns { text, finish }: finish is finishTool's arguments (null if it wasn't called).
+ * The last round only allows finishTool, so even if it queries tools for too many rounds it still delivers a result.
  */
 async function runWithTools({ systemInstruction, contents, functionDeclarations, handlers, finishTool, maxRounds = 5, temperature = 0.3, finalNudge = null }) {
   const config = {
@@ -132,16 +132,16 @@ async function runWithTools({ systemInstruction, contents, functionDeclarations,
       }
       parts.push({ functionResponse: { id: call.id, name: call.name, response: { result } } });
     }
-    // 下一輪就是限定收尾的最後一輪：附一句說明，不然模型可能交出「系統有誤」之類的空話。
-    // 放進工具結果裡；同一個回合混放 text 與 functionResponse 會被 API 拒絕
+    // The next round is the final, wrap-up-only round: add a note, or the model may hand back filler like "the system had an error".
+    // Put it inside the tool result; mixing text and functionResponse in the same turn is rejected by the API
     if (finalNudge && round === maxRounds - 2) parts[parts.length - 1].functionResponse.response.note = finalNudge;
-    // 工具結果放在 user 回合（API 不接受 role "function"）
+    // Tool results go in a user turn (the API doesn't accept role "function")
     history.push({ role: "user", parts });
   }
   return { text: "", finish: null };
 }
 
-/** 文字轉向量（EMBEDDING_DIMENSIONS 維） */
+/** Text to embedding (EMBEDDING_DIMENSIONS dimensions) */
 async function embedText(text, taskType = "SEMANTIC_SIMILARITY") {
   const response = await withRetry(() => getClient().models.embedContent({
     model: EMBEDDING_MODEL,

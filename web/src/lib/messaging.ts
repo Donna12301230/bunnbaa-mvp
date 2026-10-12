@@ -1,9 +1,9 @@
 import { getMessaging, getToken, isSupported } from "firebase/messaging";
 import { app } from "./firebase";
 
-// Firebase Console → 專案設定 → Cloud Messaging → Web Push 憑證 → 產生金鑰組。
-// 這步免信用卡、跟 Blaze 無關，純粹是 Console 裡點一下就能拿到的 key，
-// 拿到後貼進這裡（或改用 import.meta.env 從 .env.local 讀）。
+// Firebase Console → Project settings → Cloud Messaging → Web Push certificates → Generate key pair.
+// This step needs no credit card and has nothing to do with Blaze; it's just a key you get with one click in the Console.
+// Paste it here once you have it (or read it from .env.local via import.meta.env instead).
 const VAPID_KEY = "BCFVXCWoIbTmVcU9mQs5_PDhhUlDoceytu711JkCQ_2-ur33RqaFbdz425OpWVTHK4R0OGsIhzx8HHmmWPVRHwY";
 
 /**

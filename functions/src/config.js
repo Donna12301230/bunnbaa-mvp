@@ -1,53 +1,53 @@
-// 平台全域參數（規格 §2）。存在 platformConfig/global，管理員在後台「平台參數」改；
-// 文件不存在或缺欄位時用這裡的預設值，伺服器照樣能算。前端 web/src/lib/platformConfig.ts
-// 有同一份預設值，要改兩邊一起改。
+// Platform-wide settings (spec §2). Stored in platformConfig/global and edited by admins under "Platform settings" in the admin console;
+// when the doc is missing or lacks fields, these defaults apply so the server can still compute. The frontend's web/src/lib/platformConfig.ts
+// has the same defaults; change both together.
 const DEFAULT_PLATFORM_CONFIG = {
-  businessWeekdays: [1, 2, 3, 4, 5], // 週一至週五
-  // 餐期範圍：依取餐時段的「開始時間」歸類（§2）
+  businessWeekdays: [1, 2, 3, 4, 5], // Monday to Friday
+  // Meal period ranges: classified by the pickup slot's start time (§2)
   mealPeriods: {
     breakfast: "06:00-10:30",
     lunch: "10:30-14:00",
     dinner: "16:30-20:00",
   },
-  bookingRangeDays: 30, // 最遠提前 30 天
-  pickupWindow: "11:00-13:00", // 預設取餐時段；店家可調，最長 2 小時
+  bookingRangeDays: 30, // at most 30 days ahead
+  pickupWindow: "11:00-13:00", // default pickup slot; vendors can adjust it, max 2 hours
   maxPickupWindowMinutes: 120,
-  cutoffTime: "20:00", // 取餐日前一天；店家只能提前
-  weeklyLockWeekday: 6, // 週六
+  cutoffTime: "20:00", // the day before pickup; vendors can only move it earlier
+  weeklyLockWeekday: 6, // Saturday
   weeklyLockTime: "12:00",
   monthlyPurchaseDay: 25,
-  safetyStockRate: 0.1, // 店家可調
+  safetyStockRate: 0.1, // vendor-adjustable
   riceAddPrice: 10,
   riceLessPrice: -5,
   slotRemovePrice: -5,
-  maxSides: 4, // 配菜最多可選 4 道
-  addonSidePrice: 10, // 第四道「加菜」+10；設為「備案」不加價
-  riceAddGrams: 100, // 加飯 +100 g 熟飯（§16 暫定）
+  maxSides: 4, // at most 4 sides
+  addonSidePrice: 10, // fourth side as "add-on" is +10; as "backup" it's free
+  riceAddGrams: 100, // extra rice = +100 g cooked rice (§16, provisional)
   maxCandidatesPerSlot: 3,
-  candidateMinQty: 10, // 店家可調
-  openWishThreshold: 20, // 近 30 天 20 人
+  candidateMinQty: 10, // vendor-adjustable
+  openWishThreshold: 20, // 20 people within the last 30 days
   openWishWindowDays: 30,
-  // 成長獎勵（2026-10-05 改版）：累積淨營業額滿 1 萬元開池，回饋 10% 變成折價券給持抽獎券的人抽
-  // （回饋比例 10/05 曾討論改 5%，2026-10-12 決定維持 10%）
+  // Growth rewards (revised 2026-10-05): once cumulative net revenue reaches NT$10,000 the pool opens, and 10% is returned as coupons drawn among draw-ticket holders
+  // (lowering the rate to 5% was discussed on 10/05; on 2026-10-12 it was decided to keep 10%)
   rewardRate: 0.1,
-  ticketUnit: 100, // 每 100 元一張抽獎券
+  ticketUnit: 100, // one draw ticket per NT$100
   minRevenueToOpen: 10000,
   drawWindowDays: 7,
   couponValidDays: 30,
-  // 取消（2026-10-05 改版）：取餐 48 小時前可取消，不退現金，改發原價 30% 的折價券（效期同 couponValidDays）
+  // Cancellation (revised 2026-10-05): allowed up to 48 hours before pickup; no cash refund, instead a coupon worth 30% of the original price (valid for couponValidDays)
   cancelHoursBefore: 48,
   cancelCouponRate: 0.3,
   charityConvertAfterMinutes: 30,
   charityCloseAfterMinutes: 120,
-  charityReserveMinutes: 10, // 預約後 10 分鐘內到場；逾時釋出給下一位、不停權
+  charityReserveMinutes: 10, // arrive within 10 minutes of reserving; on timeout it's released to the next person, no ban
   insightRadiusMeters: 1000,
   insightMinUsers: 20,
-  // 合作方案（2026-10-05 改版）：不收月費，每份餐點抽成 5%（以實付金額計）；店家定價時自行加 5%
+  // Partnership plan (revised 2026-10-05): no monthly fee, 5% commission per meal (on the amount paid); vendors add the 5% to their own prices
   commissionRate: 0.05,
 };
 
-// 基本工資（§9.3）：platformConfig/minimumWage 存 { monthly, hourly, effectiveFrom, source, history[] }；
-// 文件不存在時用這份（勞動部公告 2026-01-01 生效：月薪 29,500、時薪 196）。
+// Minimum wage (§9.3): platformConfig/minimumWage stores { monthly, hourly, effectiveFrom, source, history[] };
+// used when the doc doesn't exist (Ministry of Labor announcement effective 2026-01-01: monthly 29,500, hourly 196).
 const DEFAULT_MINIMUM_WAGE = {
   monthly: 29500,
   hourly: 196,
@@ -59,9 +59,9 @@ const DEFAULT_MINIMUM_WAGE = {
   ],
 };
 
-// 券種（§8.3）：discount＝折抵金額，cost＝從保底升級的成本，weight＝升級預算分配權重。
-// 第一階段只保留 3 種（免費餐券、半價券、保底九五折券）；一折、三折、八折券列入後續改版。
-// 陣列第一個是頭獎（頭獎保證用），最後一個是剩餘預算繼續升級的等級。
+// Coupon types (§8.3): discount = amount off, cost = cost of upgrading from the base tier, weight = share of the upgrade budget.
+// Phase 1 keeps only 3 types (free meal, half price, base 5%-off); the 90%-, 70%- and 20%-off coupons are left for a later release.
+// The first entry is the grand prize (used for the grand-prize guarantee); the last is the tier remaining budget keeps upgrading into.
 const COUPON_TIERS = [
   { code: "free", label: "免費餐券", discount: 100, cost: 95, weight: 0.3 },
   { code: "t50", label: "半價券", discount: 50, cost: 45, weight: 0.7 },
@@ -78,7 +78,7 @@ async function loadPlatformConfig(db) {
   return merged;
 }
 
-/** 基本工資：回傳某天（YYYY-MM-DD）生效的 { monthly, hourly }；沒給日期就是目前這筆 */
+/** Minimum wage: returns the { monthly, hourly } in effect on a given day (YYYY-MM-DD); with no date, the current entry */
 function wageOn(wage, date) {
   const history = Array.isArray(wage?.history) && wage.history.length > 0 ? wage.history : [wage];
   const applicable = history

@@ -6,8 +6,8 @@ const FOCUSABLE =
 let scrollLocks = 0;
 
 /**
- * Modal / BottomSheet 共用行為：
- * Esc 關閉、Tab 焦點鎖在面板內、開啟時聚焦面板、關閉後還原焦點、鎖定 body 捲動。
+ * Behavior shared by Modal / BottomSheet:
+ * Esc closes, Tab focus is trapped in the panel, the panel is focused on open, focus is restored on close, body scroll is locked.
  */
 export function useDialogBehavior(
   panelRef: RefObject<HTMLElement>,
@@ -15,7 +15,7 @@ export function useDialogBehavior(
   onClose: () => void,
   closeOnEsc = true,
 ) {
-  // 以 ref 保存最新的 callback，避免父層每次 render 產生新函式時重跑 effect（會搶焦點）
+  // Keep the latest callback in a ref so the effect doesn't rerun (and steal focus) when the parent creates a new function each render
   const onCloseRef = useRef(onClose);
   const closeOnEscRef = useRef(closeOnEsc);
   onCloseRef.current = onClose;
@@ -25,7 +25,7 @@ export function useDialogBehavior(
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
 
-    // 延到 commit 之後再聚焦：Portal 容器在同一個 commit 內可能被移除再掛回（StrictMode），會把焦點弄丟
+    // Defer focusing until after commit: the portal container may be removed and remounted within one commit (StrictMode), which loses focus
     const focusTimer = window.setTimeout(() => {
       const panel = panelRef.current;
       const first = panel?.querySelector<HTMLElement>('[data-autofocus]') ?? panel;

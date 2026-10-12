@@ -1,9 +1,9 @@
-// 購物籃與客戶分群（doc/GoogleCloud改動建議.md P1）：每週在 BigQuery 跑 customerInsights.sql
-// （常一起買的品項配對、ML.KMEANS 會員分群、AI.GENERATE 寫群組描述），再把每家店的結果寫回 Firestore：
+// Basket analysis and customer segments (doc/GoogleCloud改動建議.md P1): runs customerInsights.sql in BigQuery weekly
+// (frequently-bought-together item pairs, ML.KMEANS member segments, AI.GENERATE segment descriptions), then writes each vendor's results back to Firestore:
 //   vendors/{vendorId}/analytics/basket    { pairs: [{ item_a, item_b, buyers, confidence }] }
 //   vendors/{vendorId}/analytics/segments  { segments: [{ segment_id, label, description, label_en, description_en, customers }] }
-//   menu_items/{id}.often_with              同店常一起買的品項 id（依 buyers 排序，最多 5 個；消費者品項頁用）
-// 商家只看得到彙總（群名、人數），看不到是哪些會員。
+//   menu_items/{id}.often_with              ids of items often bought together at the same vendor (sorted by buyers, at most 5; used on the diner item page)
+// Vendors only see aggregates (segment name, headcount), never which members are in them.
 const fs = require("fs");
 const path = require("path");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -45,7 +45,7 @@ async function runCustomerInsights() {
     if (!p) continue;
     entry(r.vendor_id).segments.push({
       segment_id: r.segment_id,
-      // AI.GENERATE 失敗時 label 是 null，前端改顯示「客群 N」
+      // When AI.GENERATE fails, label is null and the frontend shows "Segment N" instead
       label: p.label ?? null, description: p.description ?? null,
       label_en: p.label_en ?? null, description_en: p.description_en ?? null,
       customers: r.customers,
@@ -65,9 +65,9 @@ async function runCustomerInsights() {
 }
 
 /**
- * 購物籃配對（品名）→ 每個品項的 often_with（同店品項 id，依 buyers、confidence 排序，最多 5 個）。
- * 鎖定紀錄只存品名，同店同名的品項都算；計畫方案的「第 N 天」之類對不到品項的就略過。
- * items: [{ id, vendor_id, name }]；回傳 Map(itemId → id 陣列)，沒有配對的品項不在裡面。
+ * Basket pairs (by item name) → each item's often_with (ids of items at the same vendor, sorted by buyers then confidence, at most 5).
+ * Locks only store the item name, so every item with that name at the same vendor counts; names that match no item (such as meal-plan "Day N" entries) are skipped.
+ * items: [{ id, vendor_id, name }]; returns Map(itemId → array of ids); items without pairs are left out.
  */
 function oftenWithByItem(pairs, items) {
   const idsByName = new Map(); // "vendor_id/品名" → [id]
@@ -96,8 +96,8 @@ function oftenWithByItem(pairs, items) {
 }
 
 /**
- * 跟現有的 often_with 比，只回傳要改的：[{ id, often_with }]，often_with 是 null 代表要刪掉欄位。
- * 內容沒變就不寫（menu_items 的翻譯與向量觸發器每次寫入都會檢查一次）。
+ * Compares with the current often_with and returns only the changes: [{ id, often_with }]; often_with null means delete the field.
+ * Unchanged content is not written (every menu_items write makes the translation and embedding triggers check it again).
  */
 function oftenWithUpdates(pairs, items) {
   const next = oftenWithByItem(pairs, items);
@@ -110,7 +110,7 @@ function oftenWithUpdates(pairs, items) {
   return updates;
 }
 
-/** 寫 menu_items/{id}.often_with，配對消失的品項把欄位刪掉。回傳實際寫入的筆數 */
+/** Writes menu_items/{id}.often_with, deleting the field on items whose pairs disappeared. Returns the number of writes */
 async function writeOftenWith(pairs) {
   const snap = await db().collection("menu_items").select("vendor_id", "name", "often_with").get();
   const updates = oftenWithUpdates(pairs, snap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -130,7 +130,7 @@ exports.customerInsights = onSchedule(
   }
 );
 
-/** 展示／測試用：不等排程，立刻重算（只限管理員） */
+/** For demos/testing: recompute now without waiting for the schedule (admins only) */
 exports.triggerCustomerInsightsNow = onCall({ timeoutSeconds: 540, memory: "512MiB" }, async (request) => {
   assertAdminOrEmulator(request);
   return runCustomerInsights();

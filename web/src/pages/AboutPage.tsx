@@ -6,7 +6,7 @@ import CustomerLayout from "@/components/CustomerLayout";
 import PageHero from "@/components/PageHero";
 import Reveal from "@/components/Reveal";
 
-// 寫成函式：規則數字讀平台參數（lib/policy.ts），切換語言時也會重新產生
+// A function so rule numbers are read from platform settings (lib/policy.ts) and regenerated when the language switches
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const values = () => [
   {
@@ -43,8 +43,8 @@ const values = () => [
   },
 ];
 
-// 靜態行銷內容頁，沒有資料庫欄位可讀，文案直接寫在元件裡。
-// 2026-10-01 改版：編輯式排版——故事左右兩欄＋大字引言、價值改成編號清單。
+// Static marketing page with no database fields to read; the copy lives in the component.
+// 2026-10-01 redesign: editorial layout, the story in two columns plus a large pull quote, values as a numbered list.
 export default function AboutPage() {
   return (
     <CustomerLayout
@@ -66,7 +66,7 @@ export default function AboutPage() {
           </section>
         </Reveal>
 
-        {/* 使命：深棕色帶大字引言 */}
+        {/* Mission: dark brown with a large pull quote */}
         <Reveal>
           <section className="rounded-card md:rounded-[3rem] bg-[var(--surface-inverse)] text-[var(--text-on-inverse)] px-6 py-14 md:px-16 md:py-24">
             <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase opacity-80 mb-6">

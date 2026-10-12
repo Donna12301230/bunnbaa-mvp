@@ -1,8 +1,8 @@
 import type { Component, Ingredient } from "@/types";
 import { tr } from "@/lib/i18n";
 
-// 食材類別固定配色（簡化提案 §4）：飯類黃、肉／魚珊瑚、蔬菜綠、包材紫，全站共用。
-// 便當格子、備料卡片、合成格子都用這裡的顏色，商家看顏色就知道是哪一類。
+// Fixed colors per ingredient category (simplification proposal §4): rice yellow, meat / fish coral, vegetables green, packaging purple, shared site-wide.
+// Bento cells, prep cards and composition cells all use these colors, so vendors can tell the category by color.
 
 export type FoodGroup = "rice" | "protein" | "veg" | "pack" | "other";
 
@@ -17,20 +17,20 @@ export function ingredientGroup(category: string | undefined): FoodGroup {
   return GROUP_OF_CATEGORY[category ?? ""] ?? "other";
 }
 
-/** 一道菜（半成品）的顏色：用量最多的主要原物料（不算調味、包材）的類別 */
+/** Color of a dish (semi-finished component): the category of its main ingredient by quantity (excluding seasoning and packaging) */
 export function componentGroup(comp: Component | undefined, ingredientsById: Record<string, Ingredient>): FoodGroup {
   let best: { grams: number; group: FoodGroup } | null = null;
   for (const line of comp?.ingredients ?? []) {
     const ing = ingredientsById[line.ingredient_id];
     if (!ing || ing.category === "調味" || ing.category === "包材") continue;
-    // 以個、片計的（雞腿 1 支）比克數更代表這道菜，先乘個權重
+    // Ingredients counted by piece or slice (1 chicken leg) represent the dish better than grams, so apply a weight first
     const grams = (Number(line.grams) || 0) * (ing.unit === "g" || ing.unit === "ml" || ing.unit === "克" || ing.unit === "毫升" ? 1 : 100);
     if (!best || grams > best.grams) best = { grams, group: ingredientGroup(ing.category) };
   }
   return best?.group ?? "other";
 }
 
-/** 格子底色、框線、字色 */
+/** Cell background, border and text colors */
 export const GROUP_CELL: Record<FoodGroup, string> = {
   rice: "bg-warning-soft border-warning text-warning-text",
   protein: "bg-danger-soft border-danger text-danger-text",
@@ -39,7 +39,7 @@ export const GROUP_CELL: Record<FoodGroup, string> = {
   other: "bg-muted border-input text-foreground",
 };
 
-/** 色點（圖例、小標記） */
+/** Color dot (legends, small markers) */
 export const GROUP_DOT: Record<FoodGroup, string> = {
   rice: "bg-warning",
   protein: "bg-danger",

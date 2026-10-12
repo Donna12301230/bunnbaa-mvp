@@ -13,9 +13,9 @@ import { setPreferredPickup, slotLabel } from "@/lib/pickupSlots";
 import { tr } from "@/lib/i18n";
 import { tagEn } from "@/types";
 
-// 對話式預購助理（AI 功能 2，functions/src/shoppingAssistant.js）。
-// 助理只給候選卡片：品項卡連到品項頁（帶入建議的日期、時段），計畫卡連到店家頁；
-// 不幫使用者下單，價格在結帳時由伺服器重算。
+// Conversational pre-order assistant (AI feature 2, functions/src/shoppingAssistant.js).
+// The assistant only returns candidate cards: item cards link to the item page (with the suggested date and slot prefilled), meal plan cards link to the vendor page;
+// it never places orders for the user, and prices are recomputed by the server at checkout.
 
 interface ItemCard {
   type: "item";
@@ -33,7 +33,7 @@ interface ItemCard {
   early_bird_percent: number;
   open_dates: string[];
   closed_dates: string[];
-  // 推薦理由（選填，後端依需求預測或購物籃分析給的一句短語，例：「這家明天還有餘量」「常跟滷雞腿便當一起買」）
+  // Recommendation reason (optional; a short phrase from the backend based on demand forecast or basket analysis, e.g. "This vendor still has capacity tomorrow", "Often bought with the braised chicken leg bento")
   reason?: string | null;
 }
 

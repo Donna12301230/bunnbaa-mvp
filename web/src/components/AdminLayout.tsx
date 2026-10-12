@@ -9,7 +9,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
-// 用函式包起來，每次 render 依目前語言組標籤
+// Wrapped in a function so labels are built in the current language on every render
 const navItems = () => [
   { href: "/admin/vendors", label: tr("店家管理", "Vendors"), icon: Store },
   { href: "/admin/platform", label: tr("平台參數", "Platform parameters"), icon: SlidersHorizontal },

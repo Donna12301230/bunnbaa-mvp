@@ -3,8 +3,8 @@ import { applyEarlyBirdPrice } from "@/lib/pricing";
 import { DEFAULT_PLATFORM_CONFIG, liveConfig } from "@/lib/platformConfig";
 import type { BentoCustomField, BentoMain, Component, ExtraSideChoice, Ingredient, LockExtraSide, LockSlot, MenuItem, RiceOption, SlotChoice } from "@/types";
 
-// 便當計價與配方換算（規格 §3、§4）。跟 functions/src/bento.js 同一套規則；
-// 這裡只給畫面預覽與店家菜單編輯用，下單金額以伺服器為準。
+// Bento pricing and recipe conversions (spec §3, §4). Same rules as functions/src/bento.js;
+// this is only for on-screen previews and vendor menu editing; order amounts are decided by the server.
 
 export function isBento(item: Pick<MenuItem, "slots"> | null | undefined): boolean {
   return Array.isArray(item?.slots) && item!.slots!.length > 0;
@@ -29,21 +29,21 @@ export function riceLabel(rice: RiceOption | undefined): string | null {
 
 type PriceSource = Pick<MenuItem, "price" | "mains" | "main" | "image" | "custom_fields">;
 
-/** 可選主菜（mains 各自定價）；舊品項只有 main＋price 時回傳一道 */
+/** Selectable main dishes (each mains entry has its own price); legacy items with only main + price return one dish */
 export function itemMains(item: PriceSource): BentoMain[] {
   const mains = (item.mains || []).filter((m) => m && m.price > 0);
   if (mains.length > 0) return mains;
   return item.main?.name ? [{ name: item.main.name, component_id: item.main.component_id, price: item.price, image_url: item.image, portion_text: item.main.portion_text }] : [];
 }
 
-/** 品項原價：便當以所選主菜為準 */
+/** Item base price: for bentos, the chosen main dish's price */
 export function itemListPrice(item: PriceSource, mainIndex?: number | null): number {
   const mains = (item.mains || []).filter((m) => m && m.price > 0);
   if (mains.length === 0) return item.price;
   return (mains[mainIndex ?? 0] ?? mains[0]).price;
 }
 
-/** 最低起價（卡片顯示「$50 起」） */
+/** Lowest starting price (the card shows "From $50") */
 export function itemMinPrice(item: PriceSource): number {
   const mains = (item.mains || []).filter((m) => m && m.price > 0);
   return mains.length > 0 ? Math.min(...mains.map((m) => m.price)) : item.price;
@@ -51,14 +51,14 @@ export function itemMinPrice(item: PriceSource): number {
 
 export interface SideOption {
   slot: number;
-  candidate: number | null; // null＝那一格的預設菜
+  candidate: number | null; // null = that slot's default dish
   name: string;
   image_url?: string | null;
   portion_text?: string | null;
   portion_level: number;
 }
 
-/** 便當全部可選配菜：每格的預設菜＋候選菜（第四道從這裡挑） */
+/** All selectable sides of a bento: each slot's default dish + candidates (the fourth side is picked from these) */
 export function sideOptions(item: Pick<MenuItem, "slots">): SideOption[] {
   const out: SideOption[] = [];
   (item.slots || []).forEach((slot, slotIdx) => {
@@ -70,7 +70,7 @@ export function sideOptions(item: Pick<MenuItem, "slots">): SideOption[] {
   return out;
 }
 
-/** 加減金額：一碗半 +10、半碗 −5、少一道 −5、第四道加菜 +10（備案 0） */
+/** Adjustments: one and a half bowls of rice +10, half a bowl −5, one fewer side −5, extra fourth side +10 (fallback 0) */
 export function adjustAmount(rice: RiceOption, choices: SlotChoice[], config = DEFAULT_PLATFORM_CONFIG, extra?: ExtraSideChoice | null): number {
   const removed = choices.filter((c) => c === "none").length;
   let amount = removed > 0 ? removed * config.slotRemovePrice : 0;
@@ -80,27 +80,27 @@ export function adjustAmount(rice: RiceOption, choices: SlotChoice[], config = D
   return amount;
 }
 
-/** 店家自訂欄位（配菜下方的下拉選單）：只留有名稱、有選項的 */
+/** Vendor custom fields (dropdowns below the sides): only those with a name and options */
 export function customFields(item: Pick<MenuItem, "custom_fields"> | null | undefined): BentoCustomField[] {
   return (item?.custom_fields || []).filter((f) => f?.label && f.options?.length);
 }
 
-/** 自訂欄位選擇的加減價合計；picks[i] 沒給＝第一個選項 */
+/** Total price adjustment of custom field choices; a missing picks[i] = the first option */
 export function customAmount(item: Pick<MenuItem, "custom_fields"> | null | undefined, picks: number[] | null | undefined): number {
   return customFields(item).reduce((sum, f, i) => sum + (Number(f.options[picks?.[i] ?? 0]?.price) || 0), 0);
 }
 
-/** 加減價文字：+10、−5；0 不顯示 */
+/** Adjustment text: +10, −5; 0 is not shown */
 export function priceDeltaText(price: number): string {
   return price > 0 ? `+${price}` : price < 0 ? `−${Math.abs(price)}` : "";
 }
 
-/** 訂單上自訂欄位的文字：「湯品：玉米濃湯（+10）」 */
+/** Custom field text on the order: "Soup: Corn soup (+10)" */
 export function customOptionTexts(options: { label: string; choice: string; price?: number }[] | null | undefined): string[] {
   return (options || []).map((c) => `${c.label}：${c.choice}${c.price ? `（${priceDeltaText(c.price)}）` : ""}`);
 }
 
-/** 一份便當的金額拆解（早鳥只打在品項原價上，加減金額不打折） */
+/** Price breakdown for one bento (early-bird discount applies only to the item base price, not to adjustments) */
 export function priceBreakdown(
   item: PriceSource,
   pickupDate: string,
@@ -117,7 +117,7 @@ export function priceBreakdown(
   return { listPrice, discountPercent, earlyBird: listPrice - early, adjust, subtotal, coupon, total: subtotal - coupon };
 }
 
-/** 訂單上第四道的文字 */
+/** Fourth-side text on the order */
 export function extraSideText(extra: LockExtraSide | null | undefined): string | null {
   if (!extra) return null;
   if (extra.mode === "addon") return tr(`加菜：${extra.resolved || extra.dish}（+${liveConfig().addonSidePrice}）`, `Add-on: ${extra.resolved || extra.dish} (+${liveConfig().addonSidePrice})`);
@@ -125,14 +125,14 @@ export function extraSideText(extra: LockExtraSide | null | undefined): string |
   return tr(`備案：${extra.dish}（前三道沒成立才遞補）`, `Backup: ${extra.dish} (used only if a wish fails)`);
 }
 
-/** 生料用量 = 熟重 × 份數 ÷ (熟成率 × (1 − 損耗率)) */
+/** Raw quantity = cooked weight × portions ÷ (cooking yield × (1 − waste rate)) */
 export function rawAmount(cooked: number, ing: Pick<Ingredient, "yield_rate" | "loss_rate">): number {
   const y = ing.yield_rate > 0 ? ing.yield_rate : 1;
   const l = ing.loss_rate >= 0 && ing.loss_rate < 1 ? ing.loss_rate : 0;
   return cooked / (y * (1 - l));
 }
 
-/** 半成品每份成本 */
+/** Cost per portion of a semi-finished component */
 export function componentCost(component: Component | undefined, ingredientsById: Record<string, Ingredient>): number {
   if (!component) return 0;
   return (component.ingredients || []).reduce((sum, line) => {
@@ -143,7 +143,7 @@ export function componentCost(component: Component | undefined, ingredientsById:
   }, 0);
 }
 
-/** 份量級距（第一階段只分全份／半份）：預設菜成本 ÷ 候選菜成本 ≥ 0.75 全份、0.5–0.75 半份；< 0.5 回傳 null（不得列為候選） */
+/** Portion tier (phase 1 only has full / half): default dish cost ÷ candidate cost ≥ 0.75 full, 0.5–0.75 half; < 0.5 returns null (can't be a candidate) */
 export function portionLevelFor(defaultCost: number, candidateCost: number): number | null {
   if (!(candidateCost > 0)) return 1;
   const ratio = defaultCost / candidateCost;
@@ -152,7 +152,7 @@ export function portionLevelFor(defaultCost: number, candidateCost: number): num
   return null;
 }
 
-/** 訂單上每格實際的配菜文字（截單前顯示許願中） */
+/** Actual side text per slot on the order (shows "wishing" before cut-off) */
 export function slotText(slot: LockSlot): string {
   if (slot.removed) return tr(`${slot.category || "配菜"}：不要`, `${slot.category || "Side"}: none`);
   if (slot.backup_used) return tr(`${slot.resolved}（${slot.wished} 未成立，遞補備案）`, `${slot.resolved} (backup for ${slot.wished})`);

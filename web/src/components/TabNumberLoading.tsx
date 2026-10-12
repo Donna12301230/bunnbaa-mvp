@@ -1,7 +1,7 @@
 import { Skeleton } from "@/components/ds";
 import { tr } from "@/lib/i18n";
 
-/** 分頁卡上的大數字還在讀取時的占位（訂單取餐、報表與洞察共用） */
+/** Placeholder while the big number on a tab card is loading (shared by order pickup, reports and insights) */
 export default function TabNumberLoading() {
   return (
     <span className="inline-block align-middle" aria-busy="true">

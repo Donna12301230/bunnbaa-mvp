@@ -7,20 +7,20 @@ export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   src?: string;
-  /** 使用者名稱：作為 alt，圖片失效時取字做縮寫 */
+  /** User name: used as alt, and for initials when the image fails */
   name: string;
-  /** xs 24 / sm 32 / md 40（預設）/ lg 56 / xl 72 */
+  /** xs 24 / sm 32 / md 40 (default) / lg 56 / xl 72 */
   size?: AvatarSize;
-  /** 右下角狀態點 */
+  /** Status dot in the bottom-right corner */
   status?: 'online' | 'busy' | 'offline';
-  /** 載入中顯示骨架 */
+  /** Show a skeleton while loading */
   loading?: boolean;
 }
 
 const statusLabel = (status: 'online' | 'busy' | 'offline') =>
   ({ online: tr('在線', 'Online'), busy: tr('忙碌', 'Busy'), offline: tr('離線', 'Offline') })[status];
 
-/** 中文名取最後兩字（「王小明」→「小明」），英文取前兩個單字字首。 */
+/** Chinese names use the last two characters ("王小明" -> "小明"); English names use the first letters of the first two words. */
 export function getInitials(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return '?';

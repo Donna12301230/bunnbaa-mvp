@@ -1,37 +1,37 @@
-// 便當組成、計價、配方換算（規格 §3、§4）。純函式，不碰 Firestore；前端
-// web/src/lib/bento.ts 有同一套規則（顯示用），伺服器以這裡為準。
+// Bento composition, pricing and recipe conversion (spec §3, §4). Pure functions, no Firestore; the frontend's
+// web/src/lib/bento.ts has the same rules (for display), but the server is authoritative.
 //
-// menu_items 的便當欄位：
-//   item_type: bento|single                      單品直接點選、不需組合
-//   meal_periods: ["breakfast"|"lunch"|"dinner"] 供應餐期（沒設＝店家所有時段）
-//   mains: [{ name, component_id, price, image_url }] 可選主菜，各自定價（便當價以所選主菜為準）
-//   main: { name, component_id }                 舊版單一主菜（沒有 mains 時用）
-//   rice_component_id                            主食半成品（白飯等），加飯／減飯作用在它
-//   fixed: [{ name, component_id, portions }]    備料組成／固定附餐，不能換也不能減（例：滷蛋；單品的全部組成）
+// Bento fields on menu_items:
+//   item_type: bento|single                      single items are ordered directly, no composition
+//   meal_periods: ["breakfast"|"lunch"|"dinner"] meal periods served (unset = all of the vendor's pickup slots)
+//   mains: [{ name, component_id, price, image_url }] selectable mains, each with its own price (bento price follows the chosen main)
+//   main: { name, component_id }                 legacy single main (used when there are no mains)
+//   rice_component_id                            staple component (white rice etc.); extra/less rice applies to it
+//   fixed: [{ name, component_id, portions }]    prep components / fixed sides; can't be swapped or removed (e.g. braised egg; all components of a single item)
 //   slots: [{ category, default: { name, component_id },
 //             candidates: [{ name, component_id, portion_level, weekly_cap, min_qty }] }]
-//   weekdays: [1..5]                             週菜單輪替：只在這幾天供應（沒設＝每天）
-// 沒有 slots 的舊品項（咖啡輕食、飯糰）照舊當成單一品項賣，不能加減飯菜。
+//   weekdays: [1..5]                             weekly menu rotation: served only on these days (unset = every day)
+// Legacy items without slots (coffee and light meals, rice balls) are still sold as single items; rice and sides can't be adjusted.
 //
-// vendors/{id}/components/{id}（半成品）：
-//   name, portion_grams, ingredients: [{ ingredient_id, grams }]（每份熟重）,
-//   prep_minutes, equipment, batch_capacity（每批份數）, advance_hours, method, flavors[]
-// vendors/{id}/ingredients/{id}（原物料）：
+// vendors/{id}/components/{id} (components):
+//   name, portion_grams, ingredients: [{ ingredient_id, grams }] (cooked weight per portion),
+//   prep_minutes, equipment, batch_capacity (portions per batch), advance_hours, method, flavors[]
+// vendors/{id}/ingredients/{id} (ingredients):
 //   name, category, unit, purchase_unit_label, purchase_unit_size, yield_rate, loss_rate,
-//   shelf_days, frequency: monthly|weekly|daily, supplier_id, unit_price（每採購單位）
+//   shelf_days, frequency: monthly|weekly|daily, supplier_id, unit_price (per purchase unit)
 
 const { DEFAULT_PLATFORM_CONFIG } = require("./config");
 
 const RICE_OPTIONS = ["add", "normal", "less"];
 
-/** 生料用量 = 熟重 × 份數 ÷ (熟成率 × (1 − 損耗率)) */
+/** Raw amount = cooked weight × portions ÷ (yield rate × (1 − loss rate)) */
 function rawAmount(cookedAmount, ingredient) {
   const yieldRate = Number(ingredient?.yield_rate) > 0 ? Number(ingredient.yield_rate) : 1;
   const lossRate = Number(ingredient?.loss_rate) >= 0 && Number(ingredient?.loss_rate) < 1 ? Number(ingredient.loss_rate) : 0;
   return cookedAmount / (yieldRate * (1 - lossRate));
 }
 
-/** 半成品每份成本（元）；缺資料的原物料當 0 */
+/** Cost per portion of a component (NT$); ingredients with missing data count as 0 */
 function componentCost(component, ingredientsById) {
   if (!component) return 0;
   let cost = 0;
@@ -44,7 +44,7 @@ function componentCost(component, ingredientsById) {
   return cost;
 }
 
-/** 份量級距（§3.3，第一階段只分全份／半份）：預設菜成本 ÷ 候選菜成本 ≥ 0.75 全份、0.5–0.75 半份；< 0.5 回傳 null（不得列為候選） */
+/** Portion level (§3.3; phase 1 only has full/half): default dish cost ÷ candidate dish cost ≥ 0.75 is full, 0.5–0.75 half; < 0.5 returns null (not allowed as a candidate) */
 function portionLevelFor(defaultCost, candidateCost) {
   if (!(candidateCost > 0)) return 1;
   const ratio = defaultCost / candidateCost;
@@ -53,15 +53,15 @@ function portionLevelFor(defaultCost, candidateCost) {
   return null;
 }
 
-// 材料總和（§4.2）不列的原物料類別：調味料、包材不是「這份裡的菜」
+// Ingredient categories left out of the ingredient summary (§4.2): seasonings and packaging aren't "food in this portion"
 const PORTION_SKIP_CATEGORIES = ["調味", "包材"];
 const UNIT_TEXT = { g: "克", ml: "毫升" };
 
 /**
- * 材料總和顯示用的份量文字（§4.2），由配方帶出：例「滷雞腿 1 個」「炒高麗菜 80 克」。
- * 取這道菜的主要原物料（排除調味料、包材；同單位時取用量最多的，以個計的優先於克，
- * 因為「1 個雞腿」比「10 毫升醬油」更代表這道菜）。沒有配方就只回菜名。
- * 前端 web/src/components/BentoEditor.tsx 的 portionTextFor 是同一套規則，要一起改。
+ * Portion text for the ingredient summary (§4.2), derived from the recipe, e.g. "braised chicken leg 1 pc", "stir-fried cabbage 80 g".
+ * Uses the dish's main ingredient (excluding seasonings and packaging; among the same unit, the largest amount; count units win over grams,
+ * since "1 chicken leg" says more about the dish than "10 ml soy sauce"). Without a recipe, returns just the dish name.
+ * portionTextFor in the frontend's web/src/components/BentoEditor.tsx follows the same rules; change both together.
  */
 function portionText(component, ingredientsById, dishName) {
   const lines = (component?.ingredients || [])
@@ -81,9 +81,9 @@ function portionLabel(level) {
 }
 
 /**
- * 主菜（§3.2）：menu_items.mains = [{ name, component_id, price, image_url }]，每道各自定價，
- * 便當價格以所選主菜為基準。沒有 mains 的舊品項用 item.main＋item.price。
- * 回傳 { main: { name, component_id, index }, price } 或 { problem }。
+ * Mains (§3.2): menu_items.mains = [{ name, component_id, price, image_url }], each priced separately;
+ * the bento price is based on the chosen main. Legacy items without mains use item.main + item.price.
+ * Returns { main: { name, component_id, index }, price } or { problem }.
  */
 function resolveMain(item, mainIndex) {
   const mains = Array.isArray(item?.mains) ? item.mains.filter((m) => m && Number(m.price) > 0) : [];
@@ -96,7 +96,7 @@ function resolveMain(item, mainIndex) {
   return { main: { name: main.name || "", component_id: main.component_id || null, index: idx }, price: Number(main.price) };
 }
 
-/** 便當可選的所有配菜：每格的預設菜＋候選菜（第四道從這裡挑） */
+/** All sides selectable for a bento: each slot's default dish + candidate dishes (the fourth side is picked from these) */
 function sideOptions(item) {
   const out = [];
   (item?.slots || []).forEach((slot, slotIdx) => {
@@ -109,9 +109,9 @@ function sideOptions(item) {
 }
 
 /**
- * 第四道配菜（§4.2）：extra = { slot, candidate: null|index, mode: "backup"|"addon" }。
- * 選滿標準數量（沒有任何一格「不要」）才能加；不能跟已選的菜重複；總數不超過 maxSides。
- * 回傳 { extra } 、{ extra: null } 或 { problem }。
+ * Fourth side (§4.2): extra = { slot, candidate: null|index, mode: "backup"|"addon" }.
+ * Allowed only once the standard number of sides is chosen (no slot set to "none"); can't duplicate a chosen dish; total can't exceed maxSides.
+ * Returns { extra }, { extra: null } or { problem }.
  */
 function resolveExtraSide(item, extra, resolvedSlots, config = DEFAULT_PLATFORM_CONFIG) {
   if (!extra || extra.mode == null) return { extra: null };
@@ -134,7 +134,7 @@ function resolveExtraSide(item, extra, resolvedSlots, config = DEFAULT_PLATFORM_
       component_id: option.component_id,
       portion_level: option.portion_level ?? 1,
       mode: extra.mode,
-      // 候選菜當第四道也算一次許願；截單判定後填 resolved（備案：遞補到哪一格）
+      // A candidate dish picked as the fourth side also counts as a wish; resolved is filled after the cut-off decision (backup: which slot it fills in for)
       wished: cand != null,
       resolved: null,
       used_for_slot: null,
@@ -147,8 +147,8 @@ function isBento(item) {
 }
 
 /**
- * 把前端送來的選擇（slots[i].choice = "default" | "none" | 候選 index）驗證並展開成
- * 要寫進 locks 的 slots 內容。回傳 { slots, removedCount } 或 { problem }。
+ * Validates the frontend's choices (slots[i].choice = "default" | "none" | candidate index) and expands them into
+ * the slots content written to locks. Returns { slots, removedCount } or { problem }.
  */
 function resolveChoices(item, choices) {
   if (!isBento(item)) return { slots: [], removedCount: 0 };
@@ -179,7 +179,7 @@ function resolveChoices(item, choices) {
       wished: cand.name,
       wished_component_id: cand.component_id || null,
       candidate_index: idx,
-      // 截單前還不知道成不成立，先記預設菜；lockOrders 判定後改 resolved
+      // Before cut-off we don't know whether the candidate goes ahead, so record the default dish; lockOrders updates resolved after deciding
       resolved: null,
       portion_level: cand.portion_level ?? 1,
     });
@@ -190,8 +190,8 @@ function resolveChoices(item, choices) {
 }
 
 /**
- * 店家自訂欄位（配菜下方的下拉選單）：picks[i] 是第 i 個欄位選的選項 index，沒送＝第一個。
- * 回傳 { custom: [{ label, index, choice, price }], amount } 或 { problem }；金額以品項設定為準，不信前端。
+ * Vendor-defined fields (dropdowns below the sides): picks[i] is the option index chosen for field i; not sent = the first one.
+ * Returns { custom: [{ label, index, choice, price }], amount } or { problem }; amounts come from the item settings, never trust the frontend.
  */
 function resolveCustomPicks(item, picks) {
   const fields = Array.isArray(item.custom_fields) ? item.custom_fields.filter((f) => f?.label && f.options?.length) : [];
@@ -206,7 +206,7 @@ function resolveCustomPicks(item, picks) {
   return { custom, amount: custom.reduce((s, c) => s + c.price, 0) };
 }
 
-/** 加減金額（§4.2）：一碗半 +10、半碗 −5、少一道 −5、第四道加菜 +10（備案 0）；直接反映在訂單金額 */
+/** Price adjustments (§4.2): 1.5 bowls of rice +10, half bowl −5, one fewer side −5, fourth side as add-on +10 (backup 0); applied directly to the order amount */
 function adjustAmount({ rice, removedCount, extraMode }, config = DEFAULT_PLATFORM_CONFIG) {
   let amount = removedCount > 0 ? removedCount * config.slotRemovePrice : 0;
   if (rice === "add") amount += config.riceAddPrice;
@@ -215,11 +215,11 @@ function adjustAmount({ rice, removedCount, extraMode }, config = DEFAULT_PLATFO
   return amount;
 }
 
-// ── 自動標籤（§3.4）：由配方推導 ──
+// ── Auto tags (§3.4): derived from the recipe ──
 const PROTEIN_CATEGORIES = { 雞: "雞", 豬: "豬", 牛: "牛", 海鮮: "海鮮", 魚: "海鮮", 素: "素", 豆: "素", 蛋: "素" };
 const VEG_CATEGORIES = ["葉菜", "根莖", "瓜類"];
 
-/** 一道菜的標籤：{ protein[], method[], flavor[], veg[] } 攤平成字串陣列 */
+/** A dish's tags: { protein[], method[], flavor[], veg[] } flattened into a string array */
 function dishTags(component, ingredientsById) {
   const tags = new Set();
   if (!component) return [];

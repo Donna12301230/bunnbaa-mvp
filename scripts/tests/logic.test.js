@@ -1,6 +1,6 @@
-// doc/測試文件.md 中可用純函式驗證的案例（Cloud Functions 端邏輯）。
-// 執行：cd scripts/tests && npm run test:logic（不需要 emulator）。
-// 故意用 UTC 跑，確認日期判斷一律以台北時間計（F-21）。
+// Cases from doc/測試文件.md that can be checked with pure functions (Cloud Functions-side logic).
+// Run: cd scripts/tests && npm run test:logic (no emulator needed).
+// Runs in UTC on purpose, to confirm date logic always uses Taipei time (F-21).
 process.env.TZ = "UTC";
 const assert = require("node:assert/strict");
 const path = require("node:path");
@@ -20,7 +20,7 @@ function test(id, name, fn) {
   catch (e) { results.push([id, "FAIL", name, e.message.split("\n")[0]]); }
 }
 
-// 固定「現在」＝ 2026-09-30（週三）台北 10:00
+// Fixed "now" = 2026-09-30 (Wednesday) 10:00 Taipei time
 const NOW = new Date("2026-09-30T10:00:00+08:00");
 const vendor = { name: "測試店" };
 const W = "11:00-11:30";
@@ -104,7 +104,7 @@ test("V-SET-03", "取餐時段格式驗證", () => {
   assert.equal(pricing.isValidWindow("25:00-26:00"), false);
 });
 
-// 3.13 組便當
+// 3.13 Build-a-bento
 const item = {
   slots: [
     { category: "青菜", default: { name: "高麗菜", component_id: "c1" }, candidates: [{ name: "筊白筍", component_id: "c9", portion_level: 0.5 }] },
@@ -145,7 +145,7 @@ test("C-BNT-11", "沒有 slots 的舊品項不能加減", () => {
   assert.deepEqual(bento.resolveChoices({}, []), { slots: [], removedCount: 0 });
 });
 
-// 3.14 回饋池
+// 3.14 Reward pool
 test("C-RWD-04", "規格 §8.4 範例：池 10000、1000 張 → 免費 15、半價 79、保底 906，餘 20", () => {
   const r = rewards.allocatePool(10000, 1000);
   assert.deepEqual(r.counts, { free: 15, t50: 79, t95: 906 });
@@ -153,7 +153,7 @@ test("C-RWD-04", "規格 §8.4 範例：池 10000、1000 張 → 免費 15、半
   assert.equal(r.leftover, 20);
 });
 test("C-RWD-05", "頭獎保證：免費餐券算出 0 張且剩 ≥ 95 時先配 1 張", () => {
-  // N=100、P=800 → budget=300，free floor(90/95)=0、t50 floor(210/45)=4（180）→ 剩 120 ≥ 95 → 補 1 張免費
+  // N=100, P=800 → budget=300, free floor(90/95)=0, t50 floor(210/45)=4 (180) → 120 left ≥ 95 → add 1 free ticket
   const r = rewards.allocatePool(800, 100);
   assert.equal(r.counts.free, 1);
   const total = Object.values(r.counts).reduce((s, n) => s + n, 0);
@@ -225,7 +225,7 @@ test("V-PRP-14", "出餐標籤不含姓名", () => {
   assert.equal(labels[0].pickup_code, "A1B2");
 });
 
-// ── 2026-10-02 規格（技術規格1002.md）新增 ──
+// ── Added in the 2026-10-02 spec (技術規格1002.md) ──
 test("C-MEAL-01", "餐期依取餐開始時間歸類：早 06:00–10:30／中 10:30–14:00／晚 16:30–20:00", () => {
   assert.equal(pricing.mealPeriodOf("07:30-08:00", CFG), "breakfast");
   assert.equal(pricing.mealPeriodOf("10:30-11:00", CFG), "lunch");
@@ -341,7 +341,7 @@ test("V-REV-01", "材料成本＝用量 ÷ 採購單位 × 單價；時間軸工
   assert.equal(fin.timelineMinutes(tl, {}), 70);
 });
 
-// V-PRP-03 預測區間
+// V-PRP-03 forecast interval
 let fc;
 try { fc = req("pickupForecast.js").helpers; } catch (e) { fc = null; }
 test("V-PRP-03", "區間：≥8 天分位數、<8 天平均±1.28sd；a≤b≤N", () => {
@@ -354,12 +354,12 @@ test("V-PRP-03", "區間：≥8 天分位數、<8 天平均±1.28sd；a≤b≤N"
   assert.ok(r3.low <= r3.high && r3.high <= 40);
 });
 
-// F-21 時區：calendar 不依機器時區
+// F-21 time zone: calendar doesn't depend on the machine's time zone
 test("F-21", "taipeiToday 以台北時間計（UTC 16:30 已是隔天）", () => {
   assert.equal(cal.taipeiToday(new Date("2026-09-30T16:30:00Z")), "2026-10-01");
 });
 
-// C-NAV-01 靜態檢查：前端不能再出現舊制早鳥文案（BUG-1 回歸）
+// C-NAV-01 static check: the old early-bird copy must not reappear in the frontend (BUG-1 regression)
 test("C-NAV-01", "web/src 畫面文字沒有「最高 7 折」「提前 14 天」（註解不算；1002 版起最遠 30 天是正確說法）", () => {
   const fs = require("node:fs");
   const banned = /最高\s*7\s*折|提前\s*14\s*天|up to 30% off/;
@@ -376,8 +376,8 @@ test("C-NAV-01", "web/src 畫面文字沒有「最高 7 折」「提前 14 天�
   assert.deepEqual(hits, []);
 });
 
-// 預購助理的工具（functions/src/shoppingAssistant.js）：不呼叫 Gemini，直接餵假目錄。
-// 店家沒設 slot_capacity，所以不會讀 slot_counters（不需要 emulator）。
+// Pre-order assistant tools (functions/src/shoppingAssistant.js): no Gemini call, a fake catalog is fed in directly.
+// The vendor has no slot_capacity, so slot_counters isn't read (no emulator needed).
 const asyncTests = [];
 const testAsync = (id, name, fn) => asyncTests.push([id, name, fn]);
 const assistant = req("shoppingAssistant.js").helpers;
@@ -473,7 +473,7 @@ test("F-24", "常一起買：購物籃配對（品名）→ 同店品項 id，�
     { id: "a", vendor_id: "v1", name: "雞腿便當" },
     { id: "b", vendor_id: "v1", name: "滷蛋" },
     { id: "c", vendor_id: "v1", name: "紅茶" },
-    { id: "x", vendor_id: "v2", name: "滷蛋" }, // 別家同名，不能混進 v1 的配對
+    { id: "x", vendor_id: "v2", name: "滷蛋" }, // same name at another vendor; must not mix into v1's pairs
     { id: "old", vendor_id: "v1", name: "停售品", often_with: ["a"] },
     { id: "same", vendor_id: "v3", name: "粥", often_with: ["side"] },
     { id: "side", vendor_id: "v3", name: "小菜", often_with: ["same"] },
@@ -481,7 +481,7 @@ test("F-24", "常一起買：購物籃配對（品名）→ 同店品項 id，�
   const pairs = [
     { vendor_id: "v1", item_a: "滷蛋", item_b: "雞腿便當", buyers: 3, confidence: 0.5 },
     { vendor_id: "v1", item_a: "紅茶", item_b: "雞腿便當", buyers: 5, confidence: 0.4 },
-    { vendor_id: "v1", item_a: "A方案・第1/5天", item_b: "雞腿便當", buyers: 9, confidence: 1 }, // 對不到品項，略過
+    { vendor_id: "v1", item_a: "A方案・第1/5天", item_b: "雞腿便當", buyers: 9, confidence: 1 }, // matches no item, skipped
     { vendor_id: "v3", item_a: "小菜", item_b: "粥", buyers: 2, confidence: 1 },
   ];
   const m = oftenWithByItem(pairs, items);

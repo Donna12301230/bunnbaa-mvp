@@ -15,26 +15,26 @@ export interface TabsProps {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
-  /** 各分頁等寬撐滿容器（登入頁「登入 / 註冊」用法） */
+  /** Tabs share the width equally and fill the container (as in the login page's "Sign in / Sign up") */
   fullWidth?: boolean;
   size?: 'md' | 'lg';
-  /** 分段控制的可及名稱，例如「登入方式」 */
+  /** Accessible name of the segmented control, e.g. "Sign-in method" */
   'aria-label'?: string;
   /**
-   * 對應 panel 的 id 前綴。提供時每個 tab 會設 aria-controls=`${idPrefix}-panel-${value}`，
-   * panel 請設 id 相同、role="tabpanel"、aria-labelledby=`${idPrefix}-tab-${value}`。
+   * id prefix of the matching panels. When set, each tab gets aria-controls=`${idPrefix}-panel-${value}`;
+   * give the panel the same id, role="tabpanel" and aria-labelledby=`${idPrefix}-tab-${value}`.
    */
   idPrefix?: string;
-  /** 整組停用（例如送出中） */
+  /** Disable the whole group (e.g. while submitting) */
   disabled?: boolean;
   className?: string;
-  /** 僅供預覽頁：強制指定某個 tab 呈現 hover / focus */
+  /** Preview page only: force a given tab into hover / focus */
   forceState?: { value: string; state: 'hover' | 'focus' };
 }
 
 /**
- * 膠囊式分段控制：淡灰容器 + 白色選中塊，選中塊會滑動。
- * 鍵盤：← → 切換、Home / End 跳到頭尾（自動啟用）。
+ * Pill-style segmented control: light gray container + white selected indicator that slides.
+ * Keyboard: ← → to switch, Home / End to jump to the ends (automatic activation).
  */
 export function Tabs({
   items,

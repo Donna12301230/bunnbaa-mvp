@@ -1,16 +1,16 @@
-// 成長獎勵與折價券（規格 §8、§9）。
+// Growth rewards and coupons (spec §8, §9).
 //
-// vendors/{v}/rewardPeriods/{週一日期}（店主／管理員可讀）：
+// vendors/{v}/rewardPeriods/{Monday date} (readable by the vendor owner / admins):
 //   net_revenue, refunds, tickets, carried_revenue, carried_tickets,
 //   status: accumulating|carried|pooled|closed|paused, pool, allocation{code:n}, remaining{code:n},
 //   draw_deadline, leftover, unclaimed_amount
-// rewardStatus/{vendorId}（公開，只有進度，不含金額）：
-//   tickets_so_far, revenue_so_far, min_revenue, amount_to_open（再 X 元開獎）, pool_open, draw_deadline, pool_period
-// userSpend/{vendorId}_{uid}：carry（未滿 100 元的餘額，結轉下一期）, cumulative, tickets_issued
-// rewardTickets/{id}：vendor_id, user_id, period_id, status: pending|drawable|drawn|forfeited|revoked, pool_period, coupon_id
-// coupons/{id}：vendor_id, tier, discount, status: issued|owned|redeemed|expired|unclaimed, pool_period,
+// rewardStatus/{vendorId} (public, progress only, no amounts):
+//   tickets_so_far, revenue_so_far, min_revenue, amount_to_open (NT$X more until the draw), pool_open, draw_deadline, pool_period
+// userSpend/{vendorId}_{uid}: carry (remainder under NT$100, carried into the next period), cumulative, tickets_issued
+// rewardTickets/{id}: vendor_id, user_id, period_id, status: pending|drawable|drawn|forfeited|revoked, pool_period, coupon_id
+// coupons/{id}: vendor_id, tier, discount, status: issued|owned|redeemed|expired|unclaimed, pool_period,
 //   user_id, owned_at, expires_at, lock_id
-//   tier: "refund" 是取消訂單退的折價券（orders.js cancelLock 直接發成 owned，不經回饋池；source_lock_id 記來源訂單）
+//   tier: "refund" is a coupon issued for a cancelled order (orders.js cancelLock issues it directly as owned, bypassing the reward pool; source_lock_id records the source order)
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { Timestamp } = require("firebase-admin/firestore");
@@ -28,7 +28,7 @@ function periodRef(vendorId, periodId) {
   return db().collection("vendors").doc(vendorId).collection("rewardPeriods").doc(periodId);
 }
 
-/** 公開進度：本期累積（含前期結轉）的抽獎券數，距離開池還差多少 */
+/** Public progress: draw tickets accumulated this period (including carry-over from earlier periods) and how far from opening the pool */
 async function refreshRewardStatus(vendorId) {
   const config = await loadPlatformConfig(db());
   const current = mondayOf(taipeiToday());
@@ -54,9 +54,9 @@ async function refreshRewardStatus(vendorId) {
 }
 
 /**
- * onOrderCompleted / onOrderRefunded（§8.1、§8.2）：
- * - 取餐完成或轉愛心餐 → 計入淨營業額、累計付款人消費、每滿 100 元發一張抽獎券
- * - 已計入後又退款（停班取消等）→ 從當期營業額扣回（可為負，結轉），撤回尚未開池的抽獎券
+ * onOrderCompleted / onOrderRefunded (§8.1, §8.2):
+ * - Pickup completed or converted to a charity meal → add to net revenue, add to the payer's cumulative spend, one draw ticket per NT$100
+ * - Refunded after being counted (work-suspension cancellation etc.) → subtract from the current period's revenue (may go negative, carried over) and revoke draw tickets whose pool hasn't opened
  */
 exports.onLockWritten = onDocumentWritten({ document: "locks/{lockId}", region: REGION }, async (event) => {
   const after = event.data?.after;
@@ -127,7 +127,7 @@ async function uncountLock(lockRef) {
   await periodRef(lock.vendor_id, periodId).set({
     period_id: periodId, net_revenue: FieldValue.increment(-paid), refunds: FieldValue.increment(paid),
   }, { merge: true });
-  // 撤回這筆發出、尚未開池的抽獎券
+  // Revoke the draw tickets issued for this order whose pool hasn't opened
   const tickets = await db().collection("rewardTickets").where("lock_id", "==", lockRef.id).where("status", "==", "pending").get();
   const batch = db().batch();
   tickets.docs.forEach((d) => batch.update(d.ref, { status: "revoked" }));
@@ -137,9 +137,9 @@ async function uncountLock(lockRef) {
 }
 
 /**
- * 結算上一期（§8.1、§8.4）：累積淨營業額（含前期結轉）滿 minRevenueToOpen（1 萬元）才開池，
- * 回饋池＝營業額 × rewardRate（5%）；否則營業額與抽獎券結轉下一期（不設強制開池）。
- * 冪等：已 pooled／carried／paused 的期別不重算。
+ * Settle the previous period (§8.1, §8.4): the pool opens only when cumulative net revenue (including carry-over) reaches minRevenueToOpen (NT$10,000);
+ * reward pool = revenue × rewardRate (5%); otherwise revenue and draw tickets carry over to the next period (no forced opening).
+ * Idempotent: periods already pooled / carried / paused are not recomputed.
  */
 async function closePeriodFor(vendor, periodId, config) {
   const ref = periodRef(vendor.id, periodId);
@@ -152,7 +152,7 @@ async function closePeriodFor(vendor, periodId, config) {
     await ref.set({ status: "paused" }, { merge: true });
     return "paused";
   }
-  // 本期與之前各期累積、尚未開池的抽獎券（不含結算後才產生的下一期抽獎券）
+  // Draw tickets accumulated this period and in earlier periods whose pool hasn't opened (excluding next-period tickets created after settlement)
   const pendingAll = await db().collection("rewardTickets").where("vendor_id", "==", vendor.id).where("status", "==", "pending").get();
   const pending = { docs: pendingAll.docs.filter((d) => (d.data().period_id || "") <= periodId) };
   const N = pending.docs.length;
@@ -180,7 +180,7 @@ async function closePeriodFor(vendor, periodId, config) {
     remaining: counts, spent, leftover, draw_deadline: drawDeadline, opened_at: FieldValue.serverTimestamp(),
   }, { merge: true });
   await writer.flush();
-  // 負數營業額不會開池，這裡 totalRevenue ≥ 0；下一期從 0 開始
+  // Negative revenue never opens a pool, so totalRevenue ≥ 0 here; the next period starts from 0
   const holders = new Set(pending.docs.map((d) => d.data().user_id));
   for (const uid of holders) {
     await notifyUser(uid, {
@@ -214,7 +214,7 @@ exports.closeRewardPeriod = onSchedule({ schedule: "10 0 * * 1", timeZone: "Asia
   await closeRewardPeriods();
 });
 
-/** Demo／漏跑用：立即結算上一期；管理員可指定 period_id 結算任一期（例如本期） */
+/** For demos / missed runs: settle the previous period now; admins may pass period_id to settle any period (e.g. the current one) */
 exports.triggerRewardPeriodNow = onCall({}, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   if (request.data?.period_id) {
@@ -228,7 +228,7 @@ exports.triggerRewardPeriodNow = onCall({}, async (request) => {
   return closeRewardPeriods(vendorId);
 });
 
-/** 抽獎（§8.5）：Transaction 內不放回抽樣，依各等級剩餘張數加權隨機 */
+/** Draw (§8.5): sampling without replacement inside a transaction, weighted by remaining count per tier */
 exports.drawTicket = onCall({}, async (request) => {
   assertSignedInUser(request, "抽獎");
   const uid = request.auth.uid;
@@ -267,7 +267,7 @@ exports.drawTicket = onCall({}, async (request) => {
     const tier = tierInfo(code);
     return { coupon_id: couponRef.id, tier: code, label: tier.label, discount: tier.discount, expires_at: expiresAt.toMillis(), vendor_id: ticket.vendor_id };
   });
-  // 公開中獎跑馬燈（不含 uid）
+  // Public winners ticker (no uid)
   await db().collection("draws").add({
     vendor_id: result.vendor_id, buyer_tag: uid.slice(-4), tier: result.tier, label: result.label, discount: result.discount,
     created_at: FieldValue.serverTimestamp(),
@@ -276,7 +276,7 @@ exports.drawTicket = onCall({}, async (request) => {
   return result;
 });
 
-/** 每日：過期、抽獎期結束未抽作廢、到期前 3 天提醒 */
+/** Daily: expire coupons, void tickets not drawn by the end of the draw window, remind 3 days before expiry */
 exports.expireCoupons = onSchedule({ schedule: "every day 00:20", timeZone: "Asia/Taipei", region: REGION }, async () => {
   const now = Timestamp.now();
   const expired = await db().collection("coupons").where("status", "==", "owned").where("expires_at", "<=", now).get();
@@ -323,12 +323,12 @@ exports.couponReminders = onSchedule({ schedule: "every day 10:00", timeZone: "A
   }
 });
 
-/** 店家暫停參加下一期（§9.4）：需提前 7 天，從 7 天後那一週起不發抽獎券、不開池；已發出的券照常兌現 */
+/** Vendor pauses participation in the next period (§9.4): needs 7 days' notice; from the week 7 days out, no draw tickets are issued and no pool opens; coupons already issued are still honored */
 exports.setRewardPause = onCall({}, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const ref = db().collection("vendors").doc(vendorId);
   if (request.data?.paused) {
-    const from = mondayOf(addDays(taipeiToday(), 7 + 6)); // 至少 7 天後的下一個週一
+    const from = mondayOf(addDays(taipeiToday(), 7 + 6)); // the next Monday at least 7 days out
     await ref.update({ rewards_paused_from: from });
     await refreshRewardStatus(vendorId);
     return { paused_from: from };
@@ -339,10 +339,10 @@ exports.setRewardPause = onCall({}, async (request) => {
 });
 
 /**
- * 異常偵測（§9.5）：標記並通知平台與店家，不自動處分。
- * - 7 天內退款 ≥ 3 筆的使用者
- * - 單一使用者抽獎券占某期 > 20%
- * - 同一裝置 > 2 個帳號領券（users.device_id，前端登入時寫入）
+ * Anomaly detection (§9.5): flag and notify the platform and vendor; no automatic penalties.
+ * - Users with ≥ 3 refunds within 7 days
+ * - A single user holding > 20% of a period's draw tickets
+ * - > 2 accounts claiming coupons from the same device (users.device_id, written by the frontend at login)
  */
 exports.detectAnomalies = onSchedule({ schedule: "every day 03:00", timeZone: "Asia/Taipei", region: REGION }, async () => {
   const since = Timestamp.fromMillis(Date.now() - 7 * 86400000);

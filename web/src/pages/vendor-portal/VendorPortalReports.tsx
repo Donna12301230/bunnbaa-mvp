@@ -14,14 +14,14 @@ import PortalPageHeader from "@/components/PortalPageHeader";
 export type InsightsTab = "revenue" | "area" | "rewards";
 
 /**
- * 看數據（2026-10-06 整合）：原本的「統計報表」「區域洞察」「券負債看板」合成一頁三個大分頁，
- * 分頁卡上直接顯示各自最重要的數字。舊路徑都保留：/vendor-portal/reports、/insights、/growth 各自打開對應分頁。
- * 三個面板都掛著（只切換顯示），分頁卡的數字才拿得到。
+ * Reports (merged 2026-10-06): the former "Reports", "Area insights" and "Coupon liability" pages are now three tabs on one page,
+ * with each tab card showing its key number. Old paths still work: /vendor-portal/reports, /insights and /growth each open their tab.
+ * All three panels stay mounted (only visibility toggles) so the tab cards can read their numbers.
  */
 export function InsightsHub({ initial = "revenue" }: { initial?: InsightsTab }) {
   const vendorId = useAuth().user?.vendorId;
   const [tab, setTab] = useState<InsightsTab>(initial);
-  // null＝面板還在讀資料，分頁卡先顯示骨架，不要閃 0
+  // null = the panel is still loading; the tab card shows a skeleton instead of flashing 0
   const [head, setHead] = useState<Record<InsightsTab, number | null>>({ revenue: null, area: null, rewards: null });
   const set = (k: InsightsTab) => (n: number | null) => setHead((h) => (h[k] === n ? h : { ...h, [k]: n }));
 

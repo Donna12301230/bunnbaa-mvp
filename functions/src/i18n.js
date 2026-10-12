@@ -1,21 +1,21 @@
 const { AsyncLocalStorage } = require("node:async_hooks");
 
-// 回給使用者看的錯誤訊息依前端語言（中文／英文）。前端每次呼叫 callable 都帶
-// data.lang（web/src/lib/callable.ts）。同一個 Functions 實例會同時處理多個請求，
-// 所以語言放在 AsyncLocalStorage，不能用模組層級變數。沒帶或不在請求內（排程）＝中文。
+// User-facing error messages follow the frontend language (Chinese/English). The frontend sends data.lang with every
+// callable call (web/src/lib/callable.ts). One Functions instance handles several requests concurrently,
+// so the language lives in AsyncLocalStorage, not a module-level variable. Missing, or outside a request (schedules) = Chinese.
 const store = new AsyncLocalStorage();
 
-/** 包住 onCall handler：這次請求內的 t() 都依 request.data.lang 挑語言 */
+/** Wraps an onCall handler: every t() within this request picks the language from request.data.lang */
 function withLang(handler) {
   return (request) => store.run({ lang: request?.data?.lang === "en" ? "en" : "zh" }, () => handler(request));
 }
 
-/** 排程裡依收件人的語言（users.lang）組通知：在 fn 內呼叫的 t() 用指定語言 */
+/** In schedules, build notifications in the recipient's language (users.lang): t() called inside fn uses the given language */
 function inLang(lang, fn) {
   return store.run({ lang: lang === "en" ? "en" : "zh" }, fn);
 }
 
-/** 依目前請求的語言挑字串 */
+/** Pick the string for the current request's language */
 function t(zh, en) {
   return store.getStore()?.lang === "en" ? en : zh;
 }

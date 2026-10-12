@@ -36,8 +36,8 @@ interface BanAppeal {
 const appealStatusLabel = (status: BanAppeal["status"]) =>
   ({ pending: tr("審核中", "Under review"), approved: tr("已核准", "Approved"), rejected: tr("已拒絕", "Rejected") })[status];
 
-// 只有目前狀態是 isOrderBanned 才會顯示這塊；規則上 ban_appeals 的 create 也要求
-// isBanned()，所以未被封鎖的人就算硬呼叫也會被擋。
+// Only shown when the current state is isOrderBanned; the rules also require isBanned() for creating
+// ban_appeals, so users who aren't banned are blocked even if they call it directly.
 function BanAppealSection({ user }: { user: UserProfile }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -128,7 +128,7 @@ function formatDate(ts: unknown): string {
   return d ? d.toLocaleDateString() : "—";
 }
 
-// 我的訂單——表格呈現最近的鎖定紀錄，完整功能（QR、轉讓、贈送、評分）還是在 /my-bookings。
+// My orders: a table of recent locks; the full features (QR, resale, gift, rating) are still in /my-bookings.
 function OrdersPanel({ uid }: { uid: string }) {
   const { data: vendors = [] } = useVendors();
   const { data: locks = [], isLoading } = useQuery({
@@ -243,7 +243,7 @@ export default function ProfilePage() {
   const [, navigate] = useLocation();
   const { user, isLoading } = useAuth();
   const { toast } = useToast();
-  // ?tab=points（退款通知帶進來）
+  // ?tab=points (passed in from refund notifications)
   const [tab, setTab] = useState<Tab>(() => (/[?&]tab=points/.test(window.location.search + window.location.hash) ? "points" : "account"));
 
   const logoutMutation = useMutation({
@@ -270,7 +270,7 @@ export default function ProfilePage() {
       />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-10 flex flex-col md:flex-row gap-8">
-        {/* ── 左側：會員專區導覽 ── */}
+        {/* ── Left: member area navigation ── */}
         <aside className="md:w-56 shrink-0">
           <nav aria-label={tr("會員專區", "Member area")} className="bg-card rounded-card border border-ink p-3 space-y-1 md:sticky md:top-24">
             <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tr("會員專區", "Member area")}</p>
@@ -308,7 +308,7 @@ export default function ProfilePage() {
           </nav>
         </aside>
 
-        {/* ── 右側：內容 ── */}
+        {/* ── Right: content ── */}
         <main className="flex-1 min-w-0 space-y-6">
           {user?.orderBanned && <BanAppealSection user={user} />}
           {user && tab === "account" && <AccountPanel user={user} />}

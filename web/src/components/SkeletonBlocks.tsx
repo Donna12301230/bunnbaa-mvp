@@ -1,7 +1,7 @@
 import { tr } from "@/lib/i18n";
 import { Skeleton } from "@/components/ds";
 
-// 列表／卡片載入中的骨架：容器設 aria-busy，並給螢幕閱讀器一段「載入中」（設計系統 Skeleton 規範）
+// Skeleton for loading lists / cards: the container sets aria-busy and gives screen readers a "Loading" message (design-system Skeleton guideline)
 export function SkeletonBlocks({
   count = 1,
   height,

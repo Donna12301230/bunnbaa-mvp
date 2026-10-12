@@ -27,9 +27,9 @@ import UsePointsToggle, { usePointsPreview } from "@/components/UsePointsToggle"
 import WaiverText from "@/components/WaiverText";
 import { formatNT } from "@/lib/format";
 
-// 購物車（規格 §4）：每一行是一份便當，各自有取餐日（到下週五）、時段、配菜與加減飯；
-// 每筆（每一份）限用一張折價券，折抵 = min(券面, 加減後小計)。金額只是預覽，
-// createCartLinePayReservation 會依 menu_items 重算；金額 0 元（折價券全額折抵）不經 LINE Pay。
+// Cart (spec §4): each line is one bento with its own pickup date (up to next Friday), pickup slot, sides and rice adjustment;
+// each line (each meal) can use one coupon, discount = min(coupon value, subtotal after adjustments). Amounts are only a preview;
+// createCartLinePayReservation recalculates from menu_items; a 0 total (coupon covers everything) skips LINE Pay.
 export default function CartPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -126,7 +126,7 @@ export default function CartPage() {
             />
           </div>
         ) : (
-          /* 桌機兩欄：左邊餐點，右邊訂單明細（sticky） */
+          /* Desktop two columns: meals on the left, order summary on the right (sticky) */
           <div className="grid gap-8 lg:grid-cols-[1fr_420px] items-start">
           <div className="space-y-4">
             {vendor && (
@@ -259,8 +259,8 @@ export default function CartPage() {
         )}
       </div>
 
-      {/* 手機版結帳按鈕固定在畫面底部，跟品項頁「加入購物車」的黏底列一致，
-          不用捲過所有品項跟聲明勾選框才找得到（桌機版右側訂單明細本來就 sticky，不用重複） */}
+      {/* On mobile the checkout button is pinned to the bottom of the screen, matching the sticky "Add to cart" bar on the item page,
+          so users don't have to scroll past every item and the disclaimer checkbox to find it (on desktop the right-hand summary is already sticky) */}
       {lines.length > 0 && (
         <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-card border-t border-ink p-3 flex items-center gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
           <div className="min-w-0">

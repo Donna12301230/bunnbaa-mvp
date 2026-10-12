@@ -5,7 +5,7 @@ import { cx } from '../_shared/cx';
 import { usePresence } from '../_shared/usePresence';
 import { useDialogBehavior } from '../_shared/useDialogBehavior';
 import { Portal } from '../ThemeRoot';
-import '../Modal/Modal.css'; // 共用 .bb-modal__close
+import '../Modal/Modal.css'; // shares .bb-modal__close
 import './BottomSheet.css';
 
 export interface BottomSheetProps {
@@ -14,19 +14,19 @@ export interface BottomSheetProps {
   title: ReactNode;
   description?: ReactNode;
   children?: ReactNode;
-  /** 固定在底部的按鈕列（會自動加上 safe-area 內距） */
+  /** Button row pinned to the bottom (safe-area padding added automatically) */
   footer?: ReactNode;
-  /** 拖曳把手往下拉超過此距離（px）即關閉，預設 96 */
+  /** Close when the drag handle is pulled down further than this (px), default 96 */
   dismissThreshold?: number;
   closeOnOverlay?: boolean;
-  /** 送出中：暫停關閉 */
+  /** Submitting: closing is paused */
   loading?: boolean;
   className?: string;
 }
 
 const EXIT_MS = 320;
 
-/** 手機用底部抽屜：從下方滑出，可拖曳把手下拉關閉。≥768px 時置中且限制寬度。 */
+/** Mobile bottom sheet: slides up from the bottom, close by dragging the handle down. At ≥768px it is centered with a max width. */
 export function BottomSheet({
   open,
   onClose,
@@ -49,7 +49,7 @@ export function BottomSheet({
   const safeClose = () => {
     if (!loading) onClose();
   };
-  // 等面板真的掛載後才啟用（聚焦、焦點鎖、捲動鎖）
+  // Only enable once the panel has actually mounted (focus, focus trap, scroll lock)
   useDialogBehavior(panelRef, open && mounted, safeClose, !loading);
 
   function onPointerDown(e: PointerEvent<HTMLDivElement>) {
@@ -62,7 +62,7 @@ export function BottomSheet({
     drag.current.dy = Math.max(0, e.clientY - drag.current.startY);
     setDragY(drag.current.dy);
   }
-  // 用 ref 裡的位移判斷：快速下滑時 pointerup 可能比重新渲染早到，state 的 dragY 還是舊值
+  // Use the offset in the ref: on a fast swipe pointerup can arrive before the re-render, so the dragY state is still stale
   function onPointerUp() {
     if (!drag.current) return;
     const { dy } = drag.current;

@@ -17,7 +17,7 @@ import { LOOKER_EMBED_PREFIX, analyticsConfigKey, isLookerEmbedUrl, useAnalytics
 
 const PROJECT = "bunnbaa-mvp-5474";
 const DATASET = "bunnbaa_analytics";
-// bigquery/sql/02_dashboard.sql 的 view，第一個由連結自動接上，其餘在 Looker Studio「新增資料」加入
+// Views from bigquery/sql/02_dashboard.sql; the first is connected automatically by the link, the rest are added via "Add data" in Looker Studio
 const VIEWS = [
   ["dash_daily_ops", "每日營運"],
   ["dash_forecast_vs_actual", "預測 vs 實際"],
@@ -26,8 +26,8 @@ const VIEWS = [
 ] as const;
 
 /**
- * Looker Studio Linking API：開一份空白報表並接好第一個 BigQuery 資料來源。
- * 沒有範本報表時官方文件只保證「不帶別名」的單一資料來源，所以其餘 view 在報表裡手動加入。
+ * Looker Studio Linking API: opens a blank report with the first BigQuery data source connected.
+ * Without a template report, the official docs only guarantee a single data source "without an alias", so the other views are added manually in the report.
  */
 function createReportUrl() {
   const [table, name] = VIEWS[0];
@@ -45,14 +45,14 @@ function createReportUrl() {
 }
 
 /**
- * 平台儀表板：嵌入 Looker Studio 報表（資料來源是 BigQuery 的 bunnbaa_analytics，見 doc/GoogleCloud改動建議.md）。
- * 報表在 Looker Studio 建好後，把「檔案 → 嵌入報表」給的網址貼進來存檔即可；網址存在 platformConfig/analytics。
- * 報表本身的觀看權限由 Looker Studio 控制，這裡只是把它框進後台。
+ * Platform dashboard: embeds a Looker Studio report (data source is BigQuery bunnbaa_analytics, see doc/GoogleCloud改動建議.md).
+ * Once the report is built in Looker Studio, paste the URL from "File → Embed report" here and save; the URL is stored in platformConfig/analytics.
+ * Viewing permissions for the report itself are controlled by Looker Studio; this just frames it inside the admin console.
  */
 function AnalyticsContent() {
   const { toast } = useToast();
   const { data: config, isLoading } = useAnalyticsConfig();
-  // looker_embed_url 是合併前另一版用的欄位名，讀得到就沿用，存檔時改寫成 lookerStudioEmbedUrl
+  // looker_embed_url is the field name used by another version before the merge; reuse it if present, and rewrite it as lookerStudioEmbedUrl on save
   const saved = config?.lookerStudioEmbedUrl || config?.looker_embed_url || "";
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState(false);
@@ -127,7 +127,7 @@ function AnalyticsContent() {
         {!editing && <Button variant="outline" size="sm" onClick={() => setEditing(true)}>{tr("更換網址", "Change link")}</Button>}
       </div>
       {editing && form}
-      {/* 4:3 的報表在寬螢幕上限制高度，手機上至少 480px 才看得到內容 */}
+      {/* Limit the height of the 4:3 report on wide screens; on mobile it needs at least 480px for the content to be visible */}
       <iframe
         title={tr("平台儀表板", "Platform dashboard")}
         src={saved}

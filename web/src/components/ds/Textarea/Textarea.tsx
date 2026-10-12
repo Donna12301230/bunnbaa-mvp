@@ -9,12 +9,12 @@ export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
   label?: ReactNode;
   helperText?: ReactNode;
   error?: ReactNode;
-  /** 在 label 右側顯示「目前字數 / maxLength」 */
+  /** Show "current length / maxLength" to the right of the label */
   showCount?: boolean;
-  /** 右下角顯示 spinner（例如自動儲存中） */
+  /** Show a spinner in the bottom-right corner (e.g. while autosaving) */
   loading?: boolean;
   containerClassName?: string;
-  /** 僅供預覽頁強制呈現狀態 */
+  /** Only for forcing states on the preview page */
   forceState?: 'hover' | 'focus';
 }
 

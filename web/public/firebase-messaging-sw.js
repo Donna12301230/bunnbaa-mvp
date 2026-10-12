@@ -16,7 +16,7 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// 伺服器送 data-only 訊息（functions/src/common.js notifyUser）：這裡顯示，並記下要打開的頁面
+// Server sends data-only messages (functions/src/common.js notifyUser): show them here and remember which page to open
 messaging.onBackgroundMessage((payload) => {
   const data = payload.data || payload.notification || {};
   self.registration.showNotification(data.title || "BunnBaa", {
@@ -26,8 +26,8 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-// 點通知 → 打開對應頁面。hash 路由的 query 要放在真正的 ?search（/profile?tab=points → /?tab=points#/profile），
-// 跟 wouter 的 navigate 一致，否則頁面會 404
+// Clicking a notification opens its page. Hash-route query strings must go in the real ?search (/profile?tab=points → /?tab=points#/profile),
+// matching wouter's navigate; otherwise the page 404s
 function urlFor(link) {
   if (!link) return "/#/home";
   const [path, query] = String(link).split("?");

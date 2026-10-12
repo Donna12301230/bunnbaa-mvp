@@ -13,8 +13,8 @@ export interface WalletEntry {
 }
 
 /**
- * 平台點數（functions/src/wallet.js）：餘額、可退回 LINE Pay 的點數、最近明細。
- * withdrawable＝還有剩、而且記得原付款交易的批次加總；其他點數只能結帳折抵。
+ * Platform points (functions/src/wallet.js): balance, points that can be sent back to LINE Pay, recent activity.
+ * withdrawable = sum of batches that still have a balance and remember their original payment; other points can only be used at checkout.
  */
 export function useWallet(enabled = true) {
   const { user } = useAuth();

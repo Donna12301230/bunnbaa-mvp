@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  // 設計系統 Badge：唯讀標記，--radius-sm、高 24px、caption 字級；不可點所以沒有 hover
+  // Design-system Badge: read-only marker, --radius-sm, 24px tall, caption size; not clickable, so no hover
   "inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-sm border px-2 text-xs font-semibold leading-none",
   {
     variants: {

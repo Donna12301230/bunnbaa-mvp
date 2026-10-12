@@ -1,8 +1,8 @@
--- 購物籃與客戶分群（doc/GoogleCloud改動建議.md P1）。由 functions/src/customerInsights.js 每週執行，也可以直接貼到 BigQuery 主控台跑。
--- 只用到 BigQuery 的 bunnbaa_analytics（Firestore 同步過來的 locks，已去個資）。
+-- Basket analysis and customer segments (doc/GoogleCloud改動建議.md P1). Run weekly by functions/src/customerInsights.js; can also be pasted into the BigQuery console.
+-- Uses only BigQuery's bunnbaa_analytics (locks synced from Firestore, already de-identified).
 
--- 1. 常一起買：同一位客人在同一家店都買過的兩個品項，算有幾位客人兩個都買過（不限同一天：
---    一筆訂單通常只有一個品項）。confidence＝買過 A 的客人裡也買過 B 的比例。
+-- 1. Frequently bought together: for two items a diner has both bought at the same vendor, count how many diners bought both (not necessarily on the same day:
+--    an order usually has a single item). confidence = share of diners who bought A that also bought B.
 CREATE OR REPLACE TABLE bunnbaa_analytics.basket_pairs AS
 WITH bought AS (
   SELECT DISTINCT vendor_id, buyer_uid, item_name
@@ -26,8 +26,8 @@ JOIN item_buyers ia ON ia.vendor_id = p.vendor_id AND ia.item_name = p.item_a
 JOIN item_buyers ib ON ib.vendor_id = p.vendor_id AND ib.item_name = p.item_b
 WHERE p.buyers >= 2;
 
--- 2. 每位會員的特徵（過去 90 天、取餐日已過、不含取消）：RFM＋早鳥折扣（價格敏感度）＋轉讓與未取餐比例。
---    只買過 1 份的不分群（多半是展示用的一次性帳號，特徵沒有意義）。
+-- 2. Features per member (last 90 days, pickup date passed, cancellations excluded): RFM + early-bird discount (price sensitivity) + resale and no-show rates.
+--    Members who bought only 1 portion aren't segmented (mostly one-off demo accounts; their features are meaningless).
 CREATE OR REPLACE TABLE bunnbaa_analytics.buyer_features AS
 SELECT
   buyer_uid,
@@ -48,7 +48,7 @@ WHERE day < CURRENT_DATE('Asia/Taipei') AND day >= DATE_SUB(CURRENT_DATE('Asia/T
 GROUP BY buyer_uid
 HAVING COUNT(*) >= 2;
 
--- 3. K-means 分 4 群（特徵先標準化）
+-- 3. K-means into 4 segments (features standardized first)
 CREATE OR REPLACE MODEL bunnbaa_analytics.buyer_segments_model
 OPTIONS (model_type = 'KMEANS', num_clusters = 4, standardize_features = TRUE, kmeans_init_method = 'KMEANS++') AS
 SELECT recency_days, frequency, monetary, avg_price, avg_discount, resale_rate, no_show_rate, vendors
@@ -58,8 +58,8 @@ CREATE OR REPLACE TABLE bunnbaa_analytics.buyer_segments AS
 SELECT buyer_uid, CENTROID_ID AS segment_id
 FROM ML.PREDICT(MODEL bunnbaa_analytics.buyer_segments_model, (SELECT * FROM bunnbaa_analytics.buyer_features));
 
--- 4. 每一群的平均特徵，交給 Gemini（AI.GENERATE）寫一句商家看得懂的中英文描述。
---    prompt 存成欄位：模型偶爾會重複輸出到被截斷（欄位變 null），最後的 UPDATE 只對這些群重試一次。
+-- 4. Average features per segment, handed to Gemini (AI.GENERATE) to write a one-line Chinese and English description vendors can understand.
+--    The prompt is stored as a column: the model occasionally repeats itself until truncated (column becomes null), and the final UPDATE retries just those segments once.
 CREATE OR REPLACE TABLE bunnbaa_analytics.segment_profiles AS
 WITH stats AS (
   SELECT
@@ -97,7 +97,7 @@ UPDATE bunnbaa_analytics.segment_profiles
 SET ai = AI.GENERATE(prompt, endpoint => 'gemini-3.6-flash', model_params => JSON '{"generationConfig": {"temperature": 0.2, "maxOutputTokens": 512}}', output_schema => 'label STRING, description STRING, label_en STRING, description_en STRING')
 WHERE ai.label IS NULL OR ai.description IS NULL OR ai.label_en IS NULL OR ai.description_en IS NULL;
 
--- 5. 每家店的客群分布（只算有分群的會員；商家後台顯示用）
+-- 5. Customer segment distribution per vendor (segmented members only; shown in the vendor portal)
 CREATE OR REPLACE TABLE bunnbaa_analytics.vendor_segment_mix AS
 SELECT l.vendor_id, s.segment_id, COUNT(DISTINCT l.buyer_uid) AS customers
 FROM bunnbaa_analytics.locks_schema_locks_latest l

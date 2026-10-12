@@ -20,8 +20,8 @@ interface Dish {
 }
 
 /**
- * 開放許願（規格 §4.4）：先從平台菜色庫選，找不到再自由輸入（由 Gemini 歸類到標準菜名）。
- * 以人數計、近 30 天，達門檻通知店家列入參考名單。許願不保證供應。
+ * Open wish (spec §4.4): pick from the platform dish library first, otherwise type freely (Gemini maps it to a standard dish name).
+ * Counted by people over the last 30 days; once past the threshold, vendors are notified to add it to their reference list. Wishes don't guarantee supply.
  */
 export default function OpenWishDialog({ open, onOpenChange, vendorId, vendorName }: {
   open: boolean;

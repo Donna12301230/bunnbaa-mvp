@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
-// 用函式包起來，每次 render 依目前語言組標籤。
-// 依「時間」分組（簡化提案 §3-6）：今天要做的、這週要做的、有空時回顧的、偶爾調整的
+// Wrapped in a function so labels are built in the current language on every render.
+// Grouped by time (simplification proposal §3-6): today's work, this week's work, review when free, occasional tweaks
 const navGroups = () => [
   {
     title: null,
@@ -18,7 +18,7 @@ const navGroups = () => [
   {
     title: tr("今天", "Today"),
     items: [
-      // 訂單、取餐掃碼、愛心餐、訂餐時段合成一頁（四個分頁）；舊路徑也算在這一項
+      // Orders, pickup scanning, charity meals and pickup slots merged into one page (four tabs); the old paths also count as this item
       { href: "/vendor-portal/orders", label: tr("訂單取餐", "Orders & pickup"), icon: ScanLine, also: ["/lock/vendor/redeem", "/vendor-portal/sessions", "/vendor-portal/charity"] },
       { href: "/vendor-portal/prep", label: tr("今日備料", "Today's prep"), icon: ChefHat },
     ],
@@ -33,14 +33,14 @@ const navGroups = () => [
   {
     title: tr("看數據", "Insights"),
     items: [
-      // 統計報表、區域洞察、券負債看板合成一頁（三個分頁）；舊路徑也算在這一項
+      // Reports, area insights and the coupon liability board merged into one page (three tabs); the old paths also count as this item
       { href: "/vendor-portal/reports", label: tr("報表與洞察", "Reports & insights"), icon: TrendingUp, also: ["/vendor-portal/insights", "/vendor-portal/growth"] },
     ],
   },
   {
     title: tr("店家", "Store"),
     items: [
-      // 食材、單價、供應商：開店或漲價時才改，菜色的組成在菜單管理裡直接改
+      // Ingredients, unit prices, suppliers: only changed when opening or when prices rise; dish composition is edited directly in Menu
       { href: "/vendor-portal/recipes", label: tr("食材與供應商", "Ingredients & suppliers"), icon: BookOpen },
       { href: "/vendor-portal/settings", label: tr("店家設定", "Store settings"), icon: Settings },
     ],
@@ -69,7 +69,7 @@ export default function VendorPortalLayout({ children }: { children: ReactNode }
     }
   }, [isLoading, isVendor]);
 
-  // 放在所有 hooks 之後，登入狀態從載入中變成確定時 hook 數量才不會變
+  // Placed after all hooks so the hook count doesn't change when auth goes from loading to resolved
   if (isLoading || !isVendor) {
     return null;
   }

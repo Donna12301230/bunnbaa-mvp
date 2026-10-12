@@ -13,7 +13,7 @@ interface DayRow {
   revenue: number;
   material_cost: number;
   qty: number;
-  /** 人工＋手續費＋平台抽成＋固定成本日攤（舊版 Functions 沒有這欄） */
+  /** Labor + fees + platform commission + daily share of fixed costs (older Functions don't return this field) */
   other_cost?: number;
   net_profit?: number;
 }
@@ -42,9 +42,9 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
 }
 
 /**
- * 訂單統計報表「每日收入（最近 15 天）」（1002 規格 §9.3、待修改：改折線表）：
- * 收入、材料成本、淨利三條線同一個 NT$ 軸；收入與材料成本兩線之間是毛利。材料成本依配方×最新單價，
- * 淨利再扣人工、手續費、平台抽成、固定成本日攤，都由 Functions getDailyRevenueSeries 算（配方是營業機密，只在後端算）。
+ * Order report "Daily revenue (last 15 days)" (1002 spec §9.3; per 待修改.docx: switched to a line chart):
+ * revenue, material cost and net profit as three lines on one NT$ axis; the gap between revenue and material cost is gross profit. Material cost is recipe × latest unit price;
+ * net profit further subtracts labor, fees, platform commission and the daily share of fixed costs, all computed by Functions getDailyRevenueSeries (recipes are trade secrets, so only computed on the backend).
  */
 export default function RevenueCostChart({ vendorId }: { vendorId: string | null | undefined }) {
   const aiDrafts = useAiDraftsInUse(vendorId ?? undefined);
@@ -80,7 +80,7 @@ export default function RevenueCostChart({ vendorId }: { vendorId: string | null
           <Legend verticalAlign="top" align="right" height={28} iconType="plainline" wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
           <Line type="monotone" dataKey="revenue" name={tr("收入", "Revenue")} stroke="var(--chart-revenue)" strokeWidth={2}
             dot={{ r: 4, strokeWidth: 2, stroke: "var(--card)", fill: "var(--chart-revenue)" }} activeDot={{ r: 5, stroke: "var(--card)", strokeWidth: 2 }} />
-          {/* 淨利可能是負的：0 元基準線 */}
+          {/* Net profit can be negative: NT$0 baseline */}
           {hasNet && <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.5} />}
           <Line type="monotone" dataKey="material_cost" name={tr("材料成本", "Material cost")} stroke="var(--chart-cost)" strokeWidth={2}
             dot={{ r: 4, strokeWidth: 2, stroke: "var(--card)", fill: "var(--chart-cost)" }} activeDot={{ r: 5, stroke: "var(--card)", strokeWidth: 2 }} />

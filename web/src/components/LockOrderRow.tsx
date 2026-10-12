@@ -10,10 +10,10 @@ import { todayStr } from "@/lib/pickupSlots";
 import type { Lock } from "@/types";
 
 /**
- * 商家後台訂單列（訂單管理、時段明細、取餐頁共用）：第一欄是核銷碼（4 碼取餐號＋手機末三碼），
- * 再來是品項、實際配菜、加減飯、備註。
- * 今天的單可以當面核對後「確認取餐」（completePickup）。未取餐不用手動登記：
- * 取餐時段結束 30 分鐘後系統自動轉愛心餐（規格 §7）。不顯示消費者姓名（§14.2）。
+ * Vendor portal order row (shared by order management, slot details and the pickup page): the first column is the redemption code (4-digit pickup number + last three phone digits),
+ * followed by item, actual sides, rice adjustment and notes.
+ * Today's orders can be checked in person and marked "Confirm pickup" (completePickup). No-shows need no manual entry:
+ * 30 minutes after the pickup slot ends the system converts them to charity meals (spec §7). Diner names are not shown (§14.2).
  */
 export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; showDate?: boolean }) {
   const { toast } = useToast();
@@ -36,7 +36,7 @@ export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; sh
   return (
     <div className="border border-border rounded-lg p-3 bg-card space-y-2">
       <div className="flex items-start gap-3">
-        {/* 第一欄：核銷碼，店家掃一眼就能對 */}
+        {/* First column: redemption code, so the vendor can match it at a glance */}
         <div className="shrink-0 min-w-[4.5rem] rounded-md bg-muted px-1.5 py-1 text-center" title={tr("取餐碼：取餐號＋手機末三碼", "Pickup code + last 3 phone digits")}>
           <p className="font-mono text-lg font-bold leading-tight tracking-wider">{pickupCode(lock)}</p>
           <p className="font-mono text-[11px] leading-tight text-muted-foreground">{lock.phone_last3 ? `${tr("手機末三碼", "Phone last 3")} ${lock.phone_last3}` : tr("取餐號", "Pickup no.")}</p>

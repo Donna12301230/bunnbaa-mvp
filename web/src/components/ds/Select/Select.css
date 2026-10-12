@@ -1,7 +1,7 @@
 .bb-select__native {
   appearance: none;
   -webkit-appearance: none;
-  /* 讓 chevron 疊在 select 上，整條都能點 */
+  /* Overlay the chevron on the select so the whole bar is clickable */
   padding-right: 28px;
   margin-right: -28px;
   cursor: pointer;
@@ -10,7 +10,7 @@
   cursor: not-allowed;
 }
 
-/* 停在 placeholder（value=""）時用輔助色 */
+/* Use the muted color while on the placeholder (value="") */
 .bb-select__native:has(option[value='']:checked) {
   color: var(--text-muted);
 }

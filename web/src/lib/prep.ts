@@ -3,8 +3,8 @@ import { liveConfig } from "@/lib/platformConfig";
 import { tr } from "@/lib/i18n";
 import type { Component, Ingredient, Lock, MenuItem, RiceOption } from "@/types";
 
-// 備料的份數／生料計算（前端版）。跟 functions/src/prep.js 的 componentPortionsForLock、rawNeeds 同一套規則，要一起改：
-// 菜單的材料總和、截單前的備料預估都用這裡，截單後以後端算出的 prepPlans 為準。
+// Prep portion / raw-ingredient calculations (frontend copy). Same rules as componentPortionsForLock and rawNeeds in functions/src/prep.js; change both together:
+// the menu's ingredient totals and pre-cut-off prep estimates use this; after cut-off the prepPlans computed by the backend are authoritative.
 
 type Portions = Map<string, number>;
 
@@ -13,7 +13,7 @@ function add(map: Map<string, number>, key: string | null | undefined, amount: n
   map.set(key, (map.get(key) || 0) + amount);
 }
 
-/** 白飯份數：半碗 0.5、一碗 1、一碗半 1 ＋ 多加克數 ÷ 每份熟重 */
+/** Rice portions: half bowl 0.5, one bowl 1, 1.5 bowls = 1 + extra grams ÷ cooked weight per portion */
 export function ricePortions(rice: RiceOption | undefined, riceComponent: Component | undefined, config = liveConfig()): number {
   const grams = Number(riceComponent?.portion_grams) || 0;
   let portions = rice === "less" ? 0.5 : 1;
@@ -21,7 +21,7 @@ export function ricePortions(rice: RiceOption | undefined, riceComponent: Compon
   return portions;
 }
 
-/** 一筆訂單（或預估用的組合）要用到哪些半成品、各幾份 */
+/** Which components an order (or an estimate combination) uses, and how many portions of each */
 export function componentPortionsForLock(
   lock: Pick<Lock, "rice" | "slots" | "extra_side"> & { main_component_id?: string | null },
   item: MenuItem | undefined,
@@ -54,7 +54,7 @@ export function componentPortionsForLock(
   return out;
 }
 
-/** 多筆訂單合計的半成品份數 */
+/** Component portions summed over multiple orders */
 export function componentPortions(locks: (Lock & { main_component_id?: string | null })[], itemsById: Record<string, MenuItem>, componentsById: Record<string, Component>, config = liveConfig()): Portions {
   const total: Portions = new Map();
   for (const lock of locks) {
@@ -63,7 +63,7 @@ export function componentPortions(locks: (Lock & { main_component_id?: string | 
   return total;
 }
 
-/** 半成品份數 → 各原物料生料用量（原物料自己的單位） */
+/** Component portions → raw amount of each ingredient (in the ingredient's own unit) */
 export function rawNeeds(portions: Portions, componentsById: Record<string, Component>, ingredientsById: Record<string, Ingredient>): Map<string, number> {
   const needs = new Map<string, number>();
   for (const [componentId, n] of portions) {
@@ -75,22 +75,22 @@ export function rawNeeds(portions: Portions, componentsById: Record<string, Comp
   return needs;
 }
 
-/** 半成品份數 → 成本 */
+/** Component portions → cost */
 export function portionsCost(portions: Portions, componentsById: Record<string, Component>, ingredientsById: Record<string, Ingredient>): number {
   let sum = 0;
   for (const [id, n] of portions) sum += componentCost(componentsById[id], ingredientsById) * n;
   return sum;
 }
 
-// ---------------- 資料缺漏（成本算不出來的原因） ----------------
+// ---------------- Missing data (why the cost cannot be computed) ----------------
 
 export type CostIssue =
-  | { kind: "unlinked" } // 沒接半成品
-  | { kind: "missing"; componentId: string } // 接的半成品已被刪除
-  | { kind: "no_ingredients"; componentId: string } // 半成品沒有原物料
-  | { kind: "no_price"; componentId: string; ingredientId: string; name: string }; // 原物料沒單價
+  | { kind: "unlinked" } // no component linked
+  | { kind: "missing"; componentId: string } // linked component has been deleted
+  | { kind: "no_ingredients"; componentId: string } // component has no ingredients
+  | { kind: "no_price"; componentId: string; ingredientId: string; name: string }; // ingredient has no unit price
 
-/** 一道菜的成本為什麼算不出來（null＝沒問題） */
+/** Why a dish's cost cannot be computed (null = no problem) */
 export function costIssue(componentId: string | null | undefined, componentsById: Record<string, Component>, ingredientsById: Record<string, Ingredient>): CostIssue | null {
   if (!componentId) return { kind: "unlinked" };
   const comp = componentsById[componentId];
@@ -111,7 +111,7 @@ export function costIssueText(issue: CostIssue): string {
   }
 }
 
-/** 品項上每一道菜（主菜、白飯、固定附餐、配菜、候選菜）與它接的半成品 */
+/** Every dish on an item (main, rice, fixed extras, sides, candidate dishes) and the component it links to */
 export function itemDishes(item: Pick<MenuItem, "item_type" | "mains" | "main" | "rice_component_id" | "fixed" | "slots" | "component_id">): { label: string; name: string; component_id: string | null }[] {
   const out: { label: string; name: string; component_id: string | null }[] = [];
   const isBento = item.item_type ? item.item_type === "bento" : (item.slots?.length ?? 0) > 0;
@@ -130,7 +130,7 @@ export function itemDishes(item: Pick<MenuItem, "item_type" | "mains" | "main" |
   return out;
 }
 
-/** 品項的配方缺漏，例：「配菜 2 茄子：未接配方」 */
+/** Missing recipe data for an item, e.g. "Side 2 eggplant: no recipe linked" */
 export function itemIssues(item: MenuItem, componentsById: Record<string, Component>, ingredientsById: Record<string, Ingredient>): { label: string; name: string; issue: CostIssue }[] {
   const dishes = itemDishes(item);
   if (dishes.length === 0) return [{ label: tr("組成", "Part"), name: item.name, issue: { kind: "unlinked" } }];
@@ -140,7 +140,7 @@ export function itemIssues(item: MenuItem, componentsById: Record<string, Compon
   });
 }
 
-/** 半成品被哪些品項用到：component_id → 品項清單 */
+/** Which items use each component: component_id → list of items */
 export function componentUsage(items: MenuItem[]): Map<string, MenuItem[]> {
   const map = new Map<string, MenuItem[]>();
   for (const item of items) {
@@ -150,7 +150,7 @@ export function componentUsage(items: MenuItem[]): Map<string, MenuItem[]> {
   return map;
 }
 
-/** 原物料的缺漏標記；unused 只是提醒，不影響成本與叫貨 */
+/** Missing-data flags for an ingredient; unused is only a reminder and does not affect cost or purchasing */
 export function ingredientIssues(ing: Ingredient, usedIngredientIds: Set<string>): { code: "no_price" | "no_supplier" | "unused"; text: string }[] {
   const out: { code: "no_price" | "no_supplier" | "unused"; text: string }[] = [];
   if (!(ing.unit_price > 0)) out.push({ code: "no_price", text: tr("未填單價", "No price") });
@@ -159,17 +159,17 @@ export function ingredientIssues(ing: Ingredient, usedIngredientIds: Set<string>
   return out;
 }
 
-/** 數量顯示：克數大於 1000 換成公斤，其他保留一位小數 */
+/** Quantity display: above 1000 g switch to kg, otherwise keep one decimal place */
 export function amountText(amount: number, unit: string): string {
   if ((unit === "g" || unit === "克") && amount >= 1000) return `${Math.round(amount / 100) / 10} kg`;
   if ((unit === "ml" || unit === "毫升") && amount >= 1000) return `${Math.round(amount / 100) / 10} L`;
   return `${Math.round(amount * 10) / 10}${unit === "g" ? " g" : unit === "ml" ? " ml" : ` ${unit}`}`;
 }
 
-/** 調味料、包材在材料總和裡預設收合（跟 BentoEditor 的 portionTextFor 同一組分類） */
+/** Seasonings and packaging are collapsed by default in the ingredient totals (same categories as portionTextFor in BentoEditor) */
 export const MINOR_CATEGORIES = ["調味", "包材"];
 
-/** 生料需求 → 合成格子的材料（依需要量由多到少；有 stock 就帶現有量） */
+/** Raw needs → materials for the merged grid (sorted by amount needed, descending; includes current stock when present) */
 export function craftItems(needs: Map<string, number>, ingredientsById: Record<string, Ingredient>, stock?: Record<string, number>) {
   return [...needs].flatMap(([id, need]) => {
     const ing = ingredientsById[id];
@@ -179,8 +179,8 @@ export function craftItems(needs: Map<string, number>, ingredientsById: Record<s
 }
 
 /**
- * 上架中品項用到、但還是 AI 草稿（ai_draft，店家還沒按儲存確認）的半成品。
- * 草稿的份量是 AI 估的，備料、叫貨、成本照它算會不準——這些頁面要提醒店家先確認（2026-10-09）。
+ * Components used by listed items that are still AI drafts (ai_draft; the vendor has not saved to confirm them).
+ * Draft portions are AI estimates, so prep, purchasing and cost based on them will be off; those pages should remind the vendor to confirm first (2026-10-09).
  */
 export function aiDraftComponentsInUse(items: MenuItem[], componentsById: Record<string, Component>): { component: Component; items: MenuItem[] }[] {
   const usage = componentUsage(items.filter((i) => i.is_available !== false));

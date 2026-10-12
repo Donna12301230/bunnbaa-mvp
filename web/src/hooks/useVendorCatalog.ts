@@ -3,7 +3,7 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Component, Ingredient, Supplier } from "@/types";
 
-/** 店家的原物料、半成品、小盤商（vendors/{id}/ingredients|components|suppliers，只有店主能讀寫） */
+/** The vendor's ingredients, semi-finished components and small suppliers (vendors/{id}/ingredients|components|suppliers, readable and writable only by the vendor owner) */
 export function useVendorCatalog(vendorId: string | undefined) {
   return useQuery({
     queryKey: ["vendorCatalog", vendorId],

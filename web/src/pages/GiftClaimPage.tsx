@@ -16,8 +16,8 @@ import { tr, loc } from "@/lib/i18n";
 import type { Lock } from "@/types";
 
 /**
- * 接受贈送（原本在舊的 /lock 示範頁，2026-09-30 拆出來）。贈送中的鎖定公開可讀，
- * 收下是 client 直接寫 locks（firestore.rules 檢查 for_gift → locked 並記錄原持有人）。
+ * Accept a gift (split out of the old /lock demo page on 2026-09-30). Locks being gifted are publicly readable;
+ * accepting writes locks directly from the client (firestore.rules checks for_gift → locked and records the original holder).
  */
 export default function GiftClaimPage() {
   const { lockId } = useParams<{ lockId: string }>();
@@ -38,7 +38,7 @@ export default function GiftClaimPage() {
     if (!requireLogin() || !user) return;
     setBusy(true);
     try {
-      // 換掉代領連結，原持有人手上的連結失效
+      // Replace the proxy pickup link so the original holder's link stops working
       await takeOverLock(lockId, user.id, { share_token: newShareToken() });
       setDone(true);
     } catch (err) {

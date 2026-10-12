@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   server: {
-    // 固定 port；被佔用時直接報錯，避免悄悄換 port 後舊分頁連到別的專案
+    // Fixed port; fail if it's taken rather than silently switching ports and leaving old tabs connected to another project
     port: 5300,
     strictPort: true,
   },

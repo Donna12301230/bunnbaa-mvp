@@ -11,15 +11,15 @@ export interface SwitchProps
   onCheckedChange?: (checked: boolean) => void;
   label?: ReactNode;
   description?: ReactNode;
-  /** 切換中（例如等待 API 回應）：thumb 顯示 spinner、暫停互動 */
+  /** Toggling (e.g. waiting for an API response): the thumb shows a spinner and interaction is paused */
   loading?: boolean;
-  /** label 放左側（設定頁常見）或右側（預設） */
+  /** Label on the left (common on settings pages) or the right (default) */
   labelPosition?: 'start' | 'end';
-  /** 僅供預覽頁強制呈現狀態 */
+  /** Only for forcing states on the preview page */
   forceState?: 'hover' | 'focus' | 'active';
 }
 
-/** 即時生效的開關（role="switch"）。需要送出才生效的選項請改用 Checkbox。 */
+/** Switch that takes effect immediately (role="switch"). For options that apply only on submit, use Checkbox. */
 export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch(
   {
     id: idProp,

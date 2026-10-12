@@ -4,12 +4,12 @@ import './Divider.css';
 
 export interface DividerProps extends HTMLAttributes<HTMLDivElement> {
   orientation?: 'horizontal' | 'vertical';
-  /** 中間文字，例如「或」 */
+  /** Text in the middle, e.g. "or" */
   label?: ReactNode;
   variant?: 'solid' | 'dashed';
-  /** 上下（或左右）外距：none 0 / sm 8 / md 16（預設）/ lg 24 */
+  /** Vertical (or horizontal) margin: none 0 / sm 8 / md 16 (default) / lg 24 */
   spacing?: 'none' | 'sm' | 'md' | 'lg';
-  /** 純裝飾時設 true（不會被螢幕閱讀器視為分隔） */
+  /** Set true when purely decorative (screen readers won't treat it as a separator) */
   decorative?: boolean;
 }
 

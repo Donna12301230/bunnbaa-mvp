@@ -6,7 +6,7 @@ import PageHero from "@/components/PageHero";
 import { Button } from "@/components/ui/button";
 import { liveConfig } from "@/lib/platformConfig";
 
-// 合作方案：不收月費，每份餐點抽成（跟平台參數的預設值同一份）
+// Partnership plan: no monthly fee, a commission per meal (same value as the platform settings default)
 const commissionPct = () => Math.round(liveConfig().commissionRate * 1000) / 10;
 
 const benefits = () => [
@@ -36,7 +36,7 @@ const benefits = () => [
   },
 ];
 
-// 廠商申請流程本身在 LoginPage.tsx 的「廠商申請」分頁，這裡只做行銷說明 + 導去登入頁。
+// The vendor application flow itself is the "Vendor application" (廠商申請) tab in LoginPage.tsx; this page is only marketing copy plus a link to the login page.
 export default function JoinUsPage() {
   const [, navigate] = useLocation();
   return (
@@ -60,7 +60,7 @@ export default function JoinUsPage() {
           ))}
         </section>
 
-        {/* 方案：大字價格 */}
+        {/* Plan: large price */}
         <section className="grid gap-8 md:grid-cols-[1fr_1.1fr] items-center rounded-card md:rounded-[3rem] border border-ink bg-accent p-8 md:p-14">
           <div className="space-y-4">
             <h2 className="font-heading text-3xl md:text-4xl font-semibold flex items-center gap-3">

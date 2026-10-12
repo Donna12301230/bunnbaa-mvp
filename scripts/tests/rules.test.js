@@ -1,9 +1,9 @@
-// doc/測試文件.md 第 7 章：Firestore 安全規則負面測試＋相關頁面案例。
-// 用獨立的 demo-rules-test 專案，不動開發用 emulator（bunnbaa-mvp-5474）的資料。
-// 執行：
-//   開發 emulator 已經開著 → cd scripts/tests && npm run test:rules
-//   沒開 → cd scripts/tests && npm run test:rules:exec（自己起一個只有 Firestore 的 emulator）
-// emulator 位址可用 FIRESTORE_EMULATOR_HOST 覆寫（預設 127.0.0.1:8080）。
+// doc/測試文件.md chapter 7: negative tests for the Firestore security rules plus related page cases.
+// Uses a separate demo-rules-test project so the dev emulator's data (bunnbaa-mvp-5474) is untouched.
+// Run:
+//   dev emulator already running → cd scripts/tests && npm run test:rules
+//   not running → cd scripts/tests && npm run test:rules:exec (starts a Firestore-only emulator)
+// Override the emulator address with FIRESTORE_EMULATOR_HOST (default 127.0.0.1:8080).
 const fs = require("node:fs");
 const path = require("node:path");
 const { initializeTestEnvironment, assertFails, assertSucceeds } = require("@firebase/rules-unit-testing");
@@ -30,7 +30,7 @@ const results = [];
   const ADMIN = env.authenticatedContext("admin", tok("suw192336@gmail.com")).firestore();
   const ANON = env.unauthenticatedContext().firestore();
 
-  // 種子資料
+  // Seed data
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     const future = Timestamp.fromMillis(Date.now() + 10 * 86400000);
@@ -152,7 +152,7 @@ const results = [];
   await t("R-29", "未登入可讀 charityMeals、rewardStatus", async () => {
     await assertSucceeds(getDoc(doc(ANON, "charityMeals/cm1"))); await assertSucceeds(getDoc(doc(ANON, "rewardStatus/v1")));
   });
-  // 相關的頁面案例
+  // Related page cases
   await t("C-MY-10a", "已取餐可填回饋一次、第二次不能改", async () => {
     await assertSucceeds(updateDoc(doc(A, "locks/lAfree"), { consumer_feedback: "好吃" }));
     await assertFails(updateDoc(doc(A, "locks/lAfree"), { consumer_feedback: "改" }));
@@ -173,9 +173,9 @@ const results = [];
     await assertSucceeds(updateDoc(doc(ADMIN, "anomalies/a1"), { status: "reviewed", note: "ok" }));
     await assertFails(updateDoc(doc(ADMIN, "anomalies/a1"), { type: "x" }));
   });
-  // 前端實際送出的寫入（MyBookingsPage、TransferMarketPage、ProfilePage、subscription.ts、TasteAndNotifySection）
+  // Writes the frontend actually sends (MyBookingsPage, TransferMarketPage, ProfilePage, subscription.ts, TasteAndNotifySection)
   const seed = (p, data) => env.withSecurityRulesDisabled((c) => setDoc(doc(c.firestore(), p), data));
-  const windowEnd = (daysAhead) => { // MyBookingsPage.pickupWindowEnd：取餐日 13:00（台北）
+  const windowEnd = (daysAhead) => { // MyBookingsPage.pickupWindowEnd: 13:00 (Taipei) on the pickup date
     const d = new Date(Date.now() + daysAhead * 86400000 + 8 * 3600000).toISOString().slice(0, 10);
     return Timestamp.fromDate(new Date(`${d}T13:00:00+08:00`));
   };
@@ -251,11 +251,11 @@ const results = [];
       await seed(`locks/${id}`, base);
       await assertFails(updateDoc(doc(A, `locks/${id}`), { status: "for_resale", resale_price: price, resale_deadline: windowEnd(3) }));
     }
-    // 舊資料沒有 list_price：上限用 locked_price
+    // Older data has no list_price: cap at locked_price
     await seed("locks/lPriceOld", { buyer_uid: "userA", vendor_id: "v1", status: "locked", locked_price: 80 });
     await assertFails(updateDoc(doc(A, "locks/lPriceOld"), { status: "for_resale", resale_price: 81 }));
     await assertSucceeds(updateDoc(doc(A, "locks/lPriceOld"), { status: "for_resale", resale_price: 80 }));
-    // 別人不能改轉讓價
+    // Others can't change the resale price
     await assertFails(updateDoc(doc(B, "locks/lPriceOk"), { resale_price: 1 }));
   });
 

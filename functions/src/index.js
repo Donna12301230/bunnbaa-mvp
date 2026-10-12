@@ -13,19 +13,19 @@ const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./trans
 const { loadPlatformConfig } = require("./config");
 const { commissionOf, revenueOf } = require("./pricing");
 
-// 第一階段規格（doc/BunnBaa 飯飽｜第一階段技術規格1002.md）的功能拆在各模組：
-//   orders.js     下單計價、LINE Pay、截單判定許願、每日備料、QR 取餐、取消退款
-//   charity.js    捐為愛心餐、未取餐轉愛心餐、預約／逾時、報廢登記
-//   rewardsFns.js 回饋池、抽獎券、折價券、異常偵測
-//   purchasing.js 週／月叫貨單、預測、盤點
-//   insights.js   開放許願、口味偏好、區域洞察、Gemini 菜名歸類與配方草稿
-//   disaster.js   颱風警報、停班停課自動退款、菜價變動、等值替換配菜
-// AI 功能（doc/AI功能設計.md）：
-//   menuVision.js        拍照上架菜單（Gemini Vision）
-//   resaleMatch.js       轉讓智慧媒合（Embeddings + Firestore 向量搜尋 → 推播）
-//   shoppingAssistant.js 對話式預購助理（Gemini function calling）
-//   pickupForecast.js    備料頁的預估取餐區間（一般統計，不用 LLM 算數字）
-// 各模組 exports 裡的 Cloud Functions 在檔案最後一次掛上。
+// Phase 1 spec (doc/BunnBaa 飯飽｜第一階段技術規格1002.md) features are split into modules:
+//   orders.js     order pricing, LINE Pay, cut-off wish decisions, daily prep, QR pickup, cancellation refunds
+//   charity.js    donating as charity meals, no-shows to charity meals, reservations/timeouts, waste logging
+//   rewardsFns.js reward pool, draw tickets, coupons, anomaly detection
+//   purchasing.js weekly/monthly supplier orders, forecasts, stocktaking
+//   insights.js   open wishes, taste preferences, area insights, Gemini dish-name classification and recipe drafts
+//   disaster.js   typhoon warnings, automatic refunds on work-suspension days, ingredient price changes, equivalent side substitution
+// AI features (doc/AI功能設計.md):
+//   menuVision.js        list menus from a photo (Gemini Vision)
+//   resaleMatch.js       smart resale matching (Embeddings + Firestore vector search → push)
+//   shoppingAssistant.js conversational pre-order assistant (Gemini function calling)
+//   pickupForecast.js    forecast pickup time ranges on the prep page (plain statistics, no LLM for numbers)
+// The Cloud Functions in each module's exports are all registered at the end of this file.
 
 /* ------------------------------------------------------------------ *
  * 1. Vendor calibration — scheduled, batched per vendor (spec 4.4)
@@ -76,10 +76,10 @@ async function buildVendorHistory(vendorId, { maxPeriods = 14 } = {}) {
     .slice(-maxPeriods);
 }
 
-// Spec ref: README "尚未實作" — reliability_tone was a hand-set field;
+// Spec ref: README "Not yet implemented" — reliability_tone was a hand-set field;
 // this ties it to the same accuracy_rate the calibration report already
 // computes, so the badge on the consumer page stays in sync automatically.
-// accuracy_rate 由 vendorCalibration.calibrationStats 用程式算（不是 LLM），徽章才可信。
+// accuracy_rate is computed in code by vendorCalibration.calibrationStats (not an LLM), so the badge can be trusted.
 const STABLE_ACCURACY_THRESHOLD = 0.8;
 
 async function runCalibrationForVendor(vendorId) {
@@ -90,7 +90,7 @@ async function runCalibrationForVendor(vendorId) {
   }
 
   const report = await generateVendorCalibrationReport({ history });
-  // 英文介面用的譯文；翻譯失敗不影響報告本身
+  // Translation for the English UI; a translation failure doesn't affect the report itself
   let english = {};
   try {
     const [explanationEn, patternNoteEn] = await translateTexts([report.explanation ?? "", report.pattern_note ?? ""]);
@@ -150,20 +150,20 @@ exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request)
   return { report_id: reportId };
 });
 
-// 轉讓市集接手改成付費接手（規格 §4.1）：createResaleLinePayReservation＋confirmLinePayPayment（orders.js）
+// Taking over in the resale market is now a paid takeover (spec §4.1): createResaleLinePayReservation + confirmLinePayPayment (orders.js)
 
 /* ------------------------------------------------------------------ *
  * 1b. Vendor payouts — platform collects, then forwards on a schedule
- * (spec ref: 改造指南 §5.1/§5.4 — "路線 A：平台代收、定期撥款商家").
- * 合作方案 2026-10-05 改版：不收月費，每份餐點實付金額抽成 commissionRate
- * （預設 5%，逐份四捨五入），撥款金額＝實付加總 − 抽成。
+ * (spec ref: refactoring guide §5.1/§5.4 — "Route A: platform collects payments and pays vendors periodically").
+ * Partnership plan revised 2026-10-05: no monthly fee; a commission of commissionRate on the amount paid per meal
+ * (default 5%, rounded per portion); payout amount = total paid − commission.
  * This scaffolds the aggregation + a payout record with mock
- * data; the actual LINE Pay/綠界 payout API call (or, per the doc's own
+ * data; the actual LINE Pay/ECPay payout API call (or, per the doc's own
  * fallback, a manual reconciliation export) isn't wired up yet since
  * there's no merchant account to call it against.
  * ------------------------------------------------------------------ */
 
-/** 這筆訂單要撥給店家的金額（抽成前）：跟營收看板同一套（pricing.js revenueOf） */
+/** Amount to pay the vendor for this order (before commission): same basis as the earnings dashboard (pricing.js revenueOf) */
 const payableOf = (lock) => revenueOf(lock);
 
 async function settleVendorPayout(vendorId) {
@@ -180,9 +180,9 @@ async function settleVendorPayout(vendorId) {
   const unsettled = snap.docs.filter((d) => {
     const data = d.data();
     if (data.payout_settled) return false;
-    // 愛心餐（未取餐轉入或主動捐出）照常計入店家營業額（§7.1）；舊制「未取餐」也是預付不退，2026-10-09 起一樣撥款
+    // Charity meals (from no-shows or voluntary donations) still count toward vendor revenue (§7.1); under the old scheme no-shows were prepaid and non-refundable, and since 2026-10-09 they are paid out the same way
     if (["fulfilled", "resold_and_fulfilled", "charity", "no_show"].includes(data.status)) return true;
-    // 消費者取消只換折價券、不退現金（orders.js cancelForCoupon）：留下的款項也撥給店家，之後由店家兌現那張券
+    // Diner cancellations only get a coupon, no cash refund (orders.js cancelForCoupon): the money kept is also paid to the vendor, who later honors that coupon
     return data.status === "cancelled" && payableOf(data) > 0;
   });
 
@@ -200,13 +200,13 @@ async function settleVendorPayout(vendorId) {
 
   const payoutRef = await db.collection("payouts").add({
     vendor_id: vendorId,
-    amount, // 撥給店家的金額＝實付加總 − 平台抽成
+    amount, // amount paid to the vendor = total paid − platform commission
     gross_amount: gross,
     commission_amount: commission,
     commission_rate: rate,
     lock_ids: lockIds,
     lock_count: lockIds.length,
-    // No LINE Pay/綠界 merchant payout API to call yet, so this is the
+    // No LINE Pay/ECPay merchant payout API to call yet, so this is the
     // manual-reconciliation fallback the doc describes, not a real transfer.
     status: "pending_manual_export",
     created_at: FieldValue.serverTimestamp(),
@@ -260,7 +260,7 @@ exports.askCalibrationScenario = onCall({ region: "asia-east1" }, async (request
     throw new HttpsError("failed-precondition", "No history yet for this vendor");
   }
 
-  // 只回答追問、不重產整份報告（2026-10-09：省一次完整報告的 token）
+  // Only answer the follow-up, don't regenerate the whole report (2026-10-09: saves the tokens of a full report)
   let report;
   try {
     report = await answerCalibrationScenario({ history, question });
@@ -281,9 +281,9 @@ exports.askCalibrationScenario = onCall({ region: "asia-east1" }, async (request
 });
 
 /* ------------------------------------------------------------------ *
- * 3. Consumer discount explanation：2026-10-09 起改成品項頁按需產生
- *    （consumerExplanation.js getDiscountExplanation）。原本的 onLockCreated
- *    每筆訂單都呼叫 Gemini＋翻譯，但沒有畫面顯示，已移除。
+ * 3. Consumer discount explanation: since 2026-10-09 generated on demand on the item page
+ *    (consumerExplanation.js getDiscountExplanation). The old onLockCreated
+ *    called Gemini + translation for every order but nothing displayed it, so it was removed.
  * ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ *
@@ -306,7 +306,7 @@ function translationTrigger(collection) {
     try {
       await translateDoc(after.ref, after.data(), collection);
     } catch (err) {
-      // 翻譯失敗不影響原本的寫入；英文介面會先顯示中文，下次改內容或管理員補翻時再試
+      // A translation failure doesn't affect the original write; the English UI shows Chinese first, and it's retried on the next content change or when an admin backfills translations
       logger.warn(`Translation failed for ${collection}/${after.id}`, err);
     }
   });
@@ -372,14 +372,14 @@ exports.translateAllContent = onCall({ region: "asia-east1", timeoutSeconds: 540
 
 
 /* ------------------------------------------------------------------ *
- * 第一階段規格的各模組
+ * Phase 1 spec modules
  * ------------------------------------------------------------------ */
 for (const mod of [
   "./orders", "./charity", "./rewardsFns", "./purchasing", "./insights", "./disaster",
   "./finance", "./menuVision", "./resaleMatch", "./shoppingAssistant", "./pickupForecast", "./consumerExplanation", "./wallet", "./bigqueryExport", "./demandForecast", "./customerInsights",
 ]) {
   for (const [name, fn] of Object.entries(require(mod))) {
-    // 只掛 Cloud Functions（helpers 等模組內部共用的東西不是函式或沒有 __trigger/run）
+    // Register Cloud Functions only (module-internal shared things like helpers aren't functions or have no __trigger/run)
     if (typeof fn === "function" && (fn.__endpoint || fn.run)) exports[name] = fn;
   }
 }

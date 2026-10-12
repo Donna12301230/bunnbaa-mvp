@@ -3,13 +3,13 @@ import type { ExtraSideChoice, MenuItem, RiceOption, SlotChoice } from "@/types"
 import { authStore } from "@/lib/auth";
 import { vendorBlockedToast } from "@/hooks/useRequireLogin";
 
-// 購物車（存在 localStorage）。第一階段規格：每一行是一份（或多份同樣配置的）便當，
-// 各自帶取餐日期、時段、主菜、配菜選擇（含第四道）、飯量、折價券——可預訂 30 天內，一次結帳可以
-// 跨好幾天，但只能同一家店（折價券只能在發券店家用）。
-// _v3：2026-09-30 改成便當格式，舊版購物車（沒有日期／配菜）直接丟掉。
+// Shopping cart (stored in localStorage). Phase 1 spec: each line is one bento (or several with the same configuration),
+// each with its own pickup date, pickup slot, main dish, side choices (including the fourth side), rice amount and coupon. Bookable up to 30 days ahead; one checkout can
+// span several days, but only one vendor (coupons can only be used at the issuing vendor).
+// _v3: switched to the bento format on 2026-09-30; old carts (no date / sides) are discarded.
 const CART_KEY = "bento_cart_v3";
-// 結帳跳去 LINE Pay 前先清空購物車（付完回來才不會重複下單），但把內容暫存在這裡：
-// 付款取消／失敗回到取消頁時放回購物車，付款成功才丟掉。2026-10-12 修：以前取消付款購物車就沒了。
+// Before checkout redirects to LINE Pay the cart is cleared (so returning after payment can't order twice), but its contents are kept here:
+// they go back into the cart when payment is cancelled or fails and the cancel page loads, and are dropped only on success. Fixed 2026-10-12: cancelling used to lose the cart.
 const PENDING_KEY = "bento_cart_pending_payment";
 
 export interface CartLine {
@@ -19,9 +19,9 @@ export interface CartLine {
   pickupDate: string;
   pickupWindow: string;
   choices: SlotChoice[];
-  mainIndex?: number | null; // 選的主菜（menu_items.mains 的 index）
-  extraSide?: ExtraSideChoice | null; // 第四道：備案或加菜
-  customPicks?: number[]; // 店家自訂欄位：每個欄位選的選項 index
+  mainIndex?: number | null; // chosen main dish (index into menu_items.mains)
+  extraSide?: ExtraSideChoice | null; // fourth side: fallback or extra dish
+  customPicks?: number[]; // vendor custom fields: chosen option index per field
   rice: RiceOption;
   quantity: number;
   note: string;
@@ -44,7 +44,7 @@ function save() {
   try {
     localStorage.setItem(CART_KEY, JSON.stringify(_lines));
   } catch {
-    // 存不了就只在這次瀏覽有效
+    // If it can't be saved, it only lasts for this visit
   }
   _listeners.forEach((fn) => fn());
 }
@@ -61,7 +61,7 @@ export const cartStore = {
   get vendorId() { return _lines[0]?.vendorId ?? null; },
   get count() { return _lines.reduce((s, l) => s + l.quantity, 0); },
 
-  /** 加入一行；別家店的品項會清空購物車（一次只跟一家店預購）。廠商帳號不能下單，回傳 false */
+  /** Add a line; an item from another vendor clears the cart (pre-order from one vendor at a time). Vendor accounts can't order; returns false */
   add(line: Omit<CartLine, "key">): boolean {
     if (authStore.getSnapshot().user?.role === "vendor") {
       vendorBlockedToast();
@@ -89,16 +89,16 @@ export const cartStore = {
     _lines = [];
     save();
   },
-  /** 前往付款前呼叫：暫存這次結帳的內容再清空購物車 */
+  /** Call before going to payment: stash this checkout's contents, then clear the cart */
   stashForPayment(orderId: string) {
     try {
       localStorage.setItem(PENDING_KEY, JSON.stringify({ orderId, lines: _lines }));
     } catch {
-      // 存不了就只是取消後要重新加入購物車
+      // If it can't be stored, the diner just has to re-add items after cancelling
     }
     this.clear();
   },
-  /** 付款取消：把同一筆訂單暫存的內容放回購物車（不給 orderId 就放回最近一筆，例如 LINE Pay 頁面直接關掉沒回到取消頁） */
+  /** Payment cancelled: put the stashed contents for this order back in the cart (without an orderId, restore the latest one, e.g. when the LINE Pay page was closed without reaching the cancel page) */
   restoreAfterCancel(orderId?: string) {
     try {
       const pending = JSON.parse(localStorage.getItem(PENDING_KEY) ?? "null") as { orderId: string; lines: CartLine[] } | null;
@@ -109,10 +109,10 @@ export const cartStore = {
         save();
       }
     } catch {
-      // 讀不到暫存就算了
+      // If the stash can't be read, give up quietly
     }
   },
-  /** 有沒有上次沒付完的暫存（購物車空的時候提示放回） */
+  /** Whether an unpaid checkout is stashed (offered for restore when the cart is empty) */
   get hasPending() {
     try {
       return !!JSON.parse(localStorage.getItem(PENDING_KEY) ?? "null")?.lines?.length;
@@ -120,7 +120,7 @@ export const cartStore = {
       return false;
     }
   },
-  /** 付款成功：丟掉暫存 */
+  /** Payment succeeded: drop the stash */
   discardPending() {
     try {
       localStorage.removeItem(PENDING_KEY);

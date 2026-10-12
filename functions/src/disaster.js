@@ -1,8 +1,8 @@
-// 颱風與天災（規格 §11）。
-// 資料來源：國家災害防救科技中心 CAP Atom feed（彙整中央氣象署、人事行政總處），
-//   停班停課 AlertType=33、颱風 AlertType=5。可用 DISASTER_FEED_BASE 覆寫；抓不到時平台管理者
-//   可在後台手動建立天災事件（備援）。
-// disasterEvents/{id}：type: work_suspension|typhoon_warning|price_spike, counties[], towns[], dates[],
+// Typhoons and disasters (spec §11).
+// Data source: the NCDR (National Science and Technology Center for Disaster Reduction) CAP Atom feed (aggregating the Central Weather Administration and the Directorate-General of Personnel Administration),
+//   work/school suspension AlertType=33, typhoon AlertType=5. Overridable with DISASTER_FEED_BASE; when it can't be fetched, platform admins
+//   can create disaster events manually in the admin console (fallback).
+// disasterEvents/{id}: type: work_suspension|typhoon_warning|price_spike, counties[], towns[], dates[],
 //   source: ncdr|manual, summary, processed, result
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
@@ -29,8 +29,8 @@ function parseEntries(xml) {
 }
 
 /**
- * 「[停班停課通知]臺北市:明天停止上班、停止上課。」→ { county, town, date }
- * 只看「停止上班」（上班族午餐）；只停課不影響。「今天晚上」不影響午餐。
+ * "[停班停課通知]臺北市:明天停止上班、停止上課。" (Taipei: work and school suspended tomorrow) → { county, town, date }
+ * Only "停止上班" (work suspended) matters (office workers' lunches); school-only suspensions don't. "Tonight" (今天晚上) doesn't affect lunch.
  */
 function parseSuspension(entry) {
   const text = entry.summary.replace(/台/g, "臺");
@@ -118,7 +118,7 @@ function vendorAffected(vendor, event) {
   return (event.towns || []).some((x) => addr.includes(x.replace(county, "")) && x.startsWith(county));
 }
 
-/** 重算品項候選菜的份量級距（菜價變動後；只影響未截單日期，已截單的份量已鎖定） */
+/** Recompute portion levels of items' candidate dishes (after ingredient price changes; only dates before cut-off are affected, portions past cut-off are locked) */
 async function recalcPortionLevels(vendorId) {
   const catalog = await loadVendorCatalog(vendorId);
   const batch = db().batch();
@@ -156,7 +156,7 @@ async function processEvent(ref, event) {
           try {
             if (await helpers.cancelAndRefund(doc.ref, "disaster")) {
               result.cancelled++;
-              // 2026-10-09 起退款一律退成平台點數（給付款人），可結帳折抵或到會員中心退回 LINE Pay
+              // Since 2026-10-09 all refunds go to platform points (to the payer), usable at checkout or refundable to LINE Pay from the member center
               const d = doc.data();
               const payer = d.payer_uid || d.buyer_uid;
               await notifyUser(d.buyer_uid, {
@@ -218,7 +218,7 @@ async function processEvent(ref, event) {
   return result;
 }
 
-/** 新事件（自動或手動）→ 處理；退款失敗的會在管理員按「重新處理」時再試 */
+/** New event (automatic or manual) → process it; failed refunds are retried when an admin presses "Reprocess" */
 exports.onDisasterEventWritten = onDocumentWritten({ document: "disasterEvents/{id}", region: REGION }, async (event) => {
   const after = event.data?.after;
   if (!after?.exists) return;
@@ -236,8 +236,8 @@ exports.reprocessDisasterEvent = onCall({ timeoutSeconds: 300 }, async (request)
 });
 
 /**
- * 天災期間等值替換配菜（§11，須事先寫入訂購條款）：已截單的訂單，店家把某道菜換成
- * 等值的另一道，並通知消費者。
+ * Substitute an equivalent side during a disaster (§11; must be stated in the terms of purchase beforehand): for orders past cut-off, the vendor swaps one dish
+ * for another of equal value, and diners are notified.
  */
 exports.substituteDish = onCall({}, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);

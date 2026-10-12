@@ -12,10 +12,10 @@ import { setPendingEdit } from "@/lib/pendingEdit";
 import { tr } from "@/lib/i18n";
 
 /**
- * 菜單的配方完成度＋「AI 一次補完」。菜單頁頂端、採購頁共用。
- * - ready：上架品項中每道菜都有配方、原物料也都有單價（可以算成本）
- * - gapItems：還有菜沒配方的上架品項（AI 補得了）
- * - unpriced：配方齊了但原物料沒單價（AI 補不了，要店家填）
+ * Menu recipe completeness + "AI fill all". Shared by the top of the menu page and the purchasing page.
+ * - ready: every dish in listed items has a recipe and every ingredient has a unit price (cost can be computed)
+ * - gapItems: listed items that still have dishes without recipes (AI can fill these)
+ * - unpriced: recipes complete but ingredients lack unit prices (AI can't fill these; the vendor must)
  */
 export function useRecipeGaps() {
   const { data: vendor } = useMyVendor();
@@ -67,7 +67,7 @@ export const fillingText = (p: { done: number; total: number }) =>
   p.total ? tr(`AI 填寫中 ${p.done}/${p.total}…`, `Filling ${p.done}/${p.total}…`) : tr("AI 準備中…", "Starting…");
 
 /**
- * 取代頂端的警示列：只有一張卡片、一個按鈕。都齊了就不出現（空的就不要出現）。
+ * Replaces the alert bar at the top: a single card with one button. Hidden when everything is complete (don't show anything empty).
  */
 export default function RecipeGapCard() {
   const [, navigate] = useLocation();

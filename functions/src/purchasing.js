@@ -1,10 +1,10 @@
-// 採購與備料兩區（規格 §5）：每週進料（週六 12:00 鎖定）、每日備料（截單後，orders.js）。
-// 米、油、調味料、乾貨、包材等久放品項（frequency: monthly）也併入每週進料，低於安全庫存才列入叫貨單，
-// 一次補足 LONG_LIVED_WEEKS 週的量。每月備料列入第二階段（purchaseLists.type 預留）。
+// Purchasing and prep (spec §5): weekly stock-in (locked Saturday 12:00) and daily prep (after cut-off, orders.js).
+// Long-lived items such as rice, oil, seasonings, dry goods and packaging (frequency: monthly) are folded into the weekly stock-in, added to the supplier order only below safety stock,
+// and topped up with LONG_LIVED_WEEKS weeks' worth at once. Monthly prep is deferred to phase 2 (purchaseLists.type is reserved for it).
 //
-// 進料量 = 已確定用量 + 預測用量 × (1 + 安全庫存) − 目前庫存，依採購單位進位。
-// 預測：過去 4 週同星期幾平均份數，排除停班日、國定假日（店家公休）與店家標記的異常週；
-// 新店家前 4 週用店家自填預估（vendors.forecast_daily: { menu_item_id: 份數 }）。
+// Stock-in amount = confirmed usage + forecast usage × (1 + safety stock) − current stock, rounded up to the purchase unit.
+// Forecast: average portions on the same weekday over the past 4 weeks, excluding work-suspension days, national holidays (vendor closed days) and vendor-flagged anomaly weeks;
+// for a new vendor's first 4 weeks, the vendor's self-reported forecast (vendors.forecast_daily: { menu_item_id: portions }).
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { REGION, db, onCall, FieldValue, callerVendorId, notifyVendor, loadVendorCatalog, forEachVendor } = require("./common");
 const { loadPlatformConfig } = require("./config");
@@ -19,8 +19,8 @@ function safetyRate(vendor, config) {
   return own >= 0 && own <= 1 ? own : config.safetyStockRate;
 }
 
-// 停班日只看這家店的 disaster_dates（停班事件處理時只寫給受影響縣市／區的店）；
-// 不能拿 disasterEvents 全部的日期，否則別縣市停班、颱風警報都會讓這家店被當成沒營業、預測變 0。
+// Work-suspension days come only from this vendor's disaster_dates (suspension events are written only to vendors in the affected counties/districts);
+// we can't use every date in disasterEvents, or suspensions elsewhere and typhoon warnings would make this vendor look closed and zero out its forecast.
 function excludedDates(vendor) {
   const set = new Set([...(vendor.holidays || []), ...(vendor.disaster_dates || [])]);
   for (const week of vendor.anomaly_weeks || []) for (let i = 0; i < 7; i++) set.add(addDays(week, i));
@@ -28,8 +28,8 @@ function excludedDates(vendor) {
 }
 
 /**
- * 各品項在某個星期幾的預測份數：過去 4 週同星期幾平均；歷史不足 4 週時用店家自填預估。
- * 報廢（愛心餐報廢）份數從歷史扣掉，避免下週多做（§7.5）。
+ * Forecast portions per item for a given weekday: average of the same weekday over the past 4 weeks; with under 4 weeks of history, the vendor's self-reported forecast.
+ * Wasted portions (unclaimed charity meals) are subtracted from history so next week isn't overproduced (§7.5).
  */
 async function forecastByWeekday(vendor, referenceMonday) {
   const excluded = excludedDates(vendor);
@@ -70,7 +70,7 @@ async function forecastByWeekday(vendor, referenceMonday) {
   };
 }
 
-/** 預測的「還沒確定」那部分：預測份數扣掉已確定份數，當成預設配菜、一般飯量 */
+/** The "not yet confirmed" part of the forecast: forecast portions minus confirmed portions, treated as default sides and normal rice */
 function forecastLocks(forecast, confirmedCounts) {
   const out = [];
   for (const [itemId, n] of forecast) {
@@ -80,10 +80,10 @@ function forecastLocks(forecast, confirmedCounts) {
   return out;
 }
 
-/** 目前理論庫存：本週盤點值；沒盤點就用上週盤點 + 上週叫貨 − 上週用量，並標示「未盤點」 */
+/** Current theoretical stock: this week's stocktake; without one, last week's stocktake + last week's order − last week's usage, flagged "not counted" */
 async function currentStock(vendorId, weekStart) {
   const vendorRef = db().collection("vendors").doc(vendorId);
-  const countedWeek = addDays(weekStart, -7); // 週六盤點記在「本週」（下週叫貨的前一週）
+  const countedWeek = addDays(weekStart, -7); // the Saturday stocktake is recorded under "this week" (the week before next week's order)
   const inv = await vendorRef.collection("inventory").doc(countedWeek).get();
   if (inv.exists && inv.data().counted) return { stock: new Map(Object.entries(inv.data().counts || {})), counted: true };
   const prevWeek = addDays(countedWeek, -7);
@@ -110,7 +110,7 @@ async function buildWeekly(vendor, weekStart) {
   const excluded = excludedDates(vendor);
   const perDay = [];
   const board = [];
-  const sources = new Map(); // menu_item_id → { confirmed, forecast 份數, confirmedNeeds, forecastNeeds: Map(ingredient_id → 用量) }
+  const sources = new Map(); // menu_item_id → { confirmed, forecast portions, confirmedNeeds, forecastNeeds: Map(ingredient_id → amount) }
   for (const date of days) {
     const snap = await db().collection("locks").where("vendor_id", "==", vendor.id).where("pickup_date", "==", date).get();
     const locks = snap.docs.map((d) => d.data()).filter((l) => ACTIVE_LOCK_STATUSES.includes(l.status));
@@ -121,7 +121,7 @@ async function buildWeekly(vendor, weekStart) {
     const confirmedNeeds = rawNeeds(componentPortions(locks, catalog.itemsById, catalog.componentsById, config), catalog.componentsById, catalog.ingredientsById);
     const forecastNeeds = rawNeeds(componentPortions(predicted, catalog.itemsById, catalog.componentsById, config), catalog.componentsById, catalog.ingredientsById);
     perDay.push({ date, confirmedNeeds, forecastNeeds });
-    // 需求來源：這天每個品項各用掉多少原物料（叫貨頁展開「這週為什麼要這麼多」）
+    // Demand sources: how much of each ingredient each item uses that day (the purchasing page expands "why so much this week")
     for (const [list, kind] of [[locks, "confirmed"], [predicted, "forecast"]]) {
       const byItem = new Map();
       list.forEach((l) => l.menu_item_id && byItem.set(l.menu_item_id, [...(byItem.get(l.menu_item_id) || []), l]));
@@ -147,11 +147,11 @@ async function buildWeekly(vendor, weekStart) {
     const need = byDay.reduce((s, d) => s + d.amount, 0);
     if (need <= 0) continue;
     const have = Math.max(0, Number(stock.get(ing.id)) || 0);
-    // 久放品項：庫存撐得過本週（含安全庫存）就不叫；不夠時一次補 4 週
+    // Long-lived items: don't order if stock lasts the week (including safety stock); when short, top up 4 weeks at once
     if (longLived && have >= need) continue;
     const want = longLived ? need * LONG_LIVED_WEEKS : need;
     const { units, amount } = roundToPurchaseUnit(Math.max(0, want - have), ing);
-    // 分日到貨：只把要叫的量按每日需求比例分配；久放品項週一一次到
+    // Split-day delivery: only the amount to order is split in proportion to daily demand; long-lived items arrive once on Monday
     const scale = need > 0 ? Math.max(0, want - have) / need : 0;
     const deliveries = longLived
       ? [{ date: byDay[0]?.date, units }]
@@ -177,7 +177,7 @@ async function buildWeekly(vendor, weekStart) {
     type: "weekly", week_start: weekStart, safety_rate: safety, lines, board, uncounted: !counted,
     est_total: lines.reduce((s, l) => s + l.est_cost, 0), generated_at: FieldValue.serverTimestamp(),
   });
-  // 週六 12:00 後下週主菜鎖定（§16 暫定：只能等值替換配菜）
+  // After Saturday 12:00 next week's mains are locked (§16 provisional: only equivalent side substitutions allowed)
   await db().collection("vendors").doc(vendor.id).set({ menu_locked_week: weekStart }, { merge: true });
   return { lines: lines.length, uncounted: !counted };
 }
@@ -194,7 +194,7 @@ exports.buildWeeklyPurchase = onSchedule({ schedule: "0 12 * * 6", timeZone: "As
   });
 });
 
-/** 店家在後台按「重新產生」：週叫貨單（預設下週，週六前可先試算） */
+/** Vendor presses "Regenerate" in the vendor portal: weekly supplier order (next week by default; can be trial-run before Saturday) */
 exports.triggerPurchaseListNow = onCall({ timeoutSeconds: 120 }, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const vendor = { id: vendorId, ...(await db().collection("vendors").doc(vendorId).get()).data() };
