@@ -173,7 +173,7 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 - [ ] git 歷史已掃過：沒有服務帳號金鑰或 LINE Pay secret；`AIza…` 是 Firebase Web API key（設計上公開），到 GCP Console 加 HTTP referrer 限制只允許 `bunnbaa-mvp-5474.web.app`
 - [ ] 個資與內部文件：本檔有管理員 Email、成員本名與分工，`ISMS_管理制度文件.md`、`ISO27001_落差分析.md` 也是內部文件——公開前移出 repo 或至少拿掉 Email
 - [ ] `doc/` 的中文規格書、開發指南、`.docx`：移到私人位置，或在 README 註明 "internal notes, in Chinese"
-- [ ] 程式碼註解翻成英文（`claude/amazing-dijkstra-uv5zcu`；只動註解，去掉註解後的程式碼逐 token 比對相同）
+- [x] 程式碼註解翻成英文（`claude/amazing-dijkstra-uv5zcu`，263 個檔案；只動註解，去掉註解後的程式碼逐 token 比對相同；註解裡剩下的中文是程式實際輸出或比對的文字、畫面標籤、品牌名與中文檔名路徑）。**A、B 各自的分支要先合併 master，衝突都只會在註解行**
 - [ ] README 方括號：影片連結、PDF 連結、repo 網址；Functions 數量（README 寫 74，10/12 實數 79）、測試數字
 - [ ] 設成 public
 
