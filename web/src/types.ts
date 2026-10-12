@@ -432,7 +432,9 @@ export interface CharityMeal {
   id: string;
   vendor_id: string;
   vendor_name: string;
+  vendor_name_en?: string;
   vendor_address?: string;
+  vendor_address_en?: string;
   lat: number | null;
   lng: number | null;
   date: string;
@@ -440,6 +442,7 @@ export interface CharityMeal {
   status: "available" | "reserved" | "claimed" | "given" | "wasted";
   pickup_code?: string | null;
   item_name: string;
+  item_name_en?: string;
   sides: string[];
   deadline: unknown;
 }
@@ -450,8 +453,10 @@ export interface CharityReservation {
   meal_id: string;
   vendor_id: string;
   vendor_name: string;
+  vendor_name_en?: string;
   date: string;
   item_name: string;
+  item_name_en?: string;
   status: "reserved" | "claimed" | "expired";
   expires_at: unknown;
 }

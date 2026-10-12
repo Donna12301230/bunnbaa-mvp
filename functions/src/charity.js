@@ -1,7 +1,7 @@
 // No-shows and charity meals (spec §7). Charity meals appear in the "Charity meals" (愛心餐) tab of the resale market (user decision, 2026-09-30).
 //
 // charityMeals/{id} (publicly readable, no personal data at all):
-//   vendor_id, vendor_name, lat, lng, date, source: noshow|donated, status: available|reserved|claimed|given|wasted,
+//   vendor_id, vendor_name, vendor_address (+ *_en English copies), lat, lng, date, source: noshow|donated, status: available|reserved|claimed|given|wasted,
 //   pickup_code (label number on the bento box, so the vendor can find it), item_name, sides[], deadline (Timestamp)
 // charityReservations/{id} (readable by the owner, stored separately from locks, kept for 30 days):
 //   user_id, meal_id, vendor_id, date, status: reserved|claimed|expired, expires_at, qr_nonce
@@ -22,6 +22,9 @@ function mealFromLock(lockId, lock, vendor, source, deadline) {
     vendor_id: lock.vendor_id,
     vendor_name: vendor.name || "",
     vendor_address: vendor.address || "",
+    // English copies for the English UI (translate.js); empty when the vendor or order wasn't translated yet
+    vendor_name_en: vendor.name_en || "",
+    vendor_address_en: vendor.address_en || "",
     lat: Number.isFinite(vendor.lat) ? vendor.lat : null,
     lng: Number.isFinite(vendor.lng) ? vendor.lng : null,
     date: lock.pickup_date,
@@ -30,6 +33,7 @@ function mealFromLock(lockId, lock, vendor, source, deadline) {
     lock_id: lockId, // for backend reconciliation only; not shown on public pages
     pickup_code: lock.pickup_code || null,
     item_name: lock.item_name,
+    item_name_en: lock.item_name_en || "",
     sides: [
       ...(lock.slots || []).filter((s) => !s.removed).map((s) => s.resolved || s.default_dish),
       lock.extra_side?.mode === "addon" ? lock.extra_side.resolved || lock.extra_side.dish : null,
@@ -224,8 +228,8 @@ exports.reserveCharity = onCall({}, async (request) => {
     const expiresAt = Math.min(Date.now() + config.charityReserveMinutes * 60000, deadline);
     tx.update(mealRef, { status: "reserved", reservation_id: resRef.id });
     tx.set(resRef, {
-      user_id: uid, meal_id: mealRef.id, vendor_id: meal.vendor_id, vendor_name: meal.vendor_name, date: today,
-      item_name: meal.item_name, status: "reserved", expires_at: Timestamp.fromMillis(expiresAt), created_at: FieldValue.serverTimestamp(),
+      user_id: uid, meal_id: mealRef.id, vendor_id: meal.vendor_id, vendor_name: meal.vendor_name, vendor_name_en: meal.vendor_name_en || "", date: today,
+      item_name: meal.item_name, item_name_en: meal.item_name_en || "", status: "reserved", expires_at: Timestamp.fromMillis(expiresAt), created_at: FieldValue.serverTimestamp(),
     });
     return expiresAt;
   });

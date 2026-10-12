@@ -12,7 +12,7 @@ import { EmptyState, Tag } from "@/components/ds";
 import PickupQr from "@/components/PickupQr";
 import { currentPosition, decodeGeohash, distanceMeters, formatDistance, walkMinutes } from "@/lib/geo";
 import { todayStr } from "@/lib/pickupSlots";
-import { tr } from "@/lib/i18n";
+import { tr, loc, useI18n } from "@/lib/i18n";
 import { liveConfig } from "@/lib/platformConfig";
 import { policy } from "@/lib/policy";
 import type { CharityMeal, CharityReservation } from "@/types";
@@ -44,6 +44,7 @@ export default function CharityMealsSection() {
   const [busy, setBusy] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const today = todayStr();
+  const { lang } = useI18n();
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000);
@@ -87,7 +88,7 @@ export default function CharityMealsSection() {
     const map = new Map<string, { vendor_id: string; name: string; address?: string; lat: number | null; lng: number | null; available: CharityMeal[]; deadline: number }>();
     for (const m of meals) {
       if (millis(m.deadline) <= now) continue;
-      const g = map.get(m.vendor_id) ?? { vendor_id: m.vendor_id, name: m.vendor_name, address: m.vendor_address, lat: m.lat, lng: m.lng, available: [], deadline: millis(m.deadline) };
+      const g = map.get(m.vendor_id) ?? { vendor_id: m.vendor_id, name: loc(m, "vendor_name"), address: loc(m, "vendor_address"), lat: m.lat, lng: m.lng, available: [], deadline: millis(m.deadline) };
       if (m.status === "available") g.available.push(m);
       map.set(m.vendor_id, g);
     }
@@ -95,7 +96,7 @@ export default function CharityMealsSection() {
       .map((g) => ({ ...g, distance: distanceMeters(here, g) }))
       .filter((g) => g.available.length > 0 && (!here || g.distance <= range))
       .sort((a, b) => a.distance - b.distance);
-  }, [meals, here, range, now]);
+  }, [meals, here, range, now, lang]);
 
   const activeReservation = mine.find((r) => r.status === "reserved" && millis(r.expires_at) > now);
 
@@ -130,7 +131,7 @@ export default function CharityMealsSection() {
 
       {activeReservation && (
         <div className="rounded-card bg-card border-2 border-ink p-5 max-w-sm">
-          <p className="font-semibold">{tr("你的愛心餐預約", "Your reservation")}：{activeReservation.vendor_name}</p>
+          <p className="font-semibold">{tr("你的愛心餐預約", "Your reservation")}：{loc(activeReservation, "vendor_name")}</p>
           <p className="text-xs text-muted-foreground">
             {tr(`請在 ${new Date(millis(activeReservation.expires_at)).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })} 前到場`, `Arrive by ${new Date(millis(activeReservation.expires_at)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`)}
           </p>
@@ -165,7 +166,7 @@ export default function CharityMealsSection() {
                   <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {tr(`${minutesLeft} 分後截止`, `closes in ${minutesLeft} min`)}</span>
                   {walk !== null && <span className="flex items-center gap-1"><Footprints className="w-3.5 h-3.5" /> {formatDistance(g.distance)}{tr("・", " · ")}{tr(`步行 ${walk} 分`, `${walk} min walk`)}</span>}
                 </div>
-                <p className="text-xs text-muted-foreground line-clamp-2">{g.available.slice(0, 3).map((m) => m.item_name).join("、")}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2">{g.available.slice(0, 3).map((m) => loc(m, "item_name")).join(tr("、", ", "))}</p>
                 {tooFar && <span className="text-xs font-semibold text-danger-text">{tr("來不及（步行時間超過剩餘時間）", "Too far to make it in time")}</span>}
                 <Button size="sm" className="mt-auto" disabled={!!activeReservation || busy === g.vendor_id || tooFar} onClick={() => reserve(g.vendor_id)}>
                   {busy === g.vendor_id ? tr("預約中…", "Reserving…") : tr("預約一份", "Reserve one")}
