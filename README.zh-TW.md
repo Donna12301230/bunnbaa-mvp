@@ -35,6 +35,17 @@
 
 ---
 
+## 畫面
+
+消費者端（手機）與商家後台，英文介面。在本機 emulator 用示範資料截的，所以店名、菜名還沒翻譯；正式站上由 Gemini 自動翻成英文。
+
+<p>
+  <img src="assets/screenshots/diner-home.png" alt="Diner home" width="190">
+  <img src="assets/screenshots/diner-today.png" alt="Pre-order with early-bird prices" width="190">
+  <img src="assets/screenshots/diner-resale-market.png" alt="Resale market" width="190">
+</p>
+<p><img src="assets/screenshots/vendor-dashboard.png" alt="Vendor portal overview" width="780"></p>
+
 ## 要解決的問題
 
 學校和辦公區附近的小吃店，要在有人點餐之前就先叫貨。估太多，食材只能丟掉；估太少，客人買不到。顧客每天排隊，不保證買得到，也沒有因為早決定而得到好處。就算是已經付款的餐，只要訂的人臨時有事，別人也不知道有這份餐可以接手，最後還是浪費。

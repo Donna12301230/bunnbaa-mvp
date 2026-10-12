@@ -35,6 +35,17 @@ Payments run in the LINE Pay **sandbox**, so no real money moves.
 
 ---
 
+## Screenshots
+
+Diner app (mobile) and vendor portal, English UI. Taken on the local emulators with seeded demo data, so vendor and dish names are not translated yet; on production they are translated by Gemini.
+
+<p>
+  <img src="assets/screenshots/diner-home.png" alt="Diner home" width="190">
+  <img src="assets/screenshots/diner-today.png" alt="Pre-order with early-bird prices" width="190">
+  <img src="assets/screenshots/diner-resale-market.png" alt="Resale market" width="190">
+</p>
+<p><img src="assets/screenshots/vendor-dashboard.png" alt="Vendor portal overview" width="780"></p>
+
 ## The problem
 
 Small eateries near campuses and offices buy ingredients before anyone orders. If they guess high, food gets thrown away. If they guess low, customers get turned away. Diners queue every day with no guaranteed meal and no reward for deciding early. Even a prepaid meal goes to waste when its owner's plans change, because nobody else knows it is available.
