@@ -21,8 +21,8 @@ import { itemWindows, nextAvailablePickup, setPreferredPickup } from "@/lib/pick
 import type { MealPlan, MenuItem, RewardStatus, Vendor } from "@/types";
 
 /**
- * 我的最愛（§4.5）：收藏的店家依收藏時間排序（新的在前），每家列出可預購品項與計畫。
- * 僅本人可讀（firestore.rules users/{uid}/favorites）。
+ * Favorites (§4.5): favorited vendors sorted by when they were favorited (newest first), each listing its pre-orderable items and meal plans.
+ * Readable only by the owner (firestore.rules users/{uid}/favorites).
  */
 export default function FavoritesPage() {
   const { t } = useI18n();
@@ -41,7 +41,7 @@ export default function FavoritesPage() {
     return () => unsub();
   }, []);
 
-  // Firestore 的 in 查詢一次最多 30 個值，分批查
+  // Firestore "in" queries take at most 30 values, so query in batches
   const { data: catalog } = useQuery({
     queryKey: ["favoriteCatalog", key],
     queryFn: async () => {

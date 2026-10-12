@@ -1,8 +1,8 @@
 import { tr } from "@/lib/i18n";
 
-// 成長獎勵券種（規格 §8.3）與分配演算法（§8.4），跟 functions/src/rewards.js 同一份，
-// 這裡只給商家後台試算與前台顯示用。
-// 第一階段只保留 3 種（免費餐券、半價券、保底九五折）；一折、三折、八折券列入後續改版。
+// Growth reward coupon types (spec §8.3) and allocation algorithm (§8.4), shared with functions/src/rewards.js;
+// used here only for vendor portal simulations and diner-facing display.
+// Phase one keeps only 3 types (free meal, half price, guaranteed 5% off); 90%, 70% and 20% off coupons are planned for a later release.
 export const COUPON_TIERS = [
   { code: "free", label: "免費餐券", labelEn: "Free meal", discount: 100, cost: 95, weight: 0.3 },
   { code: "t50", label: "半價券", labelEn: "Half price", discount: 50, cost: 45, weight: 0.7 },
@@ -11,13 +11,13 @@ export const BASE_TIER = { code: "t95", label: "九五折券", labelEn: "5% off"
 export const ALL_TIERS = [...COUPON_TIERS, BASE_TIER];
 
 export function tierLabel(code: string): string {
-  // 取消訂單退的折價券（functions/src/orders.js cancelForCoupon），不經回饋池
+  // Coupon refunded on order cancellation (cancelForCoupon in functions/src/orders.js); does not go through the reward pool
   if (code === "refund") return tr("取消補償券", "Cancellation coupon");
   const t = ALL_TIERS.find((x) => x.code === code);
   return t ? tr(t.label, t.labelEn) : code;
 }
 
-/** 前台主標「折 N 元」（1002 規格 §8.3），副標是券名 */
+/** Diner-facing headline "折 N 元" (N dollars off, 1002 spec §8.3); the subtitle is the coupon name */
 export function couponTitle(discount: number): string {
   return tr(`折 ${discount} 元`, `NT$${discount} off`);
 }
@@ -56,7 +56,7 @@ export function allocatePool(pool: number, tickets: number) {
   return { counts, spent: P - remaining, leftover: remaining };
 }
 
-/** 開池進度（0–100）：累積淨營業額 ÷ 開池門檻。舊的 rewardStatus 沒有營業額欄位時用「還差多少」回推 */
+/** Pool opening progress (0–100): cumulative net revenue ÷ opening threshold. Older rewardStatus docs without a revenue field are back-calculated from the remaining amount */
 export function openProgress(st: { revenue_so_far?: number; min_revenue?: number; amount_to_open: number }, fallbackMin = 10000): number {
   const min = st.min_revenue ?? fallbackMin;
   const so = st.revenue_so_far ?? Math.max(0, min - st.amount_to_open);

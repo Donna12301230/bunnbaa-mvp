@@ -56,7 +56,7 @@ import { DEFAULT_SITE_LOOK, useSiteLook } from '@/lib/siteLook';
 import './DesignSystemPreview.css';
 
 /* ══════════════════════════════════════════════════════════════════════════
-   資料
+   Data
    ══════════════════════════════════════════════════════════════════════════ */
 
 const SECTIONS = [
@@ -232,7 +232,7 @@ const BADGE_TONES: { tone: BadgeTone; label: string }[] = [
 ];
 
 /* ══════════════════════════════════════════════════════════════════════════
-   小工具
+   Helpers
    ══════════════════════════════════════════════════════════════════════════ */
 
 function luminance(hex: string) {
@@ -250,7 +250,7 @@ function contrastRatio(a: string, b: string) {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-/** 讀取目前主題下 token 的實際值（切換深色模式時會重讀） */
+/** Reads the actual token values for the current theme (re-read when dark mode toggles) */
 function useTokenReader(theme: string) {
   const ref = useRef<HTMLDivElement>(null);
   const [, force] = useState(0);
@@ -308,7 +308,7 @@ function Guidelines({ dos, donts }: { dos: string[]; donts?: string[] }) {
   );
 }
 
-/** 狀態矩陣：每列一種變體，每欄一種狀態 */
+/** State matrix: one variant per row, one state per column */
 function StateMatrix({
   rows,
   states = STATES,
@@ -352,7 +352,7 @@ const forced = (s: PreviewState) => (s === 'hover' || s === 'active' || s === 'f
 const forcedField = (s: PreviewState) => (s === 'hover' || s === 'focus' ? s : undefined);
 
 /* ══════════════════════════════════════════════════════════════════════════
-   區塊
+   Sections
    ══════════════════════════════════════════════════════════════════════════ */
 
 function ColorSection({ read }: { read: (t: string) => string }) {
@@ -1426,7 +1426,7 @@ function ShowcaseSection() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   頁面
+   Page
    ══════════════════════════════════════════════════════════════════════════ */
 
 export default function DesignSystemPreview() {
@@ -1437,7 +1437,7 @@ export default function DesignSystemPreview() {
       return 'light';
     }
   });
-  // 風格切換的是整站狀態（外層 SiteThemeRoot 與 <html>），離開本頁時還原預設
+  // The look switch changes site-wide state (the outer SiteThemeRoot and <html>); restore the default when leaving this page
   const { look, setLook } = useSiteLook();
   useEffect(() => () => setLook(DEFAULT_SITE_LOOK), [setLook]);
   const { ref, read } = useTokenReader(`${theme}-${look}`);
@@ -1446,7 +1446,7 @@ export default function DesignSystemPreview() {
     try {
       localStorage.setItem('bb-ds-theme', theme);
     } catch {
-      /* 無痕模式等情況，忽略 */
+      /* Private mode and similar cases; ignore */
     }
   }, [theme]);
 

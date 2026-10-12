@@ -70,7 +70,7 @@ export default function HomePage() {
   const { t } = useI18n();
   const [location, navigate] = useLocation();
   const { add: addToCart, vendorId: cartVendorId } = useCart();
-  // 第二排「單點｜方案」是兩個獨立頁面（/home、/plans）
+  // The second row "À la carte | Meal plans" is two separate pages (/home, /plans)
   const mode: "single" | "plans" = location.startsWith("/plans") ? "plans" : "single";
   const [period, setPeriod] = useState<MealPeriod>("lunch");
   const [pickupDate, setPickupDate] = useState(() => nextAvailablePickup()?.date ?? addDaysStr(todayStr(), 1));
@@ -79,7 +79,7 @@ export default function HomePage() {
   const requireLogin = useRequireLogin();
   const searchQuery = useSearchQuery();
   const searching = searchQuery.trim().length > 0;
-  // 加入計畫確認視窗：開始日期＋時段由消費者選，送伺服器排日期、收款
+  // Join-meal-plan confirmation dialog: the diner picks the start date and pickup slot; the server schedules the dates and takes payment
   const [planDialog, setPlanDialog] = useState<{ plan: MealPlan; vendor: Vendor; item: MenuItem | null } | null>(null);
   const [planUsePoints, setPlanUsePoints] = useState(true);
   const { balance: pointBalance } = useWallet();
@@ -95,7 +95,7 @@ export default function HomePage() {
     return () => unsub();
   }, []);
 
-  // 成長獎勵公開進度（「再 X 元開獎」寫在店家卡片的「看店家」前面）
+  // Public growth reward progress ("N more dollars until the draw" shows before "View vendor" on the vendor card)
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "rewardStatus"), (snap) => {
       setRewardStatuses(new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() } as RewardStatus])));
@@ -160,7 +160,7 @@ export default function HomePage() {
   const area = useSelectedArea();
   const bookableDates = useMemo(() => bookableDateRange(), []);
 
-  // 餐期按鈕：沒有任何品項供應的變灰
+  // Meal period buttons: grayed out when no item is offered
   const periodAvailable = useMemo(() => {
     const set = new Set<MealPeriod>();
     for (const { item, vendor } of lockMealCards) for (const p of MEAL_PERIODS) if (servesPeriod(vendor, item, p)) set.add(p);
@@ -170,7 +170,7 @@ export default function HomePage() {
     if (periodAvailable.size > 0 && !periodAvailable.has(period)) setPeriod(MEAL_PERIODS.find((p) => periodAvailable.has(p)) ?? "lunch");
   }, [periodAvailable, period]);
 
-  /** 品項在目前餐期、選的日期能不能訂；搜尋時只要 30 天內任何一天能訂就算（只搜目前可預購的） */
+  /** Whether an item can be ordered for the current meal period and selected date; when searching, any orderable day within 30 days counts (search only covers what can currently be pre-ordered) */
   const itemOpen = (vendor: Vendor, item: MenuItem | null) =>
     searching
       ? bookableDates.some((d) => openWindowsOn(vendor, d, new Date(), item, period).length > 0)
@@ -221,7 +221,7 @@ export default function HomePage() {
 
   const visibleTransfers = transfers.filter((x) => !area || vendorInArea(vendors.find((v) => v.id === x.vendor_id), area));
 
-  // 便當要選主菜、配菜、飯量，帶著選好的日期與餐期到品項頁組便當再加入購物車（規格 §4.2）
+  // Bentos need a main, sides and rice amount: go to the item page with the chosen date and meal period to build the bento, then add it to the cart (spec §4.2)
   function openItem(item: MenuItem, vendor: Vendor) {
     const date = searching ? bookableDates.find((d) => openWindowsOn(vendor, d, new Date(), item, period).length > 0) ?? pickupDate : pickupDate;
     const windows = openWindowsOn(vendor, date, new Date(), item, period);
@@ -235,8 +235,8 @@ export default function HomePage() {
     navigate(`/item/${item.id}`);
   }
 
-  // 全站「加入購物車」統一行為（跟 VendorPage.tsx 的 quickAdd 同一套邏輯）：
-  // 便當、有主菜可選的要組，跳到品項頁；單品用選好的日期＋這個餐期最早的時段直接加入，不用跳頁。
+  // Site-wide "Add to cart" behavior (same logic as quickAdd in VendorPage.tsx):
+  // bentos and items with a choice of main need building, so go to the item page; single items are added directly with the chosen date + the earliest slot of this meal period, no page change.
   function quickAdd(item: MenuItem, vendor: Vendor) {
     const date = searching ? bookableDates.find((d) => openWindowsOn(vendor, d, new Date(), item, period).length > 0) ?? pickupDate : pickupDate;
     const window = openWindowsOn(vendor, date, new Date(), item, period)[0];
@@ -256,7 +256,7 @@ export default function HomePage() {
     notifyCartAdded();
   }
 
-  // 計畫（§4.4）：下單時選第一天＋一個時段套用每一天，每天各自算早鳥、遇公休順延；之後到「我的餐點」個別改時段
+  // Meal plans (§4.4): at checkout pick the first day + one pickup slot applied to every day; each day gets its own early-bird price and closed days are pushed back; slots can be changed per day later in "My meals"
   function openPlanDialog(vendor: Vendor, plan: MealPlan) {
     if (!requireLogin() || !uid) return;
     if (isOrderBanned) {
@@ -292,7 +292,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <MarketplaceHeader active="plans" />
 
-      {/* ── 頁首 ── */}
+      {/* ── Header ── */}
       <section className="max-w-[1400px] mx-auto px-4 md:px-6 pt-10 md:pt-14 pb-2 flex flex-wrap items-end justify-between gap-6 bb-home-hero">
         <div className="min-w-0">
           <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground mb-4">
@@ -317,7 +317,7 @@ export default function HomePage() {
       </section>
 
       <main className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 space-y-8">
-        {/* ── 第一排：餐期；第二排：單點｜方案 ── */}
+        {/* ── Row 1: meal period; row 2: à la carte | meal plans ── */}
         <div className="space-y-3">
           <div className="flex gap-2 flex-wrap" role="tablist" aria-label={t("餐期", "Meal")}>
             {MEAL_PERIODS.map((p) => {
@@ -379,7 +379,7 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* ── 搜尋結果提示 ── */}
+        {/* ── Search results notice ── */}
         {searching && (
           <div className="flex items-center gap-2 rounded-2xl border border-ink bg-card px-4 py-3 text-sm">
             <Search className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
@@ -393,14 +393,14 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ── 價格日期列：全站選日期只用這一種 ── */}
+        {/* ── Price/date bar: the only date picker used site-wide ── */}
         {!searching && (
           <div className="rounded-2xl border border-ink bg-card p-4">
             <PriceDateStrip value={pickupDate} onChange={setPickupDate} />
           </div>
         )}
 
-        {/* ── 單點 ── */}
+        {/* ── À la carte ── */}
         {(mode === "single" || searching) && (
           <section className="space-y-4">
             <h2 className="font-heading text-3xl font-semibold">
@@ -448,7 +448,7 @@ export default function HomePage() {
                                   )}
                                 </span>
                               </button>
-                              {/* 全站統一的「加入購物車」動作（跟商家頁同一顆圓形 + 圖示）：便當類點了會跳去組便當，單品直接加進購物車 */}
+                              {/* Site-wide "Add to cart" action (same round + icon as the vendor page): bentos go to the bento builder, single items go straight into the cart */}
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); quickAdd(item, vendor); }}
@@ -479,7 +479,7 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* ── 方案 ── */}
+        {/* ── Meal plans ── */}
         {(mode === "plans" || searching) && (
           <section className="space-y-4">
             <h2 className="font-heading text-3xl font-semibold">
@@ -528,7 +528,7 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* 加入計畫確認：列出每天日期與價格（順延的標示），所有天數同一時段、之後可個別修改，確認後才付款 */}
+        {/* Join-meal-plan confirmation: lists each day's date and price (pushed-back days are marked); every day uses the same slot, editable individually later; payment only after confirming */}
         <Dialog open={!!planDialog} onOpenChange={(open) => { if (!open && !joiningPlan) setPlanDialog(null); }}>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
             {planDialog && (() => {
@@ -612,7 +612,7 @@ export default function HomePage() {
           </DialogContent>
         </Dialog>
 
-        {/* 同學轉讓（轉讓市集併入「我的餐點」，這裡只放預覽） */}
+        {/* Student resales (the resale market is merged into "My meals"; only a preview here) */}
         {mode === "single" && !searching && (
           <section className="rounded-card p-6 md:p-10 bg-[var(--surface-inverse)] text-[var(--text-on-inverse)] space-y-6">
             <div className="flex items-center justify-between gap-6 flex-wrap">

@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// 平台全域參數（規格 §2），跟 functions/src/config.js 的預設值同一份，要改兩邊一起改。
-// 實際值存在 platformConfig/global（管理後台「平台參數」可改），缺的欄位用預設。
+// Platform-wide settings (spec §2). Defaults are shared with functions/src/config.js; change both together.
+// Live values are in platformConfig/global (editable in the admin console's "Platform settings"); missing fields fall back to defaults.
 export const DEFAULT_PLATFORM_CONFIG = {
   businessWeekdays: [1, 2, 3, 4, 5],
   mealPeriods: { breakfast: "06:00-10:30", lunch: "10:30-14:00", dinner: "16:30-20:00" },
@@ -43,8 +43,8 @@ export const DEFAULT_PLATFORM_CONFIG = {
 export type PlatformConfig = typeof DEFAULT_PLATFORM_CONFIG;
 type ScalarKey = { [K in keyof PlatformConfig]: PlatformConfig[K] extends number | string ? K : never }[keyof PlatformConfig];
 
-/** 管理後台參數表用：每個參數的中英文名稱與店家可不可調（規格 §2 表格） */
-// label／unit／vendorAdjustable 是中文，*En 是英文介面用；顯示時用 tr(f.label, f.labelEn) 在 render 當下挑語言。
+/** For the admin console settings table: each setting's Chinese/English name and whether vendors can adjust it (spec §2 table) */
+// label/unit/vendorAdjustable are Chinese, *En are for the English UI; pick the language at render time with tr(f.label, f.labelEn).
 export const PLATFORM_CONFIG_FIELDS: { key: ScalarKey; label: string; labelEn: string; unit?: string; unitEn?: string; vendorAdjustable?: string; vendorAdjustableEn?: string }[] = [
   { key: "pickupWindow", label: "取餐時段（預設）", labelEn: "Pickup window (default)", vendorAdjustable: "可調時段，不可超過 2 小時", vendorAdjustableEn: "Adjustable, max 2 hours" },
   { key: "cutoffTime", label: "每日截單（前一天）", labelEn: "Daily order cutoff (day before)", vendorAdjustable: "可提前，不可延後", vendorAdjustableEn: "Can be earlier, not later" },
@@ -70,9 +70,9 @@ export const PLATFORM_CONFIG_FIELDS: { key: ScalarKey; label: string; labelEn: s
   { key: "commissionRate", label: "平台抽成比例（每份餐點實付金額的）", labelEn: "Platform commission rate (of each meal's paid amount)" },
 ];
 
-// 目前生效的平台參數（2026-10-09）：App 啟動時讀一次 platformConfig/global 存在這裡，
-// 截單、營業日、可訂天數、加飯價等純函式（pickupSlots.ts、bento.ts）用 liveConfig() 取值，
-// 管理員在後台改了參數，前端畫面就會跟伺服器一致。讀到之前用預設值。
+// Currently active platform settings (2026-10-09): the app reads platformConfig/global once at startup and stores it here.
+// Pure functions for cut-off, business days, bookable days, rice surcharge, etc. (pickupSlots.ts, bento.ts) read it via liveConfig(),
+// so when an admin changes settings in the console, the frontend matches the server. Defaults are used until it loads.
 let live: PlatformConfig = DEFAULT_PLATFORM_CONFIG;
 export function liveConfig(): PlatformConfig {
   return live;

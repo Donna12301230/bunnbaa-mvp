@@ -21,19 +21,19 @@ import { useVendors } from "@/hooks/useVendors";
 import SiteFooter from "@/components/SiteFooter";
 
 /**
- * 品牌形象頁（#/、#/landing）
- * 2026-10-01 改版：以 Awwwards／FWA 等級的編輯式版面為目標——
- *   Hero 直接放大標語＋真實餐點照片拼貼，第一眼就看到品牌與產品；
- *   品牌故事改成捲動逐字點亮的深棕色帶；新增「怎麼運作」四步驟、
- *   可拖曳的「早鳥試算」（直接讀 lib/pricing 的級距，跟下單算價同一套規則）、
- *   收尾的大型 CTA。所有動態都尊重 prefers-reduced-motion。
- * 資料全部是真實 Firestore 內容（menu_items／vendors／reviews／landing_events），沒有就優雅地收起該區。
+ * Brand page (#/, #/landing)
+ * 2026-10-01 redesign: aiming for an Awwwards/FWA-level editorial layout:
+ *   the hero shows an enlarged tagline + a collage of real meal photos, so brand and product are seen at first glance;
+ *   the brand story becomes a dark brown band lit up word by word on scroll; adds a four-step "How it works",
+ *   a draggable "Early-bird calculator" (reads the tiers from lib/pricing directly, same rules as checkout pricing),
+ *   and a large closing CTA. All motion respects prefers-reduced-motion.
+ * All data is real Firestore content (menu_items / vendors / reviews / landing_events); a section collapses gracefully when it has none.
  */
 
 type Bi = { zh: string; en: string };
 const pick = (text: Bi, lang: Lang) => text[lang];
 
-// 跑馬燈：規則數字讀平台參數（lib/policy.ts），切換語言時重新產生
+// Marquee: rule numbers come from platform settings (lib/policy.ts) and are regenerated when the language switches
 const ticker = (): Bi[] => {
   const c = liveConfig();
   const [near, far] = EARLY_BIRD_TIERS;
@@ -46,17 +46,17 @@ const ticker = (): Bi[] => {
   ];
 };
 
-// 早鳥最高折扣（預訂 30 天內的階梯），跟 lib/pricing 同一套級距與四捨五入
+// Maximum early-bird discount (tiers for bookings within 30 days), same tiers and rounding as lib/pricing
 const BEST_EARLY_BIRD = Math.max(...EARLY_BIRD_TIERS.map((t) => t.discountPercent));
 const earlyBird = (price: number, pct = BEST_EARLY_BIRD) => Math.round(price * (1 - pct / 100));
 const discountFor = (days: number) => EARLY_BIRD_TIERS.find((t) => days >= t.minDays && days <= t.maxDays)?.discountPercent ?? 0;
 const MENU_TAB_LIMIT = 5;
 const MENU_ITEMS_PER_TAB = 4;
 
-// 預訂開放範圍：最遠提前 30 天（規格 §2，跟 lib/pickupSlots 同一個參數）
+// Booking window: up to 30 days ahead (spec §2, same setting as lib/pickupSlots)
 const maxAdvanceDays = () => liveConfig().bookingRangeDays;
 
-// 近期活動讀 landing_events（管理員在 Firestore 維護），icon 存成字串 key
+// Upcoming events come from landing_events (maintained by admins in Firestore); icon is stored as a string key
 const EVENT_ICONS: Record<string, ReactNode> = {
   sparkle: <Sparkle />,
   calendar: <CalendarClock />,
@@ -71,7 +71,7 @@ interface LandingEvent {
   date_label: string;
   title: string;
   body: string;
-  // 英文版文案（選填，沒有就顯示中文）
+  // English copy (optional; falls back to Chinese when missing)
   date_label_en?: string;
   title_en?: string;
   body_en?: string;
@@ -83,19 +83,19 @@ interface LandingEvent {
 
 const GALLERY_SHAPES = ["rounded", "circle", "arch", "rounded", "circle", "arch"] as const;
 
-// 同學評價：讀 reviews 裡有公開心得、4 星以上的最近幾則
+// Student reviews: the latest few from reviews with a public comment and 4+ stars
 const REVIEW_LIMIT = 5;
 
-// ── 動態工具 ───────────────────────────────────────────────────────────────
+// ── Motion helpers ─────────────────────────────────────────────────────────
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 /**
- * 進場動畫：root 底下所有 [data-reveal] 捲進畫面時加上 .is-in。
- * 用 MutationObserver 接住資料載入後才出現的節點；只在 root 加上 .lp-motion 後才會先藏起來，
- * 所以 JS 沒跑、縮圖擷取、reduced-motion 時內容一律直接可見。
+ * Entrance animation: adds .is-in to every [data-reveal] under root as it scrolls into view.
+ * A MutationObserver catches nodes that appear after data loads; they are only hidden once root has .lp-motion,
+ * so content is always visible when JS does not run, during thumbnail capture, or with reduced-motion.
  */
 function useRevealAll(rootRef: React.RefObject<HTMLElement>) {
   useEffect(() => {
@@ -123,8 +123,8 @@ function useRevealAll(rootRef: React.RefObject<HTMLElement>) {
 }
 
 /**
- * 捲動進度：把元素從進入視窗底部到離開頂部（或 sticky 期間）的進度 0→1 寫到 CSS 變數 --p，
- * 不經過 React state，不會每一格都 re-render。
+ * Scroll progress: writes the element's progress 0→1 from entering the viewport bottom to leaving the top (or while sticky) to the CSS variable --p,
+ * bypassing React state so it doesn't re-render every frame.
  */
 function useScrollProgress<T extends HTMLElement>(mode: "through" | "pin" = "through") {
   const ref = useRef<T>(null);
@@ -158,7 +158,7 @@ function useScrollProgress<T extends HTMLElement>(mode: "through" | "pin" = "thr
   return ref;
 }
 
-/** Hero 的游標視差：只在有滑鼠（fine pointer）時把 -1…1 的座標寫到 --mx／--my。 */
+/** Hero cursor parallax: only with a mouse (fine pointer), writes -1…1 coordinates to --mx / --my. */
 function usePointerParallax<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   useEffect(() => {
@@ -190,8 +190,8 @@ function usePointerParallax<T extends HTMLElement>() {
 }
 
 /**
- * 頁內跳轉：網站用 hash 路由（#/home），直接寫 href="#lp-how" 會被當成換頁到 /lp-how → 404。
- * 攔下預設行為，改成捲動到目標並把焦點移過去（跳到主要內容時螢幕閱讀器才會跟上）。
+ * In-page jumps: the site uses hash routing (#/home), so a plain href="#lp-how" is treated as navigating to /lp-how → 404.
+ * Intercept the default and scroll to the target and move focus there (so screen readers follow when skipping to main content).
  */
 function jumpTo(e: React.MouseEvent, id: string) {
   e.preventDefault();
@@ -201,9 +201,9 @@ function jumpTo(e: React.MouseEvent, id: string) {
   el.focus({ preventScroll: true });
 }
 
-// ── 小元件 ───────────────────────────────────────────────────────────────
+// ── Small components ─────────────────────────────────────────────────────
 
-/** 進入視窗才觸發的數字滾動（AnimatedNumber 從 0 滾到目標值）。 */
+/** Number roll-up triggered on entering the viewport (AnimatedNumber rolls from 0 to the target). */
 function StatNumber({ value, suffix }: { value: number; suffix?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [shown, setShown] = useState(() => (prefersReducedMotion() ? value : 0));
@@ -226,7 +226,7 @@ function StatNumber({ value, suffix }: { value: number; suffix?: string }) {
   );
 }
 
-/** 水平捲動列 + 左右按鈕。 */
+/** Horizontal scroll row + left/right buttons. */
 function useScroller() {
   const ref = useRef<HTMLDivElement>(null);
   const scroll = (dir: 1 | -1) => {
@@ -247,7 +247,7 @@ function LinkButton({ href, variant = "primary", size = "md", children, rightIco
   );
 }
 
-/** 章節小標：編號 + 名稱（編輯式版面的 eyebrow）。 */
+/** Section eyebrow: number + name (the editorial layout's eyebrow). */
 function Eyebrow({ index, children, invert = false }: { index: string; children: ReactNode; invert?: boolean }) {
   return (
     <p className={`lp-eyebrow${invert ? " lp-eyebrow--invert" : ""}`} data-reveal>
@@ -258,7 +258,7 @@ function Eyebrow({ index, children, invert = false }: { index: string; children:
   );
 }
 
-/** 標題逐行由下往上滑入（每行包在 overflow:hidden 的遮罩裡）。 */
+/** Heading lines slide up one by one (each line wrapped in an overflow:hidden mask). */
 function MaskLines({ lines, className, as: Tag = "h2", id }: { lines: ReactNode[]; className: string; as?: "h1" | "h2"; id?: string }) {
   return (
     <Tag className={className} id={id} data-reveal="mask">
@@ -271,7 +271,7 @@ function MaskLines({ lines, className, as: Tag = "h2", id }: { lines: ReactNode[
   );
 }
 
-/** 品牌宣言：捲動時逐字點亮。螢幕閱讀器讀完整句（逐字的 span 都 aria-hidden）。 */
+/** Brand statement: lit up word by word on scroll. Screen readers read the full sentence (the per-word spans are aria-hidden). */
 function ScrollLitStatement({ parts, id }: { parts: { text: string; pill?: boolean }[]; id: string }) {
   const ref = useScrollProgress<HTMLParagraphElement>();
   const total = parts.reduce((n, p) => n + [...p.text].length, 0);
@@ -295,7 +295,7 @@ function ScrollLitStatement({ parts, id }: { parts: { text: string; pill?: boole
   );
 }
 
-// ── 早鳥試算 ─────────────────────────────────────────────────────────────
+// ── Early-bird calculator ────────────────────────────────────────────────
 
 function EarlyBirdSimulator({ item, vendorName }: { item: MenuItem | undefined; vendorName: string }) {
   const { t, isEn } = useI18n();
@@ -362,7 +362,7 @@ function EarlyBirdSimulator({ item, vendorName }: { item: MenuItem | undefined; 
   );
 }
 
-// ── 頁面 ─────────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────
 
 function LandingContent() {
   const { t, lang, isEn } = useI18n();
@@ -371,7 +371,7 @@ function LandingContent() {
   const stepsRef = useScrollProgress<HTMLOListElement>();
   useRevealAll(rootRef);
 
-  // 招牌餐點：真實 menu_items（上架中），依 category 分頁，品項最多的分類排前面
+  // Signature dishes: real menu_items (listed), tabbed by category, categories with the most items first
   const { data: menuItems = [] } = useQuery({
     queryKey: ["landingMenu"],
     queryFn: async () => {
@@ -418,7 +418,7 @@ function LandingContent() {
       ?? reviewVendor?.cover_image
     : undefined;
 
-  // Hero 拼貼與試算優先用有照片的品項
+  // Prefer items with photos for the hero collage and the calculator
   const withPhoto = menuItems.filter((m) => m.image);
   const heroItem = withPhoto.find((m) => m.price >= 60) ?? withPhoto[0] ?? menuItems[0];
   const heroVendor = heroItem ? vendors.find((v) => v.id === heroItem.vendor_id) : undefined;
@@ -439,7 +439,7 @@ function LandingContent() {
     ? [{ text: "BunnBaa started with a simple idea: everyone should get to " }, { text: "eat on time", pill: true }, { text: ", and vendors should never have to guess how much to prep." }]
     : [{ text: "BunnBaa 從一個簡單的念頭開始：讓每個人都能" }, { text: "準時吃飽", pill: true }, { text: "，也讓店家不再猜今天要備幾份。" }];
 
-  // 章節編號：活動、評價是選擇性區塊，編號依實際出現的順序往下排
+  // Section numbers: events and reviews are optional sections, so numbering follows the order they actually appear
   let section = 4;
   const nextIndex = () => String(++section).padStart(2, "0");
 
@@ -449,7 +449,7 @@ function LandingContent() {
       <MarketplaceHeader active="landing" />
 
       <main id="lp-main" tabIndex={-1} className="outline-none">
-        {/* ── Hero：標語 + 真實餐點拼貼 + 已鎖定票券 ── */}
+        {/* ── Hero: tagline + real meal collage + locked ticket ── */}
         <section className="lp-hero" ref={heroRef} aria-labelledby="lp-hero-title">
           <div className="lp-container lp-hero__grid">
             <div className="lp-hero__copy">
@@ -522,7 +522,7 @@ function LandingContent() {
           </div>
         </section>
 
-        {/* ── 跑馬燈 ── */}
+        {/* ── Marquee ── */}
         <div className="lp-ticker" role="region" aria-label={t("最新消息", "Latest news")}>
           <div className="lp-ticker__track">
             {[...ticker(), ...ticker()].map((item, i) => (
@@ -533,7 +533,7 @@ function LandingContent() {
           </div>
         </div>
 
-        {/* ── 品牌故事：捲動逐字點亮 ── */}
+        {/* ── Brand story: lit up word by word on scroll ── */}
         <section className="lp-story" aria-labelledby="lp-story-title">
           <div className="lp-container lp-story__inner">
             <Eyebrow index="01" invert>{t("我們的初衷", "Why we exist")}</Eyebrow>
@@ -548,7 +548,7 @@ function LandingContent() {
           </div>
         </section>
 
-        {/* ── 怎麼運作：四步驟，捲動時連接線跟著畫出來 ── */}
+        {/* ── How it works: four steps, connector line drawn on scroll ── */}
         <section className="lp-section lp-how" id="lp-how" tabIndex={-1} aria-labelledby="lp-how-title" style={{ outline: "none", scrollMarginTop: 72 }}>
           <div className="lp-container">
             <Eyebrow index="02">{t("怎麼運作", "How it works")}</Eyebrow>
@@ -571,7 +571,7 @@ function LandingContent() {
           </div>
         </section>
 
-        {/* ── 早鳥試算 ── */}
+        {/* ── Early-bird calculator ── */}
         <section className="lp-section lp-early" aria-labelledby="lp-early-title">
           <div className="lp-container lp-early__grid">
             <div className="lp-early__copy">
@@ -600,7 +600,7 @@ function LandingContent() {
           </div>
         </section>
 
-        {/* ── 菜單 ── */}
+        {/* ── Menu ── */}
         <section className="lp-section" aria-labelledby="lp-menu-title">
           <div className="lp-menu">
             <Eyebrow index="04">{t("招牌餐點", "Signature dishes")}</Eyebrow>
@@ -638,7 +638,7 @@ function LandingContent() {
           </div>
         </section>
 
-        {/* ── 活動（沒有進行中的活動就整段不顯示） ── */}
+        {/* ── Events (whole section hidden when no events are running) ── */}
         {landingEvents.length > 0 && (
           <section className="lp-section" aria-labelledby="lp-events-title">
             <div className="lp-container lp-row-head">
@@ -669,7 +669,7 @@ function LandingContent() {
           </section>
         )}
 
-        {/* ── 數字 ── */}
+        {/* ── Numbers ── */}
         <section className="lp-container lp-stats-wrap" aria-label={t("BunnBaa 的承諾", "Our promises")}>
           <dl className="lp-stats">
             <div className="lp-stat" data-reveal><dd>{isEn ? <StatNumber value={BEST_EARLY_BIRD} suffix="%" /> : <StatNumber value={(100 - BEST_EARLY_BIRD) / 10} suffix="折" />}</dd><dt>{t("早鳥折扣最高", "Max early-bird discount")}</dt></div>
@@ -678,7 +678,7 @@ function LandingContent() {
           </dl>
         </section>
 
-        {/* ── 圖片牆（跑馬燈，真實品項照片） ── */}
+        {/* ── Photo wall (marquee of real item photos) ── */}
         {galleryTiles.length >= 3 && (
           <div className="lp-gallery" aria-hidden="true">
             <div className="lp-gallery__track">
@@ -692,7 +692,7 @@ function LandingContent() {
           </div>
         )}
 
-        {/* ── 評價（沒有公開評價時整段不顯示） ── */}
+        {/* ── Reviews (whole section hidden when there are no public reviews) ── */}
         {r && (
           <section className="lp-section lp-container lp-reviews" aria-labelledby="lp-reviews-title" aria-roledescription={t("輪播", "carousel")}>
             <Eyebrow index={nextIndex()}>{t("吃過的人怎麼說", "What eaters say")}</Eyebrow>
@@ -724,7 +724,7 @@ function LandingContent() {
           </section>
         )}
 
-        {/* ── 合作店家（可左右滑動） ── */}
+        {/* ── Partner vendors (swipeable) ── */}
         <section className="lp-section lp-stores-sec" aria-labelledby="lp-stores-title">
           <div className="lp-container lp-row-head">
             <div>
@@ -762,11 +762,11 @@ function LandingContent() {
           )}
         </section>
 
-        {/* ── 收尾 CTA ── */}
+        {/* ── Closing CTA ── */}
         <section className="lp-final" aria-labelledby="lp-final-title">
           <div className="lp-final__marquee" aria-hidden="true">
             <div className="lp-final__track">
-              {/* 純裝飾大字：字放在 CSS ::before（data-text），不進可及性樹 */}
+              {/* Purely decorative large text: the text lives in CSS ::before (data-text) and stays out of the accessibility tree */}
               {Array.from({ length: 4 }, (_, i) => (
                 <span key={i}>
                   <span className="lp-final__word" data-text="BunnBaa 飯飽" /><Sparkle />

@@ -12,7 +12,7 @@ export default function ContactPage() {
       hero={<PageHero eyebrow={tr("支援", "Support")} title={tr("聯絡客服", "Contact support")} description={tr("訂單、退款、帳號問題都可以來信，我們會盡快回覆。", "Reach out about orders, refunds, or your account — we'll get back to you as soon as we can.")} />}
     >
       <div className="py-4 md:py-8 space-y-12">
-        {/* 大字信箱：本頁唯一重點 */}
+        {/* Large email address: the one focal point of this page */}
         <section className="rounded-card md:rounded-[3rem] border border-ink bg-card px-6 py-12 md:px-14 md:py-20">
           <p className="flex items-center gap-3 text-xs font-semibold tracking-[0.14em] uppercase text-muted-foreground mb-6">
             <Mail className="w-4 h-4" aria-hidden="true" /> {tr("客服信箱", "Support email")}
