@@ -144,7 +144,7 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 ### 表單上要交的 5 項
 - [ ] **英文簡報 PDF**（`BunnBaa_Proposal.pdf`，10–12 頁）：從 Slides artifact 補完後匯出，見下方「簡報素材」
 - [ ] **原型網址** `https://bunnbaa-mvp-5474.web.app/?lang=en`：`claude/amazing-dijkstra-uv5zcu`（英文預設語言）合併進 `master` 後才會上線
-- [ ] **3 分鐘影片**：MP4 1080p，上傳 YouTube（公開或不公開但有連結），長度 ≤ 3:00
+- [ ] **3 分鐘影片**：MP4 1080p，上傳 YouTube（公開或不公開但有連結），長度 ≤ 3:00。**10/12：已錄完，剪輯中，還沒上傳**；上傳後連結要填進兩份 README、`Submission_EN.md`、簡報結尾頁
 - [ ] **類別**：表單只勾 **Sustainability**
 - [ ] **GitHub repo 網址**：公開前先做完下方「repo 公開前」
 
