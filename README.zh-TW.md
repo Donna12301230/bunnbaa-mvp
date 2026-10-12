@@ -267,7 +267,7 @@ npm run emulator                                  # Functions 測試專用的 em
 npm run test:functions && npm run test:functions:more
 ```
 
-2026-10-09 的結果：商業邏輯測試 61 項、Cloud Functions 測試 141 項全部通過（有 2 項跟日期有關的測試，在隔天不營業時會跳過）。Firestore 安全規則測試也全部通過。
+2026-10-12 的結果：商業邏輯測試 63 項、Cloud Functions 測試 144 項全部通過（跟時間有關的測試在時間不到時會跳過，例如兩家不同截單時間的 `lockOrders` 要 20:00 後才能跑）。Firestore 安全規則測試也全部通過。
 
 預購助理回答品質（`node scripts/eval/assistantEval.js`，24 題，涵蓋預算、過敏、素食、餐期、多日方案與英文提問，2026-10-10）：規則檢查（預算、過敏原、不吃的食材、餐期、星期、不催促）24/24 通過；**Vertex AI Gen AI Evaluation Service** 評分需求符合度 4.96/5、有據性 4.92/5。報告：[`doc/評估/預購助理回答品質評估.md`](doc/評估/預購助理回答品質評估.md)。
 

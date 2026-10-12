@@ -467,6 +467,44 @@ test("V-CAL-05", "校準準確率與誤差由程式算（不經 LLM）：Σ取�
   assert.equal(st.max_gap, 2);
   assert.equal(st.rounds, 2);
 });
+test("F-24", "常一起買：購物籃配對（品名）→ 同店品項 id，依 buyers 排序、最多 5 個；沒變不寫、配對消失要清掉", () => {
+  const { oftenWithByItem, oftenWithUpdates } = req("customerInsights.js").helpers;
+  const items = [
+    { id: "a", vendor_id: "v1", name: "雞腿便當" },
+    { id: "b", vendor_id: "v1", name: "滷蛋" },
+    { id: "c", vendor_id: "v1", name: "紅茶" },
+    { id: "x", vendor_id: "v2", name: "滷蛋" }, // 別家同名，不能混進 v1 的配對
+    { id: "old", vendor_id: "v1", name: "停售品", often_with: ["a"] },
+    { id: "same", vendor_id: "v3", name: "粥", often_with: ["side"] },
+    { id: "side", vendor_id: "v3", name: "小菜", often_with: ["same"] },
+  ];
+  const pairs = [
+    { vendor_id: "v1", item_a: "滷蛋", item_b: "雞腿便當", buyers: 3, confidence: 0.5 },
+    { vendor_id: "v1", item_a: "紅茶", item_b: "雞腿便當", buyers: 5, confidence: 0.4 },
+    { vendor_id: "v1", item_a: "A方案・第1/5天", item_b: "雞腿便當", buyers: 9, confidence: 1 }, // 對不到品項，略過
+    { vendor_id: "v3", item_a: "小菜", item_b: "粥", buyers: 2, confidence: 1 },
+  ];
+  const m = oftenWithByItem(pairs, items);
+  assert.deepEqual(m.get("a"), ["c", "b"]);
+  assert.deepEqual(m.get("b"), ["a"]);
+  assert.equal(m.has("x"), false);
+  const many = Array.from({ length: 7 }, (_, i) => ({ id: `s${i}`, vendor_id: "v9", name: `配菜${i}` }));
+  const m2 = oftenWithByItem(many.slice(1).map((s, i) => ({ vendor_id: "v9", item_a: "配菜0", item_b: s.name, buyers: 10 - i, confidence: 1 })), many);
+  assert.deepEqual(m2.get("s0"), ["s1", "s2", "s3", "s4", "s5"]);
+  const updates = oftenWithUpdates(pairs, items);
+  assert.deepEqual(updates.map((u) => u.id).sort(), ["a", "b", "c", "old"]);
+  assert.equal(updates.find((u) => u.id === "old").often_with, null);
+});
+test("C-AST-20", "推薦理由：只收有 getVendorInsights 資料的店、20 字內、沒有催促字眼", () => {
+  const { cardReason } = assistant;
+  const grounded = new Set(["v1"]);
+  assert.equal(cardReason("預估比平常不擁擠", "v1", grounded, "zh"), "預估比平常不擁擠");
+  assert.equal(cardReason("預估比平常不擁擠", "v2", grounded, "zh"), null);
+  assert.equal(cardReason("很多人訂，快搶", "v1", grounded, "zh"), null);
+  assert.equal(cardReason("這家店的便當很好吃而且份量很大配菜也很豐富喔", "v1", grounded, "zh"), null);
+  assert.equal(cardReason("Often ordered with braised egg", "v1", grounded, "en"), "Often ordered with braised egg");
+  assert.equal(cardReason("", "v1", grounded, "zh"), null);
+});
 
 (async () => {
   for (const [id, name, fn] of asyncTests) {

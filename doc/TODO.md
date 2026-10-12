@@ -38,13 +38,13 @@
 - [ ] 部署索引後，管理員呼叫一次 `backfillMenuEmbeddings`（轉讓媒合才找得到既有品項）
 - [ ] 正式站灌 `node scripts/seed-phase1.js`（或 `--catalog-only` 只灌模板與配方）——需要服務帳號金鑰
 - [ ] 確認 09-29 的補設定資料做過沒：`$env:GOOGLE_APPLICATION_CREDENTIALS="金鑰檔路徑"; node scripts/seed.js --config-only`（沒做的話 Landing「近期活動」是空的）
-- [ ] Firebase Console 確認排程都有啟用並成功跑過：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`、`closeRewardPeriod`、`buildWeeklyPurchase`、`pollDisasterFeeds`、`releaseStalePointHolds`、`settleVendorPayouts`、`dailyCalibration`、`demandForecast`（每天 05:00）、`customerInsights`（週一 04:00）
-- [ ] BigQuery：四個 extension 的 changelog 有最新時間的資料；`bunnbaa_analytics` dataset 權限只給管理員
-- [ ] 刪掉 `functions/.env` 的 `GEMINI_API_KEY`，`gh secret set FUNCTIONS_ENV < functions/.env`；`doc/AI功能設計.md`、`doc/測試文件.md` 裡還提到 `GEMINI_API_KEY` 的地方改成 Vertex 說法
+- [x] ~~Firebase Console 確認排程都有啟用並成功跑過~~（10/12 查 Cloud Scheduler：21 個排程都 ENABLED、最近都有跑；`dailyCalibration` 顯示 code 4 是因為整輪約 11 分鐘超過 Scheduler 等待期限，21 家報告其實都有產生）：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`、`closeRewardPeriod`、`buildWeeklyPurchase`、`pollDisasterFeeds`、`releaseStalePointHolds`、`settleVendorPayouts`、`dailyCalibration`、`demandForecast`（每天 05:00）、`customerInsights`（週一 04:00）
+- [x] BigQuery：四個 extension 的 changelog 有最新時間的資料；`bunnbaa_analytics` dataset 權限只給管理員（10/12 查：locks 當天有同步；dataset 只有專案擁有者 2 人與服務帳號）
+- [ ] 刪掉 `functions/.env` 的 `GEMINI_API_KEY`（10/12 本機已刪、文件已改成 Vertex 說法），**還沒做**：`gh secret set FUNCTIONS_ENV < functions/.env`（正式站 log 仍出現「API key from the environment variables」）
 
 ### 10/12–10/13 Google Cloud 補強收尾
-- [ ] **常一起買**（目前不會出現：前端讀 `menu_items/{id}.often_with`，後端沒寫）：`customerInsights.js` 寫完 `analytics/basket` 後，把每個品項的配對（依 `buyers` 排序、同店、最多 5 個 id）寫到 `menu_items/{id}.often_with`；內容沒變就不要寫（會觸發翻譯與向量觸發器的檢查），配對消失時要清掉。補單元測試，重跑 `triggerCustomerInsightsNow`，到正式站品項頁確認有出現
-- [ ] **助理推薦理由**（目前不會出現：`presentCandidates` 沒有這個參數）：加參數（例如 `reasons`：`[{ id, reason }]`，每則 20 字內、不催促），`buildCards` 填進卡片的 `reason`；只放有工具資料根據的理由（busier／quieter、常一起買）。前端標籤 `ShoppingAssistant.tsx` 已經有。改完重跑 `scripts/eval/assistantEval.js`，規則檢查要仍是 24/24，更新 `doc/評估/預購助理回答品質評估.md`
+- [ ] **常一起買**（10/12 程式＋單元測試 F-24 完成；**還沒做**：合併部署後重跑 `triggerCustomerInsightsNow`、正式站品項頁確認）（原本不會出現：前端讀 `menu_items/{id}.often_with`，後端沒寫）：`customerInsights.js` 寫完 `analytics/basket` 後，把每個品項的配對（依 `buyers` 排序、同店、最多 5 個 id）寫到 `menu_items/{id}.often_with`；內容沒變就不要寫（會觸發翻譯與向量觸發器的檢查），配對消失時要清掉。補單元測試，重跑 `triggerCustomerInsightsNow`，到正式站品項頁確認有出現
+- [x] **助理推薦理由**（10/12 完成：`reasons` 參數＋伺服器 `cardReason` 把關，C-AST-20；評估 24/24、13 張卡片有理由，抽查都對得上真實配對）（原本不會出現：`presentCandidates` 沒有這個參數）：加參數（例如 `reasons`：`[{ id, reason }]`，每則 20 字內、不催促），`buildCards` 填進卡片的 `reason`；只放有工具資料根據的理由（busier／quieter、常一起買）。前端標籤 `ShoppingAssistant.tsx` 已經有。改完重跑 `scripts/eval/assistantEval.js`，規則檢查要仍是 24/24，更新 `doc/評估/預購助理回答品質評估.md`
 - [ ] 正式站實際問一次預購助理（「想挑比較不會排隊的店，順便推薦加點」），確認走 Vertex、卡片有推薦理由
 
 ### 10/13–10/15 消費者端測試（[測試文件.md](測試文件.md)，測完直接改該案例的結果欄）
@@ -74,7 +74,7 @@
   - `customer@bunnbaa.test` 名下「A方案：五日輕食計畫」5 筆 locks：`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`（no_show，會被算進校準報告）、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`
   - `ban_appeals/lI5dGTVtIBfByBIUTy3W`
   - 仁和雅店主名下的份數測試訂單 `EJEL6PRO`（可選）
-- [ ] README 的數字：Functions 數量（README 寫 74，10/12 實數 79；最後再數一次：在 `functions/` 執行 `node -e "console.log(Object.keys(require('./src/index.js')).length)"`）、測試數字（logic 61、Functions 141，最後一次跑測試後更新）
+- [ ] README 的數字（10/12 已更新：Functions 79、logic 63、Functions 測試 144；最後一次跑測試後再核對）：Functions 數量（最後再數一次：在 `functions/` 執行 `node -e "console.log(Object.keys(require('./src/index.js')).length)"`）、測試數字（logic 61、Functions 141，最後一次跑測試後更新）
 - [ ] 最後一次合併後確認 GitHub Actions 的 Hosting、Functions 部署都成功
 - [ ] **repo 目前是 private**：設成公開（或確認評審有權限），把 repo 網址給 B 填進 `Submission_EN.md`、README 與報名表單
 

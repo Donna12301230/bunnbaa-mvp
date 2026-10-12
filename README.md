@@ -267,7 +267,7 @@ npm run emulator                                  # separate emulator for Functi
 npm run test:functions && npm run test:functions:more
 ```
 
-Results as of 9 Oct 2026: all 61 business-logic tests and all 141 Cloud Functions tests pass (2 tests that depend on the date are skipped when the next day is not a business day). The Firestore security-rule tests also pass.
+Results as of 12 Oct 2026: all 63 business-logic tests and all 144 Cloud Functions tests pass (tests that depend on the time of day are skipped when run too early, e.g. the two-cutoff `lockOrders` test needs to run after 20:00). The Firestore security-rule tests also pass.
 
 Pre-order assistant quality (`node scripts/eval/assistantEval.js`, 24 questions covering budgets, allergies, vegetarian, meal times, multi-day plans and English, 10 Oct 2026): 24/24 pass the rule checks (budget, allergens, excluded ingredients, meal period, weekday, no urgency wording) and the **Vertex AI Gen AI Evaluation Service** scores fulfillment 4.96/5 and groundedness 4.92/5. Report: [`doc/評估/預購助理回答品質評估.md`](doc/評估/預購助理回答品質評估.md).
 

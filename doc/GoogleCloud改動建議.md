@@ -156,8 +156,8 @@ FROM AI.FORECAST(
 |---|---|---|---|
 | 需求預測 | `vendors/{v}/forecast/{YYYY-MM-DD}`（一天一筆） | `date`（同文件 id）、`predicted`（預估份數）、`lower`／`upper`（預測區間，選填）、`generated_at` | 商家後台「報表與洞察」營收分頁最上方：大數字＋未來 7 天長條（`ForecastCard`） |
 | 客群 | `vendors/{v}/segments/{id}`（一群一筆） | `name`、`description`（Gemini 的一句話）、`customers`（人數）、選填 `name_en`、`description_en`、`share`（0–1）、`avg_spend`、`orders_per_month`、`generated_at` | 商家後台「報表與洞察」區域分頁最下方（`SegmentsCard`） |
-| 常一起買 | `menu_items/{id}.often_with`（同店品項 id 陣列，依配對次數排序） | 字串陣列，前端取前 3 個還在上架的 | 消費者品項頁「常一起買」，排在「同一家店的其他品項」前面 |
-| 助理推薦理由 | 預購助理回傳的品項卡片多一個 `reason`（選填字串） | 例：「這家明天還有餘量」「常跟滷雞腿便當一起買」 | 預購助理的品項卡片上多一個小標籤 |
+| 常一起買 | `menu_items/{id}.often_with`（同店品項 id 陣列，依配對次數排序） | 字串陣列（最多 5 個），前端取前 3 個還在上架的。`customerInsights` 每週一寫入：鎖定紀錄的品名對到同店同名品項；內容沒變不寫，配對消失時刪掉欄位（2026-10-12 後端已接上） | 消費者品項頁「常一起買」，排在「同一家店的其他品項」前面 |
+| 助理推薦理由 | 預購助理回傳的品項卡片多一個 `reason`（選填字串） | 模型在 `presentCandidates` 帶 `reasons: [{ id, reason }]`；伺服器只收這一輪 `getVendorInsights` 有查到資料（預估或常一起買）的店，中文 20 字內／英文 40 字元內，有催促字眼就丟掉（`cardReason`）。例：「預估比平常不擁擠」「常跟滷蛋一起點」（2026-10-12 後端已接上） | 預購助理的品項卡片上多一個小標籤 |
 | Looker Studio 儀表板 | `platformConfig/analytics.lookerStudioEmbedUrl` | 嵌入網址（`https://lookerstudio.google.com/embed/…`），在管理後台頁面上貼上存檔即可，不用改程式 | 管理後台「平台儀表板」（`/admin/analytics`） |
 
 注意：
