@@ -14,11 +14,11 @@
 ![React](https://img.shields.io/badge/React_18-TypeScript-61DAFB?logo=react&logoColor=black)
 ![Node](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 
-**Google AI Builder Cup 2026** · Theme: *Retail & Commerce: Intelligent Customer and Business Experiences* · Domain: Sustainability (food waste) and Social Good (free charity meals)
+**Google AI Builder Cup 2026** · Theme: *Retail & Commerce: Intelligent Customer and Business Experiences* · Domain: **Sustainability** (food waste reduction)
 
 | | |
 |---|---|
-| 🌐 **Live prototype** | https://bunnbaa-mvp-5474.web.app |
+| 🌐 **Live prototype** | https://bunnbaa-mvp-5474.web.app/?lang=en |
 | 🎬 **Demo video (3 min)** | [YouTube link] |
 | 📑 **Proposal deck** | [PDF link] |
 
@@ -27,6 +27,8 @@
 ## The problem
 
 Small eateries near campuses and offices buy ingredients before anyone orders. If they guess high, food gets thrown away. If they guess low, customers get turned away. Diners queue every day with no guaranteed meal and no reward for deciding early. Even a prepaid meal goes to waste when its owner's plans change, because nobody else knows it is available.
+
+This adds up. In 2022 the world wasted 1.05 billion tonnes of food, 19% of all food available to consumers, and 290 million tonnes of it was wasted in food service (UNEP, *Food Waste Index Report 2024*).
 
 ## How BunnBaa works
 

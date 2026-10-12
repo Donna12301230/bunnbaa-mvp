@@ -14,7 +14,7 @@
 ![React](https://img.shields.io/badge/React_18-TypeScript-61DAFB?logo=react&logoColor=black)
 ![Node](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 
-**Google AI Builder Cup 2026** · 賽題：*零售與商業：智慧客戶與商業體驗* · 領域：永續（減少剩食）、社會公益（免費愛心餐）
+**Google AI Builder Cup 2026** · 賽題：*零售與商業：智慧客戶與商業體驗* · 領域：**永續 Sustainability**（減少剩食）
 
 | | |
 |---|---|

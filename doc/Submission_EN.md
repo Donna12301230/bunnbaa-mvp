@@ -12,9 +12,11 @@ Items in `[brackets]` must be filled in before submitting.
 
 **Challenge theme:** Retail & Commerce — Intelligent Customer and Business Experiences
 
-**Category / domain:** Sustainability (food waste reduction); also Social Good (free charity meals)
+**Category / domain (select exactly one on the form):** **Sustainability** — food waste reduction. Free charity meals are a secondary Social Good benefit, mentioned in the pitch but not selected as the domain.
 
-**Live prototype (Firebase Hosting, Google Cloud):** https://bunnbaa-mvp-5474.web.app
+**Live prototype (Firebase Hosting + Cloud Functions 2nd gen on Cloud Run, Google Cloud):** https://bunnbaa-mvp-5474.web.app/?lang=en
+
+(The UI language follows the browser: English unless the browser is set to Chinese. `?lang=en` forces English and is remembered.)
 
 **Demo video (3 min, public):** [YouTube / Vimeo / Google Drive link]
 
@@ -28,7 +30,9 @@ Diners pay ahead to lock a meal — the earlier, the cheaper — so small eateri
 
 ### Problem
 
-Small eateries near campuses and offices buy ingredients before anyone orders. Guess high and food is thrown away; guess low and customers are turned away. Diners queue every day with no guarantee and no reward for deciding early. Even a prepaid meal is wasted when its owner's plans change, because nobody else knows it is available. [Add one sourced statistic on food-service waste in Taiwan.]
+Small eateries near campuses and offices buy ingredients before anyone orders. Guess high and food is thrown away; guess low and customers are turned away. Diners queue every day with no guarantee and no reward for deciding early. Even a prepaid meal is wasted when its owner's plans change, because nobody else knows it is available.
+
+The scale is global: in 2022 the world wasted **1.05 billion tonnes of food (19% of all food available to consumers), and 290 million tonnes of that was wasted in food service** (restaurants, canteens, eateries), according to UNEP's *Food Waste Index Report 2024*. [Optional: add one Taiwan figure from Ministry of Environment (環境部) statistics, with its source.]
 
 ### Solution
 
@@ -88,10 +92,20 @@ Every Firestore write streams into **BigQuery** (official *Stream Firestore to B
 - **Diners:** up to 20% off for booking early; a guaranteed meal with no queue; find meals in one sentence; resell or gift if plans change.
 - **Community:** less food cooked for nobody. Meals rescued through AI matching (`claimed_by_match`), resold meals (`resold_and_fulfilled`) and charity meals claimed are all recorded in Firestore and counted in BigQuery, so impact is measured, not estimated. On the prototype's demo data (seeded orders plus simulated background demand), the dashboard counts 408 of 3,659 meals saved by resale or charity, and next-day forecasts land within 6–15% of actual platform-wide (WAPE, 14-day backtest).
 
+### Feasibility (it already works)
+
+- **Running on Google Cloud today**: https://bunnbaa-mvp-5474.web.app, with 79 Cloud Functions (2nd gen, on Cloud Run) and daily BigQuery AI jobs, deployed automatically from GitHub Actions.
+- **All three roles are built end to end**: diner app (pre-order, pay, resell, gift, donate, QR pickup), vendor portal (photo-to-menu, prep and purchase lists, forecast, QR scanning, payouts), and admin console (vendor approval, platform settings, impact dashboard).
+- **Tested**: 61 business-logic tests, 141 Cloud Functions tests, Firestore security-rule tests, and a 24-question evaluation of the AI assistant (24/24 rule checks; Vertex AI Gen AI Evaluation Service scores 4.96/5 fulfillment, 4.92/5 groundedness).
+- **Real-world constraints handled**: LINE Pay request, confirm and refund flows; time-zone-aware cut-offs; refunds as platform points; usage limits on the AI assistant.
+- **Low adoption cost**: a vendor onboards with one photo of a paper menu and pays no monthly fee, only 5% per meal sold.
+
 ### Scalability and roadmap
 
 - Near-zero onboarding cost per vendor (photo-to-menu); city/district filters and automatic translation make new markets cheap.
-- Fully serverless: Cloud Functions and Firestore scale with demand.
+- Fully serverless and auto-scaling: Cloud Functions (2nd gen, on Cloud Run) scale out per request and down to zero when idle; Firestore and BigQuery need no capacity planning; Firebase Hosting serves the app from a global CDN.
+- Multi-vendor and multi-region by design: records are keyed by vendor and area, and platform rules (discount tiers, commission, reward rate) live in one shared configuration, so opening a new city is a data change, not a code change.
+- Bounded AI cost: per-user daily limits, response caching, and `gemini-3.6-flash` for every high-volume call.
 - Next: **Vertex AI Search** for semantic menu search ("light, with soup, no beef"); forecast covariates such as weather and campus calendars (multivariate `AI.FORECAST`); Gemini review and no-show insights for vendors; fraud signals (early-bird scalping, multiple accounts, gift loops) with Gemini case summaries for admins.
 
 ---
@@ -127,3 +141,17 @@ Tips: record at 1080p, keep the browser zoomed so text is readable, cut waiting 
 - [ ] Check the four AI features on the live site (see `TODO.md`)
 - [ ] Record and upload the 3-minute video as public / unlisted-with-link
 - [ ] Make sure the live site works without logging in as an admin (judges will open it)
+
+### Against the official requirements
+
+| Requirement | Where it is covered | Status |
+|---|---|---|
+| Proposal: vision, problem, community benefit | Deck + §1 Problem / Solution / Impact | Deck needs the statistic above and the team slide |
+| Proposal: feasibility and scalability | §1 Feasibility, Scalability and roadmap | Copy both into the deck |
+| Proposal exported as **PDF** | Deck → Share › Export › PDF | [ ] |
+| Working prototype using Google Cloud AI, deployed on Cloud Run / GCP / Firebase | Gemini on **Vertex AI** (service account, no API key) + BigQuery AI; Firebase Hosting + Cloud Functions 2nd gen (Cloud Run) | Done. Say "Cloud Functions 2nd gen run on Cloud Run" on the architecture slide and in the video |
+| Public 3-minute video (YouTube / Vimeo / public Google Drive) | §2 script | [ ] Upload, then test the link in a logged-out window |
+| Category stated | §1: **Sustainability** | [ ] Tick only Sustainability on the form |
+| Everything in English: code, docs, presentation | README, this file, deck, video (narration + captions) are English; the UI defaults to English for non-Chinese browsers and `?lang=en` forces it | **Gap:** about 1,700 code-comment lines in `functions/src` and `web/src` are still Chinese, plus Chinese-only developer docs in `doc/`. Translate the comments after the code freeze (10/17) so the two working branches don't get merge conflicts, or confirm with the organisers that bilingual UI strings and Chinese internal notes are acceptable |
+| Judges can try all three roles | Demo accounts | [ ] Create English-named demo accounts (diner, vendor, admin-read-only if possible) on the live site and put them in the form's notes field; don't publish real admin credentials |
+| Repository accessible | GitHub | [ ] Repo is private: make it public or add the judges, then fill in the README link |
