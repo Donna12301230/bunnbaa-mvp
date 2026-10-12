@@ -233,7 +233,7 @@ export default function CartPage() {
                 {vendor?.address && (
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted-foreground flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {tr("取餐地點（自取）", "Pickup (self)")}</dt>
-                    <dd className="text-right">{vendor.address}</dd>
+                    <dd className="text-right">{loc(vendor, "address")}</dd>
                   </div>
                 )}
                 <div className="flex justify-between gap-3"><dt className="text-muted-foreground">{tr("原價小計", "Subtotal")}</dt><dd>NT${listTotal}</dd></div>

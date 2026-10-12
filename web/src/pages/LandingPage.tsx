@@ -748,7 +748,7 @@ function LandingContent() {
                 </div>
                 <div className="lp-store__body">
                   <h3 className="lp-h3">{loc(v, "name")}</h3>
-                  {v.address && <p className="lp-muted lp-store__addr"><MapPin aria-hidden="true" />{v.address}</p>}
+                  {v.address && <p className="lp-muted lp-store__addr"><MapPin aria-hidden="true" />{loc(v, "address")}</p>}
                 </div>
                 <span className="lp-store__go" aria-hidden="true"><ArrowUpRight /></span>
               </Link>

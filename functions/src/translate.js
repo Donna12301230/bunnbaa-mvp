@@ -11,6 +11,7 @@ const SYSTEM_INSTRUCTION = `You translate Traditional Chinese text from a Taiwan
 Rules:
 - Return JSON: {"translations": [...]} with exactly one English string per input string, in the same order.
 - Store and dish names: give a natural English rendering (translate descriptive words, romanise proper nouns in Hanyu Pinyin), e.g. "阿嬤滷肉飯" -> "Grandma's Braised Pork Rice".
+- Taiwanese addresses: use the standard English postal format, smallest unit first, e.g. "嘉義市東區民族路 318 號" -> "No. 318, Minzu Rd., East Dist., Chiayi City".
 - Keep numbers, prices, dates, times and emoji unchanged. Do not add explanations.
 - If an input is empty, return an empty string for it.`;
 
@@ -50,9 +51,9 @@ async function translationPatch(data, fields) {
   return patch;
 }
 
-// 各 collection 要翻的欄位（地址不翻：比對地區篩選、實際找店都要用中文地址）
+// 各 collection 要翻的欄位（地址的 address_en 只給英文介面顯示；地區篩選照樣比對中文 address）
 const TRANSLATED_FIELDS = {
-  vendors: ["name", "description"],
+  vendors: ["name", "description", "address"],
   menu_items: ["name", "description", "category", "catalog"],
   meal_plans: ["label", "name", "description", "fastest_booking"],
   // 評價（使用者寫的心得、系所署名）與抽獎紀錄的品名

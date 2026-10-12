@@ -84,7 +84,7 @@ export default function VendorListPage() {
                     {vendor.address && (
                       <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1.5">
                         <MapPin className="w-3 h-3 shrink-0" aria-hidden="true" />
-                        <span className="truncate">{vendor.address}</span>
+                        <span className="truncate">{loc(vendor, "address")}</span>
                       </p>
                     )}
                   </div>

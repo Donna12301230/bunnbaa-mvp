@@ -163,7 +163,7 @@ export default function VendorPage() {
         )}
         {vendor.address && (
           <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-ink bg-card">
-            <MapPin className="w-4 h-4 shrink-0" aria-hidden="true" /> {vendor.address}
+            <MapPin className="w-4 h-4 shrink-0" aria-hidden="true" /> {loc(vendor, "address")}
           </span>
         )}
         {vendor.phone && (
