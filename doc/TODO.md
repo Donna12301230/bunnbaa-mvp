@@ -34,18 +34,18 @@
 ## 🔴 工程師 A：消費者端＋後端／Google Cloud
 
 ### 10/12–10/13 正式站資料（先做，C-MY-03 等測試要等這步）
-- [ ] **部署 `firestore:rules,firestore:indexes`**：10/05 之後的規則都還沒手動部署過——BUG-9 轉讓期限 31 天（沒部署前上架 24 小時以後的餐點會 PERMISSION_DENIED）、轉讓價 `resale_price`、目錄分類、`wallets`／代領碼 `proxyCodes` 規則、`holds` collectionGroup 索引、`menu_embeddings` 向量索引
-- [ ] 部署索引後，管理員呼叫一次 `backfillMenuEmbeddings`（轉讓媒合才找得到既有品項）
+- [x] **部署 `firestore:rules,firestore:indexes`**：10/05 之後的規則都還沒手動部署過——BUG-9 轉讓期限 31 天（沒部署前上架 24 小時以後的餐點會 PERMISSION_DENIED）、轉讓價 `resale_price`、目錄分類、`wallets`／代領碼 `proxyCodes` 規則、`holds` collectionGroup 索引、`menu_embeddings` 向量索引（10/12 完成：rules 其實已是最新版、這次上的是索引；18 個索引全部 READY）
+- [x] 部署索引後，管理員呼叫一次 `backfillMenuEmbeddings`（轉讓媒合才找得到既有品項）（10/12 完成：updated 253、unchanged 8、failed 0）
 - [ ] 正式站灌 `node scripts/seed-phase1.js`（或 `--catalog-only` 只灌模板與配方）——需要服務帳號金鑰
 - [ ] 確認 09-29 的補設定資料做過沒：`$env:GOOGLE_APPLICATION_CREDENTIALS="金鑰檔路徑"; node scripts/seed.js --config-only`（沒做的話 Landing「近期活動」是空的）
 - [x] ~~Firebase Console 確認排程都有啟用並成功跑過~~（10/12 查 Cloud Scheduler：21 個排程都 ENABLED、最近都有跑；`dailyCalibration` 顯示 code 4 是因為整輪約 11 分鐘超過 Scheduler 等待期限，21 家報告其實都有產生）：`lockOrders`、`pickupReminder`、`convertToCharity`、`closeCharity`、`expireCharityReservation`、`closeRewardPeriod`、`buildWeeklyPurchase`、`pollDisasterFeeds`、`releaseStalePointHolds`、`settleVendorPayouts`、`dailyCalibration`、`demandForecast`（每天 05:00）、`customerInsights`（週一 04:00）
 - [x] BigQuery：四個 extension 的 changelog 有最新時間的資料；`bunnbaa_analytics` dataset 權限只給管理員（10/12 查：locks 當天有同步；dataset 只有專案擁有者 2 人與服務帳號）
-- [ ] 刪掉 `functions/.env` 的 `GEMINI_API_KEY`（10/12 本機已刪、文件已改成 Vertex 說法），**還沒做**：`gh secret set FUNCTIONS_ENV < functions/.env`（正式站 log 仍出現「API key from the environment variables」）
+- [x] 刪掉 `functions/.env` 的 `GEMINI_API_KEY`（10/12 本機已刪、文件已改成 Vertex 說法），**還沒做**：`gh secret set FUNCTIONS_ENV < functions/.env`（正式站 log 仍出現「API key from the environment variables」）（10/12 完成：`FUNCTIONS_ENV` secret 已更新並重新部署）
 
 ### 10/12–10/13 Google Cloud 補強收尾
-- [ ] **常一起買**（10/12 程式＋單元測試 F-24 完成；**還沒做**：合併部署後重跑 `triggerCustomerInsightsNow`、正式站品項頁確認）（原本不會出現：前端讀 `menu_items/{id}.often_with`，後端沒寫）：`customerInsights.js` 寫完 `analytics/basket` 後，把每個品項的配對（依 `buyers` 排序、同店、最多 5 個 id）寫到 `menu_items/{id}.often_with`；內容沒變就不要寫（會觸發翻譯與向量觸發器的檢查），配對消失時要清掉。補單元測試，重跑 `triggerCustomerInsightsNow`，到正式站品項頁確認有出現
+- [x] **常一起買**（10/12 程式＋單元測試 F-24 完成；**還沒做**：合併部署後重跑 `triggerCustomerInsightsNow`、正式站品項頁確認）（原本不會出現：前端讀 `menu_items/{id}.often_with`，後端沒寫）：`customerInsights.js` 寫完 `analytics/basket` 後，把每個品項的配對（依 `buyers` 排序、同店、最多 5 個 id）寫到 `menu_items/{id}.often_with`；內容沒變就不要寫（會觸發翻譯與向量觸發器的檢查），配對消失時要清掉。補單元測試，重跑 `triggerCustomerInsightsNow`，到正式站品項頁確認有出現（10/12 完成：重算後 152 個品項有 often_with，正式站品項頁已出現）
 - [x] **助理推薦理由**（10/12 完成：`reasons` 參數＋伺服器 `cardReason` 把關，C-AST-20；評估 24/24、13 張卡片有理由，抽查都對得上真實配對）（原本不會出現：`presentCandidates` 沒有這個參數）：加參數（例如 `reasons`：`[{ id, reason }]`，每則 20 字內、不催促），`buildCards` 填進卡片的 `reason`；只放有工具資料根據的理由（busier／quieter、常一起買）。前端標籤 `ShoppingAssistant.tsx` 已經有。改完重跑 `scripts/eval/assistantEval.js`，規則檢查要仍是 24/24，更新 `doc/評估/預購助理回答品質評估.md`
-- [ ] 正式站實際問一次預購助理（「想挑比較不會排隊的店，順便推薦加點」），確認走 Vertex、卡片有推薦理由
+- [x] 正式站實際問一次預購助理（「想挑比較不會排隊的店，順便推薦加點」），確認走 Vertex、卡片有推薦理由（10/12 完成：正式站卡片出現「常跟火雞肉飯一起點」等理由）
 
 ### B 測試時發現、交給 A（2026-10-12）
 - [ ] **已從店家設定移除的取餐時段，上面的訂單不進備料時間軸**：示範店 10/12 有 2 筆 17:30–18:30（晚餐）訂單，但店家目前沒有晚餐時段，`prepPlans.timelines` 只有早餐、午餐，這 2 筆沒有排進任何時間軸（`order_count` 有算到）。商家後台的時段格子 B 已改成照樣列出並標「已停用」
