@@ -1,7 +1,7 @@
 # BunnBaa Demo 影片腳本與錄製指南（3 分鐘）
 
 對應官方說明會的五個重點：可運作的原型、語音導覽、公開存取、呼應評分標準、結構化呈現。
-旁白一律英文（提交物必須英文），本文件的說明用中文給團隊看。英文旁白同步放在 `Submission_EN.md` 第 2 節。
+旁白一律英文（提交物必須英文），本文件的說明用中文給團隊看。**注意**：本文件的旁白和 `Submission_EN.md` 第 2 節、`doc/demo_captions.srt` 是不同版本；定稿後以實際錄製的旁白為準，把這三處改成一致。
 
 ---
 
@@ -76,7 +76,7 @@
 
 畫面：投影片「Architecture」→「Responsible AI」。
 
-> Everything runs on Google Cloud: Firebase Hosting, seventy-four Cloud Functions on Cloud Run, Firestore vector search, and Gemini on Vertex AI. Our rule: AI advises, code calculates, people decide.
+> Everything runs on Google Cloud: Firebase Hosting, seventy-nine Cloud Functions on Cloud Run, Firestore vector search, and Gemini on Vertex AI. Our rule: AI advises, code calculates, people decide.
 
 字卡：`Gemini on Vertex AI · Cloud Functions (2nd gen) on Cloud Run · Firestore · BigQuery`
 
@@ -92,20 +92,20 @@
 
 ## 3. 錄影前準備
 
-**本腳本、`Submission_EN.md` 與投影片都已寫成 `doc/GoogleCloud改動建議.md` 的 P0、P1 已完成。錄影前必須全部做完，否則 D、E 段與投影片第 9、11、14 頁要改回去：**
-- [ ] P0：`functions/src/gemini.js` 改走 Vertex AI（`@google/genai`，服務帳號、移除 `GEMINI_API_KEY`），embedding 仍是 768 維
-- [ ] P0：Stream Firestore to BigQuery extension（`locks`、`menu_items`、`vendors`、`payment_intents`）＋回填＋schema view
-- [ ] P1：補 60～90 天模擬資料、`AI.FORECAST` 預測寫回 Firestore、店家報表頁顯示「預估明天 N 份（參考）」
-- [ ] P1：`ML.KMEANS` 客群＋`AI.GENERATE` 每群一句描述
-- [ ] P1：Looker Studio 儀表板嵌入管理後台
-- [ ] README（英文版，已寫成 Vertex AI 設定）與 `doc/開發說明.md` 環境變數段、`doc/ISMS_管理制度文件.md` 資料流同步更新
+**`doc/GoogleCloud改動建議.md` 的 P0、P1 已於 10/10 部署（D、E 段與投影片第 9、11、14 頁都以此為準），只剩 Looker Studio 報表：**
+- [x] P0：`functions/src/gemini.js` 改走 Vertex AI（`@google/genai`，服務帳號、移除 `GEMINI_API_KEY`），embedding 仍是 768 維
+- [x] P0：Stream Firestore to BigQuery extension（`locks`、`menu_items`、`vendors`、`payment_intents`）＋回填＋schema view
+- [x] P1：補 60～90 天模擬資料、`AI.FORECAST` 預測寫回 Firestore、店家報表頁顯示「預估明天 N 份（參考）」
+- [x] P1：`ML.KMEANS` 客群＋`AI.GENERATE` 每群一句描述
+- [ ] P1：Looker Studio 儀表板嵌入管理後台（報表還沒建，見 [TODO.md](TODO.md)）
+- [x] README（中英文）、`doc/開發指南.md` 環境變數段、`doc/ISMS_管理制度文件.md` 資料流已同步更新
 
 - [ ] 正式站已部署最新 Functions、rules、indexes，並跑過一次 `backfillMenuEmbeddings`（C3 推播才會出現）
 - [ ] 帳號：店家 1、消費者 A（下單、轉讓）、消費者 B（接手；過去訂過類似菜色、常用地點在 10 公里內、今天還沒收過 2 則媒合通知）
 - [ ] 一張手寫或印好的紙本菜單（C1）
 - [ ] 消費者 A 先訂好兩天後的一份餐（C3 用），店家今天有幾筆訂單（C4 備料頁才有數字）
 - [ ] 介面切成英文；瀏覽器縮放到字看得清楚；關掉不相干的分頁與通知
-- [ ] 先把四段各彩排一次，確認 Gemini 回應速度；免費層遇到 429 就換有額度的 key 或等一下再錄
+- [ ] 先把四段各彩排一次，確認 Gemini 回應速度；Vertex AI 遇到 429（配額）就等一下再錄
 
 ## 4. 錄製與剪輯
 

@@ -64,7 +64,7 @@ BunnBaa 的 AI 功能已經涵蓋大部分賽題方向，弱點在「Google Clou
 - 好處：服務帳號認證、不怕 API key 外洩、沒有免費層 429（`withRetry` 留著當保險）。
 - **驗證**：emulator 跑一次預購助理、拍照上架、轉讓媒合；embedding 維度必須仍是 768，否則 `firestore.indexes.json` 的向量索引會失效、`menu_embeddings` 要重算。
 - **已完成**：`gemini.js` 改用 `@google/genai`（Vertex 模式），預設 `global` 端點（`VERTEX_LOCATION` 可覆蓋）；本機 emulator 用 `GEMINI_DISABLED=1` 取代原本「把 key 設空白」。已用假 fetch 確認請求打到 `aiplatform.googleapis.com`、function calling 迴圈與 768 維 embedding 格式正確。
-- **已部署**：Vertex AI API 已啟用、服務帳號已加 `roles/aiplatform.user`，`gemini-3.6-flash`（global）與 768 維 embedding 實測可用，全部 functions 已重新部署。待辦：在正式站實際問一次預購助理；`functions/.env` 裡的 `GEMINI_API_KEY` 可刪除。
+- **已部署**：Vertex AI API 已啟用、服務帳號已加 `roles/aiplatform.user`，`gemini-3.6-flash`（global）與 768 維 embedding 實測可用，全部 functions 已重新部署。正式站已實際問過預購助理、`functions/.env` 的 `GEMINI_API_KEY` 已刪除（10/12，見 TODO）。
 
 ### Firestore → BigQuery 同步（約 0.5 天）
 
@@ -144,7 +144,7 @@ FROM AI.FORECAST(
 - 主要用途是簡報上證明系統穩定，結果截圖放進投稿文件。
 - **已完成（10/10）**：`scripts/eval/assistantEval.js`，24 題（預算、不吃牛／豬／香菜、素食、全素、早午晚餐、花生／海鮮／麩質／蛋＋大豆過敏、多日方案、查不到的地區、要求直接下單、英文），結果在 `doc/評估/預購助理回答品質評估.md`。
   - 兩層：規則檢查（預算、過敏原、不吃的食材、素食、餐期、星期、催促字眼）＋ Gen AI Evaluation Service（`evaluateInstances` pointwise 自訂評分標準：需求符合度、有據性；評分模型 `gemini-2.5-pro`，Evaluation Service 只在 us-central1，新版 Gemini 只在 global，所以評審用 2.5 Pro）。
-  - 最終結果：規則檢查 24/24、過敏原違規 0、需求符合度 4.96、有據性 4.92（5 分制）。C19 有據性 3 分是評估限制：餐期時間來自系統提示，不在工具資料裡。
+  - 最終結果（2026-10-12 重跑，加入推薦理由後）：規則檢查 24/24、過敏原違規 0、需求符合度 4.79、有據性 4.96（5 分制），與 README、`Submission_EN.md` 一致；逐題結果見 `doc/評估/預購助理回答品質評估.md`。
   - 評估過程抓到並修掉的問題：過敏原欄位空白被說成「不含」（C09）、按常識可能含過敏原的品項仍被推薦（C09、C20）、午餐需求推了早餐店方案（C11）、查詢輪數用完交出「系統運作有誤」（C10，最後一輪的提示放錯位置被 API 拒絕）、英文店名與卡片不一致（C17）、「下午茶」沒說明平台只有三個餐期（C19）。
   - 權限：Evaluation Service 的服務代理（`gcp-sa-vertex-eval`）加了 `roles/aiplatform.user`。
 

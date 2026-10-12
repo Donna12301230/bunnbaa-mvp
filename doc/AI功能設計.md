@@ -104,19 +104,19 @@ flowchart LR
     end
   end
   FE --> CF
-  CF --> G["Gemini API（預計改 Vertex AI）<br/>文字・視覺・工具・向量"]
+  CF --> G["Gemini on Vertex AI<br/>文字・視覺・工具・向量"]
   CF --> P[FCM 推播]
   CF --> D["Firestore<br/>含 Vector Search"]
-  D -.-> B["分析層（規劃中）<br/>BigQuery・BigQuery AI・Looker Studio"]
+  D -.-> B["分析層（10/10 已上線）<br/>BigQuery・BigQuery AI・Looker Studio"]
 ```
 
-- **可行性**：正式站已上線，包含 74 支 Cloud Functions（2026-10-09 統計，與 `Submission_EN.md` 一致）、LINE Pay 端到端付款、中英雙語、QR 核銷
+- **可行性**：正式站已上線，包含 79 支 Cloud Functions（2026-10-12 統計，與 README、`Submission_EN.md` 一致）、LINE Pay 端到端付款、中英雙語、QR 核銷
 - **可擴展性**：
-    - 資料層：Firestore → BigQuery（官方 Extension），用 BigQuery AI（`AI.FORECAST`）做需求預測，結果寫回 Firestore 給商家後台
+    - 資料層：Firestore → BigQuery（官方 Extension），用 BigQuery AI（`AI.FORECAST`）做需求預測，結果寫回 Firestore 給商家後台（10/10 已上線）
     - 多語言已自動化，擴展到其他城市、國家的成本很低
     - 地區篩選已有縣市＋鄉鎮市區
     - 拍照上架讓接一家新店的成本趨近於零
-- **Google 技術棧**：Gemini（文字、視覺、function calling、embeddings）、Firebase、Firestore Vector Search、FCM、Cloud Scheduler，全部是 Google 服務，與比賽方向一致；規劃補上 Vertex AI、BigQuery、Looker Studio
+- **Google 技術棧**：Gemini（文字、視覺、function calling、embeddings）、Firebase、Firestore Vector Search、FCM、Cloud Scheduler，全部是 Google 服務，與比賽方向一致；Gemini 已改走 Vertex AI，並已加上 BigQuery、BigQuery AI、Looker Studio（10/10）
 
 ## 風險與時程
 

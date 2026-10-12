@@ -98,7 +98,7 @@
   - 仁和雅店主名下的份數測試訂單 `EJEL6PRO`（可選）
 - [ ] README 的數字（10/12 已更新：Functions 79、logic 64、rules 65、Functions 測試 144；README、Submission_EN、簡報都已改。最後一次跑測試後再核對）：Functions 數量（最後再數一次：在 `functions/` 執行 `node -e "console.log(Object.keys(require('./src/index.js')).length)"`）、測試數字
 - [ ] 最後一次合併後確認 GitHub Actions 的 Hosting、Functions 部署都成功
-- [ ] **repo 目前是 private**：設成公開（或確認評審有權限），把 repo 網址給 B 填進 `Submission_EN.md`、README 與報名表單
+- [x] **repo 已公開**（10/12 用 `gh repo view` 確認 visibility=PUBLIC）；網址已在 `Submission_EN.md`，剩報名表單要填
 
 ---
 
@@ -163,7 +163,7 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 - [ ] **原型網址** `https://bunnbaa-mvp-5474.web.app/?lang=en`：`claude/amazing-dijkstra-uv5zcu`（英文預設語言）合併進 `master` 後才會上線
 - [ ] **3 分鐘影片**：MP4 1080p，上傳 YouTube（公開或不公開但有連結），長度 ≤ 3:00。**10/12：已錄完，剪輯中，還沒上傳**；上傳後連結要填進兩份 README、`Submission_EN.md`、簡報結尾頁
 - [ ] **類別**：表單只勾 **Sustainability**
-- [ ] **GitHub repo 網址**：公開前先做完下方「repo 公開前」
+- [ ] **GitHub repo 網址**填進報名表單（repo 已公開，下方「repo 公開後補做」仍要做完）
 
 ### 簡報素材
 - [ ] 團隊頁：三位成員英文拼音姓名＋角色（照片可選）
@@ -193,9 +193,9 @@ B 的項目都不用等 A：洞察卡需要的資料已經在正式站，商家�
 - [ ] 帳密寫進表單備註或 README 的「Try it」段落（兩份 README 的段落已建好，只剩填帳密）
 - [ ] 無痕視窗、未登入狀態把三個角色流程各走一次
 
-### repo 公開前
+### repo 公開後補做（repo 10/12 已公開）
 - [ ] git 歷史已掃過：沒有服務帳號金鑰或 LINE Pay secret；`AIza…` 是 Firebase Web API key（設計上公開），到 GCP Console 加 HTTP referrer 限制只允許 `bunnbaa-mvp-5474.web.app`
-- [ ] 個資與內部文件：本檔有管理員 Email、成員本名與分工，`ISMS_管理制度文件.md`、`ISO27001_落差分析.md` 也是內部文件——公開前移出 repo 或至少拿掉 Email
+- [ ] 個資與內部文件：本檔有管理員 Email、成員本名與分工，`ISMS_管理制度文件.md`、`ISO27001_落差分析.md` 也是內部文件——移出 repo 或至少拿掉 Email
 - [ ] `doc/` 的中文規格書、開發指南、`.docx`：移到私人位置，或在 README 註明 "internal notes, in Chinese"
 - [x] 程式碼註解翻成英文（`claude/amazing-dijkstra-uv5zcu`，263 個檔案；只動註解，去掉註解後的程式碼逐 token 比對相同；註解裡剩下的中文是程式實際輸出或比對的文字、畫面標籤、品牌名與中文檔名路徑）。**A、B 各自的分支要先合併 master，衝突都只會在註解行**
 - [ ] README 方括號：影片連結、PDF 連結、repo 網址、demo 帳密（Functions 數量與測試數字 10/12 已更新）
