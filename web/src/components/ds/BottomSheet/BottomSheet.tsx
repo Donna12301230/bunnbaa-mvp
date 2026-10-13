@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { cx } from '../_shared/cx';
 import { usePresence } from '../_shared/usePresence';
 import { useDialogBehavior } from '../_shared/useDialogBehavior';
+import { useVisibleViewport } from '../_shared/useVisibleViewport';
 import { Portal } from '../ThemeRoot';
 import '../Modal/Modal.css'; // shares .bb-modal__close
 import './BottomSheet.css';
@@ -51,6 +52,8 @@ export function BottomSheet({
   };
   // Only enable once the panel has actually mounted (focus, focus trap, scroll lock)
   useDialogBehavior(panelRef, open && mounted, safeClose, !loading);
+  // Keyboard open: fit the sheet above it so an input in the footer stays visible
+  const viewport = useVisibleViewport(open && mounted);
 
   function onPointerDown(e: PointerEvent<HTMLDivElement>) {
     if (loading) return;
@@ -75,7 +78,11 @@ export function BottomSheet({
 
   return (
     <Portal>
-      <div className="bb-sheet" data-state={visible ? 'open' : 'closed'}>
+      <div
+        className="bb-sheet"
+        data-state={visible ? 'open' : 'closed'}
+        style={viewport ? { top: viewport.top, height: viewport.height, bottom: 'auto' } : undefined}
+      >
         <div
           className="bb-sheet__overlay"
           aria-hidden="true"

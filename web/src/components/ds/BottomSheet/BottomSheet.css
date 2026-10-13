@@ -21,7 +21,8 @@
   flex-direction: column;
   width: 100%;
   max-width: 560px;
-  max-height: 88dvh;
+  /* 100%: stays within the sheet when it is shrunk to the area above the keyboard */
+  max-height: min(88dvh, 100%);
   background: var(--surface);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   box-shadow: var(--shadow-lg);

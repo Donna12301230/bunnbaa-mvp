@@ -17,3 +17,5 @@ serviceAccount*.json
 
 # Word 開檔時的暫存檔
 ~$*
+
+firebase-export-*/
