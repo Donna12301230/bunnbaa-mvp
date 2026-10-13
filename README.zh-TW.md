@@ -29,7 +29,7 @@
 | 角色 | Email | 密碼 |
 |---|---|---|
 | 消費者 | `customer@bunnbaa.test` | `demo123` |
-| 商家 | [demo 商家 email] | [密碼] |
+| 商家 | `vendor@bunnbaa.test` | `demo1234` |
 
 付款走 LINE Pay **Sandbox**，不會真的扣款。
 

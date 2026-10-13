@@ -10,7 +10,7 @@
 
 - [ ] `ckchildlikekid@gmail.com`（GCP 專案擁有者）開 2FA；SU 確認管理員帳號密碼夠強、Google 帳號有 2FA
 - [ ] Firebase Web API key 加 HTTP 參照網址限制：`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`bunnbaa-mvp-5474--*.web.app/*`、`localhost:5300/*`
-- [ ] 正式站示範商家帳號（A＋B）：不放真實資料，密碼補進 `web/src/lib/demoAccounts.ts` 與 README「Try it」；不給評審管理員帳號
+- [x] 正式站示範商家帳號（A＋B）：`vendor@bunnbaa.test` 已建好並綁仁和雅，登入頁有一鍵登入，README「Try it」兩份都已補上（10/13 正式站實測：按「以店家身分體驗」進得了店家後台）；不給評審管理員帳號
 - [ ] 以上做完，無痕＋英文瀏覽器走一次評審路徑：開站 → 看菜單 → 體驗帳號登入 → 問預購助理 → 商家帳號看備料與預估
 
 ## 🔴 A：消費者端＋後端

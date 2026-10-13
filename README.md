@@ -29,7 +29,7 @@ Open the live prototype. The interface is in English unless your browser is set 
 | Role | Email | Password |
 |---|---|---|
 | Diner | `customer@bunnbaa.test` | `demo123` |
-| Vendor | [demo vendor email] | [password] |
+| Vendor | `vendor@bunnbaa.test` | `demo1234` |
 
 Payments run in the LINE Pay **sandbox**, so no real money moves.
 
