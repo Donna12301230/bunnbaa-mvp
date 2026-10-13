@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
+import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where, writeBatch } from "firebase/firestore";
 import { Bell } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,8 +36,18 @@ export default function NotificationBell() {
     if (n.link) navigate(n.link);
   }
 
+  // Seeing the list counts as reading it: when the menu closes, mark everything shown as read so the badge clears
+  // (they stay bold while the menu is open so new ones are easy to spot)
+  function markAllRead() {
+    const pending = items.filter((n) => !n.read);
+    if (pending.length === 0) return;
+    const batch = writeBatch(db);
+    pending.forEach((n) => batch.update(doc(db, "notifications", n.id), { read: true }));
+    batch.commit().catch(() => {});
+  }
+
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(isOpen) => { if (!isOpen) markAllRead(); }}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative w-10 h-10 text-muted-foreground [&_svg]:size-5" aria-label={tr(`通知，${unread} 則未讀`, `Notifications, ${unread} unread`)}>
           <Bell />
