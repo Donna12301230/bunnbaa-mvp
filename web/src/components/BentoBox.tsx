@@ -53,7 +53,7 @@ export function itemCells(item: MenuItem, componentsById: Record<string, Compone
 }
 
 /**
- * Compartment bento box (simplification proposal §5.2): each compartment is a side dish, colored by ingredient category. The first one (usually rice) spans two rows on the left.
+ * Compartment bento box: each compartment is a side dish, colored by ingredient category. The first one (usually rice) spans two rows on the left.
  * size="thumb" is the thumbnail on menu cards; size="edit" lets you click a compartment to edit it or press "Add a compartment".
  */
 export default function BentoBox({ cells, size = "thumb", onAdd, empty }: {
@@ -117,7 +117,7 @@ export default function BentoBox({ cells, size = "thumb", onAdd, empty }: {
   );
 }
 
-/** Cost / margin bar (simplification proposal §5.2). The higher cost is as a share of price, the redder */
+/** Cost / margin bar. The higher cost is as a share of price, the redder */
 export function MarginBar({ cost, price }: { cost: number; price: number }) {
   if (!(price > 0) || !(cost > 0)) return null;
   const costPct = Math.min(100, Math.round((cost / price) * 100));

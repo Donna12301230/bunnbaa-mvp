@@ -77,7 +77,7 @@ function pickupWindowsProblem(windows: string[]): string | null {
       if (windowsOverlap(windows[i], windows[j])) return tr(`取餐時段「${slotLabel(windows[i])}」跟「${slotLabel(windows[j])}」重疊了`, `Pickup times ${slotLabel(windows[i])} and ${slotLabel(windows[j])} overlap`);
     }
   }
-  // Spec 1002 §2: one pickup slot per meal period, each at most 2 hours (breakfast, lunch and dinner counted separately)
+  // one pickup slot per meal period, each at most 2 hours (breakfast, lunch and dinner counted separately)
   if (pickupRangeMinutes(windows) > MAX_PICKUP_RANGE_MINUTES) return tr("每個餐期的取餐時段（最早到最晚）不可超過 2 小時", "Each meal's pickup window can't exceed 2 hours");
   return null;
 }
@@ -88,7 +88,7 @@ function pickupWindowsProblem(windows: string[]): string | null {
 // vendors/{id} (firestore.rules lets the vendor owner change only these fields; only admins can change the store name),
 // and diner-side pickup slot selection and checkout validation follow these settings (lib/pickupSlots.ts, functions/src/pricing.js).
 // The cover image moved to vendors/{id}.cover_image on 2026-09-28. The Parse prototype's "table QR (dine-in ordering)"
-// was removed the same day: TODO §7 decided against dine-in ordering, and the /menu/:id page the QR linked to never existed.
+// was removed the same day: dine-in ordering is out of scope, and the /menu/:id page the QR linked to never existed.
 export default function VendorPortalSettings() {
   const { toast } = useToast();
 
@@ -103,7 +103,7 @@ export default function VendorPortalSettings() {
   const [newHoliday, setNewHoliday] = useState("");
   const [pickupWindows, setPickupWindows] = useState<string[]>(DEFAULT_PICKUP_WINDOWS);
   const [slotCapacity, setSlotCapacity] = useState("");
-  // Phase 1 spec §2 "vendor-adjustable"
+  // Vendor-adjustable settings
   const [cutoffTime, setCutoffTime] = useState(liveConfig().cutoffTime);
   const [safetyRate, setSafetyRate] = useState(String(DEFAULT_PLATFORM_CONFIG.safetyStockRate * 100));
   const [minQty, setMinQty] = useState(String(DEFAULT_PLATFORM_CONFIG.candidateMinQty));

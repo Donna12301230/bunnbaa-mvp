@@ -1,4 +1,4 @@
-// Growth rewards and coupons (spec §8, §9).
+// Growth rewards and coupons.
 //
 // vendors/{v}/rewardPeriods/{Monday date} (readable by the vendor owner / admins):
 //   net_revenue, refunds, tickets, carried_revenue, carried_tickets,
@@ -54,7 +54,7 @@ async function refreshRewardStatus(vendorId) {
 }
 
 /**
- * onOrderCompleted / onOrderRefunded (§8.1, §8.2):
+ * onOrderCompleted / onOrderRefunded:
  * - Pickup completed or converted to a charity meal → add to net revenue, add to the payer's cumulative spend, one draw ticket per NT$100
  * - Refunded after being counted (work-suspension cancellation etc.) → subtract from the current period's revenue (may go negative, carried over) and revoke draw tickets whose pool hasn't opened
  */
@@ -137,7 +137,7 @@ async function uncountLock(lockRef) {
 }
 
 /**
- * Settle the previous period (§8.1, §8.4): the pool opens only when cumulative net revenue (including carry-over) reaches minRevenueToOpen (NT$10,000);
+ * Settle the previous period: the pool opens only when cumulative net revenue (including carry-over) reaches minRevenueToOpen (NT$10,000);
  * reward pool = revenue × rewardRate (5%); otherwise revenue and draw tickets carry over to the next period (no forced opening).
  * Idempotent: periods already pooled / carried / paused are not recomputed.
  */
@@ -228,7 +228,7 @@ exports.triggerRewardPeriodNow = onCall({}, async (request) => {
   return closeRewardPeriods(vendorId);
 });
 
-/** Draw (§8.5): sampling without replacement inside a transaction, weighted by remaining count per tier */
+/** Draw: sampling without replacement inside a transaction, weighted by remaining count per tier */
 exports.drawTicket = onCall({}, async (request) => {
   assertSignedInUser(request, "抽獎");
   const uid = request.auth.uid;
@@ -323,7 +323,7 @@ exports.couponReminders = onSchedule({ schedule: "every day 10:00", timeZone: "A
   }
 });
 
-/** Vendor pauses participation in the next period (§9.4): needs 7 days' notice; from the week 7 days out, no draw tickets are issued and no pool opens; coupons already issued are still honored */
+/** Vendor pauses participation in the next period: needs 7 days' notice; from the week 7 days out, no draw tickets are issued and no pool opens; coupons already issued are still honored */
 exports.setRewardPause = onCall({}, async (request) => {
   const vendorId = await callerVendorId(request, request.data?.vendor_id);
   const ref = db().collection("vendors").doc(vendorId);
@@ -339,7 +339,7 @@ exports.setRewardPause = onCall({}, async (request) => {
 });
 
 /**
- * Anomaly detection (§9.5): flag and notify the platform and vendor; no automatic penalties.
+ * Anomaly detection: flag and notify the platform and vendor; no automatic penalties.
  * - Users with ≥ 3 refunds within 7 days
  * - A single user holding > 20% of a period's draw tickets
  * - > 2 accounts claiming coupons from the same device (users.device_id, written by the frontend at login)

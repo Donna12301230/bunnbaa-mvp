@@ -1,5 +1,5 @@
 // Server-side copy of web/src/lib/pricing.ts + web/src/lib/pickupSlots.ts.
-// Phase 1 spec (doc/第一階段規格.md):
+// Pricing rules:
 //   - Three meal periods: breakfast / lunch / dinner (classified by pickup slot start time); pickup only, business days Monday to Friday
 //   - Cut-off at cutoffTime (default 20:00) the day before pickup; vendors can move it earlier (vendors.cutoff_time) but not later
 //   - Booking window: at most 30 days ahead
@@ -88,7 +88,7 @@ function vendorPickupRange(vendor) {
 
 /**
  * Pickup slot range per meal period, e.g. { breakfast: "07:30-08:30", lunch: "11:00-13:00" }.
- * Charity meal conversion, pickup reminders and the prep timeline are all computed per meal period (§5.2, §7).
+ * Charity meal conversion, pickup reminders and the prep timeline are all computed per meal period.
  */
 function vendorPeriodRanges(vendor, config = DEFAULT_PLATFORM_CONFIG) {
   const byPeriod = {};

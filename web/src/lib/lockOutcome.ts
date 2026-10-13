@@ -55,7 +55,7 @@ export function revenueOf(lock: Pick<Lock, "status" | "locked_price"> & { kept_a
   return REVENUE_STATUSES.has(lock.status) ? Number(lock.locked_price) || 0 : 0;
 }
 
-/** Pickup number: 4 digits (phase 1 spec); legacy records without one use the last 8 characters of the lock id */
+/** Pickup number: 4 digits; legacy records without one use the last 8 characters of the lock id */
 export function pickupCode(lock: Pick<Lock, "id" | "pickup_code">): string {
   return lock.pickup_code ?? lock.id.slice(-8).toUpperCase();
 }

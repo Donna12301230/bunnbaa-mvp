@@ -1,4 +1,4 @@
-// Vendor finance (spec §1, §9.3): platform commission, minimum wage, this month's earnings dashboard.
+// Vendor finance: platform commission, minimum wage, this month's earnings dashboard.
 // Partnership plan revised 2026-10-05: no monthly fee (the old maintenance fee, grace period, order suspension and free first month are gone); instead a
 // commission of commissionRate (default 5%) on the amount paid per meal, deducted at payout (index.js settleVendorPayout) and listed as a cost on the earnings dashboard.
 // Amounts and portion counts are always computed in code (no AI). Pure functions are in module.exports.helpers for tests.
@@ -26,7 +26,7 @@ const { PAID_STATUSES, revenueOf } = require("./pricing");
 const hasMeal = (l) => PAID_STATUSES.includes(l.status);
 
 /* ------------------------------------------------------------------ *
- * Minimum wage (§9.3): the platform updates it automatically (per the Ministry of Labor announcement, applied on its effective date);
+ * Minimum wage: the platform updates it automatically (per the Ministry of Labor announcement, applied on its effective date);
  * vendor inputs below the minimum wage are rejected, and when it rises, vendor settings are raised automatically with a notification
  * ------------------------------------------------------------------ */
 
@@ -49,7 +49,7 @@ function raiseToMinimum(vendor, wage) {
 
 exports.syncMinimumWage = onSchedule({ schedule: "10 0 * * *", timeZone: "Asia/Taipei", region: REGION }, async () => {
   // Phase 1 data source: platform admins enter the Ministry of Labor announcement in platformConfig/minimumWage (including future entries in history);
-  // this job applies it daily by effective date. Fetching Ministry of Labor data automatically is still to be decided (spec §16).
+  // this job applies it daily by effective date. Fetching Ministry of Labor data automatically is still to be decided.
   const today = taipeiToday();
   const doc = await loadMinimumWage(db());
   const wage = wageOn(doc, today);
@@ -105,7 +105,7 @@ exports.updateVendorCosts = onCall({}, async (request) => {
 });
 
 /* ------------------------------------------------------------------ *
- * This month's earnings dashboard (§9.3): revenue (confirmed + forecast), materials, labor, fees, platform commission, salaries, fixed costs → forecast net profit
+ * This month's earnings dashboard: revenue (confirmed + forecast), materials, labor, fees, platform commission, salaries, fixed costs → forecast net profit
  * ------------------------------------------------------------------ */
 
 function monthDays(month) {
@@ -150,7 +150,7 @@ function dayLaborMinutes(locks, catalog, vendor, config) {
   return minutes;
 }
 
-/** Gross margin per portion (§9.3): price after the deepest early-bird discount (EARLY_BIRD_TIERS, currently 20% off) − material cost per portion; flagged red when the margin is below 30% of material cost */
+/** Gross margin per portion: price after the deepest early-bird discount (EARLY_BIRD_TIERS, currently 20% off) − material cost per portion; flagged red when the margin is below 30% of material cost */
 function itemMargins(catalog, config) {
   const out = [];
   for (const item of Object.values(catalog.itemsById)) {

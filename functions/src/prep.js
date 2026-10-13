@@ -1,4 +1,4 @@
-// Deterministic prep and purchasing calculations (spec §5). Pure functions: portions, raw ingredient amounts, process timeline, pickup labels,
+// Deterministic prep and purchasing calculations. Pure functions: portions, raw ingredient amounts, process timeline, pickup labels,
 // rounding of order quantities and split-day deliveries. AI does no quantity math; Gemini only turns the results into spoken-style hints.
 
 const { rawAmount } = require("./bento");
@@ -83,7 +83,7 @@ function rawNeeds(portionsByComponent, componentsById, ingredientsById) {
 }
 
 /**
- * Process timeline (§5.4): worked backwards from the pickup start time. Backward scheduling + greedy allocation by equipment capacity:
+ * Process timeline: worked backwards from the pickup start time. Backward scheduling + greedy allocation by equipment capacity:
  * 1. Boxing and labeling in the PACKING_MINUTES minutes before pickup.
  * 2. Components that can be made ≥ 8 hours ahead go to "the night before".
  * 3. The rest, ordered by total work time from longest to shortest; each dish is split into ceil(portions / batch capacity) batches,
@@ -135,7 +135,7 @@ function buildTimeline(portionsByComponent, componentsById, pickupStart) {
   };
 }
 
-/** Pickup labels (§6.3): one per box, no names printed */
+/** Pickup labels: one per box, no names printed */
 function buildLabels(locks, itemsById) {
   return locks
     .map((lock) => {
@@ -169,7 +169,7 @@ function roundToPurchaseUnit(amount, ingredient) {
 }
 
 /**
- * Split-day delivery (§5.3): items with shelf life ≤ 3 days (leafy greens) are best delivered in batches, each covering at most shelf_days days;
+ * Split-day delivery: items with shelf life ≤ 3 days (leafy greens) are best delivered in batches, each covering at most shelf_days days;
  * everything else arrives once on Monday. byDay: [{ date, amount }] (Monday to Friday).
  */
 function splitDeliveries(byDay, ingredient) {

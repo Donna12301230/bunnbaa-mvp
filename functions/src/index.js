@@ -13,7 +13,7 @@ const { translateTexts, translationPatch, dishNamesPatch, TRANSLATED_FIELDS } = 
 const { loadPlatformConfig } = require("./config");
 const { commissionOf, revenueOf } = require("./pricing");
 
-// Phase 1 spec (doc/第一階段規格.md) features are split into modules:
+// Bento, recipe, purchasing, reward and charity features are split into modules:
 //   orders.js     order pricing, LINE Pay, cut-off wish decisions, daily prep, QR pickup, cancellation refunds
 //   charity.js    donating as charity meals, no-shows to charity meals, reservations/timeouts, waste logging
 //   rewardsFns.js reward pool, draw tickets, coupons, anomaly detection
@@ -28,7 +28,7 @@ const { commissionOf, revenueOf } = require("./pricing");
 // The Cloud Functions in each module's exports are all registered at the end of this file.
 
 /* ------------------------------------------------------------------ *
- * 1. Vendor calibration — scheduled, batched per vendor (spec 4.4)
+ * 1. Vendor calibration — scheduled, batched per vendor
  * ------------------------------------------------------------------ */
 
 /**
@@ -76,7 +76,7 @@ async function buildVendorHistory(vendorId, { maxPeriods = 14 } = {}) {
     .slice(-maxPeriods);
 }
 
-// Spec ref: README "Not yet implemented" — reliability_tone was a hand-set field;
+// reliability_tone used to be a hand-set field;
 // this ties it to the same accuracy_rate the calibration report already
 // computes, so the badge on the consumer page stays in sync automatically.
 // accuracy_rate is computed in code by vendorCalibration.calibrationStats (not an LLM), so the badge can be trusted.
@@ -119,8 +119,7 @@ async function runCalibrationForVendor(vendorId) {
 
 /**
  * Runs once a day. MVP pilot has a handful of vendors, so this simply loops
- * through all of them sequentially — batch/queue if the vendor count grows
- * (see spec 4.4).
+ * through all of them sequentially — batch/queue if the vendor count grows.
  */
 exports.dailyCalibration = onSchedule(
   { schedule: "every day 23:30", timeZone: "Asia/Taipei", region: "asia-east1" },
@@ -150,11 +149,10 @@ exports.triggerCalibrationNow = onCall({ region: "asia-east1" }, async (request)
   return { report_id: reportId };
 });
 
-// Taking over in the resale market is now a paid takeover (spec §4.1): createResaleLinePayReservation + confirmLinePayPayment (orders.js)
+// Taking over in the resale market is now a paid takeover: createResaleLinePayReservation + confirmLinePayPayment (orders.js)
 
 /* ------------------------------------------------------------------ *
  * 1b. Vendor payouts — platform collects, then forwards on a schedule
- * (spec ref: refactoring guide §5.1/§5.4 — "Route A: platform collects payments and pays vendors periodically").
  * Partnership plan revised 2026-10-05: no monthly fee; a commission of commissionRate on the amount paid per meal
  * (default 5%, rounded per portion); payout amount = total paid − commission.
  * This scaffolds the aggregation + a payout record with mock
@@ -180,7 +178,7 @@ async function settleVendorPayout(vendorId) {
   const unsettled = snap.docs.filter((d) => {
     const data = d.data();
     if (data.payout_settled) return false;
-    // Charity meals (from no-shows or voluntary donations) still count toward vendor revenue (§7.1); under the old scheme no-shows were prepaid and non-refundable, and since 2026-10-09 they are paid out the same way
+    // Charity meals (from no-shows or voluntary donations) still count toward vendor revenue; under the old scheme no-shows were prepaid and non-refundable, and since 2026-10-09 they are paid out the same way
     if (["fulfilled", "resold_and_fulfilled", "charity", "no_show"].includes(data.status)) return true;
     // Diner cancellations only get a coupon, no cash refund (orders.js cancelForCoupon): the money kept is also paid to the vendor, who later honors that coupon
     return data.status === "cancelled" && payableOf(data) > 0;
@@ -246,7 +244,7 @@ exports.triggerSettlementNow = onCall({ region: "asia-east1" }, async (request) 
 });
 
 /* ------------------------------------------------------------------ *
- * 2. Vendor what-if follow-up (spec 4.1a)
+ * 2. Vendor what-if follow-up
  * ------------------------------------------------------------------ */
 exports.askCalibrationScenario = onCall({ region: "asia-east1" }, async (request) => {
   const { vendor_id: vendorId, question } = request.data || {};
@@ -378,7 +376,7 @@ exports.translateAllContent = onCall({ region: "asia-east1", timeoutSeconds: 540
 
 
 /* ------------------------------------------------------------------ *
- * Phase 1 spec modules
+ * Bento, recipe, purchasing, reward and charity modules
  * ------------------------------------------------------------------ */
 for (const mod of [
   "./orders", "./charity", "./rewardsFns", "./purchasing", "./insights", "./disaster",

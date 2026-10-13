@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-// Keyword for the top search bar (§4.5). MarketplaceHeader writes it and the pre-order meals page reads it;
+// Keyword for the top search bar. MarketplaceHeader writes it and the pre-order meals page reads it;
 // the hash router makes passing a query string awkward, so like setPreferredPickup it uses a module-level store.
 let current = "";
 const listeners = new Set<() => void>();

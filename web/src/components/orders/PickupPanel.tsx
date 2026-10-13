@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import type { Lock } from "@/types";
 
 /**
- * Pickup redemption (spec §6): the vendor scans the diner's QR (a server-signed one-time token) with the phone's web camera;
+ * Pickup redemption: the vendor scans the diner's QR (a server-signed one-time token) with the phone's web camera;
  * the screen shows the pickup number, main dish, actual sides (wish result), more/less rice, coupon discount and amount paid, and "Complete pickup"
  * triggers onOrderCompleted (counted in sales, issues draw tickets). Only the store's own account can redeem.
  * Fallback: 4-digit pickup number + last three digits of the phone. Proxy pickup: supports scanning several in a row. Charity-meal reservation QRs are scanned here too.

@@ -64,7 +64,7 @@ const toMin = (hm: string | undefined) => {
 const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 
 /**
- * Draws the timeline (simplification proposal §4, §5.1): cook → pack → pickup as three horizontal bars, replacing the "10:40 pack" text list.
+ * Draws the timeline: cook → pack → pickup as three horizontal bars, replacing the "10:40 pack" text list.
  * Fine-grained equipment and batch scheduling lives under "Detailed schedule" (third tier, only high-volume vendors need it).
  */
 function PickupTimeline({ timeline, range, label, showNow }: { timeline: Timeline; range: string; label?: string; showNow?: boolean }) {
@@ -113,7 +113,7 @@ interface PrepPlan {
   pickup_range: string;
   components: { component_id: string; name: string; portions: number }[];
   timeline: Timeline;
-  // Spec 1002 §5.2: the timeline works backward from each meal period's pickup start time
+  // the timeline works backward from each meal period's pickup start time
   timelines?: Partial<Record<MealPeriod, Timeline & { range: string; order_count: number }>>;
   labels: { lock_id: string; pickup_code: string; pickup_window: string; item: string; main: string | null; fixed?: string[]; sides: string[]; rice: string | null; note: string | null }[];
   shortages: { ingredient_id: string; name: string; unit: string; need: number; have: number; short: number }[];
@@ -255,7 +255,7 @@ function Fold({ title, open, onToggle, children, className }: { title: ReactNode
 }
 
 /**
- * Today's prep (spec §5.4; simplification proposal §5.1): the page only answers "what do I do now".
+ * Today's prep: the page only answers "what do I do now".
  * - Top: three stat cards: portions, progress, shortages
  * - Middle: pickup timeline (cook → pack → pickup)
  * - Bottom: prep tiles, tap = done. Works without recipes (first tier): uses item portion counts from orders as tiles

@@ -40,7 +40,7 @@ function Bar({ label, value, max, text, cls = "bg-brand" }: { label: string; val
 }
 
 /**
- * Area insights (spec §10.2): within 1 km of the pickup point, last 30 days; stats with fewer than 20 people are hidden.
+ * Area insights: within 1 km of the pickup point, last 30 days; stats with fewer than 20 people are hidden.
  * Anonymous aggregates only: wishes for your store (progress bar to the "reference list" threshold), nearby taste shares, supply-demand gaps, wish ranking, "don't want" rate.
  */
 export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {

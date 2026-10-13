@@ -18,7 +18,7 @@ import PortalPageHeader from "@/components/PortalPageHeader";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 
 /**
- * Global platform settings (spec §2): stored in platformConfig/global and set platform-wide; in phase one vendors can only adjust
+ * Global platform settings: stored in platformConfig/global and set platform-wide; in phase one vendors can only adjust
  * within the "vendor-adjustable" range. Functions and the frontend read the same document (missing fields use defaults).
  */
 function PlatformContent() {

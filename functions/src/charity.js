@@ -1,4 +1,4 @@
-// No-shows and charity meals (spec §7). Charity meals appear in the "Charity meals" (愛心餐) tab of the resale market (user decision, 2026-09-30).
+// No-shows and charity meals. Charity meals appear in the "Charity meals" (愛心餐) tab of the "My meals" page.
 //
 // charityMeals/{id} (publicly readable, no personal data at all):
 //   vendor_id, vendor_name, vendor_address (+ *_en English copies), lat, lng, date, source: noshow|donated, status: available|reserved|claimed|given|wasted,
@@ -44,7 +44,7 @@ function mealFromLock(lockId, lock, vendor, source, deadline) {
 }
 
 /**
- * "Charity meals nearby" push (§7.3): off by default; sent only to users who turned it on, within 1 km of their usual location (coarse geohash),
+ * "Charity meals nearby" push: off by default; sent only to users who turned it on, within 1 km of their usual location (coarse geohash),
  * during the charity meal window, at most 2 per person per day.
  */
 async function notifyNearby(vendor, count) {
@@ -189,7 +189,7 @@ exports.closeCharity = onSchedule({ schedule: "every 10 minutes", timeZone: "Asi
 });
 
 /**
- * Online reservation (§7.2): phone-verified account, 1 per person per day, arrive within 10 minutes; released on timeout, no ban.
+ * Online reservation: phone-verified account, 1 per person per day, arrive within 10 minutes; released on timeout, no ban.
  */
 exports.reserveCharity = onCall({}, async (request) => {
   assertSignedInUser(request, "預約愛心餐");
@@ -236,7 +236,7 @@ exports.reserveCharity = onCall({}, async (request) => {
   return { reservation_id: resRef.id, expires_at: expires };
 });
 
-/** No-show after reserving: release the meal to the next person (no ban, §7.2), and clear reservations older than 30 days */
+/** No-show after reserving: release the meal to the next person (no ban), and clear reservations older than 30 days */
 exports.expireCharityReservation = onSchedule({ schedule: "every 1 minutes", timeZone: "Asia/Taipei", region: REGION }, async () => {
   const config = await loadPlatformConfig(db());
   const expired = await db().collection("charityReservations")
@@ -280,7 +280,7 @@ exports.giveCharityOnsite = onCall({}, async (request) => {
 });
 
 /**
- * After 15:00 the vendor enters the number given out on site; the rest are recorded as waste (§7.2, §7.5). Waste goes into prepPlans
+ * After 15:00 the vendor enters the number given out on site; the rest are recorded as waste. Waste goes into prepPlans
  * and is used by next week's forecast (buildWeeklyPurchase subtracts wasted portions).
  */
 exports.submitCharityResult = onCall({}, async (request) => {
@@ -309,7 +309,7 @@ exports.submitCharityResult = onCall({}, async (request) => {
     charity_result: { total: meals.size, reserved_claimed: claimed, given_onsite: Math.min(given, open.length), wasted, submitted_at: FieldValue.serverTimestamp() },
   }, { merge: true });
   await batch.commit();
-  // All of the day's charity meals were given out (§7.4): notify the original buyers, only once
+  // All of the day's charity meals were given out: notify the original buyers, only once
   const planRef = db().collection("vendors").doc(vendorId).collection("prepPlans").doc(date);
   const alreadyNotified = (await planRef.get()).data()?.charity_all_given_notified;
   const wastedBefore = meals.docs.filter((d) => d.data().status === "wasted").length;

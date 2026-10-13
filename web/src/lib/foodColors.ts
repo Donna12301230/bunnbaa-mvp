@@ -1,7 +1,7 @@
 import type { Component, Ingredient } from "@/types";
 import { tr } from "@/lib/i18n";
 
-// Fixed colors per ingredient category (simplification proposal §4): rice yellow, meat / fish coral, vegetables green, packaging purple, shared site-wide.
+// Fixed colors per ingredient category: rice yellow, meat / fish coral, vegetables green, packaging purple, shared site-wide.
 // Bento cells, prep cards and composition cells all use these colors, so vendors can tell the category by color.
 
 export type FoodGroup = "rice" | "protein" | "veg" | "pack" | "other";

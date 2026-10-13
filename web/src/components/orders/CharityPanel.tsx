@@ -22,7 +22,7 @@ export const CHARITY_STATUS: Record<string, { zh: string; en: string; dot: strin
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 
 /**
- * Charity meals (spec §7): bentos not picked up 30 minutes after the pickup slot ends are moved here automatically, along with ones diners donated themselves.
+ * Charity meals: bentos not picked up 30 minutes after the pickup slot ends are moved here automatically, along with ones diners donated themselves.
  * Diners who reserved one show a QR on arrival, scanned in the "Pickup" tab; unreserved ones are first come, first served on site (tap "Hand out" on the card).
  * After the deadline (2 hours after the slot ends), enter the number handed out on site with − +; the rest is recorded as waste, which is used to correct next week's forecast.
  * Vendors can't see the reserving diner's personal data.

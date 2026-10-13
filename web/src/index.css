@@ -125,7 +125,7 @@
   --focus: #f29e0c;               /* --brand-orange: focus outline */
   --legacy-shadow-sm: 0 2px 8px rgba(120, 80, 40, 0.05);
 
-  /* status colors — one pair per lock.status value (spec §04 design tokens) */
+  /* status colors — one pair per lock.status value */
   --status-locked: #a34f00;      --status-locked-bg: #fdebd3;
   --status-resale: #8f6315;      --status-resale-bg: #fbf1dc;
   --status-fulfilled: #437552;   --status-fulfilled-bg: #e6f2e9;
@@ -194,7 +194,7 @@ body { margin: 0; background: var(--legacy-bg); color: var(--ink); }
   color: var(--brand);
 }
 
-/* lock.status badge — color is fixed per status value, shared by both ends (spec §05 component library) */
+/* lock.status badge — color is fixed per status value, shared by both ends */
 .legacy-ui .status-badge {
   display: inline-flex; align-items: center; height: 24px; vertical-align: middle;
   font-size: 12px; font-weight: 600; line-height: 1;

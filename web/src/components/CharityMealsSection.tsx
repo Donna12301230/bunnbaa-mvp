@@ -26,10 +26,10 @@ const closeHours = () => {
 const millis = (ts: unknown) => (ts as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
 
 /**
- * "Charity meals nearby" tab at the top of the "My meals" page (spec 1002 §4.5, §7; previously on the resale market page, moved to My meals in the 1002 spec).
+ * "Charity meals nearby" tab at the top of the "My meals" page.
  * No-show or donated bentos, picked up in person the same day: reserve online (phone verification, 1 per person per day, arrive within 10 minutes; if late it goes to the next person, no suspension)
  * or first come, first served on site. Sorted by distance, showing remaining count, deadline and walking time; ones you can't reach in time are marked "Too late".
- * Charity meal reservations, pickups and views are never included in stats or recommendations (§10.3).
+ * Charity meal reservations, pickups and views are never included in stats or recommendations.
  */
 export default function CharityMealsSection() {
   const { user } = useAuth();

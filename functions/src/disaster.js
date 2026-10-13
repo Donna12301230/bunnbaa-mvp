@@ -1,4 +1,4 @@
-// Typhoons and disasters (spec §11).
+// Typhoons and disasters.
 // Data source: the NCDR (National Science and Technology Center for Disaster Reduction) CAP Atom feed (aggregating the Central Weather Administration and the Directorate-General of Personnel Administration),
 //   work/school suspension AlertType=33, typhoon AlertType=5. Overridable with DISASTER_FEED_BASE; when it can't be fetched, platform admins
 //   can create disaster events manually in the admin console (fallback).
@@ -236,7 +236,7 @@ exports.reprocessDisasterEvent = onCall({ timeoutSeconds: 300 }, async (request)
 });
 
 /**
- * Substitute an equivalent side during a disaster (§11; must be stated in the terms of purchase beforehand): for orders past cut-off, the vendor swaps one dish
+ * Substitute an equivalent side during a disaster (must be stated in the terms of purchase beforehand): for orders past cut-off, the vendor swaps one dish
  * for another of equal value, and diners are notified.
  */
 exports.substituteDish = onCall({}, async (request) => {

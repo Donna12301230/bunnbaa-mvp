@@ -321,10 +321,10 @@ BunnBaa/
 ├── extensions/             # Stream Firestore to BigQuery instance configs
 ├── scripts/                # seed data, automated tests, assistant evaluation (eval/)
 ├── firestore.rules / firestore.indexes.json / storage.rules
-└── doc/                    # specs, test plan, developer guide (Chinese)
+└── doc/                    # AI & Google Cloud design, assistant evaluation
 ```
 
-Detailed developer notes (in Chinese), covering the data model, the full list of functions and environment details: [`doc/開發指南.md`](doc/開發指南.md). The Google Cloud design is in [`doc/AI與GoogleCloud設計.md`](doc/AI與GoogleCloud設計.md).
+The AI and Google Cloud design (in Chinese) is in [`doc/AI與GoogleCloud設計.md`](doc/AI與GoogleCloud設計.md).
 
 ## Roadmap
 

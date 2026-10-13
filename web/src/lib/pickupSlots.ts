@@ -4,11 +4,11 @@ import { DEFAULT_PLATFORM_CONFIG, liveConfig } from "@/lib/platformConfig";
 import { EARLY_BIRD_TIERS } from "@/lib/pricing";
 
 // Pickup slots: the same rules as functions/src/pricing.js (the server validates again); change both together.
-// 1002 spec: three meal periods, breakfast / lunch / dinner (classified by slot start time), pickup only, business days Monday to Friday,
+// three meal periods, breakfast / lunch / dinner (classified by slot start time), pickup only, business days Monday to Friday,
 // cut-off at 20:00 the day before pickup (vendors can set it earlier), bookings up to 30 days ahead. Vendors can customize in the portal's "Store settings"
 // pickup_windows (one range per meal period, in 30-minute steps, each up to 2 hours) / business_hours / holidays.
 // window uses an ASCII hyphen (written to locks.pickup_window); slotLabel() swaps it for an en dash on screen.
-// Dates are always in Taipei time (spec §13).
+// Dates are always in Taipei time.
 export const DEFAULT_PICKUP_WINDOWS = ["11:00-11:30", "11:30-12:00", "12:00-12:30", "12:30-13:00"];
 
 export function slotLabel(window: string): string {
@@ -40,7 +40,7 @@ export function vendorWindows(vendor: MaybeSchedule): string[] {
   return [...list].sort((a, b) => toMinutes(a.split("-")[0]) - toMinutes(b.split("-")[0]));
 }
 
-// ── Meal periods (§2 meal period ranges) ──
+// ── Meal periods ──
 export const MEAL_PERIODS: MealPeriod[] = ["breakfast", "lunch", "dinner"];
 
 export function mealPeriodLabel(period: MealPeriod): string {
@@ -142,7 +142,7 @@ export function mondayOf(dateStr: string): string {
   return addDaysStr(dateStr, wd === 0 ? -6 : 1 - wd);
 }
 
-/** Furthest bookable date: 30 days out (spec §2 booking window) */
+/** Furthest bookable date: 30 days out */
 export function maxPickupDateStr(now: Date = new Date()): string {
   return addDaysStr(todayStr(now), liveConfig().bookingRangeDays);
 }
@@ -268,7 +268,7 @@ export function pickupRangeMinutes(windows: string[]): number {
   return longest;
 }
 
-/** Price date strip (§4.5): 30 days from tomorrow, each day's early-bird discount and whether it's bookable */
+/** Price date strip: 30 days from tomorrow, each day's early-bird discount and whether it's bookable */
 export interface PriceDay {
   date: string;
   discountPercent: number;

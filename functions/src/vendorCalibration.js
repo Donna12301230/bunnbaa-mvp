@@ -1,6 +1,5 @@
 /**
  * Vendor-side calibration agent.
- * Spec ref: tech doc v6, section 4.1 / 4.1a / 6.1
  *
  * Compares locked quantity vs. actual fulfillment per vendor, reads free-text
  * no-show/resale notes and consumer feedback, and produces a transparency

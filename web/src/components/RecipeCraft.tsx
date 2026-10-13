@@ -16,7 +16,7 @@ export interface CraftItem {
 }
 
 /**
- * Crafting grid (image in 待修改.docx row 4): "B + C + D → A", each material showing (on hand / needed), red when short.
+ * Crafting grid: "B + C + D → A", each material showing (on hand / needed), red when short.
  * Shared by the menu's materials total, today's prep pick list, and purchasing shortages.
  */
 export default function RecipeCraft({ items, target, onItemClick, haveNote, compact }: {

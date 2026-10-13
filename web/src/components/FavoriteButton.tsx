@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-/** Heart (favorite) button next to the badge on vendor cards (§4.5) */
+/** Heart (favorite) button next to the badge on vendor cards */
 export default function FavoriteButton({ vendorId, vendorName, className }: { vendorId: string; vendorName: string; className?: string }) {
   const { ids, toggle } = useFavorites();
   const requireLogin = useRequireLogin();

@@ -102,7 +102,7 @@ async function resolveProfile(u: User): Promise<UserProfile> {
   };
 }
 
-// Abuse detection (spec §9.5 "more than 2 accounts claiming coupons on the same device"): a random device id stored locally in the browser, recorded at sign-in to
+// Abuse detection: a random device id stored locally in the browser, recorded at sign-in to
 // users/{uid}.device_id. Used only for platform abuse flags, nothing else; skipped if reads/writes fail (private mode).
 function recordDevice(uid: string) {
   try {

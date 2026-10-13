@@ -1,4 +1,4 @@
-// doc/測試文件.md chapter 7: negative tests for the Firestore security rules plus related page cases.
+// Negative tests for the Firestore security rules plus related page cases.
 // Uses a separate demo-rules-test project so the dev emulator's data (bunnbaa-mvp-5474) is untouched.
 // Run:
 //   dev emulator already running → cd scripts/tests && npm run test:rules

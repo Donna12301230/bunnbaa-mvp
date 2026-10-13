@@ -1,5 +1,5 @@
 // Date helpers in Taipei time. Dates are always stored as YYYY-MM-DD (Taipei local); instants are built as Dates with +08:00.
-// Spec §13: times are in Asia/Taipei.
+// times are in Asia/Taipei.
 
 function taipeiToday(now = new Date()) {
   return now.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
@@ -31,7 +31,7 @@ function mondayOf(dateStr) {
   return addDays(dateStr, wd === 0 ? -6 : 1 - wd);
 }
 
-/** Booking window: at most 30 days ahead (spec §2 "booking window") */
+/** Booking window: at most 30 days ahead */
 const BOOKING_RANGE_DAYS = 30;
 function lastBookableDate(today = taipeiToday(), rangeDays = BOOKING_RANGE_DAYS) {
   return addDays(today, rangeDays);

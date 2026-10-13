@@ -25,7 +25,7 @@ const PREFS = [
 ];
 
 /**
- * Member center: taste preferences (spec §10.1, readable only by the owner) and notification settings (§7.3, §7.4).
+ * Member center: taste preferences and notification settings.
  * Explicit settings write tasteProfiles/{uid}.prefs / allergies; behavior-derived scores are computed on the backend (30-day half-life).
  * Allergy info is only used for the user's own filtering. Frequent locations store only a coarse geohash (about 150 m), never location history.
  */

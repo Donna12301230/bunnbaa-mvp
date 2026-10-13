@@ -55,7 +55,7 @@ service cloud.firestore {
                              .hasOnly(['description', 'address', 'phone', 'pickup_windows',
                                        'business_hours', 'holidays', 'slot_capacity', 'cover_image',
                                        'description_en', 'i18n_src',
-                                       // Phase 1 spec §2 "vendor-adjustable": cut-off can only move earlier, safety stock, candidate-dish minimum quantity;
+                                       // Vendor-adjustable settings: cut-off can only move earlier, safety stock, candidate-dish minimum quantity;
                                        // pickup point coordinates (area insights, nearby charity meals), new-vendor self-reported forecast, anomaly weeks
                                        'cutoff_time', 'safety_stock_rate', 'candidate_min_qty', 'lat', 'lng',
                                        'forecast_daily', 'anomaly_weeks',
@@ -137,7 +137,7 @@ service cloud.firestore {
       // since those Functions aren't deployed to prod yet (Blaze). Everything
       // below this comment is deliberately expressed as a plain client-side
       // rule instead of a Cloud Function, so it works today without waiting
-      // on the Blaze upgrade (TODO.md blocker 1).
+      // on the Blaze upgrade.
       allow update: if isAdmin()
                     // Buyer flips their own still-"locked" lock to "for_resale",
                     // optionally attaching a resale_deadline (pickup-window-based,
@@ -176,8 +176,7 @@ service cloud.firestore {
                         && recordsPreviousOwner()
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer_uid', 'transferred_from_uids', 'share_token']))
                     // Buyer cancels their own still-unclaimed for_resale/for_gift
-                    // listing back to locked (TODO.md 2026-09-22 to-do: cancelling a resale
-                    // had no matching rule). Only reachable while buyer_uid is still theirs —
+                    // listing back to locked. Only reachable while buyer_uid is still theirs —
                     // once someone else claims it, buyer_uid has already moved on.
                     // While someone is paying to take it over (resale_hold not expired), the seller can't cancel, or it would collide with the takeover transaction
                     || (isSignedInUser() && resource.data.buyer_uid == request.auth.uid
@@ -216,7 +215,7 @@ service cloud.firestore {
     // one, so after a gift/free-claim/resale handoff the previous buyer's stale
     // token is left in place instead of being handed to the new buyer — same
     // gap claimResoldLock used to have (it now deletes the token). Harmless for now since reminders are
-    // dormant pending VAPID key + Blaze deploy (TODO.md blocker 1). The buyer creates
+    // dormant pending VAPID key + Blaze deploy. The buyer creates
     // one for a lock they own; only that buyer or
     // an admin can read it; Cloud Functions (admin SDK) manage the rest.
     match /lock_tokens/{lockId} {
@@ -399,7 +398,7 @@ service cloud.firestore {
       // never touch their own profile fields again, since the resulting document
       // would always carry keys outside this allowlist.
       // muted_kinds: which notifications are turned off (e.g. charity meal notices); device_id: anomaly detection (multiple accounts on one device);
-      // home_geo: usual location, stored only as a coarse geohash (about 150 m, §14.2); no location history is stored
+      // home_geo: usual location, stored only as a coarse geohash (about 150 m); no location history is stored
       allow update: if isSignedInUser() && request.auth.uid == uid
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
                          ['display_name', 'phone', 'school', 'department', 'created_at', 'lang',
@@ -424,7 +423,7 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ── Phase 1 spec (doc/第一階段規格.md §12) ──────────────
+    // ── Bentos, recipes, rewards, charity meals ──────────────
     // Draws, redemptions, opening pools, cut-off and refunds are all written by Cloud Functions (admin SDK).
 
     // Platform-wide settings, dish library, fixed templates: publicly readable, only admins can change them
@@ -484,7 +483,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Favorites (§4.5): saved vendors, readable/writable only by the owner; also a positive taste-preference signal
+    // Favorites: saved vendors, readable/writable only by the owner; also a positive taste-preference signal
     match /users/{uid}/favorites/{vendorId} {
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow create: if isSignedInUser() && request.auth.uid == uid
@@ -514,7 +513,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Charity meals: the public list has no personal data; reservation records are readable by the owner, and vendors can't read personal fields (§12)
+    // Charity meals: the public list has no personal data; reservation records are readable by the owner, and vendors can't read personal fields
     match /charityMeals/{id} {
       allow read: if true;
       allow write: if false;

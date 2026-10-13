@@ -1,4 +1,4 @@
-// Bento composition, pricing and recipe conversion (spec §3, §4). Pure functions, no Firestore; the frontend's
+// Bento composition, pricing and recipe conversion. Pure functions, no Firestore; the frontend's
 // web/src/lib/bento.ts has the same rules (for display), but the server is authoritative.
 //
 // Bento fields on menu_items:
@@ -44,7 +44,7 @@ function componentCost(component, ingredientsById) {
   return cost;
 }
 
-/** Portion level (§3.3; phase 1 only has full/half): default dish cost ÷ candidate dish cost ≥ 0.75 is full, 0.5–0.75 half; < 0.5 returns null (not allowed as a candidate) */
+/** Portion level (phase 1 only has full/half): default dish cost ÷ candidate dish cost ≥ 0.75 is full, 0.5–0.75 half; < 0.5 returns null (not allowed as a candidate) */
 function portionLevelFor(defaultCost, candidateCost) {
   if (!(candidateCost > 0)) return 1;
   const ratio = defaultCost / candidateCost;
@@ -53,12 +53,12 @@ function portionLevelFor(defaultCost, candidateCost) {
   return null;
 }
 
-// Ingredient categories left out of the ingredient summary (§4.2): seasonings and packaging aren't "food in this portion"
+// Ingredient categories left out of the ingredient summary: seasonings and packaging aren't "food in this portion"
 const PORTION_SKIP_CATEGORIES = ["調味", "包材"];
 const UNIT_TEXT = { g: "克", ml: "毫升" };
 
 /**
- * Portion text for the ingredient summary (§4.2), derived from the recipe, e.g. "braised chicken leg 1 pc", "stir-fried cabbage 80 g".
+ * Portion text for the ingredient summary, derived from the recipe, e.g. "braised chicken leg 1 pc", "stir-fried cabbage 80 g".
  * Uses the dish's main ingredient (excluding seasonings and packaging; among the same unit, the largest amount; count units win over grams,
  * since "1 chicken leg" says more about the dish than "10 ml soy sauce"). Without a recipe, returns just the dish name.
  * portionTextFor in the frontend's web/src/components/BentoEditor.tsx follows the same rules; change both together.
@@ -81,7 +81,7 @@ function portionLabel(level) {
 }
 
 /**
- * Mains (§3.2): menu_items.mains = [{ name, component_id, price, image_url }], each priced separately;
+ * Mains: menu_items.mains = [{ name, component_id, price, image_url }], each priced separately;
  * the bento price is based on the chosen main. Legacy items without mains use item.main + item.price.
  * Returns { main: { name, component_id, index }, price } or { problem }.
  */
@@ -109,7 +109,7 @@ function sideOptions(item) {
 }
 
 /**
- * Fourth side (§4.2): extra = { slot, candidate: null|index, mode: "backup"|"addon" }.
+ * Fourth side: extra = { slot, candidate: null|index, mode: "backup"|"addon" }.
  * Allowed only once the standard number of sides is chosen (no slot set to "none"); can't duplicate a chosen dish; total can't exceed maxSides.
  * Returns { extra }, { extra: null } or { problem }.
  */
@@ -206,7 +206,7 @@ function resolveCustomPicks(item, picks) {
   return { custom, amount: custom.reduce((s, c) => s + c.price, 0) };
 }
 
-/** Price adjustments (§4.2): 1.5 bowls of rice +10, half bowl −5, one fewer side −5, fourth side as add-on +10 (backup 0); applied directly to the order amount */
+/** Price adjustments: 1.5 bowls of rice +10, half bowl −5, one fewer side −5, fourth side as add-on +10 (backup 0); applied directly to the order amount */
 function adjustAmount({ rice, removedCount, extraMode }, config = DEFAULT_PLATFORM_CONFIG) {
   let amount = removedCount > 0 ? removedCount * config.slotRemovePrice : 0;
   if (rice === "add") amount += config.riceAddPrice;
@@ -215,7 +215,7 @@ function adjustAmount({ rice, removedCount, extraMode }, config = DEFAULT_PLATFO
   return amount;
 }
 
-// ── Auto tags (§3.4): derived from the recipe ──
+// ── Auto tags: derived from the recipe ──
 const PROTEIN_CATEGORIES = { 雞: "雞", 豬: "豬", 牛: "牛", 海鮮: "海鮮", 魚: "海鮮", 素: "素", 豆: "素", 蛋: "素" };
 const VEG_CATEGORIES = ["葉菜", "根莖", "瓜類"];
 

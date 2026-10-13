@@ -59,7 +59,7 @@ const PORTION_SKIP_CATEGORIES = ["調味", "包材"];
 const UNIT_TEXT: Record<string, string> = { g: "克", ml: "毫升" };
 
 /**
- * Portion text for the materials total (§4.2), derived from the recipe: e.g. "滷雞腿 1 個", "炒高麗菜 80 克".
+ * Portion text for the materials total, derived from the recipe: e.g. "滷雞腿 1 個", "炒高麗菜 80 克".
  * Uses the main ingredient: excludes seasonings and packaging; piece/slice units win over grams ("1 chicken leg" says more about the dish than "10 ml soy sauce"),
  * and within one unit the largest quantity wins. Same rules as portionText in functions/src/bento.js; change both together.
  */
@@ -91,7 +91,7 @@ function formAsItem(value: BentoForm): MenuItem {
 const SELECT_CLASS = selectClass("md", "min-w-0 flex-1");
 
 /**
- * Combination preview (待修改.docx row 4): use dropdowns to build one serving from what's filled in above (rice, main, sides, custom fields);
+ * Combination preview: use dropdowns to build one serving from what's filled in above (rice, main, sides, custom fields);
  * below, a crafting grid lists all ingredients for this combination (on hand / needed), plus cost, price and margin. Preview only; nothing is saved.
  */
 function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsById, vendorId, orderCount }: {
@@ -256,7 +256,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
 }
 
 /**
- * Item structure editor (1002 spec §3.2, §3.3):
+ * Item structure editor:
  * - Item type: bento (customizable: rice + main + sides) or single item (ordered as is, e.g. savory congee, egg crepe)
  * - Meal periods served (breakfast / lunch / dinner, multi-select); pickup slots are set per meal period in vendor settings
  * - Multiple mains can be listed, each with its own price; the bento price follows the chosen main. Every dish needs a photo (diners pick dishes by image)

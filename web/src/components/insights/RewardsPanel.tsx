@@ -41,7 +41,7 @@ const STATUS: Record<string, { zh: string; en: string; cls: string }> = {
 const nt = (n: number) => `NT$${Math.round(n).toLocaleString()}`;
 
 /**
- * Reward coupons (spec §8, §9.3, §9.4): when cumulative net sales reach NT$10,000, 10% of it forms a reward pool, split into coupons for a draw where everyone wins; rules can't change once coupons are issued.
+ * Reward coupons: when cumulative net sales reach NT$10,000, 10% of it forms a reward pool, split into coupons for a draw where everyone wins; rules can't change once coupons are issued.
  * At a glance: outstanding liability (large), progress to opening the pool, a color bar of where coupons went, remaining coupons per type this period, weekly reward-pool bars; lookup, export and pause are under "Tools".
  */
 export default function RewardsPanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {

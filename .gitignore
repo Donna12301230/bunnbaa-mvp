@@ -19,3 +19,6 @@ serviceAccount*.json
 ~$*
 
 firebase-export-*/
+
+# 本機資料夾，不納入版本控制
+比賽之外/

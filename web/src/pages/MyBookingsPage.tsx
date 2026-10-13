@@ -662,7 +662,7 @@ export default function MyBookingsPage() {
       <PageHero eyebrow={tr("訂單與取餐", "Orders & pickup")} title={tr("我的餐點", "My meals")} description={tr(`查看訂單詳情、出示取餐碼、截單前修改、${policy.cancelShort()}，或轉讓／贈送／請朋友代領／捐為愛心餐。`, `See order details, show your pickup code, change before cutoff, ${policy.cancelShort()}, or transfer / gift / send a friend / donate a meal.`)} />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
-        {/* Tabs at the top: My meals | Resale market | Nearby charity meals (§4.5: "Resale · Charity meals" merged into My meals) */}
+        {/* Tabs at the top: My meals | Resale market | Nearby charity meals */}
         <div className="overflow-x-auto bb-thin-scroll">
           <Tabs
             aria-label={tr("我的餐點分頁", "My meals tabs")}

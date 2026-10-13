@@ -10,7 +10,7 @@
       --import / --export-on-exit, so closing the emulator saves to .emulator-data/ and the next
       start loads it back.
     - The emulator hangs under a Chinese path and must run from an ASCII junction; Vite, conversely,
-      must stay on the Chinese path. (See "📌 環境備忘" (environment notes) in TODO.md)
+      must stay on the Chinese path.
     - Seeds only when the database is empty (seed.js itself also refuses to seed twice).
     - "Today/tomorrow" order dates in the seed are computed at seed time; a saved snapshot goes
       stale after a few days, so rerun with -Reset.
@@ -86,7 +86,7 @@ if (-not $hasExport) {
   if ($LASTEXITCODE -ne 0) {
     Write-Host "Extra seed data was not loaded (if the message is 'seed-user-001 already exists', the data is already there and this can be ignored)." -ForegroundColor Yellow
   }
-  # Phase 1 spec: templates, recipes, bentos, order history, wishes, reward pool (fixed ids, safe to rerun)
+  # Templates, recipes, bentos, order history, wishes, reward pool (fixed ids, safe to rerun)
   node (Join-Path $repo "scripts\seed-phase1.js")
   if ($LASTEXITCODE -ne 0) {
     Write-Host "Phase-1 seed data was not loaded; see the error above." -ForegroundColor Yellow

@@ -20,7 +20,7 @@ interface Dish {
 }
 
 /**
- * Open wish (spec §4.4): pick from the platform dish library first, otherwise type freely (Gemini maps it to a standard dish name).
+ * Open wish: pick from the platform dish library first, otherwise type freely (Gemini maps it to a standard dish name).
  * Counted by people over the last 30 days; once past the threshold, vendors are notified to add it to their reference list. Wishes don't guarantee supply.
  */
 export default function OpenWishDialog({ open, onOpenChange, vendorId, vendorName }: {

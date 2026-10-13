@@ -1,9 +1,9 @@
-// Platform-wide settings (spec §2). Stored in platformConfig/global and edited by admins under "Platform settings" in the admin console;
+// Platform-wide settings. Stored in platformConfig/global and edited by admins under "Platform settings" in the admin console;
 // when the doc is missing or lacks fields, these defaults apply so the server can still compute. The frontend's web/src/lib/platformConfig.ts
 // has the same defaults; change both together.
 const DEFAULT_PLATFORM_CONFIG = {
   businessWeekdays: [1, 2, 3, 4, 5], // Monday to Friday
-  // Meal period ranges: classified by the pickup slot's start time (§2)
+  // Meal period ranges: classified by the pickup slot's start time
   mealPeriods: {
     breakfast: "06:00-10:30",
     lunch: "10:30-14:00",
@@ -22,7 +22,7 @@ const DEFAULT_PLATFORM_CONFIG = {
   slotRemovePrice: -5,
   maxSides: 4, // at most 4 sides
   addonSidePrice: 10, // fourth side as "add-on" is +10; as "backup" it's free
-  riceAddGrams: 100, // extra rice = +100 g cooked rice (§16, provisional)
+  riceAddGrams: 100, // extra rice = +100 g cooked rice (provisional)
   maxCandidatesPerSlot: 3,
   candidateMinQty: 10, // vendor-adjustable
   openWishThreshold: 20, // 20 people within the last 30 days
@@ -46,7 +46,7 @@ const DEFAULT_PLATFORM_CONFIG = {
   commissionRate: 0.05,
 };
 
-// Minimum wage (§9.3): platformConfig/minimumWage stores { monthly, hourly, effectiveFrom, source, history[] };
+// Minimum wage: platformConfig/minimumWage stores { monthly, hourly, effectiveFrom, source, history[] };
 // used when the doc doesn't exist (Ministry of Labor announcement effective 2026-01-01: monthly 29,500, hourly 196).
 const DEFAULT_MINIMUM_WAGE = {
   monthly: 29500,
@@ -59,7 +59,7 @@ const DEFAULT_MINIMUM_WAGE = {
   ],
 };
 
-// Coupon types (§8.3): discount = amount off, cost = cost of upgrading from the base tier, weight = share of the upgrade budget.
+// Coupon types: discount = amount off, cost = cost of upgrading from the base tier, weight = share of the upgrade budget.
 // Phase 1 keeps only 3 types (free meal, half price, base 5%-off); the 90%-, 70%- and 20%-off coupons are left for a later release.
 // The first entry is the grand prize (used for the grand-prize guarantee); the last is the tier remaining budget keeps upgrading into.
 const COUPON_TIERS = [

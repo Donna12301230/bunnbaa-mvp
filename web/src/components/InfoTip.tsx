@@ -4,7 +4,7 @@ import { tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
- * Help text tucked behind ⓘ (simplification proposal §4): the page shows only the title, and the help appears on tapping ⓘ. Click rather than hover so it works on phones.
+ * Help text tucked behind ⓘ: the page shows only the title, and the help appears on tapping ⓘ. Click rather than hover so it works on phones.
  */
 export default function InfoTip({ children, className }: { children: ReactNode; className?: string }) {
   const [open, setOpen] = useState(false);

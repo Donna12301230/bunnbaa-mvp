@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 // Wrapped in a function so labels are built in the current language on every render.
-// Grouped by time (simplification proposal §3-6): today's work, this week's work, review when free, occasional tweaks
+// Grouped by time: today's work, this week's work, review when free, occasional tweaks
 const navGroups = () => [
   {
     title: null,

@@ -30,7 +30,7 @@ interface Props {
 }
 
 /**
- * Price date strip (§4.5): the only way to pick a date anywhere on the site.
+ * Price date strip: the only way to pick a date anywhere on the site.
  * The discount buttons at the top ("5% off | 20% off") jump to the first day with that discount; below, 30 days from tomorrow run horizontally,
  * each showing that day's price, colored by discount, with closed days greyed out; tapping a date selects it.
  */

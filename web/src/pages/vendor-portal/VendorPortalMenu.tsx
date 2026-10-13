@@ -107,7 +107,7 @@ export default function VendorPortalMenu() {
   const { data: myVendor } = useMyVendor();
   const VENDOR_ID = myVendor?.id;
   const { data: catalog } = useVendorCatalog(VENDOR_ID);
-  // After next week's supplier order is generated on Saturday 12:00, next week's mains are locked and only like-for-like side swaps are allowed (§16, provisional)
+  // After next week's supplier order is generated on Saturday 12:00, next week's mains are locked and only like-for-like side swaps are allowed (provisional)
   const nextWeekLocked = !!myVendor?.menu_locked_week && myVendor.menu_locked_week >= mondayOf(addDaysStr(todayStr(), 7));
 
   const { data: items = [], isLoading } = useVendorMenu(VENDOR_ID);
@@ -167,7 +167,7 @@ export default function VendorPortalMenu() {
         image: form.image || null, // Firestore SDK throws on `undefined` field values
         allergens: form.allergens,
         dietary_tags: form.dietaryTags,
-        // Item structure (1002 spec §3.2): type, meal periods served, mains (each priced separately), sides; each dish has a photo and portion text
+        // Item structure: type, meal periods served, mains (each priced separately), sides; each dish has a photo and portion text
         item_type: bento.itemType,
         meal_periods: bento.mealPeriods,
         mains: bento.itemType === "bento" ? mains : [],

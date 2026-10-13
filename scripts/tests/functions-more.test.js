@@ -1,4 +1,4 @@
-// Cases from doc/測試文件.md that functions.test.js doesn't cover but can be automated server-side:
+// Test cases that functions.test.js doesn't cover but can be automated server-side:
 // schedules (no-show to charity meal, charity meal close, reservation timeout, reward pool settlement,
 // coupon expiry, draw period end, expiry reminders, anomaly detection, pickup reminders), resale matching,
 // disaster days, purchasing, taste scores, open wishes, area insights, payouts, meal plans, English error messages.
@@ -95,7 +95,7 @@ function expectCode(r, code, msg) {
   if (r.code !== code) throw new Error(`${msg || ""} expected ${code}, got ${r.code}: ${r.message}`);
   return r;
 }
-/** Paid takeover on the resale market (§4.1): reserve + request payment → confirm payment. The emulator has no LINE Pay keys, so this uses a fake payment flow */
+/** Paid takeover on the resale market: reserve + request payment → confirm payment. The emulator has no LINE Pay keys, so this uses a fake payment flow */
 async function takeOver(user, lockId) {
   const r = await user.call("createResaleLinePayReservation", { lock_id: lockId });
   if (!r.ok) return r;
@@ -344,7 +344,7 @@ function geohash(lat, lng, precision = 7) {
     eq((await get(`vendors/${VR}/rewardPeriods/${mondayOf(TODAY)}`)).carried_tickets, 60, "重跑不應再結轉一次");
   });
 
-  await test("C-RWD-04 C-RWD-17", "§8.4 範例（100,000 元、1,000 張，回饋 10%）實際開池：分配、leftover、發 1,000 張券；重跑不重複發券", async () => {
+  await test("C-RWD-04 C-RWD-17", "回饋池分配範例（100,000 元、1,000 張，回饋 10%）實際開池：分配、leftover、發 1,000 張券；重跑不重複發券", async () => {
     const VP = await mkVendor(vid("pool"));
     let batch = db.batch();
     for (let i = 0; i < 1000; i++) {
@@ -1039,7 +1039,7 @@ function geohash(lat, lng, precision = 7) {
     } finally { await ref.set(original); }
   });
 
-  // ════ v4 (1002 spec): mains, fourth dish, changing slot, charity meals by meal period, maintenance fee, minimum wage, revenue dashboard ════
+  // ════ v4: mains, fourth dish, changing slot, charity meals by meal period, maintenance fee, minimum wage, revenue dashboard ════
   {
     const VB = await mkVendor(vid("v4bento"), { pickup_windows: ["07:30-08:00", "11:00-11:30", "12:00-12:30"] });
     const BENTO = await mkBento(VB, {

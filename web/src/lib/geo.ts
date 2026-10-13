@@ -1,5 +1,5 @@
-// Location utilities: distance, walking time, geohash. Saved places store only a coarse geohash (7 characters ≈ 150 m,
-// spec §14.2), never location history. functions/src/common.js has the same geohash decoding.
+// Location utilities: distance, walking time, geohash. Saved places store only a coarse geohash (7 characters ≈ 150 m),
+// never location history. functions/src/common.js has the same geohash decoding.
 
 const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 

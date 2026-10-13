@@ -1,7 +1,7 @@
 {
   "name": "bunnbaa-tests",
   "private": true,
-  "description": "doc/測試文件.md 可自動化的部分：純邏輯（定價、組便當、回饋池、備料）與 Firestore 安全規則",
+  "description": "自動化測試：純邏輯（定價、組便當、回饋池、備料）與 Firestore 安全規則",
   "scripts": {
     "test": "npm run test:logic && npm run test:rules",
     "test:logic": "node logic.test.js",

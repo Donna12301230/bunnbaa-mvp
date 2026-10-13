@@ -13,7 +13,7 @@ import type { Lock } from "@/types";
  * Vendor portal order row (shared by order management, slot details and the pickup page): the first column is the redemption code (4-digit pickup number + last three phone digits),
  * followed by item, actual sides, rice adjustment and notes.
  * Today's orders can be checked in person and marked "Confirm pickup" (completePickup). No-shows need no manual entry:
- * 30 minutes after the pickup slot ends the system converts them to charity meals (spec §7). Diner names are not shown (§14.2).
+ * 30 minutes after the pickup slot ends the system converts them to charity meals. Diner names are not shown.
  */
 export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; showDate?: boolean }) {
   const { toast } = useToast();

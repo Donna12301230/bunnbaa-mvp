@@ -4,7 +4,7 @@
  * vendors, locks (historical + current), payouts, accuracy_reports,
  * discount_explanations, growth_rewards, draws.
  *
- * Story this tells (2026-09-23 seed, TODO.md pilot scope):
+ * Story this tells:
  *   - cafe-renheya-demo ("仁和雅咖啡", Renheya Cafe): the hero vendor every hardcoded
  *     VENDOR_ID in the frontend (Marketplace/VendorDashboard/VendorPortal*)
  *     points at. 45 days of history, accuracy improving 55%→90%, settled
@@ -22,7 +22,7 @@
  *
  * AI-generated fields (accuracy_reports, discount_explanations) are
  * hand-written here instead of calling Gemini — the API key isn't
- * provisioned yet (TODO.md, blocker 2). discount_explanations is pre-warmed
+ * provisioned yet. discount_explanations is pre-warmed
  * *before* any lock is written, so the real deployed `onLockCreated`
  * trigger finds a cache hit for every lock this script creates and never
  * attempts a Gemini call. Swap in real reports once the key lands; nothing
@@ -32,7 +32,7 @@
  * deliberately NOT seeded — they're only ever visible on the buyer's own
  * MyBookings page (queried by buyer_uid), and a synthetic buyer_uid isn't
  * reachable by anyone signing in for the demo. Same call the project
- * already made for this (TODO.md: "plan-type ... no fake data added this time").
+ * already made for this.
  *
  * Usage:
  *   cd scripts && npm install       # one-time: installs firebase-admin locally
@@ -50,13 +50,11 @@
  * Requires a service account key. Either:
  *   - run via `firebase emulators:exec` against the local emulator, or
  *   - set GOOGLE_APPLICATION_CREDENTIALS to a service account JSON
- *     for the real bunnbaa-mvp-5474 project (this is what TODO.md's
- *     "seed the data right before recording the demo" step means).
+ *     for the real bunnbaa-mvp-5474 project.
  *
  * After running against production, still manually needed (this script
  * can't do it — no real Firebase Auth UID to bind):
- *   - vendors/{id}.owner_uid for each vendor, per TODO.md's "vendor account
- *     binding" flow, otherwise the vendor-portal login guard has nothing to match.
+ *   - vendors/{id}.owner_uid for each vendor, otherwise the vendor-portal login guard has nothing to match.
  */
 const admin = require("firebase-admin");
 
@@ -314,7 +312,7 @@ async function seedVendors(finalAccuracyByVendor) {
       address: v.address,
       phone: v.phone,
       // owner_uid intentionally left unset — bind it manually to a real
-      // Firebase Auth uid per TODO.md's "vendor account binding" before the demo.
+      // Firebase Auth uid before the demo.
       owner_uid: null,
       created_at: Timestamp.fromDate(daysAgo(v.historyDays > 0 ? v.historyDays + 5 : 2)),
     });
@@ -340,7 +338,7 @@ async function seedVendorHistory(v, writer) {
 
   for (let day = v.historyDays; day >= 1; day--) {
     const date = daysAgo(day);
-    if (date.getDay() === 0 || date.getDay() === 6) continue; // phase 1 is open Monday to Friday (spec §2)
+    if (date.getDay() === 0 || date.getDay() === 6) continue; // phase 1 is open Monday to Friday
     const dateStr = isoDate(date);
     const progress = v.historyDays === 1 ? 1 : (v.historyDays - day) / (v.historyDays - 1);
     let dayAccuracy = v.accuracyStart + progress * (v.accuracyEnd - v.accuracyStart);
@@ -510,7 +508,7 @@ async function seedCurrentLocks(writer) {
   const zaoan = VENDORS[3];
 
   async function addLock(v, { daysAhead: requested, window, status, resaleDeadlineHoursFromNow, buyerSuffix }) {
-    // Open Monday to Friday (spec §2): dates on Sat/Sun move forward to Monday (if today itself is a weekend, keep it so the demo has orders for today)
+    // Open Monday to Friday: dates on Sat/Sun move forward to Monday (if today itself is a weekend, keep it so the demo has orders for today)
     const day = daysFromNow(requested).getDay();
     const daysAhead = requested === 0 ? 0 : day === 6 ? requested + 2 : day === 0 ? requested + 1 : requested;
     const pickupDate = isoDate(daysFromNow(daysAhead));
@@ -700,7 +698,7 @@ async function seedPlatformConfig(writer) {
 }
 
 // Admin-only collection (see firestore.rules) — no consumer submission
-// flow exists (TODO.md), so this is the only way any content ever lands
+// flow exists, so this is the only way any content ever lands
 // here. buyer_uid values reuse real seeded historical buyer_uids so the
 // appeal at least plausibly ties back to an actual no-show in the demo data.
 async function seedBanAppeals(writer) {
@@ -873,7 +871,7 @@ async function main() {
 
   console.log(`\nSeed complete: ${totalLocks} historical locks, ${totalPayouts} payouts, 4 vendors, ${writer.totalCommitted + 26} total writes (approx).`);
   console.log("discount_explanation fields on each lock are filled in asynchronously by the deployed onLockCreated trigger — give it a minute.");
-  console.log("Still needed before recording: bind vendors/{id}.owner_uid to real Firebase Auth uids (TODO.md 商家帳號綁定); Gemini key for any *new* lock created live during the demo.");
+  console.log("Still needed before recording: bind vendors/{id}.owner_uid to real Firebase Auth uids; Gemini key for any *new* lock created live during the demo.");
   process.exit(0);
 }
 

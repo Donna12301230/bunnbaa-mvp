@@ -24,7 +24,7 @@ import { Link, useLocation } from "wouter";
 
 // Matches the "Resale market" screen in the UI mockup Marketplace.dc.html. Wired to real Firestore, following
 // the pattern already proven in ConsumerLockPage.tsx:
-//   - "Take over" = paid takeover (spec §4.1): createResaleLinePayReservation holds it for 15 minutes and redirects to
+//   - "Take over" = paid takeover: createResaleLinePayReservation holds it for 15 minutes and redirects to
 //     LINE Pay; after payment confirmation (confirmLinePayPayment) ownership changes and the original payer is refunded automatically (functions/src/orders.js)
 //   - $0 resales (custom price 0, or opened up for free claim after the timeout) are no longer listed here since 2026-10-09;
 //     they're on the "Nearby charity meals" tab instead (components/FreeTransfersSection.tsx)
@@ -47,8 +47,8 @@ function formatCountdown(deadline: Date, now: number): string {
   return tr(`${Math.floor(diffMin / 60)} 小時 ${diffMin % 60} 分後截止`, `Ends in ${Math.floor(diffMin / 60)} h ${diffMin % 60} min`);
 }
 
-// 1002 spec: the nav bar's "Resale · Charity meals" is merged into "My meals", with "Resale market" and "Nearby charity meals" tabs at the top.
-// Lives in the "Resale market" tab of the My meals page (1002 spec §4.5); charity meals are shown on My meals' own tab.
+// the nav bar's "Resale · Charity meals" is merged into "My meals", with "Resale market" and "Nearby charity meals" tabs at the top.
+// Lives in the "Resale market" tab of the My meals page; charity meals are shown on My meals' own tab.
 export default function TransferMarketPage({ onShowFree }: { onShowFree?: () => void }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();

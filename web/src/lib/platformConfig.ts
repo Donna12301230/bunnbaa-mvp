@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// Platform-wide settings (spec §2). Defaults are shared with functions/src/config.js; change both together.
+// Platform-wide settings. Defaults are shared with functions/src/config.js; change both together.
 // Live values are in platformConfig/global (editable in the admin console's "Platform settings"); missing fields fall back to defaults.
 export const DEFAULT_PLATFORM_CONFIG = {
   businessWeekdays: [1, 2, 3, 4, 5],
@@ -43,7 +43,7 @@ export const DEFAULT_PLATFORM_CONFIG = {
 export type PlatformConfig = typeof DEFAULT_PLATFORM_CONFIG;
 type ScalarKey = { [K in keyof PlatformConfig]: PlatformConfig[K] extends number | string ? K : never }[keyof PlatformConfig];
 
-/** For the admin console settings table: each setting's Chinese/English name and whether vendors can adjust it (spec §2 table) */
+/** For the admin console settings table: each setting's Chinese/English name and whether vendors can adjust it */
 // label/unit/vendorAdjustable are Chinese, *En are for the English UI; pick the language at render time with tr(f.label, f.labelEn).
 export const PLATFORM_CONFIG_FIELDS: { key: ScalarKey; label: string; labelEn: string; unit?: string; unitEn?: string; vendorAdjustable?: string; vendorAdjustableEn?: string }[] = [
   { key: "pickupWindow", label: "取餐時段（預設）", labelEn: "Pickup window (default)", vendorAdjustable: "可調時段，不可超過 2 小時", vendorAdjustableEn: "Adjustable, max 2 hours" },

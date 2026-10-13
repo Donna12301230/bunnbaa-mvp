@@ -1,6 +1,6 @@
 import { tr } from "@/lib/i18n";
 
-// Growth reward coupon types (spec §8.3) and allocation algorithm (§8.4), shared with functions/src/rewards.js;
+// Growth reward coupon types and allocation algorithm, shared with functions/src/rewards.js;
 // used here only for vendor portal simulations and diner-facing display.
 // Phase one keeps only 3 types (free meal, half price, guaranteed 5% off); 90%, 70% and 20% off coupons are planned for a later release.
 export const COUPON_TIERS = [
@@ -17,7 +17,7 @@ export function tierLabel(code: string): string {
   return t ? tr(t.label, t.labelEn) : code;
 }
 
-/** Diner-facing headline "折 N 元" (N dollars off, 1002 spec §8.3); the subtitle is the coupon name */
+/** Diner-facing headline "折 N 元" (N dollars off); the subtitle is the coupon name */
 export function couponTitle(discount: number): string {
   return tr(`折 ${discount} 元`, `NT$${discount} off`);
 }

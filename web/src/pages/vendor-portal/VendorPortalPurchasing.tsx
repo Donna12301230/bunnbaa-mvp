@@ -100,7 +100,7 @@ function BoardBars({ board }: { board: NonNullable<PurchaseList["board"]> }) {
 }
 
 /**
- * Purchasing (spec §5; simplification proposal §5.3): the page only answers "what do I buy".
+ * Purchasing: the page only answers "what do I buy".
  * - Top: three stat cards: total to spend, mini bar chart of next week's orders, supplier order deadline
  * - Shopping list grouped by supplier: one card and one "Send via LINE" button per supplier
  * - Each row does three things: what's left in the fridge (− + is the stock count), how much to buy, and bought or not (ticked = struck through); grey "Enough" when stock covers it

@@ -35,7 +35,7 @@ export const ING_CATEGORIES = ["雞", "豬", "牛", "海鮮", "素", "蛋", "豆
 const EQUIPMENT = ["炒鍋", "電鍋", "炸鍋", "烤箱", "滷鍋", "蒸籠", "湯鍋", "工作台"];
 const METHODS = ["炸", "滷", "烤", "炒", "蒸", "煮", "涼拌"];
 const FLAVORS = ["辣", "清淡", "甜"];
-// 1002 spec §5: purchasing is only weekly stock-up or daily prep; long-life items (monthly) such as rice, oil, seasonings, dry goods and packaging fold into weekly and are ordered only below safety stock
+// purchasing is only weekly stock-up or daily prep; long-life items (monthly) such as rice, oil, seasonings, dry goods and packaging fold into weekly and are ordered only below safety stock
 export const FREQ_LABEL: Record<string, { zh: string; en: string }> = {
   monthly: { zh: "久放品項（低於安全庫存才叫）", en: "Long-life (reorder below safety stock)" },
   weekly: { zh: "每週進料", en: "Weekly delivery" },
@@ -53,7 +53,7 @@ const EN_LABEL: Record<string, string> = {
 };
 /** Display text for category / equipment / method / flavor; unknown values are shown as is */
 export const catalogLabel = (v: string) => tr(v, EN_LABEL[v] ?? v);
-// Units of measure are vendor-defined (§3.2); these are only suggestions
+// Units of measure are vendor-defined; these are only suggestions
 const UNIT_SUGGESTIONS = ["克", "片", "顆", "塊", "毫升", "支", "張", "g", "ml", "個"];
 const NEW_ING = "__new__";
 
@@ -197,7 +197,7 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
   );
 }
 
-// Cooking method and equipment fill in defaults (simplification proposal §3-4): picking a method auto-fills equipment, servings per batch and process minutes, so the vendor doesn't have to work them out
+// Cooking method and equipment fill in defaults: picking a method auto-fills equipment, servings per batch and process minutes, so the vendor doesn't have to work them out
 const METHOD_PRESET: Record<string, { equipment: string; batch_capacity: number; prep_minutes: number }> = {
   炒: { equipment: "炒鍋", batch_capacity: 10, prep_minutes: 15 },
   煮: { equipment: "電鍋", batch_capacity: 20, prep_minutes: 50 },

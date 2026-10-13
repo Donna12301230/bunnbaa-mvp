@@ -1,4 +1,4 @@
-// Cases from doc/測試文件.md that can be checked with pure functions (Cloud Functions-side logic).
+// Test cases that can be checked with pure functions (Cloud Functions-side logic).
 // Run: cd scripts/tests && npm run test:logic (no emulator needed).
 // Runs in UTC on purpose, to confirm date logic always uses Taipei time (F-21).
 process.env.TZ = "UTC";
@@ -146,7 +146,7 @@ test("C-BNT-11", "沒有 slots 的舊品項不能加減", () => {
 });
 
 // 3.14 Reward pool
-test("C-RWD-04", "規格 §8.4 範例：池 10000、1000 張 → 免費 15、半價 79、保底 906，餘 20", () => {
+test("C-RWD-04", "回饋池分配範例：池 10000、1000 張 → 免費 15、半價 79、保底 906，餘 20", () => {
   const r = rewards.allocatePool(10000, 1000);
   assert.deepEqual(r.counts, { free: 15, t50: 79, t95: 906 });
   assert.equal(r.spent, 9980);
@@ -225,7 +225,7 @@ test("V-PRP-14", "出餐標籤不含姓名", () => {
   assert.equal(labels[0].pickup_code, "A1B2");
 });
 
-// ── Added in the 2026-10-02 spec (技術規格1002.md) ──
+// ── Meal periods, booking window, mains, fourth dish ──
 test("C-MEAL-01", "餐期依取餐開始時間歸類：早 06:00–10:30／中 10:30–14:00／晚 16:30–20:00", () => {
   assert.equal(pricing.mealPeriodOf("07:30-08:00", CFG), "breakfast");
   assert.equal(pricing.mealPeriodOf("10:30-11:00", CFG), "lunch");
@@ -360,7 +360,7 @@ test("F-21", "taipeiToday 以台北時間計（UTC 16:30 已是隔天）", () =>
 });
 
 // C-NAV-01 static check: the old early-bird copy must not reappear in the frontend (BUG-1 regression)
-test("C-NAV-01", "web/src 畫面文字沒有「最高 7 折」「提前 14 天」（註解不算；1002 版起最遠 30 天是正確說法）", () => {
+test("C-NAV-01", "web/src 畫面文字沒有「最高 7 折」「提前 14 天」（註解不算；最遠 30 天才是正確說法）", () => {
   const fs = require("node:fs");
   const banned = /最高\s*7\s*折|提前\s*14\s*天|up to 30% off/;
   const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replace(/\s\/\/.*$/gm, "");

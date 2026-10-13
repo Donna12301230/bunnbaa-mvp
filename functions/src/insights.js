@@ -1,4 +1,4 @@
-// Open wishes, taste preferences, area insights (spec §4.4, §10), plus Gemini dish-name classification and recipe drafts (§3.1).
+// Open wishes, taste preferences, area insights, plus Gemini dish-name classification and recipe drafts.
 // Main data flow: recipe → auto tags → taste stats → find gaps → wishes → into prep → pickup completed → counted toward growth rewards.
 //
 // openWishes/{vendorId}_{uid}_{dishKey}: repeat wishes by the same person count once (deduped by doc id); created_at updates each time
@@ -84,7 +84,7 @@ exports.onLockCreatedTaste = onDocumentCreated({ document: "locks/{lockId}", reg
 });
 
 /**
- * Favoriting a vendor (Favorites, §4.5, §10): a positive signal equal to a purchase. +2 is spread evenly across the tags
+ * Favoriting a vendor (Favorites): a positive signal equal to a purchase. +2 is spread evenly across the tags
  * of the vendor's currently served mains and default sides, so vendors with many dishes don't get flooded with points at once.
  */
 exports.onFavoriteCreated = onDocumentCreated({ document: "users/{uid}/favorites/{vendorId}", region: REGION }, async (event) => {
@@ -105,7 +105,7 @@ exports.onFavoriteCreated = onDocumentCreated({ document: "users/{uid}/favorites
 });
 
 /**
- * Viewing an item page (§10.1, the weakest signal, +1): only the tags of the main and default sides are added.
+ * Viewing an item page (the weakest signal, +1): only the tags of the main and default sides are added.
  * Counted once per person per item per day (users/{uid}.viewed_items records items viewed that day).
  */
 exports.recordItemView = onCall({}, async (request) => {
@@ -138,7 +138,7 @@ exports.recordItemView = onCall({}, async (request) => {
 });
 
 /**
- * Open wishes (§4.4): pick from the platform dish library first (dish_id); if not found, free text, which Gemini maps to a standard dish name.
+ * Open wishes: pick from the platform dish library first (dish_id); if not found, free text, which Gemini maps to a standard dish name.
  * Counted by people: repeat wishes by the same person count once; only the last 30 days count. The screen notes "wishes don't guarantee availability".
  */
 exports.placeOpenWish = onCall({}, async (request) => {
@@ -287,7 +287,7 @@ exports.draftRecipe = onCall({ timeoutSeconds: 60 }, async (request) => {
 });
 
 /* ------------------------------------------------------------------ *
- * Area insights (§10.2): within 1 km of the pickup point, last 30 days; not generated when fewer than 20 people are counted.
+ * Area insights: within 1 km of the pickup point, last 30 days; not generated when fewer than 20 people are counted.
  * Charity meal reservations, claims and views never enter the stats (only locks and openWishes are read here).
  * ------------------------------------------------------------------ */
 

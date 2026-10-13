@@ -3,7 +3,7 @@ import type { ExtraSideChoice, MenuItem, RiceOption, SlotChoice } from "@/types"
 import { authStore } from "@/lib/auth";
 import { vendorBlockedToast } from "@/hooks/useRequireLogin";
 
-// Shopping cart (stored in localStorage). Phase 1 spec: each line is one bento (or several with the same configuration),
+// Shopping cart (stored in localStorage). Each line is one bento (or several with the same configuration),
 // each with its own pickup date, pickup slot, main dish, side choices (including the fourth side), rice amount and coupon. Bookable up to 30 days ahead; one checkout can
 // span several days, but only one vendor (coupons can only be used at the issuing vendor).
 // _v3: switched to the bento format on 2026-09-30; old carts (no date / sides) are discarded.

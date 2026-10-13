@@ -28,7 +28,7 @@ import { getPreferredPickup, mealPeriodLabel, mealPeriodOf, priceDays, slotLabel
 import { notifyCartAdded } from "@/components/CartPreview";
 import DiscountExplanation from "@/components/DiscountExplanation";
 
-/** One dropdown row (§4.2): thumbnail of the selected dish on the left, native select on the right (system picker on mobile) */
+/** One dropdown row: thumbnail of the selected dish on the left, native select on the right (system picker on mobile) */
 function DishSelectRow({
   label, image, hint, children,
 }: {
@@ -57,7 +57,7 @@ function DishSelectRow({
   );
 }
 
-// Item page = build a bento (spec §4.2): the price/date row picks the pickup date (within 30 days) and pickup slot; rice, main and sides all use dropdowns
+// Item page = build a bento: the price/date row picks the pickup date (within 30 days) and pickup slot; rice, main and sides all use dropdowns
 // (sides come preselected with the default dishes; picking a candidate dish is a wish; picking "None" drops one dish), plus a fourth dish (backup or add-on);
 // below, ingredients are listed as "ingredient + ingredient → bento"; the total is pinned at the bottom with an expandable price breakdown.
 // Prices are only a preview; the server recalculates them at checkout.
@@ -142,7 +142,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     setCustomPicks(customFields(item).map(() => 0));
   }, [item?.id]);
 
-  // Browse signal (§10): log one view per signed-in user on the item page; the server counts the same item at most once per day
+  // Browse signal: log one view per signed-in user on the item page; the server counts the same item at most once per day
   useEffect(() => {
     if (!item?.id || !auth.currentUser) return;
     httpsCallable(functions, "recordItemView")({ menu_item_id: item.id }).catch(() => {});
@@ -221,7 +221,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     setExtra({ mode: mode as ExtraSideMode, slot: Number(slot), candidate: cand === "d" ? null : Number(cand) });
   }
 
-  // Ingredient totals (§4.2): every ingredient and quantity in this serving; uses the same recipe as the vendor's daily prep
+  // Ingredient totals: every ingredient and quantity in this serving; uses the same recipe as the vendor's daily prep
   const riceText = RICE_OPTIONS.find((r) => r.value === rice);
   const materials: { label: string; image?: string | null }[] = [];
   if (bento && item.rice_component_id && riceText) materials.push({ label: tr(`白飯 ${riceText.label}`, `Rice: ${riceText.labelEn}`) });
@@ -463,7 +463,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
             </section>
           )}
 
-          {/* Ingredient totals (§4.2): ingredient + ingredient + … → bento */}
+          {/* Ingredient totals: ingredient + ingredient + … → bento */}
           {materials.length > 0 && (
             <section className="rounded-2xl border border-ink bg-accent p-4 space-y-3" aria-label={tr("材料總和", "What's in it")}>
               <h2 className="font-heading text-lg font-semibold">{tr("材料總和", "What's in it")}</h2>

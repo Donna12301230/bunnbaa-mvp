@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import type { ExtraSideChoice, Lock, MenuItem, RiceOption, SlotChoice, Vendor } from "@/types";
 
 /**
- * Edit before cut-off (spec §4.1): pickup slot (same day; each day of a meal plan is also edited here individually), main, sides, rice amount, fourth dish.
+ * Edit before cut-off: pickup slot (same day; each day of a meal plan is also edited here individually), main, sides, rice amount, fourth dish.
  * The amount is recomputed with the early-bird discount from order time: if cheaper, the difference is refunded as platform points; if more expensive, paying the difference online isn't supported yet (blocked by server updateLockChoices).
  */
 export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null; onClose: () => void }) {

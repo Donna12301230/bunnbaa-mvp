@@ -42,7 +42,7 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
 }
 
 /**
- * Order report "Daily revenue (last 15 days)" (1002 spec §9.3; per 待修改.docx: switched to a line chart):
+ * Order report "Daily revenue (last 15 days)":
  * revenue, material cost and net profit as three lines on one NT$ axis; the gap between revenue and material cost is gross profit. Material cost is recipe × latest unit price;
  * net profit further subtracts labor, fees, platform commission and the daily share of fixed costs, all computed by Functions getDailyRevenueSeries (recipes are trade secrets, so only computed on the backend).
  */

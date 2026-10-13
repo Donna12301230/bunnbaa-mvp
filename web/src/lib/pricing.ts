@@ -8,7 +8,7 @@ export interface EarlyBirdTier {
   discountPercent: number; // discount percent, e.g. 5 means 5% off
 }
 
-// 1002 spec: 5% off for tomorrow, 20% off 2–30 days ahead; book up to 30 days ahead. A 30% off tier for 14+ days is planned for a later release;
+// 5% off for tomorrow, 20% off 2–30 days ahead; book up to 30 days ahead. A 30% off tier for 14+ days is planned for a later release;
 // then add a third tier here and change the second tier's maxDays to 13.
 export const EARLY_BIRD_TIERS: EarlyBirdTier[] = [
   { minDays: 0, maxDays: 1, discountPercent: 5 },

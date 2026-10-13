@@ -29,7 +29,7 @@ const EN_LABEL: Record<string, string> = {
 const label = (v: string) => tr(v, EN_LABEL[v] ?? v);
 
 /**
- * Platform dish library and preset templates (spec §3.1, §4.4): open wishes are picked from the dish library first; free-text input is then classified by Gemini into
+ * Platform dish library and preset templates: open wishes are picked from the dish library first; free-text input is then classified by Gemini into
  * the standard dish names here. Preset templates let a vendor open shop in one click. Template content is created by scripts/seed.js; it can be viewed and deleted here.
  */
 function DishesContent() {

@@ -319,10 +319,10 @@ BunnBaa/
 ├── extensions/             # Stream Firestore to BigQuery 實例設定
 ├── scripts/                # 種子資料、自動化測試、預購助理評估（eval/）
 ├── firestore.rules / firestore.indexes.json / storage.rules
-└── doc/                    # 規格、測試文件、開發指南
+└── doc/                    # AI 與 Google Cloud 設計、助理評估
 ```
 
-給開發者的詳細說明（資料模型、完整的 Functions 清單、環境設定）：[`doc/開發指南.md`](doc/開發指南.md)。Google Cloud 的設計：[`doc/AI與GoogleCloud設計.md`](doc/AI與GoogleCloud設計.md)。
+AI 與 Google Cloud 的設計：[`doc/AI與GoogleCloud設計.md`](doc/AI與GoogleCloud設計.md)。
 
 ## 後續規劃
 

@@ -1,5 +1,5 @@
 // Order lifecycle (still stored as locks): pricing → LINE Pay → cut-off wish decisions → QR pickup.
-// Spec §4, §6; keeps the existing "lock the early-bird discount + resale" model (user decision, 2026-09-30).
+// Keeps the "lock the early-bird discount + resale" model.
 //
 // Fields added to locks:
 //   menu_item_id, slots[{ category, default_dish, default_component_id, removed, wished,
@@ -175,7 +175,7 @@ async function buildDrafts(line, ctx) {
   const choice = resolveOrderChoices(item, line, ctx.config);
   const { rice, resolved, extra, custom, main, listPrice, adjust } = choice;
 
-  // Weekly supply cap for candidate dishes (§4.3); a candidate chosen as the fourth side counts too
+  // Weekly supply cap for candidate dishes; a candidate chosen as the fourth side counts too
   const week = mondayOf(pickupDate);
   for (const w of wishedEntries(resolved.slots, extra)) {
     const cand = item.slots[w.slot].candidates[w.candidate];
@@ -357,7 +357,7 @@ exports.createCartLinePayReservation = onCall({}, async (request) => {
 });
 
 /**
- * Meal plans (multi-day plans, §4.4): N consecutive business days in the same pickup slot (closed days are pushed back). Each day is a separate lock;
+ * Meal plans (multi-day plans): N consecutive business days in the same pickup slot (closed days are pushed back). Each day is a separate lock;
  * early-bird pricing is computed per day (plan price price_per_meal is the list price); each day's slot can be changed later under "My meals".
  * preview=true only returns each day's date and price (for the confirmation dialog) without creating a payment.
  */
@@ -436,7 +436,7 @@ function randomCode(digits) {
   return String(crypto.randomInt(0, 10 ** digits)).padStart(digits, "0");
 }
 
-/** 4-digit pickup number, unique per vendor per day (§6.2 fallback verification) */
+/** 4-digit pickup number, unique per vendor per day */
 async function allocatePickupCodes(drafts) {
   const taken = new Map();
   const codes = [];
@@ -705,7 +705,7 @@ async function cancelForCoupon(lockRef, config) {
 }
 
 /* ------------------------------------------------------------------ *
- * Paid takeover in the resale market (spec §4.1: the taker becomes the new holder after paying)
+ * Paid takeover in the resale market
  * The taker pays the "resale price" via LINE Pay: set by the seller when listing (locks.resale_price, 0 to list price); if unset, the early-bird price (before coupons).
  * On success the original payer is refunded automatically, the smaller of what they paid and the resale price (a LINE Pay refund can't exceed the original payment):
  *   - Sold below what they paid: the seller absorbs the difference; sold above: the excess stays with the vendor, so the seller can't profit.
@@ -974,7 +974,7 @@ function currentChoices(lock) {
 }
 
 /**
- * Edit before cut-off (§4.1): main, sides, rice, fourth side and pickup slot (same day).
+ * Edit before cut-off: main, sides, rice, fourth side and pickup slot (same day).
  * The amount is recomputed at the early-bird rate from the original order: if cheaper, refund the difference (LINE Pay partial refund); if more expensive,
  * phase 1 requires cancelling and re-ordering. Each day of a meal plan also changes its slot through this.
  */
@@ -1079,7 +1079,7 @@ exports.updateLockChoices = onCall({}, async (request) => {
 });
 
 /* ------------------------------------------------------------------ *
- * QR pickup (§6): server-signed one-time token (id + expiry + nonce + HMAC)
+ * QR pickup: server-signed one-time token (id + expiry + nonce + HMAC)
  * ------------------------------------------------------------------ */
 
 const QR_TTL_MS = 10 * 60 * 1000;
@@ -1314,7 +1314,7 @@ async function completeCharityReservation(parsed, vendorId, preview) {
 }
 
 /* ------------------------------------------------------------------ *
- * Cut-off (§4.3, §5.4): decide candidate-dish wishes, generate daily prep and pickup labels, shortage warnings
+ * Cut-off: decide candidate-dish wishes, generate daily prep and pickup labels, shortage warnings
  * ------------------------------------------------------------------ */
 
 /**
@@ -1369,7 +1369,7 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
   const catalog = await loadVendorCatalog(vendor.id);
   const minDefault = Number(vendor.candidate_min_qty) > 0 ? Number(vendor.candidate_min_qty) : config.candidateMinQty;
 
-  // Decide wishes (§4.3): candidates that reach the minimum quantity are served; those that don't switch to the backup if there is one, otherwise back to the default dish with a notification (the default dish is made as usual)
+  // Decide wishes: candidates that reach the minimum quantity are served; those that don't switch to the backup if there is one, otherwise back to the default dish with a notification (the default dish is made as usual)
   const batch = db().batch();
   const failedWishes = new Map(); // uid -> [message]
   const wishResults = {};
@@ -1394,7 +1394,7 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
       if (slot.removed) return slot;
       if (slot.wished == null) return { ...slot, resolved: slot.default_dish };
       const { ok, count, minQty, cand } = judge(item, slotIdx, slot.candidate_index, slot.wished);
-      // Portion level is taken from the item settings at cut-off time (recomputed after price changes, §11) and locked after cut-off
+      // Portion level is taken from the item settings at cut-off time (recomputed after price changes) and locked after cut-off
       if (ok) return { ...slot, resolved: slot.wished, portion_level: cand?.portion_level ?? slot.portion_level ?? 1 };
       const short = Math.max(0, minQty - count);
       if (backupFree) {
@@ -1427,7 +1427,7 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
 
   const portions = componentPortions(locks, catalog.itemsById, catalog.componentsById, config);
   const needs = rawNeeds(portions, catalog.componentsById, catalog.ingredientsById);
-  // The timeline is worked backwards separately from each meal period's pickup start time (§5.2)
+  // The timeline is worked backwards separately from each meal period's pickup start time
   const periodRanges = vendorPeriodRanges(vendor, config);
   const timelines = {};
   for (const period of MEAL_PERIODS) {
@@ -1523,7 +1523,7 @@ async function activeLocksOn(vendorId, date, period = null, config = null) {
   });
 }
 
-/** Start/end instants of each meal period's pickup slot today for this vendor: [{ period, label, start, end }] (breakfast, lunch and dinner computed separately, §7) */
+/** Start/end instants of each meal period's pickup slot today for this vendor: [{ period, label, start, end }] (breakfast, lunch and dinner computed separately) */
 function periodRangesOn(vendor, date, config) {
   return Object.entries(vendorPeriodRanges(vendor, config || undefined)).map(([period, range]) => {
     const { start, end } = splitWindow(range);

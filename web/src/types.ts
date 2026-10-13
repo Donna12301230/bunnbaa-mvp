@@ -20,7 +20,7 @@ export interface Vendor {
   business_hours?: BusinessHour[];
   holidays?: string[]; // YYYY-MM-DD
   slot_capacity?: number; // Cap on all meals combined per pickup slot; 0 / unset = no limit; booked counts live in slot_counters
-  // Phase 1 spec §2 vendor-adjustable settings (unset = platform default)
+  // Vendor-adjustable settings (unset = platform default)
   cutoff_time?: string; // Cut-off time on the previous day; can only be earlier than the platform's (20:00)
   safety_stock_rate?: number;
   candidate_min_qty?: number;
@@ -32,7 +32,7 @@ export interface Vendor {
   typhoon_notice?: { dates: string[]; event_id: string } | null;
   menu_locked_week?: string;
   rewards_paused_from?: string;
-  // Earnings dashboard cost settings (§9.3), written by updateVendorCosts; wages may not be below minimum wage
+  // Earnings dashboard cost settings, written by updateVendorCosts; wages may not be below minimum wage
   hourly_wage?: number;
   staff_salaries?: number[];
   fixed_costs?: number;
@@ -62,7 +62,7 @@ export interface MenuItem {
   allergens: string[];
   dietary_tags: string[];
   created_at: unknown; // Firestore Timestamp
-  // Bento (Phase 1 spec §3): items without slots are single items, with no adding/removing rice or sides
+  // Bento: items without slots are single items, with no adding/removing rice or sides
   item_type?: "bento" | "single"; // Single items are ordered directly, no assembly
   meal_periods?: MealPeriod[]; // Meal periods served (unset = all of the vendor's slots)
   template?: string | null;
@@ -90,7 +90,7 @@ export interface BentoMain {
 export interface BentoCandidate {
   name: string;
   component_id?: string | null;
-  image_url?: string | null; // Diners pick dishes by tapping the image (§4.2)
+  image_url?: string | null; // Diners pick dishes by tapping the image
   portion_text?: string | null; // Display of total ingredients, e.g. "60 g bitter melon"
   portion_level: number; // 1 full portion, 0.5 half portion (Phase 1 has only two levels; derived from cost, the vendor can fine-tune)
   weekly_cap?: number | null; // Supply cap for this week
@@ -218,7 +218,7 @@ export interface Lock {
   plan_id?: string;
   plan_label?: string;
   meal_plan_id?: string; // meal_plans id; only on meal plans joined after 2026-09-28
-  // Phase 1 spec: bento contents, amount breakdown, pickup credentials
+  // bento contents, amount breakdown, pickup credentials
   menu_item_id?: string | null;
   meal_period?: MealPeriod;
   main_dish?: string | null;
@@ -347,7 +347,7 @@ export interface Review {
   created_at: unknown; // Firestore Timestamp
 }
 
-// ── Phase 1 spec: recipes, purchasing, rewards, charity meals, insights ──────────────────────────
+// ── Recipes, purchasing, rewards, charity meals, insights ──────────────────────────
 
 export interface Ingredient {
   id: string;

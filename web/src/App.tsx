@@ -254,7 +254,7 @@ export default function App() {
           <Route path="/profile">
             <MarketplacePage><MemberOnly><ProfilePage /></MemberOnly></MarketplacePage>
           </Route>
-          {/* The resale market was merged into the "My meals" tab (1002 spec §4.5); old links redirect there */}
+          {/* The resale market was merged into the "My meals" tab; old links redirect there */}
           <Route path="/marketplace">
             <Redirect to={/tab=charity/.test(window.location.search + window.location.hash) ? "/my-bookings?tab=charity" : "/my-bookings?tab=market"} replace />
           </Route>

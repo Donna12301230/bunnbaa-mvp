@@ -3,7 +3,7 @@ import { applyEarlyBirdPrice } from "@/lib/pricing";
 import { DEFAULT_PLATFORM_CONFIG, liveConfig } from "@/lib/platformConfig";
 import type { BentoCustomField, BentoMain, Component, ExtraSideChoice, Ingredient, LockExtraSide, LockSlot, MenuItem, RiceOption, SlotChoice } from "@/types";
 
-// Bento pricing and recipe conversions (spec §3, §4). Same rules as functions/src/bento.js;
+// Bento pricing and recipe conversions. Same rules as functions/src/bento.js;
 // this is only for on-screen previews and vendor menu editing; order amounts are decided by the server.
 
 export function isBento(item: Pick<MenuItem, "slots"> | null | undefined): boolean {

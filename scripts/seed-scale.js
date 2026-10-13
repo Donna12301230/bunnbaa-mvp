@@ -954,7 +954,7 @@ const REVIEW_COMMENTS = {
 function pickupDateFor(offsetDays) {
   return isoDate(daysAgo(offsetDays));
 }
-// Phase 1 only operates Monday to Friday (spec §2): pickup dates on Saturday or Sunday move back to Friday
+// Phase 1 only operates Monday to Friday: pickup dates on Saturday or Sunday move back to Friday
 function weekdayOffset(offsetDays) {
   const day = daysAgo(offsetDays).getDay();
   return day === 6 ? offsetDays + 1 : day === 0 ? offsetDays + 2 : offsetDays;

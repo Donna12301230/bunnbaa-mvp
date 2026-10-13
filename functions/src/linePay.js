@@ -104,7 +104,7 @@ function confirmPayment({ transactionId, amount }) {
  * Refunds a captured payment, fully or partially (refundAmount omitted = full).
  * One cart checkout is one LINE Pay transaction covering several locks, so
  * cancelling a single lock before cutoff is a partial refund of that lock's
- * locked_price. Automatic refunds for work-suspension days (§11) also go through here.
+ * locked_price. Automatic refunds for work-suspension days also go through here.
  */
 function refundPayment({ transactionId, refundAmount }) {
   if (isFakeTransaction(transactionId)) return Promise.resolve({ refundTransactionId: `${transactionId}-refund`, fake: true, refundAmount });

@@ -27,7 +27,7 @@ import UsePointsToggle, { usePointsPreview } from "@/components/UsePointsToggle"
 import WaiverText from "@/components/WaiverText";
 import { formatNT } from "@/lib/format";
 
-// Cart (spec §4): each line is one bento with its own pickup date (up to bookingRangeDays, 30 days, ahead), pickup slot, sides and rice adjustment;
+// Cart: each line is one bento with its own pickup date (up to bookingRangeDays, 30 days, ahead), pickup slot, sides and rice adjustment;
 // each line (each meal) can use one coupon, discount = min(coupon value, subtotal after adjustments). Amounts are only a preview;
 // createCartLinePayReservation recalculates from menu_items; a 0 total (coupon covers everything) skips LINE Pay.
 export default function CartPage() {

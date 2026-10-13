@@ -7,7 +7,7 @@ import { EMPTY_COMP, EMPTY_ING } from "@/components/CatalogEditors";
 import { portionTextFor } from "@/components/BentoEditor";
 import type { Component, Ingredient, MenuItem } from "@/types";
 
-// AI fill-in (simplification proposal §3-2): for menu dishes that have no composition yet, generate recipe drafts in one go with draftRecipe and link them back to the items.
+// AI fill-in: for menu dishes that have no composition yet, generate recipe drafts in one go with draftRecipe and link them back to the items.
 // Dishes with the same name are generated once (sides shared by several bentos become one semi-finished component); ingredients with an existing name are reused.
 // Drafts are marked ai_draft and unit prices are always left at 0 for the vendor to fill in (costs aren't faked).
 

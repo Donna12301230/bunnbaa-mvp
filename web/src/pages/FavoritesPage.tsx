@@ -21,7 +21,7 @@ import { itemWindows, nextAvailablePickup, setPreferredPickup } from "@/lib/pick
 import type { MealPlan, MenuItem, RewardStatus, Vendor } from "@/types";
 
 /**
- * Favorites (§4.5): favorited vendors sorted by when they were favorited (newest first), each listing its pre-orderable items and meal plans.
+ * Favorites: favorited vendors sorted by when they were favorited (newest first), each listing its pre-orderable items and meal plans.
  * Readable only by the owner (firestore.rules users/{uid}/favorites).
  */
 export default function FavoritesPage() {

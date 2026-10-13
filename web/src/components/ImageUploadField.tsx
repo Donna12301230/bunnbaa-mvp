@@ -45,7 +45,7 @@ function useImageUpload(vendorId: string | undefined, onChange: (url: string) =>
   return { fileInputRef, uploading, handleFile };
 }
 
-/** Photo for each dish in the menu editor (§3.2 "every dish needs a photo"): small thumbnail, click to upload, remove at top right */
+/** Photo for each dish in the menu editor: small thumbnail, click to upload, remove at top right */
 export function ImageThumbUpload({ vendorId, value, onChange, label }: { vendorId: string | undefined; value: string | null | undefined; onChange: (url: string) => void; label: string }) {
   const { fileInputRef, uploading, handleFile } = useImageUpload(vendorId, onChange);
   return (

@@ -225,7 +225,7 @@ export default function HomePage() {
 
   const visibleTransfers = transfers.filter((x) => !area || vendorInArea(vendors.find((v) => v.id === x.vendor_id), area));
 
-  // Bentos need a main, sides and rice amount: go to the item page with the chosen date and meal period to build the bento, then add it to the cart (spec §4.2)
+  // Bentos need a main, sides and rice amount: go to the item page with the chosen date and meal period to build the bento, then add it to the cart
   function openItem(item: MenuItem, vendor: Vendor) {
     const date = searching ? bookableDates.find((d) => openWindowsOn(vendor, d, new Date(), item, period).length > 0) ?? pickupDate : pickupDate;
     const windows = openWindowsOn(vendor, date, new Date(), item, period);
@@ -260,7 +260,7 @@ export default function HomePage() {
     notifyCartAdded();
   }
 
-  // Meal plans (§4.4): at checkout pick the first day + one pickup slot applied to every day; each day gets its own early-bird price and closed days are pushed back; slots can be changed per day later in "My meals"
+  // Meal plans: at checkout pick the first day + one pickup slot applied to every day; each day gets its own early-bird price and closed days are pushed back; slots can be changed per day later in "My meals"
   function openPlanDialog(vendor: Vendor, plan: MealPlan) {
     if (!requireLogin() || !uid) return;
     if (isOrderBanned) {

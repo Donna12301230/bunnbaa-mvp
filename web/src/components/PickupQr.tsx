@@ -26,7 +26,7 @@ interface Props {
 }
 
 /**
- * Pickup QR (spec §6.2): a one-time, server-signed credential (id + expiry + nonce + HMAC); every generation uses a new nonce,
+ * Pickup QR: a one-time, server-signed credential (id + expiry + nonce + HMAC); every generation uses a new nonce,
  * so reused screenshots or forgeries are rejected. Expires in 10 minutes; the screen refreshes it every 9 minutes.
  * Fallback: the vendor can also verify with the 4-digit pickup number + last three phone digits.
  */

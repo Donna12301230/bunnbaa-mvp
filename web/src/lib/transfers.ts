@@ -5,7 +5,7 @@ import type { Lock } from "@/types";
 
 type PriceFields = Pick<Lock, "list_price" | "early_bird_amount" | "adjust_amount" | "locked_price" | "coupon_discount">;
 
-/** Default resale price (spec §4.1): early-bird price + add-ons/reductions, before coupons. Used when the seller sets no price */
+/** Default resale price: early-bird price + add-ons/reductions, before coupons. Used when the seller sets no price */
 export function defaultResalePrice(lock: PriceFields): number {
   if (Number.isFinite(lock.list_price) && Number.isFinite(lock.early_bird_amount)) {
     return Math.max(0, lock.list_price! - lock.early_bird_amount! + (lock.adjust_amount ?? 0));

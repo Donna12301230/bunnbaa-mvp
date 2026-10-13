@@ -3,7 +3,7 @@ import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { ProxyPickupView } from "@/components/ProxyPickupPanel";
 
 /**
- * Proxy pickup (spec §6.4), legacy link #/pickup/:lockId/:token: the proxy doesn't need to sign in and can show the QR right away.
+ * Proxy pickup, legacy link #/pickup/:lockId/:token: the proxy doesn't need to sign in and can show the QR right away.
  * Since 2026-10-09 proxy pickup codes are used instead (entered on the "Proxy pickup" tab under My meals); this path is kept for links already sent out.
  * share_token is checked by the server; it is regenerated after resale, gifting or cancelling a resale, which invalidates old links.
  */

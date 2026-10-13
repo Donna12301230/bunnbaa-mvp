@@ -20,7 +20,7 @@ import { loc, tr } from "@/lib/i18n";
 import type { RewardStatus } from "@/types";
 
 /**
- * Growth rewards (spec §8, §9): when a vendor's cumulative net revenue reaches 10,000 NTD, 10% of it funds a reward pool, split into coupons that diners draw; every draw wins.
+ * Growth rewards: when a vendor's cumulative net revenue reaches 10,000 NTD, 10% of it funds a reward pool, split into coupons that diners draw; every draw wins.
  * One draw ticket per 100 NTD actually paid (only valid for that vendor's reward pool); below 10,000 NTD in revenue the pool doesn't open and keeps accumulating.
  * A drawn coupon is valid for 30 days, offered automatically at checkout, one per order.
  */

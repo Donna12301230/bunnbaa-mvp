@@ -1,6 +1,5 @@
 /**
  * Consumer-side discount explanation agent.
- * Spec ref: tech doc v6, section 4.2 / 6.2
  *
  * Explains, in one or two plain sentences, why a given discount is what it
  * is and what locking in means. Never recommends buying — purely explanatory,
@@ -30,7 +29,7 @@ const DISCLAIMER = "此為預購規則說明，非購買建議";
  * @param {number} params.discountPercent   e.g. 20 for 20% off
  * @param {"stable"|"variable"|"new"} params.vendorReliabilityTone
  *        Qualitative only — never pass the raw accuracy number to this agent,
- *        per spec 6.2 ("tone reference only; never show specific numbers to diners").
+ *        (tone reference only; never show specific numbers to diners).
  * @param {object} params.rules  platform settings: tiers, cancelHoursBefore, cancelCouponRate
  * @returns {Promise<{ explanation_text: string, explanation_text_en: string, disclaimer: string }>}
  */

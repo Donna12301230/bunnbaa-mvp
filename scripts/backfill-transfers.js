@@ -1,7 +1,6 @@
 /**
  * Backfills locks.transferred_from_uids for locks that changed hands before
- * the field existed (TODO.md: "My resales" can't track items that were already
- * taken over / 「我的轉讓」無法追蹤已被接手的項目).
+ * the field existed.
  *
  * Only source of the original owner is payment_intents: a confirmed intent
  * records the payer's buyer_uid + the lock_ids it created. If a lock's

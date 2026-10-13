@@ -45,7 +45,7 @@ import { rememberReturnPath } from "@/lib/returnPath";
 // nowhere on the site to view or check out the cart — a broken flow); see CartPage.tsx.
 //
 // 2026-09-28: added a "Home" tab at the front, linking to the brand page (/landing, LandingPage.tsx).
-// 2026-10-02 (1002 spec §4.5): the nav keeps only 4 tabs — Pre-order meals, My meals, Favorites, Growth rewards.
+// 2026-10-02: the nav keeps only 4 tabs — Pre-order meals, My meals, Favorites, Growth rewards.
 // "Vendors" removed (duplicates Pre-order meals); "Resale · Charity meals" merged into a My meals tab. The search box now drives the Pre-order meals page search.
 export type MarketplaceTab = "landing" | "plans" | "transfer" | "bookings" | "vendors" | "rewards" | "favorites" | "portal";
 

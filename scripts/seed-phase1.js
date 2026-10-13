@@ -1,17 +1,17 @@
 /**
- * Demo data for the Phase 1 spec (doc/第一階段規格.md).
+ * Demo data for bentos, recipes, rewards and charity meals.
  * Runs after the old seed.js (vendors, accounts, old locks); every doc id is fixed, so reruns
  * overwrite instead of duplicating.
  *
  * Writes:
- *   platformConfig/global            global platform settings (§2)
+ *   platformConfig/global            global platform settings
  *   dishLibrary/*                    platform dish library (for classifying open wishes)
- *   templates/*                      fixed-menu templates ×6 (§3.1)
+ *   templates/*                      fixed-menu templates ×6
  *   vendors/{demo}/ingredients|components|suppliers, menu_items    recipes and bentos for the two demo vendors
  *   vendors/{demo} lat/lng           pickup point coordinates (nearby charity meals, area insights)
  *   locks (p1-*)                     4 weeks of order history (forecast, area insights) + orders and wishes for the next business day
  *   sideWishes, prepPlans (waste counts), openWishes, wishTally
- *   rewardPeriods, rewardTickets, coupons, rewardStatus   Renheya's reward pool opened last period (§8)
+ *   rewardPeriods, rewardTickets, coupons, rewardStatus   Renheya's reward pool opened last period
  *
  * Historical orders are written with reward_counted: true and tags directly, without relying on
  * Functions triggers, so this runs on both the emulator and production.
@@ -238,7 +238,7 @@ async function seedVendorCatalogs(writer) {
     const itemsById = {};
     for (const item of items) {
       const id = `${v.id}-${item.key}`;
-      // Portion text for the ingredient summary (§4.2), derived from the recipe the same way as when a vendor saves in menu management
+      // Portion text for the ingredient summary, derived from the recipe the same way as when a vendor saves in menu management
       const portion = (component, name) => portionText(componentsById[component], ingredientsById, name);
       const slots = (item.slots || []).map((s) => {
         const base = componentCost(componentsById[s.default.component], ingredientsById);

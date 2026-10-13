@@ -1,10 +1,10 @@
-// Growth rewards (spec §8): reward pool allocation algorithm and sampling without replacement. Pure functions used by closeRewardPeriod /
+// Growth rewards: reward pool allocation algorithm and sampling without replacement. Pure functions used by closeRewardPeriod /
 // drawTicket; web/src/lib/rewards.ts has the same code (for preview calculations).
 
 const { COUPON_TIERS, BASE_TIER } = require("./config");
 
 /**
- * Allocation algorithm (§8.4)
+ * Allocation algorithm
  * 1. Every draw ticket first gets a base coupon: cost N × base discount
  * 2. Upgrade budget B = P − N × base discount
  * 3. Upgrades per tier = floor(B × weight ÷ upgrade cost)

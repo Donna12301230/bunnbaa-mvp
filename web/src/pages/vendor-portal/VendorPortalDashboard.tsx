@@ -20,7 +20,7 @@ import type { Lock } from "@/types";
 
 // Ported from BunnBaa Parse_Ref's client/src/pages/vendor/dashboard.tsx.
 // 2026-09-28: switched to real data; stats and today's pickup slots are computed from this vendor's locks (vendor_id + created_at index, latest 200).
-// 2026-10-06 visual redesign (simplification proposal §4): today's pickup progress ring, per-slot progress bars, a 7-day bar chart, four shortcut cards (with live status).
+// 2026-10-06 visual redesign: today's pickup progress ring, per-slot progress bars, a 7-day bar chart, four shortcut cards (with live status).
 
 // A donated meal (charity) is still cooked and handed out at the counter, so it counts as waiting, same as the prep page
 const PENDING_STATUSES = new Set(["locked", "for_resale", "for_gift", "charity"]);
@@ -229,7 +229,7 @@ export default function VendorPortalDashboard() {
         </Shortcut>
       </div>
 
-      {/* This month's earnings board (§9.3) */}
+      {/* This month's earnings board */}
       <RevenueDashboardCard vendor={myVendor} />
     </VendorPortalLayout>
   );

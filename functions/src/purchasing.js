@@ -1,4 +1,4 @@
-// Purchasing and prep (spec §5): weekly stock-in (locked Saturday 12:00) and daily prep (after cut-off, orders.js).
+// Purchasing and prep: weekly stock-in (locked Saturday 12:00) and daily prep (after cut-off, orders.js).
 // Long-lived items such as rice, oil, seasonings, dry goods and packaging (frequency: monthly) are folded into the weekly stock-in, added to the supplier order only below safety stock,
 // and topped up with LONG_LIVED_WEEKS weeks' worth at once. Monthly prep is deferred to phase 2 (purchaseLists.type is reserved for it).
 //
@@ -29,7 +29,7 @@ function excludedDates(vendor) {
 
 /**
  * Forecast portions per item for a given weekday: average of the same weekday over the past 4 weeks; with under 4 weeks of history, the vendor's self-reported forecast.
- * Wasted portions (unclaimed charity meals) are subtracted from history so next week isn't overproduced (§7.5).
+ * Wasted portions (unclaimed charity meals) are subtracted from history so next week isn't overproduced.
  */
 async function forecastByWeekday(vendor, referenceMonday) {
   const excluded = excludedDates(vendor);
@@ -177,7 +177,7 @@ async function buildWeekly(vendor, weekStart) {
     type: "weekly", week_start: weekStart, safety_rate: safety, lines, board, uncounted: !counted,
     est_total: lines.reduce((s, l) => s + l.est_cost, 0), generated_at: FieldValue.serverTimestamp(),
   });
-  // After Saturday 12:00 next week's mains are locked (§16 provisional: only equivalent side substitutions allowed)
+  // After Saturday 12:00 next week's mains are locked
   await db().collection("vendors").doc(vendor.id).set({ menu_locked_week: weekStart }, { merge: true });
   return { lines: lines.length, uncounted: !counted };
 }

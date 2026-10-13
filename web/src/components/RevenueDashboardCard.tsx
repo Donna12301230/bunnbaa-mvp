@@ -62,7 +62,7 @@ function Row({ label, value, minus, strong }: { label: string; value: number; mi
 }
 
 /**
- * First card on the vendor portal home, "This month's earnings dashboard" (1002 spec §9.3): how much material to prep this month and how much net profit remains after labor.
+ * First card on the vendor portal home, "This month's earnings dashboard": how much material to prep this month and how much net profit remains after labor.
  * Numbers are computed by Functions buildRevenueForecast (daily 21:00) / refreshRevenueForecast and stored in vendors/{id}/revenueForecast/{month};
  * forecasts are for reference only; the month is settled on actual figures.
  */

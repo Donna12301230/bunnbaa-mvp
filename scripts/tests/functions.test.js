@@ -1,4 +1,4 @@
-// Cases from doc/測試文件.md that actually call Cloud Functions (chapters 3, 4 and 6).
+// Test cases that actually call Cloud Functions.
 // Runs on a separate test emulator and creates its own test vendors (zz-*) and members A/B/C, so it
 // doesn't depend on the dates in the seed data.
 //
@@ -78,7 +78,7 @@ function expectCode(r, code, msg) {
   if (r.code !== code) throw new Error(`${msg || ""} expected ${code}, got ${r.code}: ${r.message}`);
   return r;
 }
-/** Paid takeover on the resale market (§4.1): reserve + request payment → confirm payment. The emulator has no LINE Pay keys, so this uses a fake payment flow */
+/** Paid takeover on the resale market: reserve + request payment → confirm payment. The emulator has no LINE Pay keys, so this uses a fake payment flow */
 async function takeOver(user, lockId) {
   const r = await user.call("createResaleLinePayReservation", { lock_id: lockId });
   if (!r.ok) return r;

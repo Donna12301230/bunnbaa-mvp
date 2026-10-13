@@ -9,7 +9,7 @@ export interface Favorite {
 }
 
 /**
- * Favorites (§4.5): users/{uid}/favorites/{vendorId}, readable and writable only by the owner (firestore.rules).
+ * Favorites: users/{uid}/favorites/{vendorId}, readable and writable only by the owner (firestore.rules).
  * A favorite is also a positive taste-preference signal (functions/src/insights.js onFavoriteCreated).
  * Every heart on vendor cards uses this, so the whole site shares one onSnapshot (per uid).
  */

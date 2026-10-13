@@ -53,7 +53,7 @@ const discountFor = (days: number) => EARLY_BIRD_TIERS.find((t) => days >= t.min
 const MENU_TAB_LIMIT = 5;
 const MENU_ITEMS_PER_TAB = 4;
 
-// Booking window: up to 30 days ahead (spec §2, same setting as lib/pickupSlots)
+// Booking window: up to 30 days ahead
 const maxAdvanceDays = () => liveConfig().bookingRangeDays;
 
 // Upcoming events come from landing_events (maintained by admins in Firestore); icon is stored as a string key

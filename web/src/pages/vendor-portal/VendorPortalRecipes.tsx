@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 import { componentGroup, GROUP_CELL, GROUP_DOT, groupLabel, ingredientGroup, type FoodGroup } from "@/lib/foodColors";
 import type { Component, Ingredient, Supplier } from "@/types";
 
-// Three recipe tiers (spec §3): item (menu management) → semi-finished component → ingredient.
+// Three recipe tiers: item (menu management) → semi-finished component → ingredient.
 // Recipes drive prep quantities, cost, portion tiers and flavor tags; quantities are always computed by code, Gemini only drafts.
 // Each component shows "used in which dishes"; ingredients flag gaps that would skew cost / purchasing (no unit price, no supplier, not used by any recipe).
 
@@ -151,7 +151,7 @@ export default function VendorPortalRecipes() {
     }
   }
 
-  /** Set up the shop from a preset template (§3.1): copies ingredients, components and items (including side-dish cells and candidate dish suggestions) */
+  /** Set up the shop from a preset template: copies ingredients, components and items (including side-dish cells and candidate dish suggestions) */
   async function applyTemplate(t: TemplateDoc) {
     if (!vendorId) return;
     try {

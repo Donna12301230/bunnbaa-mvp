@@ -34,7 +34,7 @@ const ANOMALY_LABEL: Record<string, { zh: string; en: string }> = {
 const typeLabel = (t: string) => (TYPE_LABEL[t] ? tr(TYPE_LABEL[t].zh, TYPE_LABEL[t].en) : t);
 const anomalyLabel = (t: string) => (ANOMALY_LABEL[t] ? tr(ANOMALY_LABEL[t].zh, ANOMALY_LABEL[t].en) : t);
 
-/** Disaster events (§11): fetched automatically from NCDR (aggregating the Central Weather Administration and DGPA); admins create them manually when the source fails. */
+/** Disaster events: fetched automatically from NCDR (aggregating the Central Weather Administration and DGPA); admins create them manually when the source fails. */
 function DisasterContent() {
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -118,7 +118,7 @@ function DisasterContent() {
   );
 }
 
-/** Anomaly detection (§9.5): flags and notifies the platform and vendor; no automatic penalties. */
+/** Anomaly detection: flags and notifies the platform and vendor; no automatic penalties. */
 function AnomalyContent() {
   const [itemList, setItems] = useState<Anomaly[] | null>(null);
   const items = itemList ?? [];
