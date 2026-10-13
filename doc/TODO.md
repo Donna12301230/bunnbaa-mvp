@@ -35,7 +35,7 @@
 - 收尾：
   - [ ] 截圖給 B：預購助理卡片、「常一起買」、評估結果表
   - [ ] 清測試資料：`customer@bunnbaa.test` 的「A方案」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）、`ban_appeals/lI5dGTVtIBfByBIUTy3W`、`EJEL6PRO`（可選）
-  - [ ] 最後核對 README 數字（Functions 79、logic 64、rules 65、Functions 測試 144）
+  - [ ] 最後核對 README 數字（Functions 80、logic 64、rules 65、Functions 測試 144）
   - [-] 報名表單
 
 ## 🔴 B：商家端＋管理後台＋投稿素材

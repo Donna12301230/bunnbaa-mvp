@@ -75,7 +75,7 @@ flowchart TB
     direction LR
     D["🍱 Diner app"]
     V["🧑‍🍳 Vendor portal"]
-    A["🛡️ Admin console<br/>+ Looker Studio embed"]
+    A["🛡️ Admin console<br/>+ platform dashboard"]
     AUTH["Firebase Auth<br/>email · phone OTP"]
   end
 
@@ -129,7 +129,7 @@ flowchart TB
 ✨ marks the points where AI is called. The five layers:
 
 1. **Presentation.** Three web apps (diner, vendor, admin) share one React codebase on Firebase Hosting. They read Firestore directly through realtime listeners, and Security Rules decide what each user can see. Anything that changes money or stock goes through a callable function.
-2. **Compute.** 79 Cloud Functions (2nd gen, running on Cloud Run) handle three kinds of work: callables that users trigger, triggers that react to Firestore writes, and jobs that Cloud Scheduler starts on a timer.
+2. **Compute.** 80 Cloud Functions (2nd gen, running on Cloud Run) handle three kinds of work: callables that users trigger, triggers that react to Firestore writes, and jobs that Cloud Scheduler starts on a timer.
 3. **AI core.** Every Gemini call goes through one wrapper (`functions/src/gemini.js`) to Vertex AI, authenticated with the functions' service account. The assistant runs a function-calling loop: Gemini asks for a tool, the function runs it against Firestore, and the result goes back to Gemini.
 4. **Data.** Firestore holds all operational data. The menu vectors used for resale matching live in the same documents, with a Firestore vector index, so there is no separate vector database. Menu photos are in Cloud Storage.
 5. **Analytics.** The official extension copies every Firestore write into BigQuery. BigQuery AI forecasts demand and groups diners into segments. A scheduled job writes the forecasts back to Firestore for the vendor portal, and Looker Studio reports the waste-reduction numbers.
@@ -194,7 +194,7 @@ Gemini also explains the early-bird discount on the item page (`getDiscountExpla
 | **Demand forecast** | `AI.FORECAST` (TimesFM, no training needed) on the daily lock count for each vendor, 7 days ahead | "About N meals expected tomorrow (for reference)" in the vendor portal, written back to `vendors/{v}/forecast` |
 | **Frequently bought together** | SQL self-join on items the same diner has bought from the same vendor (on any day; most orders hold a single item) | Item pairs the vendor can bundle, also used by the pre-order assistant |
 | **Diner segments** | `ML.KMEANS` on recency, frequency and spend, plus resale rate and no-show rate | 4 segments of members with 2+ orders, retrained weekly; `AI.GENERATE` asks Gemini for a bilingual name and one-line description of each, e.g. "reliable early-bird multi-store regulars" |
-| **Impact dashboard** | Looker Studio on `bunnbaa_analytics`, embedded in the admin console | Daily locks, forecast vs. actual, meals rescued, charity meals served, segment mix |
+| **Impact dashboard** | Admin console charts read the `bunnbaa_analytics` dashboard views through a Cloud Function; the same views back a Looker Studio report | Daily locks, forecast vs. actual, meals rescued, charity meals served, segment mix |
 
 ## Technical decisions
 
@@ -316,7 +316,7 @@ BunnBaa/
 ├── web/src/                # React + TypeScript + Vite + Tailwind
 │   ├── pages/              # diner app
 │   ├── pages/vendor-portal/
-│   └── pages/admin/        # includes the embedded Looker Studio dashboard
+│   └── pages/admin/        # includes the platform dashboard (BigQuery views, drawn with Recharts)
 ├── bigquery/               # analytics SQL, schema views, setup steps
 ├── extensions/             # Stream Firestore to BigQuery instance configs
 ├── scripts/                # seed data, automated tests, assistant evaluation (eval/)

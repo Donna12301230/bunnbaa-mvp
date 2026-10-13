@@ -38,5 +38,5 @@ GROUP BY day;
 
 -- 4. Customer segment distribution (segment names written by Gemini)
 CREATE OR REPLACE VIEW bunnbaa_analytics.dash_segments AS
-SELECT segment_id, ai.label AS label, ai.description AS description, members, frequency, avg_price, avg_discount, resale_rate, no_show_rate
+SELECT segment_id, ai.label AS label, ai.description AS description, ai.label_en AS label_en, ai.description_en AS description_en, members, frequency, avg_price, avg_discount, resale_rate, no_show_rate
 FROM bunnbaa_analytics.segment_profiles;

@@ -78,7 +78,7 @@ Every Firestore write streams into **BigQuery** (official *Stream Firestore to B
 ### Technical implementation (Google Cloud)
 
 - Frontend: React + TypeScript + Vite on **Firebase Hosting**; diner app, vendor portal and admin console; Firebase Auth.
-- Backend: **79 Cloud Functions** (2nd gen on **Cloud Run**, asia-east1) — callables, Firestore triggers and Cloud Scheduler jobs (cut-off, payouts, pickup reminders, charity conversion, daily forecast, weekly segments).
+- Backend: **80 Cloud Functions** (2nd gen on **Cloud Run**, asia-east1) — callables, Firestore triggers and Cloud Scheduler jobs (cut-off, payouts, pickup reminders, charity conversion, daily forecast, weekly segments).
 - Data: **Firestore** with native **Vector Search**; **Cloud Storage** for menu photos; **Firebase Cloud Messaging** for push.
 - AI: **Gemini on Vertex AI** (`gemini-3.6-flash` for text/vision/tools, `gemini-embedding-001` for 768-dim vectors) through one shared wrapper (`@google/genai`, JSON mode, retry, and a final round that must return an answer), authenticated with the functions' service account (`roles/aiplatform.user`).
 - Analytics: **BigQuery** (`bunnbaa_analytics`, asia-east1) fed by the *Stream Firestore to BigQuery* extension; **BigQuery AI** `AI.FORECAST`, `ML.KMEANS`, `AI.GENERATE`; **Looker Studio** dashboard; forecasts and segments are written back to Firestore so the apps stay real-time.
@@ -94,7 +94,7 @@ Every Firestore write streams into **BigQuery** (official *Stream Firestore to B
 
 ### Feasibility (it already works)
 
-- **Running on Google Cloud today**: https://bunnbaa-mvp-5474.web.app, with 79 Cloud Functions (2nd gen, on Cloud Run) and daily BigQuery AI jobs, deployed automatically from GitHub Actions.
+- **Running on Google Cloud today**: https://bunnbaa-mvp-5474.web.app, with 80 Cloud Functions (2nd gen, on Cloud Run) and daily BigQuery AI jobs, deployed automatically from GitHub Actions.
 - **All three roles are built end to end**: diner app (pre-order, pay, resell, gift, donate, QR pickup), vendor portal (photo-to-menu, prep and purchase lists, forecast, QR scanning, payouts), and admin console (vendor approval, platform settings, impact dashboard).
 - **Tested**: 64 business-logic tests, 144 Cloud Functions tests, 65 Firestore security-rule tests, and a 24-question evaluation of the AI assistant (24/24 rule checks; Vertex AI Gen AI Evaluation Service scores 4.79/5 fulfillment, 4.96/5 groundedness).
 - **Real-world constraints handled**: LINE Pay request, confirm and refund flows; time-zone-aware cut-offs; refunds as platform points; usage limits on the AI assistant.

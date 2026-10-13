@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { paren } from "@/lib/format";
 import { selectClass } from "@/lib/fieldStyles";
 import { AlertTriangle, Plus, Trash2, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -183,7 +184,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
         <label className="flex items-center gap-2 text-sm">
           <span className="w-20 shrink-0 text-xs text-muted-foreground">{tr("主菜", "Main")}</span>
           <select className={SELECT_CLASS} value={Math.min(mainIdx, mains.length - 1)} onChange={(e) => setMainIdx(Number(e.target.value))}>
-            {mains.map((m, i) => <option key={i} value={i}>{m.name}（{m.price || 0}）</option>)}
+            {mains.map((m, i) => <option key={i} value={i}>{m.name}{paren(m.price || 0)}</option>)}
           </select>
         </label>
       )}
@@ -199,7 +200,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
             }}
           >
             <option value="default">{slot.default.name}{tr("（預設）", " (default)")}</option>
-            {slot.candidates.filter((c) => c.name).map((c, ci) => <option key={ci} value={ci}>{c.name}（{portionLabel(c.portion_level)}）</option>)}
+            {slot.candidates.filter((c) => c.name).map((c, ci) => <option key={ci} value={ci}>{c.name}{paren(portionLabel(c.portion_level))}</option>)}
             <option value="none">{tr(`不要（${priceDeltaText(cfg.slotRemovePrice)}）`, `None (${priceDeltaText(cfg.slotRemovePrice)})`)}</option>
           </select>
         </label>

@@ -103,7 +103,7 @@ export default function PriceDateStrip({ value, onChange, vendor, basePrice, cla
               )}
             >
               <span className="block text-xs font-semibold">
-                {d.date.slice(5).replace("-", "/")}（{weekdays[weekdayOf(d.date)]}）
+                {d.date.slice(5).replace("-", "/")}{lang === "en" ? ` (${weekdays[weekdayOf(d.date)]})` : `（${weekdays[weekdayOf(d.date)]}）`}
               </span>
               <span className="block font-heading text-base font-semibold leading-tight">
                 {disabled

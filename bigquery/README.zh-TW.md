@@ -65,9 +65,9 @@ done
 
 SQL 在 `functions/src/customerInsights.sql`（函式部署時一起打包），由 `customerInsights` 每週一 04:00 執行，產生 `basket_pairs`、`buyer_features`、`buyer_segments_model`（K-means）、`buyer_segments`、`segment_profiles`（含 `AI.GENERATE` 群組描述）、`vendor_segment_mix`。也可以直接貼到 BigQuery 主控台跑。
 
-## Looker Studio 儀表板（P1）
+## 平台儀表板與 Looker Studio（P1）
 
-執行 `sql/02_dashboard.sql` 建立儀表板用的 view（已於 2026-10-10 執行）。報表從管理後台「數據儀表板」的連結建立，嵌入網址貼回同一頁。
+執行 `sql/02_dashboard.sql` 建立儀表板用的 view（已於 2026-10-10 執行；2026-10-13 `dash_segments` 加上 `label_en`／`description_en`）。管理後台「平台儀表板」頁呼叫 `getPlatformDashboard`（限管理員），即時查這幾個 view，用 Recharts 畫圖。同一組 view 也接 Looker Studio 報表：從同一頁「Looker Studio 報表設定」的連結建立，嵌入網址貼回那裡，頁面就會出現「在 Looker Studio 開啟」按鈕。
 
 ## 權限
 

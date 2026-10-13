@@ -33,7 +33,7 @@ BunnBaa 以「上架 → 找餐 → 救餐 → 校準」四段 AI 循環，讓�
 | 自動翻譯 | 觸發器寫入 `*_en` 欄位 | 英文介面 | Gemini |
 | 需求預測（7 天） | `demandForecast.js` | 商家營收頁 `DemandForecastCard` | BigQuery `AI.FORECAST`（TimesFM） |
 | 客群與常一起買 | `customerInsights.js`＋`.sql` | `CustomerInsightsCard`、品項頁「常一起買」 | `ML.KMEANS`＋`AI.GENERATE` |
-| 平台儀表板 | `bigquery/sql/02_dashboard.sql` | 管理後台 `/admin/analytics` | Looker Studio |
+| 平台儀表板 | `bigquery/sql/02_dashboard.sql`＋`platformDashboard.js` | 管理後台 `/admin/analytics` | BigQuery view；同一組 view 也接 Looker Studio |
 
 Roadmap（未實作）：評論與未取餐洞察（每週彙整 `reviews` 與 no-show 備註成品項主題）、異常行為偵測與申訴摘要（目前 `detectAnomalies` 是規則版）、Vertex AI Search 語意搜尋（現有 Firestore KNN 已夠用）。
 
@@ -133,9 +133,9 @@ flowchart LR
 - 購物籃：同一位客人在同一家店都買過的品項配對，寫回 `vendors/{v}/analytics/basket` 與 `menu_items/{id}.often_with`（內容沒變不寫）
 - 分群：過去 90 天買過 2 份以上的會員，以 RFM＋轉讓率＋爽約率分 4～5 群；`AI.GENERATE` 產生中英文群名與描述，欄位不完整的群組重試一次。只寫彙總數字，不寫 `buyer_uid`
 
-### 4.5 Looker Studio 儀表板
+### 4.5 平台儀表板（Looker Studio）
 
-`bigquery/sql/02_dashboard.sql` 建立 `dash_daily_ops`、`dash_forecast_vs_actual`、`dash_forecast_next`、`dash_segments`。管理後台「平台儀表板」（`/admin/analytics`）嵌入報表，網址存在 `platformConfig/analytics.lookerStudioEmbedUrl`；CSP `frame-src` 已允許 `https://lookerstudio.google.com`。目前數字：3,659 份裡救回 408 份（轉讓 296＋愛心餐 112），全平台預測誤差（WAPE）6～15%。
+`bigquery/sql/02_dashboard.sql` 建立 `dash_daily_ops`、`dash_forecast_vs_actual`、`dash_forecast_next`、`dash_segments`。管理後台「平台儀表板」（`/admin/analytics`）呼叫 `getPlatformDashboard`（限管理員）即時查這四個 view，用 Recharts 畫總數卡、每日預訂與救回、預測 vs 實際、未來預估、客群表（英文介面用 `label_en`）。同一組 view 也接 Looker Studio 報表，頁面上有「在 Looker Studio 開啟」按鈕，網址存在 `platformConfig/analytics.lookerStudioEmbedUrl`。目前數字：3,659 份裡救回 408 份（轉讓 296＋愛心餐 112），全平台預測誤差（WAPE）6～15%。
 
 ### 4.6 前端讀取格式
 
@@ -147,7 +147,8 @@ flowchart LR
 | 客群 | `vendors/{v}/analytics/segments` | `segments: [{ segment_id, label, description, label_en, description_en, customers }]` |
 | 常一起買 | `menu_items/{id}.often_with` | 同店品項 id 陣列（最多 5 個），前端取前 3 個還在上架的 |
 | 助理推薦理由 | 助理卡片的 `reason` | 選填字串 |
-| 儀表板 | `platformConfig/analytics.lookerStudioEmbedUrl` | 嵌入網址 |
+| 平台儀表板 | callable `getPlatformDashboard` | `daily`、`backtest`、`next`、`segments`（各 view 的列）、`generated_at` |
+| Looker Studio 報表 | `platformConfig/analytics.lookerStudioEmbedUrl` | 嵌入網址 |
 
 ### 4.7 其他 Google Cloud 對應
 

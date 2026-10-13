@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { paren } from "@/lib/format";
 import { selectClass } from "@/lib/fieldStyles";
 import { useQuery } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
@@ -152,7 +153,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
               }}
             >
               <option value="default">{slot.default.name}{tr("（預設）", " (default)")}</option>
-              {slot.candidates.map((c, ci) => !c.disabled && <option key={ci} value={ci}>{c.name}（{portionLabel(c.portion_level)}）</option>)}
+              {slot.candidates.map((c, ci) => !c.disabled && <option key={ci} value={ci}>{c.name}{paren(portionLabel(c.portion_level))}</option>)}
               <option value="none">{tr(`少一道（−${Math.abs(config?.slotRemovePrice ?? 5)}）`, `None (−${Math.abs(config?.slotRemovePrice ?? 5)})`)}</option>
             </select>
           </label>

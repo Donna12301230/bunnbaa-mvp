@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { paren } from "@/lib/format";
 import { selectClass } from "@/lib/fieldStyles";
 import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { AlertTriangle, Check, ChefHat, ChevronDown, ChevronRight, ClipboardList, MessageCircle, MessageCircleQuestion, Pencil, Printer, RefreshCw, Replace, Sparkles, Tag as TagIcon, TrendingUp, Zap } from "lucide-react";
@@ -48,7 +49,7 @@ function TimelineTable({ timeline }: { timeline: Timeline }) {
           <tr className="align-top"><td className="pr-3 py-1 font-semibold whitespace-nowrap">{tr("前一晚", "Night before")}</td><td className="py-1">{timeline.overnight.map((o) => o.task).join("、")}</td></tr>
         )}
         {timeline.slots.map((s, i) => (
-          <tr key={i} className="align-top"><td className="pr-3 py-1 font-mono whitespace-nowrap">{s.start}</td><td className="py-1">{s.task} <span className="text-xs text-muted-foreground">（{s.equipment}）</span></td></tr>
+          <tr key={i} className="align-top"><td className="pr-3 py-1 font-mono whitespace-nowrap">{s.start}</td><td className="py-1">{s.task} <span className="text-xs text-muted-foreground">{paren(s.equipment)}</span></td></tr>
         ))}
         <tr className="align-top"><td className="pr-3 py-1 font-mono">{timeline.packing.start}</td><td className="py-1">{tr("裝盒、貼出餐標籤", "Pack & label")}</td></tr>
       </tbody>

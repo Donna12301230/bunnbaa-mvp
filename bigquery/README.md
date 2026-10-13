@@ -65,9 +65,9 @@ The simulated data is for demonstration only: once there is enough real history,
 
 The SQL is in `functions/src/customerInsights.sql` (bundled with the functions). `customerInsights` runs it every Monday at 04:00 and produces `basket_pairs`, `buyer_features`, `buyer_segments_model` (k-means), `buyer_segments`, `segment_profiles` (with `AI.GENERATE` segment descriptions) and `vendor_segment_mix`. It can also be pasted into the BigQuery console.
 
-## Looker Studio dashboard (P1)
+## Platform dashboard and Looker Studio (P1)
 
-Run `sql/02_dashboard.sql` to create the dashboard views (run on 2026-10-10). Create the report from the link on the admin console's Dashboard page, then paste the embed URL back on the same page.
+Run `sql/02_dashboard.sql` to create the dashboard views (run on 2026-10-10; `dash_segments` gained `label_en`/`description_en` on 2026-10-13). The admin console's Platform dashboard page calls `getPlatformDashboard` (admins only), which queries these views live and draws the charts with Recharts. The same views back a Looker Studio report; create it from the link under "Looker Studio report settings" on that page and paste its embed URL there to show an "Open in Looker Studio" button.
 
 ## Access
 

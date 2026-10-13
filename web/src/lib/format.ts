@@ -34,3 +34,8 @@ export function formatDateTime(d: Date | null | undefined): string {
   const pad = (x: number) => String(x).padStart(2, "0");
   return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** Value in brackets after a label: Chinese "（7+）", English " (7+)" */
+export function paren(s: string | number): string {
+  return getLang() === "en" ? ` (${s})` : `（${s}）`;
+}

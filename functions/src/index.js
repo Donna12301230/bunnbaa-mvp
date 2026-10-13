@@ -376,7 +376,7 @@ exports.translateAllContent = onCall({ region: "asia-east1", timeoutSeconds: 540
  * ------------------------------------------------------------------ */
 for (const mod of [
   "./orders", "./charity", "./rewardsFns", "./purchasing", "./insights", "./disaster",
-  "./finance", "./menuVision", "./resaleMatch", "./shoppingAssistant", "./pickupForecast", "./consumerExplanation", "./wallet", "./bigqueryExport", "./demandForecast", "./customerInsights",
+  "./finance", "./menuVision", "./resaleMatch", "./shoppingAssistant", "./pickupForecast", "./consumerExplanation", "./wallet", "./bigqueryExport", "./demandForecast", "./customerInsights", "./platformDashboard",
 ]) {
   for (const [name, fn] of Object.entries(require(mod))) {
     // Register Cloud Functions only (module-internal shared things like helpers aren't functions or have no __trigger/run)

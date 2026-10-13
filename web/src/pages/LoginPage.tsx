@@ -333,7 +333,7 @@ export default function LoginPage() {
                             disabled={demoLoginMutation.isPending || isPendingLogin} onClick={() => demoLoginMutation.mutate(account)}>
                             <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
                             <span className="min-w-0">
-                              <span className="block text-sm font-semibold">{busy ? tr("登入中…", "Signing in…") : tr(`以${account.label}身分體驗`, `Try it as a ${account.label.toLowerCase()}`)}</span>
+                              <span className="block text-sm font-semibold">{busy ? tr("登入中…", "Signing in…") : tr(`以${account.label}身分體驗`, `Try it as ${/^[aeiou]/i.test(account.label) ? "an" : "a"} ${account.label.toLowerCase()}`)}</span>
                               <span className="block truncate text-caption font-normal text-muted-foreground">{account.hint}</span>
                             </span>
                           </Button>

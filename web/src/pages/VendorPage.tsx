@@ -1,4 +1,5 @@
 import { useMemo, useState, type MouseEvent } from "react";
+import { paren } from "@/lib/format";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
@@ -158,7 +159,7 @@ export default function VendorPage() {
           <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-ink bg-card">
             <Star className="w-4 h-4 fill-warning text-warning" aria-hidden="true" />
             <span className="font-semibold">{rating.average}</span>
-            <span className="text-muted-foreground">（{rating.count}+）</span>
+            <span className="text-muted-foreground">{paren(`${rating.count}+`)}</span>
           </span>
         )}
         {vendor.address && (

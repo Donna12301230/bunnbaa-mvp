@@ -44,7 +44,10 @@ let current: Lang = readLang();
 applyHtmlLang(current);
 
 function applyHtmlLang(lang: Lang) {
-  if (typeof document !== "undefined") document.documentElement.lang = lang === "en" ? "en" : "zh-Hant-TW";
+  if (typeof document === "undefined") return;
+  document.documentElement.lang = lang === "en" ? "en" : "zh-Hant-TW";
+  // The tab title in index.html is Chinese; English visitors (e.g. ?lang=en) would otherwise see it on the tab
+  document.title = lang === "en" ? "BunnBaa | Book early, eat happy" : "BunnBaa 飯飽｜越早訂，越開心";
 }
 
 export function setLang(lang: Lang) {

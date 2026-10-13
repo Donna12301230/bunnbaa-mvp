@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { paren } from "@/lib/format";
 import { policy } from "@/lib/policy";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -412,7 +413,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                           : st.full && choice !== ci
                             ? tr("已滿", "full")
                             : tr(`${portionLabel(st.cand.portion_level)}・${st.count}/${st.min} 人成立`, `${portionLabel(st.cand.portion_level)} · ${st.count}/${st.min} wishes`);
-                        return <option key={ci} value={ci} disabled={st.cand.disabled || (st.full && choice !== ci)}>{st.cand.name}（{status}）</option>;
+                        return <option key={ci} value={ci} disabled={st.cand.disabled || (st.full && choice !== ci)}>{st.cand.name}{paren(status)}</option>;
                       })}
                       <option value="none">{tr(`不要這道（−${removePrice}）`, `None (−${removePrice})`)}</option>
                     </Select>
