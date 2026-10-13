@@ -312,6 +312,19 @@ function geohash(lat, lng, precision = 7) {
       eq((await get(`charityReservations/${again.reservation_id}`)).status, "reserved");
       assert(!(await get(`tasteProfiles/${R2.uid}`)), "預約愛心餐不應產生口味分數");
     });
+
+    await test("C-CHR-01b", "店家現在只設午餐時段，今天還有早餐時段的單：照樣轉愛心餐、照樣截止（2026-10-13 修）", async () => {
+      if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
+      if (nowMinutes < 150) throw new Error("SKIP：00:30 + 2 小時還沒到");
+      const VL = await mkVendor(vid("lunchonly"), { pickup_windows: ["12:00-12:30"], owner_uid: `zz2-owner-lunchonly-${RUN}` });
+      await mkBento(VL);
+      const old = await lock(`zz2-y-${RUN}`, VL, { pickup_date: TODAY, pickup_window: "00:00-00:30", locked_price: 60 });
+      await runSchedule("charity.js", "convertToCharity");
+      const l = await get(`locks/${old.id}`);
+      eq(l.status, "charity"); eq(l.charity_source, "noshow");
+      await runSchedule("charity.js", "closeCharity");
+      eq((await get(`vendors/${VL}/prepPlans/${TODAY}`)).charity_closed_breakfast, true, "轉完後截止排程也要看到早餐時段");
+    });
   }
 
   // ════ 3.14 Reward pool settlement, coupon expiry, draw period end, expiry reminders, refund clawback ════
@@ -879,6 +892,99 @@ function geohash(lat, lng, precision = 7) {
       } finally { await db.doc(`users/${U.uid}`).set({ orderBanned: false }, { merge: true }); }
     });
   }
+
+  // Meal plan pricing and restrictions (paid entirely with points, so it doesn't go through LINE Pay)
+  {
+    const VP = await mkVendor(vid("plan2"), { pickup_windows: ["07:30-08:00", "11:00-11:30", "11:30-12:00"] });
+    await mkBento(VP, { meal_periods: ["lunch"] });
+    const plan = async (extra = {}) => {
+      const ref = db.collection("meal_plans").doc(uniq("zzmp"));
+      await ref.set({ vendor_id: VP, name: "測試週餐", label: "週方案", days: 3, price_per_meal: 100, menu_item_id: `${VP}-bento`, ...extra });
+      return ref.id;
+    };
+    const U = await freshUser("plan2");
+    const givePoints = async (n) => {
+      await db.collection(`wallets/${U.uid}/lots`).add({ source_tx: null, amount: n, remaining: n, reason: "test", created_at: Timestamp.now() });
+      await db.doc(`wallets/${U.uid}`).set({ balance: FieldValue.increment(n) }, { merge: true });
+    };
+    let planLocks = [];
+
+    await test("C-PRC-09", "計畫 price_per_meal=100、第一天明天：每天各自疊早鳥（明天 95、其餘 80），每筆寫 discount_percent／early_bird_amount", async () => {
+      const tomorrow = addDays(TODAY, 1);
+      if (OPEN_DAY !== tomorrow) throw new Error(`SKIP：明天 ${tomorrow} 不能訂（OPEN_DAY=${OPEN_DAY}）`);
+      await givePoints(300);
+      const r = expectOk(await U.call("createPlanLinePayReservation", { plan_id: await plan(), start_date: tomorrow, pickup_window: "11:00-11:30", use_points: true }));
+      eq([r.free, r.points_used], [true, 255], "95＋80＋80 全用點數");
+      planLocks = expectOk(await U.call("confirmLinePayPayment", { order_id: r.order_id })).lock_ids;
+      const locks = (await Promise.all(planLocks.map((id) => get(`locks/${id}`)))).sort((a, b) => a.plan_day - b.plan_day);
+      eq(locks.map((l) => [l.list_price, l.discount_percent, l.early_bird_amount, l.locked_price]), [[100, 5, 5, 95], [100, 20, 20, 80], [100, 20, 20, 80]]);
+      eq(locks[0].pickup_date, tomorrow);
+      assert(new Set(locks.map((l) => l.plan_id)).size === 1, "同一個 plan_id");
+    });
+
+    await test("C-PRC-14", "20 天後的計畫：仍是 8 折（80），不是 7 折", async () => {
+      let d = addDays(TODAY, 20);
+      while (!CFG.businessWeekdays.includes(weekdayOf(d))) d = addDays(d, 1);
+      const p = expectOk(await U.call("createPlanLinePayReservation", { plan_id: await plan({ days: 1 }), start_date: d, pickup_window: "11:00-11:30", preview: true }));
+      eq(p.days.map((x) => [x.date, x.discount_percent, x.price]), [[d, 20, 80]]);
+    });
+
+    await test("C-PLN-07", "計畫中的一天：截單前改同一天另一個時段成功；改配菜被擋", async () => {
+      if (!planLocks.length) throw new Error("SKIP：C-PRC-09 沒有建立計畫訂單");
+      const first = (await Promise.all(planLocks.map(async (id) => ({ id, ...(await get(`locks/${id}`)) })))).find((l) => l.plan_day === 1);
+      expectOk(await U.call("updateLockChoices", { lock_id: first.id, pickup_window: "11:30-12:00" }), "改時段");
+      eq((await get(`locks/${first.id}`)).pickup_window, "11:30-12:00");
+      const r = expectCode(await U.call("updateLockChoices", { lock_id: first.id, slots: [{ choice: "default" }, { choice: "default" }] }), "failed-precondition");
+      assert(/只能改取餐時段/.test(r.message), r.message);
+      eq((await get(`locks/${first.id}`)).locked_price, 95, "價格不變");
+    });
+
+    await test("C-PLN-08", "計畫綁的品項只供應午餐，開始時段選早餐 → 擋「沒有供應早餐」", async () => {
+      const r = expectCode(await U.call("createPlanLinePayReservation", { plan_id: await plan(), start_date: OPEN_DAY, pickup_window: "07:30-08:00", preview: true }), "invalid-argument");
+      assert(/沒有供應早餐/.test(r.message), r.message);
+    });
+
+    await test("W-06", "用點數下單不付款超過 40 分 → releaseStalePointHolds 還點數、意圖 expired、之後不能確認", async () => {
+      await givePoints(100);
+      const before = (await get(`wallets/${U.uid}`)).balance;
+      const r = expectOk(await U.call("createPlanLinePayReservation", { plan_id: await plan({ days: 1 }), start_date: OPEN_DAY, pickup_window: "11:00-11:30", use_points: true }));
+      assert(r.points_used > 0, "有扣點數");
+      eq((await get(`wallets/${U.uid}`)).balance, before - r.points_used, "扣住");
+      const hold = db.doc(`wallets/${U.uid}/holds/${r.order_id}`);
+      await hold.update({ created_at: Timestamp.fromMillis(Date.now() - 39 * 60000) });
+      await runSchedule("wallet.js", "releaseStalePointHolds");
+      eq((await hold.get()).data().status, "held", "39 分還不還");
+      await hold.update({ created_at: Timestamp.fromMillis(Date.now() - 41 * 60000) });
+      await runSchedule("wallet.js", "releaseStalePointHolds");
+      eq((await hold.get()).data().status, "expired");
+      eq((await get(`wallets/${U.uid}`)).balance, before, "點數還回去");
+      eq((await get(`payment_intents/${r.order_id}`)).status, "expired");
+      expectCode(await U.call("confirmLinePayPayment", { order_id: r.order_id }), "failed-precondition", "逾時後確認");
+      eq((await db.collection("locks").where("payment_intent_id", "==", r.order_id).get()).size, 0, "不產生 locks");
+    });
+  }
+
+  await test("C-CHR-20", "有加菜的訂單轉愛心餐：charityMeals.sides 含加菜（遞補後的菜），沒用到的備案不列", async () => {
+    if (!TODAY_IS_BUSINESS) throw new Error("SKIP：今天不是營業日");
+    const VA = await mkVendor(vid("addon"), { pickup_windows: ["07:30-08:00"], owner_uid: `zz2-owner-addon-${RUN}` });
+    await mkBento(VA);
+    const l = await lock(`zz2-addon-${RUN}`, VA, {
+      pickup_date: TODAY, pickup_window: "07:30-08:00",
+      slots: [
+        { category: "青菜類", default_dish: "高麗菜", removed: false, wished: "地瓜葉", backup: "空心菜", backup_used: false, resolved: "地瓜葉", portion_level: 1 },
+        { category: "蛋豆類", default_dish: "滷蛋", removed: true, wished: null, resolved: null, portion_level: 1 },
+      ],
+      extra_side: { mode: "addon", dish: "玉米筍", resolved: "花椰菜", price: 15 },
+    });
+    const realNow = Date.now;
+    try {
+      Date.now = () => Date.parse(`${TODAY}T09:00:00+08:00`);
+      await runSchedule("charity.js", "convertToCharity");
+    } finally { Date.now = realNow; }
+    const after = await get(`locks/${l.id}`);
+    eq(after.status, "charity");
+    eq((await get(`charityMeals/${after.charity_meal_id}`)).sides, ["地瓜葉", "花椰菜"], "加菜用遞補後的、拿掉的格子和沒用到的備案不列");
+  });
 
   // ════ 6. English error messages, AI failures, platform settings ════
   await test("F-08", "lang=en：公休、額滿、封鎖、截單的錯誤訊息是英文", async () => {

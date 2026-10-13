@@ -66,7 +66,9 @@ type SortId = (typeof SORT_OPTIONS)[number]["id"];
 
 export default function HomePage() {
   const { toast } = useToast();
-  const { isOrderBanned } = useAuth();
+  const { isOrderBanned, user } = useAuth();
+  // Vendor accounts viewing the storefront see their own store first
+  const myVendorId = user?.role === "vendor" ? user.vendorId : undefined;
   const { t } = useI18n();
   const [location, navigate] = useLocation();
   const { add: addToCart, vendorId: cartVendorId } = useCart();
@@ -198,8 +200,9 @@ export default function HomePage() {
       }
       groups[i].items.push(item);
     }
+    if (myVendorId) groups.sort((a, b) => Number(b.vendor.id === myVendorId) - Number(a.vendor.id === myVendorId));
     return groups;
-  }, [lockMealCards, area, period, pickupDate, selectedSort, vendorRatings, searchQuery]);
+  }, [lockMealCards, area, period, pickupDate, selectedSort, vendorRatings, searchQuery, myVendorId]);
 
   const visiblePlanGroups = useMemo(() => {
     const groups = vendorPlanGroups
@@ -216,8 +219,9 @@ export default function HomePage() {
       groups.sort((a, b) => (vendorRatings.get(b.vendorId)?.average ?? -1) - (vendorRatings.get(a.vendorId)?.average ?? -1));
     }
     if (selectedSort === "price") groups.sort((a, b) => Math.min(...a.plans.map((p) => p.price_per_meal)) - Math.min(...b.plans.map((p) => p.price_per_meal)));
+    if (myVendorId) groups.sort((a, b) => Number(b.vendorId === myVendorId) - Number(a.vendorId === myVendorId));
     return groups;
-  }, [vendorPlanGroups, itemsById, area, period, pickupDate, selectedSort, vendorRatings, searchQuery]);
+  }, [vendorPlanGroups, itemsById, area, period, pickupDate, selectedSort, vendorRatings, searchQuery, myVendorId]);
 
   const visibleTransfers = transfers.filter((x) => !area || vendorInArea(vendors.find((v) => v.id === x.vendor_id), area));
 

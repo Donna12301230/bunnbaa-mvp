@@ -11,13 +11,12 @@
 - [ ] `ckchildlikekid@gmail.com`（GCP 專案擁有者）開 2FA；SU 確認管理員帳號密碼夠強、Google 帳號有 2FA
 - [ ] Firebase Web API key 加 HTTP 參照網址限制：`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`bunnbaa-mvp-5474--*.web.app/*`、`localhost:5300/*`
 - [ ] 正式站示範商家帳號（A＋B）：不放真實資料，密碼補進 `web/src/lib/demoAccounts.ts` 與 README「Try it」；不給評審管理員帳號
-- [ ] Looker Studio 報表（B，手動）：`/admin/analytics` →「在 Looker Studio 建立報表」→ 加 `dash_forecast_vs_actual`、`dash_forecast_next`、`dash_segments` → 排圖表（每日鎖定量、預測 vs. 實際、救回份數、客群）→ 開啟嵌入，網址貼回管理後台
 - [ ] 以上做完，無痕＋英文瀏覽器走一次評審路徑：開站 → 看菜單 → 體驗帳號登入 → 問預購助理 → 商家帳號看備料與預估
 
 ## 🔴 A：消費者端＋後端
 
 - [ ] 正式站補設定資料：`node scripts/seed.js --config-only`（`landing_events`、`platform_config/growth` 還沒有）
-- [-] 過了取餐日仍是「已鎖定」（列表排序已修）：正式站 53 筆過期的 locked／for_resale／for_gift。`convertToCharity` 只掃「今天」、只掃店家**現在設定**的時段（仁和雅只剩午餐，晚餐的單永遠不轉），9/30 前的單也沒補掃。待決定：改成依 lock 自己的時段判斷＋補掃；舊單轉 charity 還是直接標未取餐
+- [-] 過了取餐日仍是「已鎖定」：程式已改（未部署）——轉愛心餐／截止／取餐提醒改看當天 locks 自己的時段（`lockPeriodRangesOn`），functions-more 77/80（失敗是 V-INS 重跑污染＋F-19 時間限制）。正式站 53 筆過期示範單不清理（示範網站，10-13 決定）。待：部署 functions
 - [ ] 已從店家設定移除的取餐時段，上面的訂單不進備料時間軸（`prepPlans.timelines`），跟上一項同一個根因
 - [ ] 「經典便當」模板候選菜數量不對（`seed-phase1.js`）
 - 測試：

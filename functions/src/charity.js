@@ -117,7 +117,7 @@ exports.convertToCharity = onSchedule({ schedule: "every 5 minutes", timeZone: "
   const config = await loadPlatformConfig(db());
   const today = taipeiToday();
   await forEachVendor("convertToCharity", async (vendor) => {
-    for (const { period, label, end } of helpers.periodRangesOn(vendor, today, config)) {
+    for (const { period, label, end } of await helpers.lockPeriodRangesOn(vendor, today, config)) {
       if (Date.now() < end.getTime() + config.charityConvertAfterMinutes * 60000) continue;
       const planRef = db().collection("vendors").doc(vendor.id).collection("prepPlans").doc(today);
       const plan = await planRef.get();
@@ -166,7 +166,7 @@ exports.closeCharity = onSchedule({ schedule: "every 10 minutes", timeZone: "Asi
   const config = await loadPlatformConfig(db());
   const today = taipeiToday();
   await forEachVendor("closeCharity", async (vendor) => {
-    for (const { period, label, end } of helpers.periodRangesOn(vendor, today, config)) {
+    for (const { period, label, end } of await helpers.lockPeriodRangesOn(vendor, today, config)) {
       const deadline = periodDeadline(end, config);
       if (Date.now() < deadline.getTime()) continue;
       const planRef = db().collection("vendors").doc(vendor.id).collection("prepPlans").doc(today);

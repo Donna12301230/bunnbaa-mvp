@@ -1525,6 +1525,30 @@ function periodRangesOn(vendor, date, config) {
   });
 }
 
+/**
+ * periodRangesOn plus meal periods that only exist in the day's active locks (2026-10-13: a vendor that dropped dinner slots
+ * still had dinner locks, which never got reminders or charity conversion); those periods span the locks' own pickup slots.
+ * Charity locks count too, so closeCharity still sees the period after convertToCharity has moved its locks out of active
+ */
+async function lockPeriodRangesOn(vendor, date, config) {
+  const ranges = periodRangesOn(vendor, date, config);
+  const known = new Set(ranges.map((r) => r.period));
+  const extra = {};
+  const snap = await db().collection("locks").where("vendor_id", "==", vendor.id).where("pickup_date", "==", date).get();
+  for (const doc of snap.docs) {
+    const lock = doc.data();
+    if (!lock.pickup_window || !(ACTIVE_LOCK_STATUSES.includes(lock.status) || lock.status === "charity")) continue;
+    const period = lock.meal_period || mealPeriodOf(lock.pickup_window, config || undefined);
+    if (!known.has(period)) (extra[period] = extra[period] || []).push(splitWindow(lock.pickup_window));
+  }
+  for (const [period, windows] of Object.entries(extra)) {
+    const start = windows.map((w) => w.start).sort()[0];
+    const end = windows.map((w) => w.end).sort().pop();
+    ranges.push({ period, label: mealPeriodLabel(period), start: at(date, start), end: at(date, end), endText: end });
+  }
+  return ranges;
+}
+
 /** Start/end instants of the meal period a pickup slot belongs to (used to judge donations and charity conversions) */
 function todayRange(vendor, date, window = null, config = null) {
   const ranges = periodRangesOn(vendor, date, config);
@@ -1537,7 +1561,7 @@ exports.pickupReminder = onSchedule({ schedule: "every 5 minutes", timeZone: "As
   const today = taipeiToday();
   const config = await loadPlatformConfig(db());
   await forEachVendor("pickupReminder", async (vendor) => {
-    for (const { period, end, endText } of periodRangesOn(vendor, today, config)) {
+    for (const { period, end, endText } of await lockPeriodRangesOn(vendor, today, config)) {
       const minutesLeft = (end.getTime() - Date.now()) / 60000;
       if (minutesLeft > 30 || minutesLeft < 0) continue;
       const planRef = db().collection("vendors").doc(vendor.id).collection("prepPlans").doc(today);
@@ -1562,6 +1586,6 @@ exports.pickupReminder = onSchedule({ schedule: "every 5 minutes", timeZone: "As
 });
 
 module.exports.helpers = {
-  cancelAndRefund, activeLocksOn, todayRange, periodRangesOn, runLockOrders, sideWishId, taipeiTime,
+  cancelAndRefund, activeLocksOn, todayRange, periodRangesOn, lockPeriodRangesOn, runLockOrders, sideWishId, taipeiTime,
   resalePriceOf, resaleCapOf,
 };
