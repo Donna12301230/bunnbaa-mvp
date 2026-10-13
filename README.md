@@ -129,7 +129,7 @@ flowchart TB
 ✨ marks the points where AI is called. The five layers:
 
 1. **Presentation.** Three web apps (diner, vendor, admin) share one React codebase on Firebase Hosting. They read Firestore directly through realtime listeners, and Security Rules decide what each user can see. Anything that changes money or stock goes through a callable function.
-2. **Compute.** 80 Cloud Functions (2nd gen, running on Cloud Run) handle three kinds of work: callables that users trigger, triggers that react to Firestore writes, and jobs that Cloud Scheduler starts on a timer.
+2. **Compute.** 81 Cloud Functions (2nd gen, running on Cloud Run) handle three kinds of work: callables that users trigger, triggers that react to Firestore writes, and jobs that Cloud Scheduler starts on a timer.
 3. **AI core.** Every Gemini call goes through one wrapper (`functions/src/gemini.js`) to Vertex AI, authenticated with the functions' service account. The assistant runs a function-calling loop: Gemini asks for a tool, the function runs it against Firestore, and the result goes back to Gemini.
 4. **Data.** Firestore holds all operational data. The menu vectors used for resale matching live in the same documents, with a Firestore vector index, so there is no separate vector database. Menu photos are in Cloud Storage.
 5. **Analytics.** The official extension copies every Firestore write into BigQuery. BigQuery AI forecasts demand and groups diners into segments. A scheduled job writes the forecasts back to Firestore for the vendor portal, and Looker Studio reports the waste-reduction numbers.

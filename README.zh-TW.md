@@ -127,7 +127,7 @@ flowchart TB
 ✨ 標示的是呼叫 AI 的地方。五層分別是：
 
 1. **前端互動層**：顧客端、店家後台、管理後台共用一套 React 程式，放在 Firebase Hosting。畫面直接即時監聽 Firestore，每個人能看到什麼由 Security Rules 決定；牽涉金額或庫存的動作一律走 callable 函式。
-2. **服務運算層**：80 支 Cloud Functions（第二代，跑在 Cloud Run 上）分三種：使用者觸發的 callable、Firestore 寫入時觸發的事件函式，以及 Cloud Scheduler 定時執行的排程。
+2. **服務運算層**：81 支 Cloud Functions（第二代，跑在 Cloud Run 上）分三種：使用者觸發的 callable、Firestore 寫入時觸發的事件函式，以及 Cloud Scheduler 定時執行的排程。
 3. **AI 核心**：所有 Gemini 呼叫都經過同一個 wrapper（`functions/src/gemini.js`）送到 Vertex AI，用 functions 的服務帳號認證。預購助理跑 function calling 迴圈：Gemini 要求呼叫工具，函式到 Firestore 查詢，再把結果交回 Gemini。
 4. **數據持久層**：Firestore 存所有營運資料。轉讓媒合用的菜單向量存在同一份文件裡，搭配 Firestore 向量索引，不用另外架向量資料庫。菜單照片存在 Cloud Storage。
 5. **分析層**：官方擴充功能把每一筆 Firestore 寫入同步到 BigQuery。BigQuery AI 預測需求、把顧客分群；排程把預測寫回 Firestore 給店家後台；Looker Studio 呈現減少剩食的數字。

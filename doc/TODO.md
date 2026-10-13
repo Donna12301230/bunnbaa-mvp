@@ -11,7 +11,7 @@
 - [ ] `ckchildlikekid@gmail.com`（GCP 專案擁有者）開 2FA；SU 確認管理員帳號密碼夠強、Google 帳號有 2FA
 - [ ] Firebase Web API key 加 HTTP 參照網址限制：`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`bunnbaa-mvp-5474--*.web.app/*`、`localhost:5300/*`
 - [x] 正式站示範商家帳號（A＋B）：`vendor@bunnbaa.test` 已建好並綁仁和雅，登入頁有一鍵登入，README「Try it」兩份都已補上（10/13 正式站實測：按「以店家身分體驗」進得了店家後台）；不給評審管理員帳號
-- [ ] 以上做完，無痕＋英文瀏覽器走一次評審路徑：開站 → 看菜單 → 體驗帳號登入 → 問預購助理 → 商家帳號看備料與預估
+- [-] 以上做完，無痕＋英文瀏覽器走一次評審路徑：開站 → 看菜單 → 體驗帳號登入 → 問預購助理 → 商家帳號看備料與預估。10/13 已用一般視窗＋`?lang=en` 走過一次（兩個體驗帳號、預購助理、備料、報表都正常，殘留中文已修並部署）；待：上面兩項做完後用無痕再走一次
 
 ## 🔴 A：消費者端＋後端
 
@@ -30,12 +30,17 @@
   - [ ] 真機：定位、取餐提醒推播、OTP 簡訊
 - 收尾：
   - [ ] 清測試資料：`customer@bunnbaa.test` 的「A方案」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）、`ban_appeals/lI5dGTVtIBfByBIUTy3W`、`EJEL6PRO`（可選）
-  - [ ] 最後核對 README 數字（Functions 80、logic 64、rules 65、Functions 測試 144）
+  - [ ] 最後核對 README 數字（Functions 81、logic 64、rules 65、Functions 測試 144）。10/13 新增 `translateComponent`，80 → 81，兩份 README、`Submission_EN.md`、開發指南已改
+  - [ ] B 在 10/13 動了 A 區的檔案，請看一眼：`functions/src/index.js`／`translate.js`（半成品名稱翻譯）、`MyBookingsPage.tsx`（取餐日已過仍「已鎖定」的訂單排到已結束區）、`MarketplaceHeader.tsx`（英文介面體驗帳號顯示 Diner／Vendor）、`NotificationBell.tsx`（關閉選單時整批標已讀）
+  - [ ] 清測試資料（可選）：`customer@bunnbaa.test` 有一筆 9/23、NT$0、狀態仍是「已鎖定」的舊單
   - [-] 報名表單
 
 ## 🔴 B：商家端＋管理後台＋投稿素材
 
 - [ ] 幫一家店設公休日（A 測加入計畫要用）
+- [ ] 通知鈴鐺「看過清單就清掉未讀數」10/13 已部署，正式站還沒實測（未讀超過 20 則要開關兩次）
+- [ ] 英文介面還會看到中文：備料／叫貨的食材名稱（只翻了半成品）、區域洞察「Nearby wishes」的許願文字（使用者輸入）；店家體驗帳號在店面頁頁首的名稱還沒看過
+- 新增或改名半成品會自動翻英文；舊資料要管理員到「系統設定 → 補翻既有資料」（10/13 已補 29 筆）
 - 測試：
   - [ ] P0：V-MNU-08／09、V-RDM-10
   - [ ] 正式站（Gemini）：V-MNU-03、V-MNU-08～13、V-MNU-17、V-RCP-04、V-PRP-07
