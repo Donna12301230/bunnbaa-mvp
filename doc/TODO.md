@@ -8,27 +8,22 @@
 
 ## 🚨 最優先
 
-- [ ] `ckchildlikekid@gmail.com`（GCP 專案擁有者）開 2FA；SU 確認管理員帳號密碼夠強、Google 帳號有 2FA
-- [ ] Firebase Web API key 加 HTTP 參照網址限制：`bunnbaa-mvp-5474.web.app/*`、`bunnbaa-mvp-5474.firebaseapp.com/*`、`bunnbaa-mvp-5474--*.web.app/*`、`localhost:5300/*`
-- [ ] 正式站示範商家帳號（A＋B）：不放真實資料，密碼補進 `web/src/lib/demoAccounts.ts` 與 README「Try it」；不給評審管理員帳號
-- [ ] 以上做完，無痕＋英文瀏覽器走一次評審路徑：開站 → 看菜單 → 體驗帳號登入 → 問預購助理 → 商家帳號看備料與預估
+- [ ] 無痕＋英文瀏覽器走一次評審路徑：開站 → 看菜單 → 體驗帳號登入 → 問預購助理 → 商家帳號看備料與預估
 
 ## 🔴 A：消費者端＋後端
 
 - 測試：
   - [-] C-AST-17（PARTIAL）：畫面、拖曳關閉已過；鍵盤遮擋已加 `visualViewport` 防護（未部署），待 iOS＋Android 實機各點一次助理輸入框
-  - [ ] C-MY-03、C-ORD-02（LINE Pay Sandbox 成功頁）
   - [ ] 重測：C-MY-17、C-BNT-08、C-PLN-01、C-BNT-09、C-CHR-05（文字已過，按預約與倒數待測）
-  - [ ] 正式站限定：C-NAV-03、C-AUTH-04／05、C-CHR-06、C-MY-13、C-MTC-09、C-CHR-14、F-11、F-12、N-SEC-01～03、N-PRF-01
+  - [ ] 正式站限定：C-NAV-03（先跑 `seed.js --config-only`）、C-AUTH-04／05、C-CHR-06、C-MTC-09（部署修正後複測通知）、C-CHR-14、F-11、F-12、N-SEC-02、N-SEC-03、N-PRF-01
   - [ ] 端到端情境（第 9 章）至少跑 A、C、G
 - 正式站實際點過：
   - [ ] 組便當 → 購物車套券 → LINE Pay → 我的餐點（QR、修改、取消、代領碼、捐愛心餐）
   - [ ] 加入計畫走 LINE Pay（N 筆 `locks` 同 `plan_id`；某天額滿要擋）；被封鎖時顯示白話提示
-  - [ ] 購物車跨店結帳，`locks.vendor_id` 正確
   - [ ] 回饋期結算後抽獎；評分（重複評分要擋）
   - [ ] 真機：定位、取餐提醒推播、OTP 簡訊
 - 收尾：
-  - [ ] 清測試資料：`customer@bunnbaa.test` 的「A方案」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）、`ban_appeals/lI5dGTVtIBfByBIUTy3W`、`EJEL6PRO`（可選）
+  - [ ] 清測試資料：`customer@bunnbaa.test` 的「A方案」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）、`ban_appeals/lI5dGTVtIBfByBIUTy3W`、10/13 C-ORD-02 的 4 筆 locks（`84nMRBcwCI0CWHKXwuLG`、`K7ZSCHK6IG9WGhc83CT0`、`ivjPhVtFPhNYjNDnrRvs`、`s8uliaWvdgCygIRBWEA4`，10/16 取餐）、`EJEL6PRO`（可選）
   - [ ] 最後核對 README 數字（Functions 80、logic 64、rules 65、Functions 測試 144）
   - [-] 報名表單
 
@@ -53,7 +48,7 @@
   - [ ] 投影片（https://claude.ai/artifact/FCk692pY4uC2KmKJ2qHzQD）：補團隊、影片連結；架構圖與技術清單加上 Vertex AI、BigQuery AI、Looker Studio、Evaluation Service；匯出 PDF（10–12 頁）
   - [ ] 截圖：重拍 `assets/screenshots/` 4 張（正式站已有英文）；預購助理、拍照建菜單、備料、預估卡、客群卡、掃碼、Looker 兩張圖、評估結果表
   - [-] 影片：已錄完剪輯中；上傳 YouTube 後連結填進兩份 README、`Submission_EN.md`、簡報
-  - [-] 補方括號：`Submission_EN.md`（影片、PDF）、兩份 README（影片、PDF、商家帳密）
+  - [-] 補方括號：`Submission_EN.md`（影片、PDF）、兩份 README（影片、PDF）
   - [-] `assets/demo.gif`（約 10 秒）
   - [ ] 推上 GitHub 後看一次 README（Mermaid、徽章、連結）
 
@@ -66,10 +61,6 @@
 
 ## ❓ 要跟雅婷確認
 
-- [ ] 退款折價券能不能疊加（目前每份限一張、早鳥照算）
-- [ ] 取消留在店家的款項（`locks.kept_amount`）要不要算營收、要不要抽成
-- [ ] 取餐 48 小時前取消也不退現金，是否符合消保法（條款在 `TermsNotices.tsx`）
-- [ ] 轉讓價高於原價時差額留在店家，要不要另做撥款給轉讓人
 - [ ] GitHub `master` branch protection
 
 ## ⚪ Demo 後
