@@ -87,6 +87,18 @@ export function loc<T extends object>(obj: T | null | undefined, field: keyof T 
   return typeof zh === "string" ? zh : "";
 }
 
+/**
+ * Dish names, side categories and custom-field text inside a menu item: the English UI reads the item's dish_names_en map
+ * (filled by Functions translateMenuItem), falling back to the original Chinese. E.g. dishName(item, slot.default.name).
+ */
+export function dishName(item: { dish_names_en?: Record<string, string> } | null | undefined, name: string): string {
+  if (current === "en") {
+    const en = item?.dish_names_en?.[name];
+    if (typeof en === "string" && en.trim()) return en;
+  }
+  return name;
+}
+
 /** Strips "・第1/5天" / " · Day 1/5" from meal-plan order item names so one plan merges into a single entry in summaries */
 export function planBaseName(itemName: string): string {
   return itemName.split("・第")[0].split(" · Day ")[0];

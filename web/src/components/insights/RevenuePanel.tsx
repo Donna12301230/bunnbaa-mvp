@@ -30,6 +30,9 @@ interface ReportStats {
   totalOrders: number;
   avgOrder: number;
   completedOrders: number;
+  // Orders whose pickup day has passed (or already picked up): the base for the pickup rate, so today's pending orders don't drag it down
+  settledOrders: number;
+  charityOrders: number;
   topItems: { name: string; qty: number; revenue: number }[];
 }
 
@@ -49,11 +52,14 @@ function computeStats(locks: Lock[]): ReportStats | null {
     item.revenue += l.locked_price || 0;
     byItem.set(name, item);
   }
+  const settled = rows.filter((l) => l.pickup_date < end || DONE_STATUSES.has(l.status));
   return {
     totalRevenue,
     totalOrders: rows.length,
     avgOrder: rows.length ? Math.round(rows.reduce((s, l) => s + revenueOf(l), 0) / rows.length) : 0,
-    completedOrders: rows.filter((l) => DONE_STATUSES.has(l.status)).length,
+    completedOrders: settled.filter((l) => DONE_STATUSES.has(l.status)).length,
+    settledOrders: settled.length,
+    charityOrders: settled.filter((l) => l.status === "charity").length,
     topItems: [...byItem].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.qty - a.qty).slice(0, 10),
   };
 }
@@ -123,7 +129,14 @@ export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: strin
               { icon: Banknote, label: tr(`${REPORT_DAYS} 天收入`, `${REPORT_DAYS}-day revenue`), v: `NT$${stats.totalRevenue.toLocaleString()}`, cls: "text-accent-foreground" },
               { icon: ShoppingBag, label: tr("訂單", "Orders"), v: String(stats.totalOrders), cls: "" },
               { icon: TrendingUp, label: tr("每單平均", "Avg. order"), v: `NT$${stats.avgOrder}`, cls: "" },
-              { icon: CheckCircle2, label: tr("已取餐", "Picked up"), v: `${Math.round((stats.completedOrders / stats.totalOrders) * 100)}%`, cls: "text-success-text" },
+              {
+                icon: CheckCircle2,
+                label: stats.charityOrders > 0
+                  ? tr(`已取餐（另 ${Math.round((stats.charityOrders / stats.settledOrders) * 100)}% 轉愛心餐）`, `Picked up (+${Math.round((stats.charityOrders / stats.settledOrders) * 100)}% to charity)`)
+                  : tr("已取餐", "Picked up"),
+                v: stats.settledOrders > 0 ? `${Math.round((stats.completedOrders / stats.settledOrders) * 100)}%` : "—",
+                cls: "text-success-text",
+              },
             ].map((x) => (
               <Card key={x.label} className="border-2">
                 <CardContent className="p-4">

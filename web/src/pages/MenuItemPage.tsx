@@ -16,7 +16,7 @@ import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState, Select } from "@/components/ds";
 import { Input } from "@/components/ui/input";
 import PriceDateStrip from "@/components/PriceDateStrip";
-import { tr, loc } from "@/lib/i18n";
+import { tr, loc, dishName } from "@/lib/i18n";
 import { tagEn } from "@/types";
 import { cn } from "@/lib/utils";
 import { discountText } from "@/lib/pricing";
@@ -201,6 +201,9 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
     if (extra && extra.slot === slotIdx && extra.candidate === (choice === "default" ? null : choice)) setExtra(null);
   }
 
+  // Dish names and side categories in the English UI (dish_names_en on the item)
+  const dn = (name: string) => dishName(item, name);
+
   const chosenNames = new Set(
     (item.slots || []).map((slot, i) => {
       const c = choices[i];
@@ -223,22 +226,22 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
   const materials: { label: string; image?: string | null }[] = [];
   if (bento && item.rice_component_id && riceText) materials.push({ label: tr(`白飯 ${riceText.label}`, `Rice: ${riceText.labelEn}`) });
   const main = mainIndex != null ? mains[mainIndex] : mains[0];
-  if (main) materials.push({ label: main.portion_text || main.name, image: main.image_url });
-  for (const f of item.fixed || []) materials.push({ label: `${f.portion_text || f.name}${f.portions && f.portions !== 1 ? ` ×${f.portions}` : ""}` });
+  if (main) materials.push({ label: dn(main.portion_text || main.name), image: main.image_url });
+  for (const f of item.fixed || []) materials.push({ label: `${dn(f.portion_text || f.name)}${f.portions && f.portions !== 1 ? ` ×${f.portions}` : ""}` });
   (item.slots || []).forEach((slot, i) => {
     const c = choices[i];
     if (c === "none" || c === undefined) return;
-    if (c === "default") materials.push({ label: slot.default.portion_text || slot.default.name, image: slot.default.image_url });
+    if (c === "default") materials.push({ label: dn(slot.default.portion_text || slot.default.name), image: slot.default.image_url });
     else {
       const cand = slot.candidates[c as number];
-      materials.push({ label: `${cand.portion_text || cand.name}${cand.portion_level < 1 ? tr("（半份）", " (half)") : ""}`, image: cand.image_url });
+      materials.push({ label: `${dn(cand.portion_text || cand.name)}${cand.portion_level < 1 ? tr("（半份）", " (half)") : ""}`, image: cand.image_url });
     }
   });
   const extraOpt = extra ? options.find((o) => o.slot === extra.slot && o.candidate === extra.candidate) : null;
-  if (extra?.mode === "addon" && extraOpt) materials.push({ label: extraOpt.portion_text || extraOpt.name, image: extraOpt.image_url });
+  if (extra?.mode === "addon" && extraOpt) materials.push({ label: dn(extraOpt.portion_text || extraOpt.name), image: extraOpt.image_url });
   custom.forEach((f, i) => {
     const o = f.options[customPicks[i] ?? 0];
-    if (o) materials.push({ label: `${f.label}：${o.name}` });
+    if (o) materials.push({ label: `${dn(f.label)}${tr("：", ": ")}${dn(o.name)}` });
   });
 
   // Before adding to cart, confirm the order in a dialog (don't add directly)
@@ -308,7 +311,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
             </p>
             <h1 className="font-heading font-semibold text-[clamp(28px,3.6vw,46px)] leading-[1.08] tracking-[-0.02em] mb-2">{loc(item, "name")}</h1>
             <p className="text-muted-foreground leading-relaxed">{loc(item, "description")}</p>
-            {(item.fixed?.length ?? 0) > 0 && <p className="text-sm mt-1">{bento ? tr("附：", "Comes with: ") : tr("內含：", "Contains: ")}{item.fixed!.map((f) => f.name).join("、")}</p>}
+            {(item.fixed?.length ?? 0) > 0 && <p className="text-sm mt-1">{bento ? tr("附：", "Comes with: ") : tr("內含：", "Contains: ")}{item.fixed!.map((f) => dn(f.name)).join(tr("、", ", "))}</p>}
             {(item.dietary_tags?.length > 0 || item.allergens?.length > 0) && (
               <div className="space-y-1.5 mt-2">
                 {item.dietary_tags?.length > 0 && (
@@ -383,7 +386,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               {mains.length > 0 && (
                 <DishSelectRow label={tr("主菜", "Main")} image={main?.image_url}>
                   <Select aria-label={tr("主菜", "Main")} value={String(mainIndex ?? 0)} disabled={mains.length === 1} onChange={(e) => setMainIndex(Number(e.target.value))}>
-                    {mains.map((m, i) => <option key={i} value={i}>{m.name}{mains.length > 1 ? `（NT$${m.price}）` : ""}</option>)}
+                    {mains.map((m, i) => <option key={i} value={i}>{dn(m.name)}{mains.length > 1 ? `（NT$${m.price}）` : ""}</option>)}
                   </Select>
                 </DishSelectRow>
               )}
@@ -395,17 +398,17 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                 return (
                   <DishSelectRow
                     key={i}
-                    label={`${tr(`配菜 ${i + 1}`, `Side ${i + 1}`)}${slot.category ? `・${slot.category}` : ""}`}
+                    label={`${tr(`配菜 ${i + 1}`, `Side ${i + 1}`)}${slot.category ? `・${dn(slot.category)}` : ""}`}
                     image={picked?.image_url}
                     hint={wish ? (
                       <p className="text-accent-foreground">
                         {tr(`許願中：截單時滿 ${wish.min} 人才成立；未成立${extra?.mode === "backup" ? "換成備案" : `換回「${slot.default.name}」`}，訂單照常成立。`,
-                          `Wish: needs ${wish.min} people by cutoff; otherwise ${extra?.mode === "backup" ? "your backup" : slot.default.name} is used.`)}
+                          `Wish: needs ${wish.min} people by cutoff; otherwise ${extra?.mode === "backup" ? "your backup" : dn(slot.default.name)} is used.`)}
                       </p>
                     ) : choice === "none" ? <p className="text-accent-foreground">{tr(`這道不要（−${removePrice}）`, `Skipped (−${removePrice})`)}</p> : null}
                   >
                     <Select aria-label={tr(`配菜 ${i + 1}`, `Side ${i + 1}`)} value={String(choice)} onChange={(e) => pickSide(i, e.target.value === "default" || e.target.value === "none" ? e.target.value : Number(e.target.value))}>
-                      <option value="default">{slot.default.name}{tr("（預設）", " (default)")}</option>
+                      <option value="default">{dn(slot.default.name)}{tr("（預設）", " (default)")}</option>
                       {slot.candidates.map((_, ci) => {
                         const st = candidateState(i, ci);
                         const status = st.cand.disabled
@@ -413,7 +416,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                           : st.full && choice !== ci
                             ? tr("已滿", "full")
                             : tr(`${portionLabel(st.cand.portion_level)}・${st.count}/${st.min} 人成立`, `${portionLabel(st.cand.portion_level)} · ${st.count}/${st.min} wishes`);
-                        return <option key={ci} value={ci} disabled={st.cand.disabled || (st.full && choice !== ci)}>{st.cand.name}{paren(status)}</option>;
+                        return <option key={ci} value={ci} disabled={st.cand.disabled || (st.full && choice !== ci)}>{dn(st.cand.name)}{paren(status)}</option>;
                       })}
                       <option value="none">{tr(`不要這道（−${removePrice}）`, `None (−${removePrice})`)}</option>
                     </Select>
@@ -439,7 +442,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                           const value = `${mode}|${o.slot}|${o.candidate ?? "d"}`;
                           return (
                             <option key={value} value={value} disabled={!!st?.full && value !== extraValue}>
-                              {o.name}{o.portion_level < 1 ? tr("（半份）", " (half)") : ""}{st ? tr(`・${st.count}/${st.min} 人`, ` · ${st.count}/${st.min}`) : ""}
+                              {dn(o.name)}{o.portion_level < 1 ? tr("（半份）", " (half)") : ""}{st ? tr(`・${st.count}/${st.min} 人`, ` · ${st.count}/${st.min}`) : ""}
                             </option>
                           );
                         })}
@@ -450,9 +453,9 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               )}
               {/* Vendor-defined fields (e.g. soup, drink, spice level); the first option is the default */}
               {custom.map((f, i) => (
-                <DishSelectRow key={`custom-${i}`} label={f.label}>
-                  <Select aria-label={f.label} value={String(customPicks[i] ?? 0)} onChange={(e) => setCustomPicks((prev) => custom.map((_, j) => (j === i ? Number(e.target.value) : prev[j] ?? 0)))}>
-                    {f.options.map((o, oi) => <option key={oi} value={oi}>{o.name}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</option>)}
+                <DishSelectRow key={`custom-${i}`} label={dn(f.label)}>
+                  <Select aria-label={dn(f.label)} value={String(customPicks[i] ?? 0)} onChange={(e) => setCustomPicks((prev) => custom.map((_, j) => (j === i ? Number(e.target.value) : prev[j] ?? 0)))}>
+                    {f.options.map((o, oi) => <option key={oi} value={oi}>{dn(o.name)}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</option>)}
                   </Select>
                 </DishSelectRow>
               ))}
@@ -479,7 +482,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                   {loc(item, "name")}{breakdown ? `・NT$${breakdown.total}` : ""}
                 </span>
               </div>
-              {extra?.mode === "backup" && extraOpt && <p className="text-xs text-muted-foreground">{tr(`備案：${extraOpt.name}（前面許願沒成立才遞補）`, `Backup: ${extraOpt.name} (only if a wish fails)`)}</p>}
+              {extra?.mode === "backup" && extraOpt && <p className="text-xs text-muted-foreground">{tr(`備案：${extraOpt.name}（前面許願沒成立才遞補）`, `Backup: ${dn(extraOpt.name)} (only if a wish fails)`)}</p>}
             </section>
           )}
 
@@ -591,10 +594,10 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
             <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("品項", "Item")}</dt><dd className="text-right font-medium">{loc(item, "name")}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("取餐", "Pickup")}</dt><dd className="text-right">{date}・{slotLabel(window)}</dd></div>
             {bento && item.mains && item.mains.length > 0 && mainIndex !== null && (
-              <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("主菜", "Main")}</dt><dd className="text-right">{item.mains[mainIndex]?.name}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("主菜", "Main")}</dt><dd className="text-right">{dn(item.mains[mainIndex]?.name ?? "")}</dd></div>
             )}
             {bento && (item.slots || []).map((slot, i) => (
-              <div key={i} className="flex justify-between gap-4"><dt className="text-muted-foreground">{slot.category}</dt><dd className="text-right">{choiceName(i)}</dd></div>
+              <div key={i} className="flex justify-between gap-4"><dt className="text-muted-foreground">{dn(slot.category)}</dt><dd className="text-right">{dn(choiceName(i))}</dd></div>
             ))}
             {bento && (
               <div className="flex justify-between gap-4">
@@ -606,7 +609,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("第四道", "4th side")}</dt><dd className="text-right">{extra.mode === "backup" ? tr("備案", "Backup") : tr("加菜", "Add-on")}</dd></div>
             )}
             {custom.map((f, i) => (
-              <div key={`custom-${i}`} className="flex justify-between gap-4"><dt className="text-muted-foreground">{f.label}</dt><dd className="text-right">{f.options[customPicks[i] ?? 0]?.name}</dd></div>
+              <div key={`custom-${i}`} className="flex justify-between gap-4"><dt className="text-muted-foreground">{dn(f.label)}</dt><dd className="text-right">{dn(f.options[customPicks[i] ?? 0]?.name ?? "")}</dd></div>
             ))}
             <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("數量", "Qty")}</dt><dd className="text-right">{qty}</dd></div>
             {note.trim() && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{tr("備註", "Note")}</dt><dd className="text-right">{note.trim()}</dd></div>}

@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
 import { usePlatformConfig } from "@/lib/platformConfig";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface Insight {
@@ -22,8 +22,8 @@ interface Insight {
   orders?: number;
   nearby_vendors?: number;
   tag_shares?: { tag: string; share: number }[];
-  removal_rates?: { dish: string; rate: number; total: number }[];
-  open_wishes?: { dish: string; dish_key: string; people: number }[];
+  removal_rates?: { dish: string; dish_en?: string; rate: number; total: number }[];
+  open_wishes?: { dish: string; dish_en?: string; dish_key: string; people: number }[];
   gaps?: { tag: string; share: number; suppliers: number }[];
 }
 interface Tally { id: string; name: string; count: number; notified?: boolean; listed?: boolean }
@@ -171,13 +171,13 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
             <Card className="border-2">
               <CardContent className="p-4 space-y-2">
                 <p className="font-semibold">{tr("附近大家許願的菜", "Nearby wishes")}</p>
-                {insight.open_wishes?.length ? insight.open_wishes.map((w) => <Bar key={w.dish_key} label={w.dish} value={w.people} max={insight.open_wishes![0].people} text={tr(`${w.people} 人`, `${w.people}`)} cls="bg-plum" />) : <p className="text-sm text-muted-foreground">—</p>}
+                {insight.open_wishes?.length ? insight.open_wishes.map((w) => <Bar key={w.dish_key} label={loc(w, "dish")} value={w.people} max={insight.open_wishes![0].people} text={tr(`${w.people} 人`, `${w.people}`)} cls="bg-plum" />) : <p className="text-sm text-muted-foreground">—</p>}
               </CardContent>
             </Card>
             <Card className="border-2 md:col-span-2">
               <CardContent className="p-4 space-y-2">
                 <p className="font-semibold flex items-center gap-1.5"><ThumbsDown className="w-4 h-4 text-danger-text" />{tr("常被點「不要」的配菜", "Most-removed sides")}</p>
-                {insight.removal_rates?.length ? insight.removal_rates.map((r) => <Bar key={r.dish} label={r.dish} value={r.rate} max={100} text={`${r.rate}%`} cls="bg-danger" />) : <p className="text-sm text-muted-foreground">—</p>}
+                {insight.removal_rates?.length ? insight.removal_rates.map((r) => <Bar key={r.dish} label={loc(r, "dish")} value={r.rate} max={100} text={`${r.rate}%`} cls="bg-danger" />) : <p className="text-sm text-muted-foreground">—</p>}
               </CardContent>
             </Card>
           </div>

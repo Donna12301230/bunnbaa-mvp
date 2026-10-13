@@ -15,6 +15,7 @@ const {
 const { loadPlatformConfig } = require("./config");
 const { dishTags } = require("./bento");
 const { generateJSON } = require("./gemini");
+const { translateTexts } = require("./translate");
 const { taipeiToday, addDays, mondayOf } = require("./calendar");
 
 const HALF_LIFE_DAYS = 30;
@@ -357,6 +358,15 @@ async function buildInsightsFor(vendor, vendors, config, week) {
   }
   const gaps = tagShares.filter((x) => x.share >= 15 && (supply.get(x.tag) || 0) <= 1)
     .map((x) => ({ tag: x.tag, share: x.share, suppliers: supply.get(x.tag) || 0 }));
+  // Wished and removed dish names are free text typed by diners; give the English UI a dish_en (a failed translation just falls back to Chinese)
+  const names = [...new Set([...openWishes, ...removalRates].map((x) => x.dish).filter(Boolean))];
+  try {
+    const english = await translateTexts(names);
+    const en = new Map(names.map((n, i) => [n, english[i]]));
+    [...openWishes, ...removalRates].forEach((x) => { if (en.get(x.dish)) x.dish_en = en.get(x.dish); });
+  } catch (err) {
+    logger.warn("buildAreaInsights: dish translation failed", { vendor: vendor.id, error: err.message });
+  }
   await ref.set({
     vendor_id: vendor.id, week, users: users.size, orders: locks.length, nearby_vendors: nearby.length,
     tag_shares: tagShares.slice(0, 15), removal_rates: removalRates, open_wishes: openWishes, gaps,

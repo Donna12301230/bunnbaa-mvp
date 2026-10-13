@@ -556,7 +556,8 @@ function geohash(lat, lng, precision = 7) {
     eq(r.users, 20);
     const doc = await get(`areaInsights/${VI}_${mondayOf(TODAY)}`);
     eq(doc.tag_shares.find((x) => x.tag === "雞")?.share, 100, "標籤占比");
-    eq(doc.removal_rates[0], { dish: "高麗菜", rate: 25, total: 20 }, "不要率");
+    const { dish, rate, total } = doc.removal_rates[0];
+    eq({ dish, rate, total }, { dish: "高麗菜", rate: 25, total: 20 }, "不要率");
     eq(doc.open_wishes[0].people, 3, "許願排行");
     assert(doc.gaps.some((g) => g.tag === "雞"), "供需缺口");
     const json = JSON.stringify(doc);

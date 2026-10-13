@@ -540,7 +540,7 @@ function LandingContent() {
             <h2 className="sr-only" id="lp-story-title">{t("品牌故事", "Our story")}</h2>
             <ScrollLitStatement id="lp-story-statement" parts={statementParts} />
             <div className="lp-story__foot" data-reveal>
-              <img src="/飯飽R.png" alt={t("飯飽 BunnBaa 標誌", "BunnBaa logo")} className="lp-story__mark" width={88} height={78} loading="lazy" />
+              <img src="/飯飽R-sm.webp" alt={t("飯飽 BunnBaa 標誌", "BunnBaa logo")} className="lp-story__mark" width={88} height={78} loading="lazy" />
               <p className="lp-story__body">
                 {t("剩下的交給轉讓市集：臨時去不了的餐，會找到下一個想吃的人。", "The transfer market handles the rest: a meal you can't make finds the next person who wants it.")}
               </p>

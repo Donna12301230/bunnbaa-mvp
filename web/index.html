@@ -11,12 +11,14 @@
     <meta property="og:description" content="提前預約校園午餐，最高 8 折；準時取餐、不排隊、不浪費。" />
     <meta property="og:image" content="/飯飽R.png" />
     <link rel="icon" type="image/png" href="/飯飽R.png" />
-    <!-- Design-system fonts: Noto Sans TC / Noto Serif TC; Fraunces is only for Latin letters and digits on the brand page (Google Fonts splits by unicode-range, so only glyphs the page uses are downloaded) -->
+    <!-- Design-system fonts: Noto Serif TC for headings; Fraunces is only for Latin letters and digits on the brand page (Google Fonts splits by unicode-range, so only glyphs the page uses are downloaded).
+         Body text uses system CJK fonts (PingFang TC / Android's built-in Noto Sans CJK / Microsoft JhengHei): the Noto Sans TC web font was ~1.2MB on the home page and made slow-4G loads take over 9s.
+         Serif only ships 600/700 (headings are 600; 500 falls back to 600, 900 to 700). -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Serif+TC:wght@500;600;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Noto+Serif+TC:wght@600;700&display=swap"
     />
   </head>
   <body>

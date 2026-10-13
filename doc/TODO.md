@@ -9,21 +9,22 @@
 ## 🚨 最優先
 
 - [-] 無痕＋英文瀏覽器走一次評審路徑：開站 → 看菜單 → 體驗帳號登入 → 問預購助理 → 商家帳號看備料與預估。10/13 已用一般視窗＋`?lang=en` 走過一次（兩個體驗帳號、預購助理、備料、報表都正常，殘留中文已修並部署）；待：用無痕再走一次
+  - [-] 商家端評審問題已修未部署：總覽店名／每份毛利菜名改英文、愛心餐算進今日取餐、預估旁顯示已訂份數、取餐率只算已過取餐日的訂單並另列轉愛心餐比例、許願／不要率菜名加 `dish_en`。部署 hosting＋functions 後按區域頁 Refresh（`triggerAreaInsightsNow`）重算，再跑 functions-more 的 V-INS-01
 
 ## 🔴 A：消費者端＋後端
 
 - 測試：
   - [-] C-AST-17（PARTIAL）：畫面、拖曳關閉已過；鍵盤遮擋已加 `visualViewport` 防護（未部署），待 iOS＋Android 實機各點一次助理輸入框
   - [ ] 重測：C-MY-17、C-BNT-08、C-PLN-01、C-BNT-09、C-CHR-05（文字已過，按預約與倒數待測）
-  - [ ] 正式站限定：C-NAV-03（先跑 `seed.js --config-only`）、C-AUTH-04／05、C-CHR-06、C-MTC-09（部署修正後複測通知）、C-CHR-14、F-11、F-12、N-SEC-02（部署 CSP 修正後，登入走一次含 FCM／LINE Pay）、N-SEC-03、N-PRF-01（FAIL，TTI 11.2s，要不要優化再決定）
+  - [ ] 正式站限定：C-NAV-03（先跑 `seed.js --config-only`）、C-AUTH-04／05、C-CHR-06、C-MTC-09（部署修正後複測通知）、C-CHR-14、F-11、F-12、N-SEC-02（部署 CSP 修正後，登入走一次含 FCM／LINE Pay）、N-SEC-03、N-PRF-01（已優化未部署，部署後正式站重量；Fast 4G 本機 TTI 3.3～3.9s 仍略超 3 秒）
   - [ ] 端到端情境（第 9 章）至少跑 A、C、G
 - 正式站實際點過：
-  - [ ] 組便當 → 購物車套券 → LINE Pay → 我的餐點（QR、修改、取消、代領碼、捐愛心餐）
+  - [-] 組便當 → 購物車套券 → LINE Pay → 我的餐點：10/13 除捐愛心餐外都過；捐愛心餐限取餐當天，10/20 11:00–11:30 前在 10/20 滷雞腿便當（取餐號 0144）按「捐出」
   - [ ] 加入計畫走 LINE Pay（N 筆 `locks` 同 `plan_id`；某天額滿要擋）；被封鎖時顯示白話提示
   - [ ] 回饋期結算後抽獎；評分（重複評分要擋）
   - [ ] 真機：定位、取餐提醒推播、OTP 簡訊
 - 收尾：
-  - [ ] 清測試資料：`customer@bunnbaa.test` 的「A方案」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）、`ban_appeals/lI5dGTVtIBfByBIUTy3W`、10/13 C-ORD-02 的 4 筆 locks（`84nMRBcwCI0CWHKXwuLG`、`K7ZSCHK6IG9WGhc83CT0`、`ivjPhVtFPhNYjNDnrRvs`、`s8uliaWvdgCygIRBWEA4`，10/16 取餐）、`EJEL6PRO`（可選）
+  - [ ] 清測試資料：`customer@bunnbaa.test` 的「A方案」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）、`ban_appeals/lI5dGTVtIBfByBIUTy3W`、10/13 C-ORD-02 的 4 筆 locks（`84nMRBcwCI0CWHKXwuLG`、`K7ZSCHK6IG9WGhc83CT0`、`ivjPhVtFPhNYjNDnrRvs`、`s8uliaWvdgCygIRBWEA4`，10/16 取餐）、10/13 端到端的滷雞腿便當 2 筆（10/19 取餐號 8752 已取消；10/20 取餐號 0144，捐出後就不用清）、`EJEL6PRO`（可選）
   - [ ] 最後核對 README 數字（Functions 81、logic 64、rules 65、Functions 測試 144）。10/13 新增 `translateComponent`，80 → 81，兩份 README、`Submission_EN.md`、開發指南已改
   - [ ] B 在 10/13 動了 A 區的檔案，請看一眼：`functions/src/index.js`／`translate.js`（半成品名稱翻譯）、`MyBookingsPage.tsx`（取餐日已過仍「已鎖定」的訂單排到已結束區）、`MarketplaceHeader.tsx`（英文介面體驗帳號顯示 Diner／Vendor）、`NotificationBell.tsx`（關閉選單時整批標已讀）
   - [ ] 清測試資料（可選）：`customer@bunnbaa.test` 有一筆 9/23、NT$0、狀態仍是「已鎖定」的舊單

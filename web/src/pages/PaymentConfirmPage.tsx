@@ -79,7 +79,7 @@ export default function PaymentConfirmPage() {
       <div className="max-w-xl mx-auto px-4 pt-12 md:pt-20 pb-16 space-y-6">
         {(status === "waiting-auth" || status === "confirming") && (
           <div className="bb-receipt text-center" role="status" aria-live="polite">
-            <img src="/飯飽R.png" alt="" width={72} height={64} className="mx-auto mb-4 animate-pulse motion-reduce:animate-none" />
+            <img src="/飯飽R-sm.webp" alt="" width={72} height={64} className="mx-auto mb-4 animate-pulse motion-reduce:animate-none" />
             <p className="font-heading text-2xl font-semibold">{tr("確認付款中…", "Confirming payment…")}</p>
             <p className="text-sm text-muted-foreground mt-1">{tr("請不要關閉這個頁面。", "Please keep this page open.")}</p>
           </div>

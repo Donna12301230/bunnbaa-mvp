@@ -12,7 +12,7 @@ import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import PortalPageHeader from "@/components/PortalPageHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyVendor } from "@/hooks/useMyVendor";
-import { dateLocale, tr } from "@/lib/i18n";
+import { dateLocale, loc, tr } from "@/lib/i18n";
 import { db } from "@/lib/firebase";
 import { addDaysStr, mondayOf, todayStr } from "@/lib/pickupSlots";
 import { cn } from "@/lib/utils";
@@ -22,7 +22,8 @@ import type { Lock } from "@/types";
 // 2026-09-28: switched to real data; stats and today's pickup slots are computed from this vendor's locks (vendor_id + created_at index, latest 200).
 // 2026-10-06 visual redesign (simplification proposal §4): today's pickup progress ring, per-slot progress bars, a 7-day bar chart, four shortcut cards (with live status).
 
-const PENDING_STATUSES = new Set(["locked", "for_resale", "for_gift"]);
+// A donated meal (charity) is still cooked and handed out at the counter, so it counts as waiting, same as the prep page
+const PENDING_STATUSES = new Set(["locked", "for_resale", "for_gift", "charity"]);
 const DONE_STATUSES = new Set(["fulfilled", "resold_and_fulfilled"]);
 const WD = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -131,7 +132,7 @@ export default function VendorPortalDashboard() {
     <VendorPortalLayout>
       <PortalPageHeader
         icon={LayoutDashboard}
-        title={myVendor?.name ?? tr("總覽", "Overview")}
+        title={loc(myVendor, "name") || tr("總覽", "Overview")}
         description={format(new Date(), tr("M 月 d 日 EEEE", "EEEE, MMM d"), { locale: dateLocale() })}
       />
 
