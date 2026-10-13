@@ -322,6 +322,9 @@ export default function VendorPortalPrep() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [locks, plan]);
 
+  // Orders and labels carry the original item name; show the menu's translated name in the English UI
+  const itemLabel = (name: string) => loc(menuItems.find((m) => m.name === name), "name") || name;
+
   async function runCutoff(force: boolean) {
     if (!isPastCutoff(date, vendor) && !(await confirm({
       title: tr("現在就截單？", "Close orders now?"),
@@ -407,7 +410,7 @@ export default function VendorPortalPrep() {
         const n = Math.round(c.portions * 10) / 10;
         return { key: c.component_id, name: loc(comp, "name") || c.name, sub: comp?.portion_grams ? `${comp.portion_grams}g × ${n}` : `× ${n}`, group: componentGroup(comp, ingById), detail: c.component_id };
       })
-      : itemCounts.map(([name, n]) => ({ key: `item:${name}`, name, sub: tr(`${n} 份`, `× ${n}`), group: "other" as FoodGroup, detail: null as string | null }))
+      : itemCounts.map(([name, n]) => ({ key: `item:${name}`, name: itemLabel(name), sub: tr(`${n} 份`, `× ${n}`), group: "other" as FoodGroup, detail: null as string | null }))
     : [];
   const doneCount = plan ? tiles.filter((t) => plan.done?.[t.key]).length : 0;
   const dishes = plan ? [...new Set(plan.labels.flatMap((l) => l.sides))].filter((s) => !s.includes("不要")) : [];
@@ -467,7 +470,7 @@ export default function VendorPortalPrep() {
           ) : (
             <div className="space-y-4 print:hidden">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {itemCounts.map(([name, n]) => <PrepTile key={name} name={name} sub={tr(`${n} 份`, `× ${n}`)} group="other" done={false} />)}
+                {itemCounts.map(([name, n]) => <PrepTile key={name} name={itemLabel(name)} sub={tr(`${n} 份`, `× ${n}`)} group="other" done={false} />)}
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <Button onClick={() => runCutoff(false)} disabled={busy}><RefreshCw /> {tr("產生備料清單", "Generate prep list")}</Button>
