@@ -16,7 +16,6 @@
 ## 🔴 A：消費者端＋後端
 
 - [-] 已從店家設定移除的取餐時段，上面的訂單不進備料時間軸（`prepPlans.timelines`）：程式已改（未部署）——截單時沒有對應店家時段的餐期，改用該餐期訂單自己的取餐時段組出範圍（同 `lockPeriodRangesOn`）。10-13 emulator 驗證：仁和雅 6 份 → 「午餐・4 份」＋「晚餐 17:30-18:30・2 份」。待：推 master 自動部署
-- [ ] 「經典便當」模板候選菜數量不對（`seed-phase1.js`）
 - 測試：
   - [-] C-AST-17（PARTIAL）
   - [ ] C-MY-03、C-ORD-02（LINE Pay Sandbox 成功頁）
@@ -30,7 +29,6 @@
   - [ ] 回饋期結算後抽獎；評分（重複評分要擋）
   - [ ] 真機：定位、取餐提醒推播、OTP 簡訊
 - 收尾：
-  - [ ] 截圖給 B：預購助理卡片、「常一起買」、評估結果表
   - [ ] 清測試資料：`customer@bunnbaa.test` 的「A方案」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）、`ban_appeals/lI5dGTVtIBfByBIUTy3W`、`EJEL6PRO`（可選）
   - [ ] 最後核對 README 數字（Functions 80、logic 64、rules 65、Functions 測試 144）
   - [-] 報名表單
@@ -105,4 +103,4 @@
 
 本機 emulator（密碼都是 `demo1234`）：`customer@bunnbaa.test`（會員）、`vendor@bunnbaa.test`（仁和雅店主）、`applicant@bunnbaa.test`（申請中）、`suw192336@gmail.com`（管理員）。
 
-正式站：管理員 `suw192336@gmail.com`、`ckchildlikekid@gmail.com`；測試會員 `customer@bunnbaa.test`；仁和雅店主已綁定。
+正式站：管理員 `suw192336@gmail.com`、`ckchildlikekid@gmail.com`；測試會員 `customer@bunnbaa.test`（`demo123`）；仁和雅店主 `vendor@bunnbaa.test`（`demo1234`，登入頁有一鍵登入）。
