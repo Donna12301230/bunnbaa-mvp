@@ -74,6 +74,7 @@ export interface MenuItem {
   fixed?: { name: string; component_id?: string | null; portion_text?: string | null; portions?: number }[];
   slots?: BentoSlot[];
   custom_fields?: BentoCustomField[]; // Vendor-defined dropdowns below the side dishes (e.g. soup, drink, spice level)
+  dish_names_en?: Record<string, string>; // English names of the dishes / side categories above, keyed by the Chinese (auto-translated by Functions)
   weekdays?: number[]; // Weekly menu rotation: only served on these days (unset = every day)
   component_id?: string | null; // Semi-finished component for a single item (for prep)
 }

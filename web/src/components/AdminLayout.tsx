@@ -60,7 +60,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <div className="sticky top-0 z-40 bg-card/90 backdrop-blur-xl border-b border-border px-4 md:px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/landing" className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <img src="/飯飽wordR.png" alt={tr("飯飽 BunnBaa 首頁", "BunnBaa home")} className="h-8" />
+            <img src="/飯飽wordR-sm.webp" alt={tr("飯飽 BunnBaa 首頁", "BunnBaa home")} className="h-8" />
           </Link>
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground border border-ink">{tr("管理後台", "Admin")}</span>
         </div>

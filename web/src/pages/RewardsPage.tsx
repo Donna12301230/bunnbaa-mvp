@@ -14,8 +14,9 @@ import { httpsCallable } from "@/lib/callable";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMyCoupons, useMyTickets, millis } from "@/hooks/useMyRewards";
+import { useVendors } from "@/hooks/useVendors";
 import { couponTitle, openProgress, tierLabel } from "@/lib/rewards";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import type { RewardStatus } from "@/types";
 
 /**
@@ -28,6 +29,9 @@ export default function RewardsPage() {
   const { toast } = useToast();
   const tickets = useMyTickets(user?.id);
   const { coupons } = useMyCoupons(user?.id);
+  const { data: vendors = [] } = useVendors();
+  // Tickets and coupons store the Chinese vendor name; the English UI uses the vendor's translated name
+  const vendorName = (id: string, fallback?: string) => loc(vendors.find((v) => v.id === id), "name") || fallback || "";
   const [statuses, setStatuses] = useState<RewardStatus[]>([]);
   const [drawing, setDrawing] = useState<string | null>(null);
   const [result, setResult] = useState<{ label: string; discount: number; expires_at: number; vendor: string } | null>(null);
@@ -83,7 +87,7 @@ export default function RewardsPage() {
                     const st = statusOf(g.vendorId);
                     return (
                       <div key={g.vendorId} className="bg-card rounded-card border border-ink p-6 space-y-3">
-                        <p className="font-heading text-xl font-semibold">{g.name || st?.vendor_name}</p>
+                        <p className="font-heading text-xl font-semibold">{vendorName(g.vendorId, g.name || st?.vendor_name)}</p>
                         <p className="text-sm">
                           {g.drawable > 0
                             ? tr(`${g.drawable} 張可以抽`, `${g.drawable} ready to draw`)
@@ -102,7 +106,7 @@ export default function RewardsPage() {
                         {st?.pool_open && (
                           <p className="text-xs text-muted-foreground">{tr(`抽獎期限 ${new Date(millis(st.draw_deadline)).toLocaleDateString()}，逾期未抽的獎項回歸店家`, `Draw by ${new Date(millis(st.draw_deadline)).toLocaleDateString()}`)}</p>
                         )}
-                        <Button size="sm" disabled={g.drawable === 0 || drawing !== null} onClick={() => draw(g.vendorId, g.name || st?.vendor_name || "")}>
+                        <Button size="sm" disabled={g.drawable === 0 || drawing !== null} onClick={() => draw(g.vendorId, vendorName(g.vendorId, g.name || st?.vendor_name))}>
                           <Gift /> {drawing === g.vendorId ? tr("抽獎中…", "Drawing…") : tr("抽一張", "Draw")}
                         </Button>
                       </div>
@@ -122,7 +126,7 @@ export default function RewardsPage() {
                     <div key={c.id} className="rounded-card border-2 border-dashed border-ink bg-accent p-6">
                       <p className="font-heading text-4xl font-semibold">{couponTitle(c.discount)}</p>
                       <p className="text-xs text-muted-foreground">{tierLabel(c.tier)}</p>
-                      <p className="text-sm mt-1">{c.vendor_name}</p>
+                      <p className="text-sm mt-1">{vendorName(c.vendor_id, c.vendor_name)}</p>
                       <p className="text-xs text-muted-foreground">{tr("到期", "Expires")} {new Date(millis(c.expires_at)).toLocaleDateString()}</p>
                     </div>
                   ))}
@@ -133,7 +137,7 @@ export default function RewardsPage() {
                 <details className="text-sm">
                   <summary className="cursor-pointer text-muted-foreground">{tr("已使用／過期", "Used / expired")}（{pastCoupons.length}）</summary>
                   <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                    {pastCoupons.map((c) => <li key={c.id}>{c.vendor_name} {couponTitle(c.discount)}・{c.status === "redeemed" ? tr("已使用", "used") : tr("已過期", "expired")}</li>)}
+                    {pastCoupons.map((c) => <li key={c.id}>{vendorName(c.vendor_id, c.vendor_name)} {couponTitle(c.discount)}・{c.status === "redeemed" ? tr("已使用", "used") : tr("已過期", "expired")}</li>)}
                   </ul>
                 </details>
               )}

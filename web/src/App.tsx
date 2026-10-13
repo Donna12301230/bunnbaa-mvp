@@ -104,7 +104,7 @@ function NotFound() {
 function RouteFallback() {
   return (
     <div className="bb-route-fallback" role="status" aria-live="polite">
-      <img src="/飯飽R.png" alt="" width={72} height={64} />
+      <img src="/飯飽R-sm.webp" alt="" width={72} height={64} />
       <span className="sr-only">{tr("載入中…", "Loading…")}</span>
     </div>
   );

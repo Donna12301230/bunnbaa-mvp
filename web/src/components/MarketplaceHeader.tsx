@@ -125,7 +125,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
 
         {/* A real link (formerly img role=button): middle-click opens a new tab, screen readers read it as a link */}
         <Link href="/landing" className="shrink-0 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-          <img src="/飯飽wordR.png" alt={t("飯飽 BunnBaa 首頁", "BunnBaa home")} className="h-8" />
+          <img src="/飯飽wordR-sm.webp" alt={t("飯飽 BunnBaa 首頁", "BunnBaa home")} className="h-8" />
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 shrink-0">

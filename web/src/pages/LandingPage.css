@@ -299,9 +299,10 @@
   translate: calc(var(--mx) * -10px) calc(var(--my) * -10px);
   transition: translate 800ms var(--lp-ease-out);
 }
+/* Only rotate (compositor-only). Animating border-radius re-laid out and repainted the blob every frame, which kept the main thread busy on phones */
 @keyframes lp-morph {
-  0% { border-radius: 46% 54% 42% 58% / 52% 44% 56% 48%; rotate: 0deg; }
-  100% { border-radius: 58% 42% 55% 45% / 42% 58% 42% 58%; rotate: 14deg; }
+  0% { rotate: 0deg; }
+  100% { rotate: 14deg; }
 }
 .lp-hero__frame {
   position: absolute;
@@ -974,8 +975,8 @@
   overflow: hidden;
   padding: 6px 14px;
   border-radius: var(--radius-full);
+  /* No backdrop-filter: these captions scroll with the marquee, and a moving blur repaints every frame */
   background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(6px);
   color: var(--text);
   font-size: 13px;
   font-weight: 600;

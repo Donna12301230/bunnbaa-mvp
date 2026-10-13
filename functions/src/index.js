@@ -9,7 +9,7 @@ const db = admin.firestore();
 
 const { onCall, HttpsError, assertAdminOrEmulator, assertAdminOrVendorOwner, t } = require("./common");
 const { generateVendorCalibrationReport, answerCalibrationScenario } = require("./vendorCalibration");
-const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./translate");
+const { translateTexts, translationPatch, dishNamesPatch, TRANSLATED_FIELDS } = require("./translate");
 const { loadPlatformConfig } = require("./config");
 const { commissionOf, revenueOf } = require("./pricing");
 
@@ -295,8 +295,12 @@ exports.askCalibrationScenario = onCall({ region: "asia-east1" }, async (request
 
 async function translateDoc(ref, data, collection) {
   const patch = await translationPatch(data, TRANSLATED_FIELDS[collection]);
-  if (patch) await ref.set(patch, { merge: true });
-  return !!patch;
+  // Menu items also carry English names for the dishes inside a bento (dish_names_en)
+  const dishes = collection === "menu_items" ? await dishNamesPatch(data) : null;
+  if (!patch && !dishes) return false;
+  const merged = { ...patch, ...dishes, i18n_src: { ...patch?.i18n_src, ...dishes?.i18n_src } };
+  await ref.set(merged, { merge: true });
+  return true;
 }
 
 function translationTrigger(collection, path = `${collection}/{docId}`) {

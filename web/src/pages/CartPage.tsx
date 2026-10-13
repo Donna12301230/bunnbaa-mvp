@@ -22,7 +22,7 @@ import { bookingProblem, slotLabel, vendorCutoffTime } from "@/lib/pickupSlots";
 import { discountText } from "@/lib/pricing";
 import { customFields, itemMains, portionLabel, priceBreakdown, priceDeltaText, riceLabel, sideOptions } from "@/lib/bento";
 import { couponTitle } from "@/lib/rewards";
-import { tr, loc } from "@/lib/i18n";
+import { tr, loc, dishName } from "@/lib/i18n";
 import UsePointsToggle, { usePointsPreview } from "@/components/UsePointsToggle";
 import WaiverText from "@/components/WaiverText";
 import { formatNT } from "@/lib/format";
@@ -153,25 +153,25 @@ export default function CartPage() {
                       {unit.discountPercent > 0 && <span className="text-success-text">・{tr("早鳥", "Early bird")} {discountText(unit.discountPercent)}</span>}
                     </p>
                     {line.mainIndex != null && itemMains(line.menuItem)[line.mainIndex] && (
-                      <p className="text-xs text-muted-foreground">{tr("主菜：", "Main: ")}{itemMains(line.menuItem)[line.mainIndex].name}</p>
+                      <p className="text-xs text-muted-foreground">{tr("主菜：", "Main: ")}{dishName(line.menuItem, itemMains(line.menuItem)[line.mainIndex].name)}</p>
                     )}
                     {line.menuItem.slots && line.choices.length > 0 && (
                       <ul className="text-xs text-muted-foreground">
                         {line.menuItem.slots.map((slot, i) => {
                           const c = line.choices[i];
-                          const text = c === "none" ? tr("少一道", "none") : c === "default" || c === undefined ? slot.default.name
-                            : tr(`許願 ${slot.candidates[c].name}（${portionLabel(slot.candidates[c].portion_level)}）`, `Wish: ${slot.candidates[c].name}`);
-                          return <li key={i}>{slot.category}：{text}</li>;
+                          const text = c === "none" ? tr("少一道", "none") : c === "default" || c === undefined ? dishName(line.menuItem, slot.default.name)
+                            : tr(`許願 ${slot.candidates[c].name}（${portionLabel(slot.candidates[c].portion_level)}）`, `Wish: ${dishName(line.menuItem, slot.candidates[c].name)}`);
+                          return <li key={i}>{dishName(line.menuItem, slot.category)}{tr("：", ": ")}{text}</li>;
                         })}
                       </ul>
                     )}
                     {line.extraSide && (() => {
                       const o = sideOptions(line.menuItem).find((x) => x.slot === line.extraSide!.slot && x.candidate === line.extraSide!.candidate);
-                      return o ? <p className="text-xs text-muted-foreground">{line.extraSide.mode === "addon" ? tr(`第四道加菜：${o.name}（+10）`, `Add-on: ${o.name} (+10)`) : tr(`第四道備案：${o.name}`, `Backup: ${o.name}`)}</p> : null;
+                      return o ? <p className="text-xs text-muted-foreground">{line.extraSide.mode === "addon" ? tr(`第四道加菜：${o.name}（+10）`, `Add-on: ${dishName(line.menuItem, o.name)} (+10)`) : tr(`第四道備案：${o.name}`, `Backup: ${dishName(line.menuItem, o.name)}`)}</p> : null;
                     })()}
                     {customFields(line.menuItem).map((f, i) => {
                       const o = f.options[line.customPicks?.[i] ?? 0];
-                      return o ? <p key={i} className="text-xs text-muted-foreground">{f.label}：{o.name}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</p> : null;
+                      return o ? <p key={i} className="text-xs text-muted-foreground">{dishName(line.menuItem, f.label)}{tr("：", ": ")}{dishName(line.menuItem, o.name)}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</p> : null;
                     })}
                     {riceLabel(line.rice) && <p className="text-xs text-muted-foreground">{riceLabel(line.rice)}</p>}
                     {line.note && <p className="text-xs text-muted-foreground">{tr("備註：", "Note: ")}{line.note}</p>}

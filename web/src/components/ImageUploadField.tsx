@@ -5,8 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImagePlus, Upload, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/lib/firebase";
+import { getStorageInstance } from "@/lib/firebase";
 
 // Images are stored in Firebase Storage under vendors/{vendorId}/; storage.rules uses
 // vendors/{vendorId}.owner_uid to allow writes only by the vendor owner, limited to image/* and ≤ 5MB.
@@ -32,6 +31,7 @@ function useImageUpload(vendorId: string | undefined, onChange: (url: string) =>
       if (!file.type.startsWith("image/")) throw new Error(tr("只能上傳圖片檔", "Only image files can be uploaded"));
       if (file.size > MAX_BYTES) throw new Error(tr("圖片不能超過 5MB", "Images must be 5 MB or smaller"));
       const ext = file.name.includes(".") ? file.name.split(".").pop() : "img";
+      const [storage, { ref, uploadBytes, getDownloadURL }] = await Promise.all([getStorageInstance(), import("firebase/storage")]);
       const fileRef = ref(storage, `vendors/${vendorId}/${crypto.randomUUID()}.${ext}`);
       await uploadBytes(fileRef, file, { contentType: file.type });
       onChange(await getDownloadURL(fileRef));

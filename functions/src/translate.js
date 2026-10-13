@@ -54,6 +54,45 @@ async function translationPatch(data, fields) {
   return patch;
 }
 
+/** Dish names, side categories and custom-field text inside a menu item (main, mains, fixed, slots, custom_fields), sorted and de-duplicated */
+function dishNames(data) {
+  const names = new Set();
+  const add = (s) => { if (typeof s === "string" && s.trim()) names.add(s); };
+  const addDish = (d) => { add(d?.name); add(d?.portion_text); };
+  addDish(data?.main);
+  (data?.mains ?? []).forEach(addDish);
+  (data?.fixed ?? []).forEach(addDish);
+  (data?.slots ?? []).forEach((s) => {
+    add(s?.category);
+    addDish(s?.default);
+    (s?.candidates ?? []).forEach(addDish);
+  });
+  (data?.custom_fields ?? []).forEach((f) => {
+    add(f?.label);
+    (f?.options ?? []).forEach((o) => add(o?.name));
+  });
+  return [...names].sort();
+}
+
+/**
+ * English names for the dishes inside a menu item, stored as a zh -> en map (dish_names_en). The
+ * components these dishes link to are vendor-private, so diners can't read their name_en.
+ * Returns null when the dish list matches the last translation; only names without an English
+ * version are sent to Gemini.
+ */
+async function dishNamesPatch(data) {
+  const names = dishNames(data);
+  const have = data?.dish_names_en ?? {};
+  const prev = data?.i18n_src?.dish_names;
+  const missing = names.filter((n) => typeof have[n] !== "string");
+  if (missing.length === 0 && Array.isArray(prev) && prev.join("\n") === names.join("\n")) return null;
+
+  const english = await translateTexts(missing);
+  const map = {};
+  names.forEach((n) => { map[n] = typeof have[n] === "string" ? have[n] : english[missing.indexOf(n)]; });
+  return { dish_names_en: map, i18n_src: { dish_names: names } };
+}
+
 // Fields to translate per collection (address_en is only for display in the English UI; area filtering still matches the Chinese address)
 const TRANSLATED_FIELDS = {
   vendors: ["name", "description", "address"],
@@ -66,4 +105,4 @@ const TRANSLATED_FIELDS = {
   components: ["name"],
 };
 
-module.exports = { translateTexts, translationPatch, TRANSLATED_FIELDS };
+module.exports = { translateTexts, translationPatch, dishNames, dishNamesPatch, TRANSLATED_FIELDS };
