@@ -45,7 +45,7 @@ function createReportUrl() {
 }
 
 /**
- * Platform dashboard: embeds a Looker Studio report (data source is BigQuery bunnbaa_analytics, see doc/GoogleCloud改動建議.md).
+ * Platform dashboard: embeds a Looker Studio report (data source is BigQuery bunnbaa_analytics, see doc/AI與GoogleCloud設計.md).
  * Once the report is built in Looker Studio, paste the URL from "File → Embed report" here and save; the URL is stored in platformConfig/analytics.
  * Viewing permissions for the report itself are controlled by Looker Studio; this just frames it inside the admin console.
  */

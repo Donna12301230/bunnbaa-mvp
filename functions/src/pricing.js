@@ -1,5 +1,5 @@
 // Server-side copy of web/src/lib/pricing.ts + web/src/lib/pickupSlots.ts.
-// Phase 1 spec (doc/BunnBaa 飯飽｜第一階段技術規格1002.md):
+// Phase 1 spec (doc/第一階段規格.md):
 //   - Three meal periods: breakfast / lunch / dinner (classified by pickup slot start time); pickup only, business days Monday to Friday
 //   - Cut-off at cutoffTime (default 20:00) the day before pickup; vendors can move it earlier (vendors.cutoff_time) but not later
 //   - Booking window: at most 30 days ahead

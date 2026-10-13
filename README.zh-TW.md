@@ -295,7 +295,7 @@ npm run test:functions && npm run test:functions:more
 
 2026-10-12 的結果：商業邏輯測試 64 項、Firestore 安全規則測試 65 項、Cloud Functions 測試 144 項全部通過（跟時間有關的測試在時間不到時會跳過，例如兩家不同截單時間的 `lockOrders` 要台北時間 20:00 後才能跑）。
 
-預購助理回答品質（`node scripts/eval/assistantEval.js`，24 題，涵蓋預算、過敏、素食、餐期、多日方案與英文提問，2026-10-12）：規則檢查（預算、過敏原、不吃的食材、餐期、星期、不催促）24/24 通過、過敏原違規 0；**Vertex AI Gen AI Evaluation Service** 評分需求符合度 4.79/5、有據性 4.96/5。報告：[`doc/評估/預購助理回答品質評估.md`](doc/評估/預購助理回答品質評估.md)。
+預購助理回答品質（`node scripts/eval/assistantEval.js`，24 題，涵蓋預算、過敏、素食、餐期、多日方案與英文提問，2026-10-12）：規則檢查（預算、過敏原、不吃的食材、餐期、星期、不催促）24/24 通過、過敏原違規 0；**Vertex AI Gen AI Evaluation Service** 評分需求符合度 4.79/5、有據性 4.96/5。報告：[`doc/evaluation/預購助理回答品質評估.md`](doc/evaluation/預購助理回答品質評估.md)。
 
 ---
 
@@ -322,7 +322,7 @@ BunnBaa/
 └── doc/                    # 規格、測試文件、開發指南
 ```
 
-給開發者的詳細說明（資料模型、完整的 Functions 清單、環境設定）：[`doc/開發指南.md`](doc/開發指南.md)。Google Cloud 的設計：[`doc/GoogleCloud改動建議.md`](doc/GoogleCloud改動建議.md)。
+給開發者的詳細說明（資料模型、完整的 Functions 清單、環境設定）：[`doc/開發指南.md`](doc/開發指南.md)。Google Cloud 的設計：[`doc/AI與GoogleCloud設計.md`](doc/AI與GoogleCloud設計.md)。
 
 ## 後續規劃
 

@@ -1,4 +1,4 @@
--- Demand forecast (doc/GoogleCloud改動建議.md P1). Run once in the BigQuery console or with bq query --use_legacy_sql=false; safe to re-run.
+-- Demand forecast (doc/AI與GoogleCloud設計.md). Run once in the BigQuery console or with bq query --use_legacy_sql=false; safe to re-run.
 -- Prerequisites: the extension, backfill and schema views from bigquery/README.md are done (locks_schema_locks_latest and vendors_schema_vendors_latest must exist).
 -- The daily forecast is produced by the Cloud Function demandForecast (functions/src/demandForecast.js), which runs AI.FORECAST, writes demand_forecast and writes back to Firestore.
 

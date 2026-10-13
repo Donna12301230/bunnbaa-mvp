@@ -13,14 +13,14 @@ const { translateTexts, translationPatch, TRANSLATED_FIELDS } = require("./trans
 const { loadPlatformConfig } = require("./config");
 const { commissionOf, revenueOf } = require("./pricing");
 
-// Phase 1 spec (doc/BunnBaa 飯飽｜第一階段技術規格1002.md) features are split into modules:
+// Phase 1 spec (doc/第一階段規格.md) features are split into modules:
 //   orders.js     order pricing, LINE Pay, cut-off wish decisions, daily prep, QR pickup, cancellation refunds
 //   charity.js    donating as charity meals, no-shows to charity meals, reservations/timeouts, waste logging
 //   rewardsFns.js reward pool, draw tickets, coupons, anomaly detection
 //   purchasing.js weekly/monthly supplier orders, forecasts, stocktaking
 //   insights.js   open wishes, taste preferences, area insights, Gemini dish-name classification and recipe drafts
 //   disaster.js   typhoon warnings, automatic refunds on work-suspension days, ingredient price changes, equivalent side substitution
-// AI features (doc/AI功能設計.md):
+// AI features (doc/AI與GoogleCloud設計.md):
 //   menuVision.js        list menus from a photo (Gemini Vision)
 //   resaleMatch.js       smart resale matching (Embeddings + Firestore vector search → push)
 //   shoppingAssistant.js conversational pre-order assistant (Gemini function calling)

@@ -1,4 +1,4 @@
-// AI feature 4: prep forecast range (doc/AI功能設計.md, strengthening the existing calibration).
+// AI feature 4: prep forecast range (doc/AI與GoogleCloud設計.md, strengthening the existing calibration).
 // "42 locked; based on past pickups, 38–41 expected to be picked up". The range uses plain statistics:
 // the daily ratio "actually picked up ÷ locked portions"; with enough data, the 10%/90% percentiles, otherwise mean ± 1.28 standard deviations.
 // Numbers are never handed to the LLM; the plain-language explanation reuses the daily calibration report (Gemini), and follow-ups go through askCalibrationScenario.

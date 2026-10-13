@@ -1,4 +1,4 @@
-// AI feature 1: list menus from a photo (doc/AI功能設計.md). The vendor owner photographs a paper menu or a dish, and Gemini Vision
+// AI feature 1: list menus from a photo (doc/AI與GoogleCloud設計.md). The vendor owner photographs a paper menu or a dish, and Gemini Vision
 // reads it into item drafts; this only returns drafts and doesn't write menu_items. The owner confirms and edits them on the menu page before listing.
 // Dietary tags and allergens must be one of the frontend's fixed options (DIETARY_TAGS / ALLERGEN_LIST in web/src/types.ts;
 // change both together); any other value from the model is dropped. Allergens are required by food safety law, and the UI reminds the owner to confirm each one.

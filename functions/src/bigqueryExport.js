@@ -13,7 +13,7 @@ const ALWAYS_DROP = new Set([
   "transaction_id", "pickup_code", "qr_nonce", "share_token",
 ]);
 
-// payment_intents keeps only amount, status and timestamps (GoogleCloud改動建議.md P0)
+// payment_intents keeps only amount, status and timestamps (doc/AI與GoogleCloud設計.md)
 const PAYMENT_INTENT_FIELDS = new Set(["status", "amount", "total", "points_used"]);
 
 function collectionOf(documentName) {

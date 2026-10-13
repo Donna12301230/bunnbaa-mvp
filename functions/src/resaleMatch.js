@@ -1,4 +1,4 @@
-// AI feature 3: smart resale matching (doc/AI功能設計.md). When a lock becomes for_resale, find members likely to want it
+// AI feature 3: smart resale matching (doc/AI與GoogleCloud設計.md). When a lock becomes for_resale, find members likely to want it
 // and push to them, so a bento whose owner can't pick it up finds a taker instead of becoming a charity meal or waste.
 //
 // menu_embeddings/{menuItemId}: vendor_id, embedding (Gemini vector, 768 dims), src (text the embedding was computed from)

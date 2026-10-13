@@ -2,7 +2,7 @@
 
 [English](README.md) | **中文**
 
-Firestore 用官方 extension **Stream Firestore to BigQuery** 同步到 BigQuery（`doc/GoogleCloud改動建議.md` P0）。
+Firestore 用官方 extension **Stream Firestore to BigQuery** 同步到 BigQuery（`doc/AI與GoogleCloud設計.md` P0）。
 
 - 實例設定：`firebase.json` 的 `extensions` ＋ `extensions/bq-*.env`（`locks`、`menu_items`、`vendors`、`payment_intents` 各一個）
 - Dataset：`bunnbaa_analytics`（`asia-east1`），每個集合一張 `{collection}_raw_changelog` 和一個 `{collection}_raw_latest` view
@@ -71,4 +71,4 @@ SQL 在 `functions/src/customerInsights.sql`（函式部署時一起打包），
 
 ## 權限
 
-`bunnbaa_analytics` 只開給管理員（BigQuery Data Viewer），Looker Studio 用管理員帳號連線。資料流描述同步寫在 `doc/ISMS_管理制度文件.md`。
+`bunnbaa_analytics` 只開給管理員（BigQuery Data Viewer），Looker Studio 用管理員帳號連線。資料流描述同步寫在 `doc/資安.md`。

@@ -1,4 +1,4 @@
-// Basket analysis and customer segments (doc/GoogleCloud改動建議.md P1): runs customerInsights.sql in BigQuery weekly
+// Basket analysis and customer segments (doc/AI與GoogleCloud設計.md): runs customerInsights.sql in BigQuery weekly
 // (frequently-bought-together item pairs, ML.KMEANS member segments, AI.GENERATE segment descriptions), then writes each vendor's results back to Firestore:
 //   vendors/{vendorId}/analytics/basket    { pairs: [{ item_a, item_b, buyers, confidence }] }
 //   vendors/{vendorId}/analytics/segments  { segments: [{ segment_id, label, description, label_en, description_en, customers }] }

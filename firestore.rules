@@ -424,7 +424,7 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ── Phase 1 spec (doc/BunnBaa 飯飽｜第一階段技術規格.md §12) ──────────────
+    // ── Phase 1 spec (doc/第一階段規格.md §12) ──────────────
     // Draws, redemptions, opening pools, cut-off and refunds are all written by Cloud Functions (admin SDK).
 
     // Platform-wide settings, dish library, fixed templates: publicly readable, only admins can change them
@@ -547,7 +547,7 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
       allow create, delete: if false;
     }
-    // AI features (doc/AI功能設計.md): read/written only by Functions
+    // AI features (doc/AI與GoogleCloud設計.md): read/written only by Functions
     // menu_embeddings: item embeddings (for resale matching); not readable by the frontend so item pages don't load vectors
     // resale_matches: who resale matching notified and whether a notified user took it over (affects metrics); readable by admins
     // assistant_cache: single-turn Q&A cache for the pre-order assistant

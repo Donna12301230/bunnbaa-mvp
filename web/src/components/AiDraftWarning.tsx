@@ -16,7 +16,7 @@ export function useAiDraftsInUse(vendorId: string | undefined) {
 /**
  * Notice at the top of the prep and purchasing pages: recipe quantities from "AI fill all" are estimates, so prepping
  * or ordering from them before the vendor confirms may over- or under-order.
- * AI does not decide stock levels for vendors (doc/AI功能設計.md responsible-AI principles), so vendors must see this and decide.
+ * AI does not decide stock levels for vendors (doc/AI與GoogleCloud設計.md responsible-AI principles), so vendors must see this and decide.
  */
 export default function AiDraftWarning({ vendorId, what }: { vendorId: string | undefined; what: string }) {
   const drafts = useAiDraftsInUse(vendorId);

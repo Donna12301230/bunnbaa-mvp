@@ -1,4 +1,4 @@
--- Basket analysis and customer segments (doc/GoogleCloud改動建議.md P1). Run weekly by functions/src/customerInsights.js; can also be pasted into the BigQuery console.
+-- Basket analysis and customer segments (doc/AI與GoogleCloud設計.md). Run weekly by functions/src/customerInsights.js; can also be pasted into the BigQuery console.
 -- Uses only BigQuery's bunnbaa_analytics (locks synced from Firestore, already de-identified).
 
 -- 1. Frequently bought together: for two items a diner has both bought at the same vendor, count how many diners bought both (not necessarily on the same day:

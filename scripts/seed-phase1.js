@@ -1,5 +1,5 @@
 /**
- * Demo data for the Phase 1 spec (doc/BunnBaa 飯飽｜第一階段技術規格.md).
+ * Demo data for the Phase 1 spec (doc/第一階段規格.md).
  * Runs after the old seed.js (vendors, accounts, old locks); every doc id is fixed, so reruns
  * overwrite instead of duplicating.
  *

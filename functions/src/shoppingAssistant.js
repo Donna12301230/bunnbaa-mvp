@@ -1,4 +1,4 @@
-// AI feature 2: conversational pre-order assistant (doc/AI功能設計.md). The diner describes
+// AI feature 2: conversational pre-order assistant (doc/AI與GoogleCloud設計.md). The diner describes
 // what they want in one sentence, e.g. "weekday lunches next week, Da'an District, budget 120,
 // no beef"; Gemini calls the tools below via function calling to find candidates, then calls
 // presentCandidates to return the cards.

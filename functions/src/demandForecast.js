@@ -1,4 +1,4 @@
-// Demand forecast (doc/GoogleCloud改動建議.md P1): BigQuery AI.FORECAST (TimesFM, no training) predicts each vendor's portions for the next 7 days.
+// Demand forecast (doc/AI與GoogleCloud設計.md): BigQuery AI.FORECAST (TimesFM, no training) predicts each vendor's portions for the next 7 days.
 // Data: bunnbaa_analytics.daily_demand (locks synced by the Firestore → BigQuery extension, plus simulated background demand for demos);
 // table and view setup is in bigquery/sql/01_demand_forecast.sql.
 // Results go into BigQuery demand_forecast (history kept so Looker can compare forecast vs actual), then are written back to Firestore

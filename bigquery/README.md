@@ -2,7 +2,7 @@
 
 **English** | [中文](README.zh-TW.md)
 
-Firestore is synced to BigQuery with the official **Stream Firestore to BigQuery** extension (`doc/GoogleCloud改動建議.md`, P0).
+Firestore is synced to BigQuery with the official **Stream Firestore to BigQuery** extension (`doc/AI與GoogleCloud設計.md`, P0).
 
 - Instance config: `extensions` in `firebase.json` plus `extensions/bq-*.env` (one each for `locks`, `menu_items`, `vendors`, `payment_intents`)
 - Dataset: `bunnbaa_analytics` (`asia-east1`), with one `{collection}_raw_changelog` table and one `{collection}_raw_latest` view per collection
@@ -71,4 +71,4 @@ Run `sql/02_dashboard.sql` to create the dashboard views (run on 2026-10-10). Cr
 
 ## Access
 
-`bunnbaa_analytics` is shared with admins only (BigQuery Data Viewer); Looker Studio connects with an admin account. The data flow is also described in `doc/ISMS_管理制度文件.md`.
+`bunnbaa_analytics` is shared with admins only (BigQuery Data Viewer); Looker Studio connects with an admin account. The data flow is also described in `doc/資安.md`.

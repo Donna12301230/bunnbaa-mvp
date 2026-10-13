@@ -9,7 +9,7 @@
  *
  * 2026-10-09: accuracy rate and error range are now computed in code (calibrationStats) instead of
  * by Gemini. The accuracy rate drives the "Stable" badge diners see, so the numbers can't be left to
- * an LLM (responsible-AI principles in doc/AI功能設計.md). Gemini only takes the computed numbers to
+ * an LLM (responsible-AI principles in doc/AI與GoogleCloud設計.md). Gemini only takes the computed numbers to
  * write a plain-language explanation, summarize patterns in the notes, and answer what-if follow-ups.
  */
 const { logger } = require("firebase-functions");

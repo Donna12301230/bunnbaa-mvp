@@ -1,5 +1,5 @@
 /**
- * Answer-quality eval for the pre-order assistant (doc/GoogleCloud改動建議.md P2).
+ * Answer-quality eval for the pre-order assistant (doc/AI與GoogleCloud設計.md).
  *
  * Each case runs once through the same assistant flow as production (runAssistant in
  * functions/src/shoppingAssistant.js, via Vertex AI against production Firestore; read-only, no
@@ -15,7 +15,7 @@
  * Usage (needs gcloud auth application-default login with an account that has project access):
  *   node scripts/eval/assistantEval.js            # all cases
  *   node scripts/eval/assistantEval.js C03 C07    # only the given cases
- * Results go to doc/評估/預購助理回答品質評估.md and assistant_eval_results.json.
+ * Results go to doc/evaluation/預購助理回答品質評估.md and assistant_eval_results.json.
  */
 const path = require("path");
 const fs = require("fs");
@@ -34,7 +34,7 @@ const { weekdayOf } = require(path.join(FN, "src/calendar"));
 const PROJECT = process.env.GCLOUD_PROJECT;
 const EVAL_LOCATION = "us-central1";
 const AUTORATER = `projects/${PROJECT}/locations/${EVAL_LOCATION}/publishers/google/models/gemini-2.5-pro`;
-const OUT_DIR = path.resolve(__dirname, "../../doc/評估");
+const OUT_DIR = path.resolve(__dirname, "../../doc/evaluation");
 const CONCURRENCY = 3;
 const AREA = { county: "嘉義市", town: "" };
 const PRESSURE = /手刀|快搶|搶購|限時|趕快|錯過|售完就沒|最後機會|hurry|don't miss|limited time/i;

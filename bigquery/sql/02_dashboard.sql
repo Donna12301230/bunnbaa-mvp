@@ -1,4 +1,4 @@
--- Views for the Looker Studio platform dashboard (doc/GoogleCloud改動建議.md P1). Run once; safe to re-run.
+-- Views for the Looker Studio platform dashboard (doc/AI與GoogleCloud設計.md). Run once; safe to re-run.
 -- Prerequisites: 01_demand_forecast.sql and functions/src/customerInsights.sql have both been run.
 
 -- 1. Daily operations (real locks only, no simulated background demand): portions, pickups, rescued via resale, charity meals, no-shows, revenue

@@ -297,7 +297,7 @@ npm run test:functions && npm run test:functions:more
 
 Results as of 12 Oct 2026: all 64 business-logic tests, all 65 Firestore security-rule tests and all 144 Cloud Functions tests pass (tests that depend on the time of day are skipped when run too early, e.g. the two-cutoff `lockOrders` test needs to run after 20:00 Taipei time).
 
-Pre-order assistant quality (`node scripts/eval/assistantEval.js`, 24 questions covering budgets, allergies, vegetarian, meal times, multi-day plans and English, 12 Oct 2026): 24/24 pass the rule checks (budget, allergens, excluded ingredients, meal period, weekday, no urgency wording) with zero allergen violations, and the **Vertex AI Gen AI Evaluation Service** scores fulfillment 4.79/5 and groundedness 4.96/5. Report: [`doc/assistant-evaluation.md`](doc/assistant-evaluation.md).
+Pre-order assistant quality (`node scripts/eval/assistantEval.js`, 24 questions covering budgets, allergies, vegetarian, meal times, multi-day plans and English, 12 Oct 2026): 24/24 pass the rule checks (budget, allergens, excluded ingredients, meal period, weekday, no urgency wording) with zero allergen violations, and the **Vertex AI Gen AI Evaluation Service** scores fulfillment 4.79/5 and groundedness 4.96/5. Report: [`doc/evaluation/assistant-evaluation.md`](doc/evaluation/assistant-evaluation.md).
 
 ---
 
@@ -324,7 +324,7 @@ BunnBaa/
 └── doc/                    # specs, test plan, developer guide (Chinese)
 ```
 
-Detailed developer notes (in Chinese), covering the data model, the full list of functions and environment details: [`doc/開發指南.md`](doc/開發指南.md). The Google Cloud design is in [`doc/GoogleCloud改動建議.md`](doc/GoogleCloud改動建議.md).
+Detailed developer notes (in Chinese), covering the data model, the full list of functions and environment details: [`doc/開發指南.md`](doc/開發指南.md). The Google Cloud design is in [`doc/AI與GoogleCloud設計.md`](doc/AI與GoogleCloud設計.md).
 
 ## Roadmap
 
