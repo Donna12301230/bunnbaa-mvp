@@ -4,12 +4,14 @@
 
 -- 1. Simulated background demand: seed data has only 0-3 portions per vendor per day, so the forecast would be flat. This generates 90 days of simulated portions per vendor,
 --    with a weekday effect (campus is quieter on weekends), rain (same day citywide, -15%), slow growth and ±10% noise. FARM_FINGERPRINT is the random source, so re-runs give the same result.
---    Once in production with enough real history, run DROP TABLE bunnbaa_analytics.demand_history_sim and daily_demand will contain only real data.
-CREATE OR REPLACE TABLE bunnbaa_analytics.demand_history_sim AS
+--    It is a view that runs from a fixed start date to yesterday, so it extends itself every day (a table built once stopped on the day it was created,
+--    and from then on "actual" dropped to real orders only while the forecast still expected hundreds). Growth counts from the fixed start date, so past days never change.
+--    Once in production with enough real history, run DROP VIEW bunnbaa_analytics.demand_history_sim and daily_demand will contain only real data.
+--    (Before 2026-10-13 this was a table; on such a dataset run DROP TABLE bunnbaa_analytics.demand_history_sim first.)
+CREATE OR REPLACE VIEW bunnbaa_analytics.demand_history_sim AS
 WITH days AS (
-  SELECT day, DATE_DIFF(CURRENT_DATE('Asia/Taipei'), day, DAY) AS days_ago
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE_SUB(CURRENT_DATE('Asia/Taipei'), INTERVAL 90 DAY),
-                                  DATE_SUB(CURRENT_DATE('Asia/Taipei'), INTERVAL 1 DAY))) AS day
+  SELECT day
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '2026-07-12', DATE_SUB(CURRENT_DATE('Asia/Taipei'), INTERVAL 1 DAY))) AS day
 ),
 vendors AS (
   SELECT document_id AS vendor_id
@@ -18,7 +20,7 @@ vendors AS (
 ),
 grid AS (
   SELECT
-    v.vendor_id, d.day, d.days_ago,
+    v.vendor_id, d.day,
     15 + MOD(ABS(FARM_FINGERPRINT(v.vendor_id)), 25) AS base,
     CASE EXTRACT(DAYOFWEEK FROM d.day) WHEN 1 THEN 0.4 WHEN 7 THEN 0.6 WHEN 6 THEN 1.1 ELSE 1.0 END AS weekday_factor,
     MOD(ABS(FARM_FINGERPRINT(CONCAT('rain-', CAST(d.day AS STRING)))), 100) < 25 AS rainy,
@@ -27,7 +29,7 @@ grid AS (
 )
 SELECT
   vendor_id, day, rainy,
-  GREATEST(0, CAST(ROUND(base * weekday_factor * IF(rainy, 0.85, 1.0) * (1 + 0.002 * (90 - days_ago)) * (1 + noise)) AS INT64)) AS locks
+  GREATEST(0, CAST(ROUND(base * weekday_factor * IF(rainy, 0.85, 1.0) * (1 + 0.002 * DATE_DIFF(day, DATE '2026-07-12', DAY)) * (1 + noise)) AS INT64)) AS locks
 FROM grid;
 
 -- 2. Daily demand per vendor: every lock is one portion of demand (resale, charity meals and no-shows count too, they all need prep); cancelled ones are not made and don't count.

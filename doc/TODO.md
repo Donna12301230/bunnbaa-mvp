@@ -15,15 +15,12 @@
 
 ## 🔴 A：消費者端＋後端
 
-- [ ] 正式站補設定資料：`node scripts/seed.js --config-only`（`landing_events`、`platform_config/growth` 還沒有）
-- [-] 過了取餐日仍是「已鎖定」：程式已改（未部署）——轉愛心餐／截止／取餐提醒改看當天 locks 自己的時段（`lockPeriodRangesOn`），functions-more 77/80（失敗是 V-INS 重跑污染＋F-19 時間限制）。正式站 53 筆過期示範單不清理（示範網站，10-13 決定）。待：部署 functions
-- [ ] 已從店家設定移除的取餐時段，上面的訂單不進備料時間軸（`prepPlans.timelines`），跟上一項同一個根因
+- [-] 已從店家設定移除的取餐時段，上面的訂單不進備料時間軸（`prepPlans.timelines`）：程式已改（未部署）——截單時沒有對應店家時段的餐期，改用該餐期訂單自己的取餐時段組出範圍（同 `lockPeriodRangesOn`）。10-13 emulator 驗證：仁和雅 6 份 → 「午餐・4 份」＋「晚餐 17:30-18:30・2 份」。待：推 master 自動部署
 - [ ] 「經典便當」模板候選菜數量不對（`seed-phase1.js`）
 - 測試：
   - [-] C-AST-17（PARTIAL）
   - [ ] C-MY-03、C-ORD-02（LINE Pay Sandbox 成功頁）
-  - [ ] 重測：C-MY-17、C-BNT-08、C-RWD-08、C-PLN-01、C-BNT-09、C-CHR-05
-  - [ ] 畫面待測：C-MTC-01、C-BNT-12、C-MEAL-01、C-BAN-02
+  - [ ] 重測：C-MY-17、C-BNT-08、C-PLN-01、C-BNT-09、C-CHR-05（文字已過，按預約與倒數待測）
   - [ ] 正式站限定：C-NAV-03、C-AUTH-04／05、C-CHR-06、C-MY-13、C-MTC-09、C-CHR-14、F-11、F-12、N-SEC-01～03、N-PRF-01
   - [ ] 端到端情境（第 9 章）至少跑 A、C、G
 - 正式站實際點過：
@@ -44,9 +41,9 @@
 - 測試：
   - [ ] P0：V-MNU-08／09、V-RDM-10
   - [ ] 正式站（Gemini）：V-MNU-03、V-MNU-08～13、V-MNU-17、V-RCP-04、V-PRP-07
-  - [ ] 其他：V-MNU-15、V-RCP-05、V-PRP-04、V-SET-08
+  - [ ] 其他：V-RCP-05（邏輯已過，畫面新增半成品待測）、V-SET-08
   - [-] V-PRP-11、V-SET-03
-  - [ ] 正式站限定：V-RDM-13／14／16、V-MNU-10、V-PUR-08、V-REV-06、A-AUD-01、A-DIS-08
+  - [ ] 正式站限定：V-RDM-13／14／16、V-MNU-10、V-MNU-15（emulator 權限直接放行測不了）、V-PUR-08、V-REV-06、A-AUD-01、A-DIS-08
   - [ ] 第二家店主：V-ACC-02、V-RDM-09、V-MNU-06；別家店主呼叫 `completePickup` 要回 `permission-denied`
 - 正式站實際點過：
   - [ ] 配方與原物料 → 菜單 → 今日備料 → 採購叫貨（LINE 傳送）→ 取餐掃碼 → 愛心餐 → 券負債 → 區域洞察
