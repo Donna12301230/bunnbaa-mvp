@@ -32,7 +32,7 @@ import { httpsCallable } from "@/lib/callable";
 import { MEAL_PERIODS, addDaysStr, bookableDateRange, cutoffAt, isPastCutoff, mealPeriodLabel, todayStr, vendorCutoffTime } from "@/lib/pickupSlots";
 import type { MealPeriod } from "@/types";
 import { PENDING_STATUSES } from "@/lib/lockOutcome";
-import { tr } from "@/lib/i18n";
+import { tr, loc } from "@/lib/i18n";
 import type { Lock } from "@/types";
 
 interface Timeline {
@@ -405,7 +405,7 @@ export default function VendorPortalPrep() {
       ? plan.components.map((c) => {
         const comp = compById[c.component_id];
         const n = Math.round(c.portions * 10) / 10;
-        return { key: c.component_id, name: c.name, sub: comp?.portion_grams ? `${comp.portion_grams}g × ${n}` : `× ${n}`, group: componentGroup(comp, ingById), detail: c.component_id };
+        return { key: c.component_id, name: loc(comp, "name") || c.name, sub: comp?.portion_grams ? `${comp.portion_grams}g × ${n}` : `× ${n}`, group: componentGroup(comp, ingById), detail: c.component_id };
       })
       : itemCounts.map(([name, n]) => ({ key: `item:${name}`, name, sub: tr(`${n} 份`, `× ${n}`), group: "other" as FoodGroup, detail: null as string | null }))
     : [];
@@ -531,14 +531,14 @@ export default function VendorPortalPrep() {
                   <CardContent className="p-4 space-y-2 text-sm">
                     {detailComp ? (
                       <>
-                        <p className="font-semibold">{detailComp.name}{tr("・", " · ")}{tr(`${Math.round(detailPortions * 10) / 10} 份`, `× ${detailPortions}`)}</p>
+                        <p className="font-semibold">{loc(detailComp, "name")}{tr("・", " · ")}{tr(`${Math.round(detailPortions * 10) / 10} 份`, `× ${detailPortions}`)}</p>
                         <p className="text-xs text-muted-foreground">{tr(`${detailComp.equipment}・每批 ${detailComp.batch_capacity} 份 → 做 ${Math.ceil(detailPortions / Math.max(1, detailComp.batch_capacity))} 批・每批 ${detailComp.prep_minutes} 分鐘`, `${detailComp.equipment} · ${Math.ceil(detailPortions / Math.max(1, detailComp.batch_capacity))} batch(es) × ${detailComp.prep_minutes} min`)}</p>
                         <RecipeCraft
                           items={detailComp.ingredients.flatMap((l) => {
                             const ing = ingById[l.ingredient_id];
                             return ing ? [{ id: l.ingredient_id, name: ing.name, need: rawAmount((l.grams || 0) * detailPortions, ing), unit: ing.unit || "g" }] : [];
                           })}
-                          target={{ name: detailComp.name, sub: tr(`${Math.round(detailPortions * 10) / 10} 份`, `× ${detailPortions}`) }}
+                          target={{ name: loc(detailComp, "name"), sub: tr(`${Math.round(detailPortions * 10) / 10} 份`, `× ${detailPortions}`) }}
                           compact
                         />
                         <button type="button" className="text-primary underline inline-flex items-center gap-0.5 text-xs" onClick={() => editComponent(detailComp.id)}><Pencil className="w-3 h-3" /> {tr("改配方", "Edit recipe")}</button>

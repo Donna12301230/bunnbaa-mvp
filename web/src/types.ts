@@ -366,6 +366,7 @@ export interface Ingredient {
 export interface Component {
   id: string;
   name: string;
+  name_en?: string; // Auto-translated by Functions (translateComponent)
   portion_grams: number;
   ingredients: { ingredient_id: string; grams: number }[];
   prep_minutes: number;

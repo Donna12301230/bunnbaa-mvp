@@ -62,6 +62,8 @@ const TRANSLATED_FIELDS = {
   // Reviews (the user's comment and department signature) and item names on draw records
   reviews: ["comment", "item_name", "reviewer_label"],
   draws: ["item_name"],
+  // Vendors' semi-finished items (vendors/{id}/components), shown on the prep page
+  components: ["name"],
 };
 
 module.exports = { translateTexts, translationPatch, TRANSLATED_FIELDS };

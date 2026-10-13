@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { Link2, Users } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { useVendorMenu } from "@/hooks/useVendorMenu";
 import { tr, loc } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import InfoTip from "@/components/InfoTip";
@@ -23,6 +24,9 @@ interface Segment {
 export default function CustomerInsightsCard({ vendorId }: { vendorId: string | undefined }) {
   const [pairs, setPairs] = useState<BasketPair[]>([]);
   const [segments, setSegments] = useState<Segment[]>([]);
+  const { data: menu = [] } = useVendorMenu(vendorId);
+  // basket pairs carry the original item names; show the translated name in the English UI when the item still exists
+  const itemName = (name: string) => loc(menu.find((m) => m.name === name), "name") || name;
 
   useEffect(() => {
     if (!vendorId) return;
@@ -69,7 +73,7 @@ export default function CustomerInsightsCard({ vendorId }: { vendorId: string | 
             </div>
             {pairs.map((p) => (
               <div key={`${p.item_a}|${p.item_b}`} className="flex items-center justify-between gap-2 text-sm">
-                <span className="min-w-0 truncate">{p.item_a} <span className="text-muted-foreground">＋</span> {p.item_b}</span>
+                <span className="min-w-0 truncate">{itemName(p.item_a)} <span className="text-muted-foreground">＋</span> {itemName(p.item_b)}</span>
                 <span className="shrink-0 text-muted-foreground"><b className="text-foreground">{p.buyers}</b> {tr("位客人", "customers")}</span>
               </div>
             ))}

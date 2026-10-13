@@ -20,6 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/comp
 import { Input } from "@/components/ui/input";
 import AreaPicker from "@/components/AreaPicker";
 import { setLang, useI18n } from "@/lib/i18n";
+import { demoDisplayName } from "@/lib/demoAccounts";
 import { avatarUrl } from "@/lib/avatar";
 import { setSearchQuery, useSearchQuery } from "@/lib/searchQuery";
 import { isClean } from "@/lib/searchFilter";
@@ -213,7 +214,7 @@ export default function MarketplaceHeader({ active }: { active?: MarketplaceTab 
               <DropdownMenuTrigger asChild>
                 <button type="button" className="flex items-center gap-1.5 text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <img src={avatarUrl(user.id)} alt="" className="w-5 h-5 rounded-full bg-secondary" />
-                  <span className="max-w-[80px] truncate hidden sm:inline">{user.displayName || user.username}</span>
+                  <span className="max-w-[80px] truncate hidden sm:inline">{demoDisplayName(user.email) || user.displayName || user.username}</span>
                   <ChevronDown className="w-3 h-3" />
                 </button>
               </DropdownMenuTrigger>

@@ -15,6 +15,12 @@ export interface DemoAccount {
 }
 
 /** A function, so labels are built in the current language on every render */
+/** English UI only: the demo accounts' stored display names are Chinese, so show the role label instead */
+export function demoDisplayName(email: string | undefined): string {
+  const account = email ? demoAccounts().find((a) => a.email === email) : undefined;
+  return account ? tr("", account.label) : "";
+}
+
 export function demoAccounts(): DemoAccount[] {
   const customer = { key: "customer" as const, email: "customer@bunnbaa.test", label: tr("顧客", "Diner"), hint: tr("訂餐、轉讓、成長獎勵", "Order, transfer, rewards") };
   const vendor = { key: "vendor" as const, email: "vendor@bunnbaa.test", password: "demo1234", label: tr("店家", "Vendor"), hint: tr("店家後台：訂單、備料、報表", "Vendor portal: orders, prep, reports") };

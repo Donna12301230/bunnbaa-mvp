@@ -215,11 +215,14 @@ export default function MyBookingsPage() {
   // Default list order: still-actionable items (locked / for resale / for gift) first, by pickup date nearest first;
   // finished items (picked up / cancelled / charity meal, etc.) after them, by pickup date newest first.
   const sortedLocks = useMemo(() => {
+    // An order whose pickup day has passed but was never settled is no longer actionable: list it with the finished ones
+    const today = todayStr();
+    const isActive = (l: Lock) => ACTIVE_STATUSES.has(l.status) && l.pickup_date >= today;
     const active = locks
-      .filter((l) => ACTIVE_STATUSES.has(l.status))
+      .filter(isActive)
       .sort((a, b) => a.pickup_date.localeCompare(b.pickup_date) || a.pickup_window.localeCompare(b.pickup_window));
     const past = locks
-      .filter((l) => !ACTIVE_STATUSES.has(l.status))
+      .filter((l) => !isActive(l))
       .sort((a, b) => b.pickup_date.localeCompare(a.pickup_date) || b.pickup_window.localeCompare(a.pickup_window));
     return [...active, ...past];
   }, [locks]);
