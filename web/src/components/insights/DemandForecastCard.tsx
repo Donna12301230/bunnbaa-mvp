@@ -16,6 +16,9 @@ interface DayForecast {
   model?: string;
 }
 
+// Locks that will be cooked that day (same set the prep page counts)
+const BOOKED_STATUSES = new Set(["locked", "for_resale", "for_gift", "charity", "fulfilled", "resold_and_fulfilled"]);
+
 const WEEKDAYS_ZH = ["日", "一", "二", "三", "四", "五", "六"];
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -30,6 +33,9 @@ function weekdayLabel(day: string) {
  */
 export default function DemandForecastCard({ vendorId }: { vendorId: string | undefined }) {
   const [days, setDays] = useState<DayForecast[]>([]);
+  const [booked, setBooked] = useState<number | null>(null);
+  const tomorrow = addDaysStr(todayStr(), 1);
+  const headDay = (days.find((d) => d.day === tomorrow) ?? days[0])?.day;
 
   useEffect(() => {
     if (!vendorId) return;
@@ -37,9 +43,15 @@ export default function DemandForecastCard({ vendorId }: { vendorId: string | un
     return onSnapshot(q, (snap) => setDays(snap.docs.map((d) => d.data() as DayForecast)), () => setDays([]));
   }, [vendorId]);
 
+  // Already booked for the headline day, so the estimate can be read against the real orders so far
+  useEffect(() => {
+    if (!vendorId || !headDay) return;
+    const q = query(collection(db, "locks"), where("vendor_id", "==", vendorId), where("pickup_date", "==", headDay));
+    return onSnapshot(q, (snap) => setBooked(snap.docs.filter((d) => BOOKED_STATUSES.has(d.data().status)).length), () => setBooked(null));
+  }, [vendorId, headDay]);
+
   if (days.length === 0) return null;
-  const tomorrow = addDaysStr(todayStr(), 1);
-  const head = days.find((d) => d.day === tomorrow) ?? days[0];
+  const head = days.find((d) => d.day === headDay) ?? days[0];
   const max = Math.max(...days.map((d) => d.upper || d.forecast), 1);
 
   return (
@@ -54,6 +66,11 @@ export default function DemandForecastCard({ vendorId }: { vendorId: string | un
           <p className="text-sm text-muted-foreground">{head.day === tomorrow ? tr("明天", "Tomorrow") : head.day.slice(5)}</p>
           <p className="text-4xl font-bold tabular-nums">{head.forecast}<span className="ml-1 text-base font-normal text-muted-foreground">{tr("份（參考）", "meals (estimate)")}</span></p>
           <p className="text-xs text-muted-foreground">{tr(`大約 ${head.lower}–${head.upper} 份`, `Roughly ${head.lower}–${head.upper}`)}</p>
+          {booked !== null && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {tr(`目前已訂 ${booked} 份，截單前還會增加；預估是依過去訂單推算最後大概會到多少。`, `${booked} booked so far. More come in until the cut-off; the estimate is where past orders suggest it will end up.`)}
+            </p>
+          )}
         </div>
         <div className="grid grid-cols-7 gap-1 items-end h-24" aria-label={tr("每日預估份數", "Daily forecast")}>
           {days.map((d) => (

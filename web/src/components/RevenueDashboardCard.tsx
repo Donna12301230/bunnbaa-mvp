@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { MEAL_PERIODS, mealPeriodLabel, todayStr } from "@/lib/pickupSlots";
 import { cn } from "@/lib/utils";
 import InfoTip from "@/components/InfoTip";
 import { useVendorCatalog } from "@/hooks/useVendorCatalog";
+import { useVendorMenu } from "@/hooks/useVendorMenu";
 import { GROUP_DOT, ingredientGroup } from "@/lib/foodColors";
 import { queryClient } from "@/lib/queryClient";
 import { myVendorDocKey } from "@/hooks/useMyVendor";
@@ -75,6 +76,9 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
   const [costsOpen, setCostsOpen] = useState(false);
   const autoRefreshed = useRef(false);
   const { data: catalog } = useVendorCatalog(vendor?.id);
+  // item_margins stores the Chinese item name; the English UI reads the menu item's translated name
+  const { data: menuItems = [] } = useVendorMenu(vendor?.id);
+  const itemName = (id: string, name: string) => loc(menuItems.find((i) => i.id === id), "name") || name;
 
   useEffect(() => {
     if (!vendor?.id) return;
@@ -247,7 +251,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                       return (
                         <li key={`${m.menu_item_id}-${m.name}`} className="space-y-0.5">
                           <div className={cn("flex justify-between gap-2 text-sm", m.warn && "text-danger-text font-semibold")}>
-                            <span className="truncate">{m.warn && <AlertTriangle className="inline w-3.5 h-3.5 mr-0.5" />}{m.name}</span>
+                            <span className="truncate">{m.warn && <AlertTriangle className="inline w-3.5 h-3.5 mr-0.5" />}{itemName(m.menu_item_id, m.name)}</span>
                             <span className="tabular-nums shrink-0">+${m.margin}</span>
                           </div>
                           <div className="flex h-2.5 overflow-hidden rounded-full" role="img" aria-label={tr(`售價 ${m.discounted_price}，材料 ${m.material_cost}`, `price ${m.discounted_price}, materials ${m.material_cost}`)}>
