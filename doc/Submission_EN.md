@@ -84,7 +84,7 @@ Every Firestore write streams into **BigQuery** (official *Stream Firestore to B
 - Analytics: **BigQuery** (`bunnbaa_analytics`, asia-east1) fed by the *Stream Firestore to BigQuery* extension; **BigQuery AI** `AI.FORECAST`, `ML.KMEANS`, `AI.GENERATE`; **Looker Studio** dashboard; forecasts and segments are written back to Firestore so the apps stay real-time.
 - Evaluation: **Vertex AI Gen AI Evaluation Service** (`evaluateInstances`) on a 24-question assistant test set.
 - Payments: LINE Pay request / confirm / refund (sandbox).
-- Quality (12 Oct 2026): 64/64 business-logic tests, 65/65 Firestore security-rule tests and 144/144 Cloud Functions tests passing (time-dependent tests need to run after 20:00 Taipei time).
+- Quality (13 Oct 2026): 64/64 business-logic tests, 65/65 Firestore security-rule tests and 151/151 Cloud Functions tests passing (time-dependent tests need to run after 20:00 Taipei time).
 
 ### Impact
 
@@ -96,7 +96,7 @@ Every Firestore write streams into **BigQuery** (official *Stream Firestore to B
 
 - **Running on Google Cloud today**: https://bunnbaa-mvp-5474.web.app, with 81 Cloud Functions (2nd gen, on Cloud Run) and daily BigQuery AI jobs, deployed automatically from GitHub Actions.
 - **All three roles are built end to end**: diner app (pre-order, pay, resell, gift, donate, QR pickup), vendor portal (photo-to-menu, prep and purchase lists, forecast, QR scanning, payouts), and admin console (vendor approval, platform settings, impact dashboard).
-- **Tested**: 64 business-logic tests, 144 Cloud Functions tests, 65 Firestore security-rule tests, and a 24-question evaluation of the AI assistant (24/24 rule checks; Vertex AI Gen AI Evaluation Service scores 4.79/5 fulfillment, 4.96/5 groundedness).
+- **Tested**: 64 business-logic tests, 151 Cloud Functions tests, 65 Firestore security-rule tests, and a 24-question evaluation of the AI assistant (24/24 rule checks; Vertex AI Gen AI Evaluation Service scores 4.79/5 fulfillment, 4.96/5 groundedness).
 - **Real-world constraints handled**: LINE Pay request, confirm and refund flows; time-zone-aware cut-offs; refunds as platform points; usage limits on the AI assistant.
 - **Low adoption cost**: a vendor onboards with one photo of a paper menu and pays no monthly fee, only 5% per meal sold.
 
@@ -117,12 +117,12 @@ Record on the live site. Prepare beforehand: a diner account and a vendor accoun
 | Time | Screen | Voice-over |
 |---|---|---|
 | 0:00–0:15 | Cover slide, then the home page | "Small eateries buy ingredients before anyone orders. Too much and food is wasted; too little and customers leave. BunnBaa fixes that: diners pay ahead to lock a meal, and the earlier they lock, the cheaper it is." |
-| 0:15–0:45 | **Vendor portal → Menu → Photo listing.** Photograph the paper menu; drafts appear; edit one allergen; confirm | "Onboarding takes one photo. Gemini's vision model reads the menu and drafts every item — name, English name, price, dietary tags and allergens. Nothing goes live until the owner confirms it." |
+| 0:15–0:45 | **Vendor portal → Menu → From a photo.** Photograph the paper menu; drafts appear; edit one allergen; confirm | "Onboarding takes one photo. Gemini's vision model reads the menu and drafts every item — name, English name, price, dietary tags and allergens. Nothing goes live until the owner confirms it." |
 | 0:45–1:20 | **Diner home → assistant.** Type "Lunch next Monday to Friday, Da'an, under 120, no beef"; cards appear; open one; show the date/price row with the early-bird price; check out with LINE Pay sandbox | "Diners don't have to browse ten shops. They just ask. Gemini calls our server-side tools to check menus, availability and meal plans, and returns meals they can actually book. It suggests; it never buys. Booking two days ahead saves 20 percent." |
 | 1:20–1:55 | **My meals → Transfer → list for resale.** Switch to the second diner's phone: push notification arrives; tap; pay; first diner sees the refund as platform points | "Plans change. Instead of wasting the meal, the diner lists it for resale. Gemini embeddings and Firestore vector search find people nearby who like similar food, and we notify them. The new buyer pays, and the original buyer is refunded automatically as platform points. That's a meal rescued — and we count every one." |
-| 1:55–2:25 | **Vendor portal → Daily prep**, then **Reports → Revenue**: the 7-day forecast card and "who your regulars are" | "After the 20:00 cut-off, the vendor has an exact count and a ready-made prep and purchase list. For the days after that, BigQuery's TimesFM model forecasts demand, and k-means groups the regulars, with Gemini naming each group. AI advises; the vendor decides." |
+| 1:55–2:25 | **Vendor portal → Today's prep**, then **Reports & insights → Revenue**: the 7-day forecast card and "who your regulars are" | "After the 20:00 cut-off, the vendor has an exact count and a ready-made prep and purchase list. For the days after that, BigQuery's TimesFM model forecasts demand, and k-means groups the regulars, with Gemini naming each group. AI advises; the vendor decides." |
 | 2:25–2:40 | **Pickup.** Diner shows QR; vendor scans with camera; "picked up". Briefly show the charity-meal tab | "At the counter, a signed QR code is scanned. Any meal still unclaimed becomes a free charity meal, so it still feeds someone." |
-| 2:40–3:00 | **Admin → Analytics** (Looker Studio: meals saved, forecast vs. actual), architecture slide, closing slide | "Every booking streams into BigQuery, so we can show meals saved and how close the forecast was. BunnBaa runs entirely on Google Cloud: Gemini on Vertex AI, Cloud Run functions, Firestore with vector search, BigQuery AI and Looker Studio — and we test the assistant with Vertex AI's evaluation service. Cook what's ordered. Eat what's cooked." |
+| 2:40–3:00 | **Admin → Dashboard** (Looker Studio: meals saved, forecast vs. actual), architecture slide, closing slide | "Every booking streams into BigQuery, so we can show meals saved and how close the forecast was. BunnBaa runs entirely on Google Cloud: Gemini on Vertex AI, Cloud Run functions, Firestore with vector search, BigQuery AI and Looker Studio — and we test the assistant with Vertex AI's evaluation service. Cook what's ordered. Eat what's cooked." |
 
 Tips: record at 1080p, keep the browser zoomed so text is readable, cut waiting time (LINE Pay redirects, push delivery), and add English captions.
 
@@ -134,14 +134,14 @@ Tips: record at 1080p, keep the browser zoomed so text is readable, cut waiting 
 - [ ] Export the deck to PDF (Share › Export › PDF)
 - [x] Deploy the latest Functions and Hosting (10 Oct: Vertex AI, BigQuery sync, forecast, segments, assistant insights tool)
 - [x] Run `backfillMenuEmbeddings` once so resale matching works on existing items (12 Oct)
-- [ ] Build the Looker Studio report from Admin → Analytics, enable embedding and paste the embed URL back
+- [x] Build the Looker Studio report from Admin → Dashboard, enable embedding and paste the embed URL back (13 Oct)
 - [x] Ask the pre-order assistant one question on the live site (first live call through Vertex AI, 12 Oct)
 - [ ] Screenshot the evaluation summary ([`assistant-evaluation.md`](evaluation/assistant-evaluation.md)) for the deck
 - [x] Update the architecture slide: Firestore →(extension)→ BigQuery → BigQuery AI / Looker Studio, forecasts written back to Firestore → vendor portal
 - [ ] Check the four AI features on the live site (see `TODO.md`)
 - [ ] Record and upload the 3-minute video as public / unlisted-with-link
 - [ ] Make sure the live site works without logging in as an admin (judges will open it)
-- [ ] Run the admin console's "Backfill translations" so vendor and dish names show in English on production (the English UI otherwise shows Chinese names)
+- [x] Run the admin console's "Translate existing data" (System settings) so vendor and dish names show in English on production (13 Oct)
 
 ### Against the official requirements
 
@@ -154,5 +154,5 @@ Tips: record at 1080p, keep the browser zoomed so text is readable, cut waiting 
 | Public 3-minute video (YouTube / Vimeo / public Google Drive) | §2 script | [ ] Upload, then test the link in a logged-out window |
 | Category stated | §1: **Sustainability** | [ ] Tick only Sustainability on the form |
 | Everything in English: code, docs, presentation | README, this file, deck, video (narration + captions) are English; the UI defaults to English for non-Chinese browsers and `?lang=en` forces it | Code comments translated to English (263 files, comment-only; the Chinese left in comments is text the code outputs or matches, on-screen labels, the brand name and Chinese doc file names). UI strings stay bilingual by design. **Remaining gap:** Chinese-only developer docs in `doc/` (spec, test plan, developer guide, AI/Google Cloud design, security, TODO); move them out of the public repo or label them as internal notes. English versions exist for the evaluation report (`evaluation/assistant-evaluation.md`) and `bigquery/README.md` |
-| Judges can try all three roles | Login page "Demo accounts" button; README Try it | Diner: done (`customer@bunnbaa.test`). [ ] Vendor: no production demo account yet, so judges can't open the vendor portal (photo-to-menu, prep lists, forecast). Admin: deliberately not offered |
+| Judges can try all three roles | Login page "Demo accounts" button; README Try it | Done: Diner (`customer@bunnbaa.test`) and Vendor (`vendor@bunnbaa.test`, owns the demo store 仁和雅咖啡) both have one-tap sign-in on production. Admin: deliberately not offered |
 | Repository accessible | GitHub | Done: public at https://github.com/Donna12301230/bunnbaa-mvp |

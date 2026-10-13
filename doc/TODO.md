@@ -25,7 +25,7 @@
   - [ ] 真機：定位、取餐提醒推播、OTP 簡訊
 - 收尾：
   - [ ] 清測試資料：`customer@bunnbaa.test` 的「A方案」5 筆 locks（`3FISlB1jhR7o8hVo4YHo`、`4XYmoY4zyhT1kFaHATzz`、`JBeV9Xc7C58da8YF09xv`、`GtAMfgcFRBymMQ2cdjXh`、`jNnDK42dOdMF75jckhWe`）、`ban_appeals/lI5dGTVtIBfByBIUTy3W`、10/13 C-ORD-02 的 4 筆 locks（`84nMRBcwCI0CWHKXwuLG`、`K7ZSCHK6IG9WGhc83CT0`、`ivjPhVtFPhNYjNDnrRvs`、`s8uliaWvdgCygIRBWEA4`，10/16 取餐）、10/13 端到端的滷雞腿便當 2 筆（10/19 取餐號 8752 已取消；10/20 取餐號 0144，捐出後就不用清）、`EJEL6PRO`（可選）
-  - [ ] 最後核對 README 數字（Functions 81、logic 64、rules 65、Functions 測試 144）。10/13 新增 `translateComponent`，80 → 81，兩份 README、`Submission_EN.md`、開發指南已改
+  - [ ] 最後核對 README 數字（Functions 81、logic 64、rules 65、Functions 測試 151）。10/13 新增 `translateComponent`，80 → 81；Functions 測試 144 → 151（10/13 跑過）；兩份 README、`Submission_EN.md` 已改
   - [ ] B 在 10/13 動了 A 區的檔案，請看一眼：`functions/src/index.js`／`translate.js`（半成品名稱翻譯）、`MyBookingsPage.tsx`（取餐日已過仍「已鎖定」的訂單排到已結束區）、`MarketplaceHeader.tsx`（英文介面體驗帳號顯示 Diner／Vendor）、`NotificationBell.tsx`（關閉選單時整批標已讀）
   - [ ] 清測試資料（可選）：`customer@bunnbaa.test` 有一筆 9/23、NT$0、狀態仍是「已鎖定」的舊單
   - [-] 報名表單
