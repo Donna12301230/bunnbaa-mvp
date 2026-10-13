@@ -669,7 +669,7 @@ exports.cancelLock = onCall({}, async (request) => {
  * Diner cancellation (revised 2026-10-05): no cash refund; instead a coupon for this vendor (30% of the list price, valid for couponValidDays days).
  * The money stays with the vendor (kept_amount); any coupon used on the order is still returned (not if expired); portions and wish counts are rolled back.
  * The whole thing runs in a transaction, so a double click issues only one coupon. Cancellations not caused by the diner (e.g. work-suspension days) still use cancelAndRefund for a full refund.
- * Whether this coupon stacks with other discounts is still undecided (doc/TODO.md): for now it's like a regular coupon, one per meal, with early-bird pricing still applied.
+ * Stacking (decided 2026-10-13): like a regular coupon, one per meal, with early-bird pricing still applied.
  */
 async function cancelForCoupon(lockRef, config) {
   const couponRef = db().collection("coupons").doc();
