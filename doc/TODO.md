@@ -15,9 +15,8 @@
 
 ## 🔴 A：消費者端＋後端
 
-- [-] 已從店家設定移除的取餐時段，上面的訂單不進備料時間軸（`prepPlans.timelines`）：程式已改（未部署）——截單時沒有對應店家時段的餐期，改用該餐期訂單自己的取餐時段組出範圍（同 `lockPeriodRangesOn`）。10-13 emulator 驗證：仁和雅 6 份 → 「午餐・4 份」＋「晚餐 17:30-18:30・2 份」。待：推 master 自動部署
 - 測試：
-  - [-] C-AST-17（PARTIAL）
+  - [-] C-AST-17（PARTIAL）：畫面、拖曳關閉已過；鍵盤遮擋已加 `visualViewport` 防護（未部署），待 iOS＋Android 實機各點一次助理輸入框
   - [ ] C-MY-03、C-ORD-02（LINE Pay Sandbox 成功頁）
   - [ ] 重測：C-MY-17、C-BNT-08、C-PLN-01、C-BNT-09、C-CHR-05（文字已過，按預約與倒數待測）
   - [ ] 正式站限定：C-NAV-03、C-AUTH-04／05、C-CHR-06、C-MY-13、C-MTC-09、C-CHR-14、F-11、F-12、N-SEC-01～03、N-PRF-01
