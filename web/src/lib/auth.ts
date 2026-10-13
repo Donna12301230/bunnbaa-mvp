@@ -176,9 +176,13 @@ function assertValidNewPassword(password: string) {
 }
 
 export async function login(email: string, password: string): Promise<void> {
-  if (!email.trim() || !password) throw new Error(tr("請輸入 Email 與密碼", "Please enter your email and password"));
+  // Sign-up rejects passwords with leading/trailing spaces (assertValidNewPassword), so a space around either field
+  // at sign-in is always a typing or paste slip: strip it instead of failing with "wrong email or password".
+  const cleanEmail = email.replace(/\s+/g, "");
+  const cleanPassword = password.trim();
+  if (!cleanEmail || !cleanPassword) throw new Error(tr("請輸入 Email 與密碼", "Please enter your email and password"));
   try {
-    await signInWithEmailAndPassword(auth, email.trim(), password);
+    await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
   } catch (err) {
     throw friendlyAuthError(err);
   }

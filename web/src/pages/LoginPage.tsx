@@ -23,6 +23,9 @@ import { ShoppingBag, Clock, Tag, Store, Eye, EyeOff, Smartphone, Mail, ShieldCh
 // Ported from BunnBaa Parse_Ref's client/src/pages/landing.tsx.
 // Sign-in / sign-up / forgot password use real Firebase Auth (@/lib/auth); sign-in is by email.
 // The "Account" field is only a fallback name when no display name is given.
+/** Emails never contain whitespace: drop it as typed or pasted, so a stray space can't break sign-in */
+const noSpaces = (value: string) => value.replace(/\s+/g, "");
+
 export default function LoginPage() {
   // Shared sign-in fields
   const [username, setUsername] = useState("");
@@ -228,12 +231,12 @@ export default function LoginPage() {
                     <form onSubmit={(e) => { e.preventDefault(); loginMutation.mutate(); }} className="space-y-3 max-w-xs mx-auto">
                       <div>
                         <Label>Email</Label>
-                        <Input autoComplete="username" type="email" placeholder={tr("請輸入 Email", "Your email")} value={username} onChange={e => setUsername(e.target.value)} required />
+                        <Input autoComplete="username" type="email" placeholder={tr("請輸入 Email", "Your email")} value={username} onChange={e => setUsername(noSpaces(e.target.value))} required />
                       </div>
                       <div>
                         <Label>{tr("密碼", "Password")}</Label>
                         <div className="relative mt-1">
-                          <Input autoComplete="current-password" type={showPassword ? "text" : "password"} placeholder={tr("請輸入密碼", "Your password")} value={password} onChange={e => setPassword(e.target.value)} required className="pr-11" />
+                          <Input autoComplete="current-password" type={showPassword ? "text" : "password"} placeholder={tr("請輸入密碼", "Your password")} value={password} onChange={e => setPassword(e.target.value.trimStart())} onBlur={e => setPassword(e.target.value.trim())} required className="pr-11" />
                           <button type="button" aria-label={showPassword ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowPassword(v => !v)}>
                             {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                           </button>
@@ -396,13 +399,13 @@ export default function LoginPage() {
                       </div>
                       <div>
                         <Label>Email *</Label>
-                        <Input autoComplete="email" type="email" placeholder={tr("電子信箱", "Email address")} value={regEmail} onChange={e => setRegEmail(e.target.value)} required />
+                        <Input autoComplete="email" type="email" placeholder={tr("電子信箱", "Email address")} value={regEmail} onChange={e => setRegEmail(noSpaces(e.target.value))} required />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label>{tr("密碼 *", "Password *")}</Label>
                           <div className="relative mt-1">
-                            <Input autoComplete="new-password" type={showRegPassword ? "text" : "password"} placeholder={tr("至少 6 位", "At least 6 characters")} value={regPassword} onChange={e => setRegPassword(e.target.value)} required className="pr-11" />
+                            <Input autoComplete="new-password" type={showRegPassword ? "text" : "password"} placeholder={tr("至少 6 位", "At least 6 characters")} value={regPassword} onChange={e => setRegPassword(e.target.value.trimStart())} onBlur={e => setRegPassword(e.target.value.trim())} required className="pr-11" />
                             <button type="button" aria-label={showRegPassword ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showRegPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowRegPassword(v => !v)}>
                               {showRegPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
@@ -411,7 +414,7 @@ export default function LoginPage() {
                         <div>
                           <Label>{tr("確認密碼 *", "Confirm password *")}</Label>
                           <div className="relative mt-1">
-                            <Input autoComplete="new-password" type={showRegConfirm ? "text" : "password"} placeholder={tr("再輸入一次", "Enter it again")} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required className="pr-11" />
+                            <Input autoComplete="new-password" type={showRegConfirm ? "text" : "password"} placeholder={tr("再輸入一次", "Enter it again")} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value.trimStart())} onBlur={e => setConfirmPassword(e.target.value.trim())} required className="pr-11" />
                             <button type="button" aria-label={showRegConfirm ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showRegConfirm} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowRegConfirm(v => !v)}>
                               {showRegConfirm ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
@@ -517,13 +520,13 @@ export default function LoginPage() {
                       </div>
                       <div>
                         <Label>{tr("Email *（登入用）", "Email * (for signing in)")}</Label>
-                        <Input autoComplete="username" type="email" placeholder={tr("電子信箱", "Email address")} value={vendorEmail} onChange={e => setVendorEmail(e.target.value)} required />
+                        <Input autoComplete="username" type="email" placeholder={tr("電子信箱", "Email address")} value={vendorEmail} onChange={e => setVendorEmail(noSpaces(e.target.value))} required />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label>{tr("密碼 *", "Password *")}</Label>
                           <div className="relative mt-1">
-                            <Input autoComplete="new-password" type={showVendorPassword ? "text" : "password"} placeholder={tr("至少 6 位", "At least 6 characters")} value={vendorPassword} onChange={e => setVendorPassword(e.target.value)} required className="pr-11" />
+                            <Input autoComplete="new-password" type={showVendorPassword ? "text" : "password"} placeholder={tr("至少 6 位", "At least 6 characters")} value={vendorPassword} onChange={e => setVendorPassword(e.target.value.trimStart())} onBlur={e => setVendorPassword(e.target.value.trim())} required className="pr-11" />
                             <button type="button" aria-label={showVendorPassword ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showVendorPassword} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowVendorPassword(v => !v)}>
                               {showVendorPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
@@ -532,7 +535,7 @@ export default function LoginPage() {
                         <div>
                           <Label>{tr("確認密碼 *", "Confirm password *")}</Label>
                           <div className="relative mt-1">
-                            <Input autoComplete="new-password" type={showVendorConfirm ? "text" : "password"} placeholder={tr("再輸入一次", "Enter it again")} value={vendorConfirmPassword} onChange={e => setVendorConfirmPassword(e.target.value)} required className="pr-11" />
+                            <Input autoComplete="new-password" type={showVendorConfirm ? "text" : "password"} placeholder={tr("再輸入一次", "Enter it again")} value={vendorConfirmPassword} onChange={e => setVendorConfirmPassword(e.target.value.trimStart())} onBlur={e => setVendorConfirmPassword(e.target.value.trim())} required className="pr-11" />
                             <button type="button" aria-label={showVendorConfirm ? tr("隱藏密碼", "Hide password") : tr("顯示密碼", "Show password")} aria-pressed={showVendorConfirm} className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setShowVendorConfirm(v => !v)}>
                               {showVendorConfirm ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                             </button>
@@ -569,7 +572,7 @@ export default function LoginPage() {
                 type="email"
                 placeholder="example@mail.com"
                 value={resetEmail}
-                onChange={e => setResetEmail(e.target.value)}
+                onChange={e => setResetEmail(noSpaces(e.target.value))}
               />
             </div>
           </div>
