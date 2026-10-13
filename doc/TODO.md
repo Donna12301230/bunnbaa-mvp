@@ -15,7 +15,7 @@
 - 測試：
   - [-] C-AST-17（PARTIAL）：畫面、拖曳關閉已過；鍵盤遮擋已加 `visualViewport` 防護（未部署），待 iOS＋Android 實機各點一次助理輸入框
   - [ ] 重測：C-MY-17、C-BNT-08、C-PLN-01、C-BNT-09、C-CHR-05（文字已過，按預約與倒數待測）
-  - [ ] 正式站限定：C-NAV-03（先跑 `seed.js --config-only`）、C-AUTH-04／05、C-CHR-06、C-MTC-09（部署修正後複測通知）、C-CHR-14、F-11、F-12、N-SEC-02、N-SEC-03、N-PRF-01
+  - [ ] 正式站限定：C-NAV-03（先跑 `seed.js --config-only`）、C-AUTH-04／05、C-CHR-06、C-MTC-09（部署修正後複測通知）、C-CHR-14、F-11、F-12、N-SEC-02（部署 CSP 修正後，登入走一次含 FCM／LINE Pay）、N-SEC-03、N-PRF-01（FAIL，TTI 11.2s，要不要優化再決定）
   - [ ] 端到端情境（第 9 章）至少跑 A、C、G
 - 正式站實際點過：
   - [ ] 組便當 → 購物車套券 → LINE Pay → 我的餐點（QR、修改、取消、代領碼、捐愛心餐）
