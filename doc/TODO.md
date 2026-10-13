@@ -15,9 +15,7 @@
 
 ## 🔴 A：消費者端＋後端
 
-- [ ] 正式站補設定資料：`node scripts/seed.js --config-only`（`landing_events`、`platform_config/growth` 還沒有）
-- [-] 過了取餐日仍是「已鎖定」：程式已改（未部署）——轉愛心餐／截止／取餐提醒改看當天 locks 自己的時段（`lockPeriodRangesOn`），functions-more 77/80（失敗是 V-INS 重跑污染＋F-19 時間限制）。正式站 53 筆過期示範單不清理（示範網站，10-13 決定）。待：部署 functions
-- [ ] 已從店家設定移除的取餐時段，上面的訂單不進備料時間軸（`prepPlans.timelines`），跟上一項同一個根因。10-13 emulator 重現：仁和雅今天 6 份，2 份在 `17:30-18:30`（店家已無晚餐時段）→ 畫面「6 份要做」但時間軸只有「午餐・4 份」
+- [-] 已從店家設定移除的取餐時段，上面的訂單不進備料時間軸（`prepPlans.timelines`）：程式已改（未部署）——截單時沒有對應店家時段的餐期，改用該餐期訂單自己的取餐時段組出範圍（同 `lockPeriodRangesOn`）。10-13 emulator 驗證：仁和雅 6 份 → 「午餐・4 份」＋「晚餐 17:30-18:30・2 份」。待：推 master 自動部署
 - [ ] 「經典便當」模板候選菜數量不對（`seed-phase1.js`）
 - 測試：
   - [-] C-AST-17（PARTIAL）

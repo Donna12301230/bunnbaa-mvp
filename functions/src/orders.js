@@ -23,7 +23,7 @@ const { loadPlatformConfig } = require("./config");
 const { requestPayment, confirmPayment, refundPayment } = require("./linePay");
 const {
   validatePickup, planPickupDates, applyEarlyBirdPrice, vendorSlotCapacity, cutoffAt, isPastCutoff,
-  cancelDeadlineAt, cancelCouponAmount, mealPeriodOf, mealPeriodLabel, vendorPeriodRanges, MEAL_PERIODS,
+  cancelDeadlineAt, cancelCouponAmount, mealPeriodOf, mealPeriodLabel, vendorPeriodRanges, rangeOf, MEAL_PERIODS,
 } = require("./pricing");
 const { isBento, resolveChoices, resolveMain, resolveExtraSide, resolveCustomPicks, adjustAmount, RICE_OPTIONS } = require("./bento");
 const { ACTIVE_LOCK_STATUSES, componentPortions, rawNeeds, buildTimeline, buildLabels } = require("./prep");
@@ -1432,7 +1432,13 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
   const timelines = {};
   for (const period of MEAL_PERIODS) {
     const periodLocks = locks.filter((l) => (l.meal_period || mealPeriodOf(l.pickup_window, config)) === period);
-    if (periodLocks.length === 0 || !periodRanges[period]) continue;
+    if (periodLocks.length === 0) continue;
+    // A period the vendor has since removed from its settings still has locks: span them by their own pickup slots (same as lockPeriodRangesOn)
+    if (!periodRanges[period]) {
+      const windows = periodLocks.map((l) => l.pickup_window).filter(Boolean);
+      if (windows.length === 0) continue;
+      periodRanges[period] = rangeOf(windows);
+    }
     const periodPortions = componentPortions(periodLocks, catalog.itemsById, catalog.componentsById, config);
     timelines[period] = { ...buildTimeline(periodPortions, catalog.componentsById, splitWindow(periodRanges[period]).start), range: periodRanges[period], order_count: periodLocks.length };
   }

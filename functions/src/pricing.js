@@ -249,7 +249,7 @@ function windowMinutes(window) {
 
 module.exports = {
   EARLY_BIRD_TIERS, DEFAULT_PICKUP_WINDOWS, MEAL_PERIODS, mealPeriodOf, mealPeriodLabel, itemMealPeriods, itemWindows,
-  vendorPeriodRanges, isValidWindow, vendorWindows, vendorPickupRange, vendorCutoffTime,
+  vendorPeriodRanges, rangeOf, isValidWindow, vendorWindows, vendorPickupRange, vendorCutoffTime,
   cutoffAt, isPastCutoff, cancelDeadlineAt, cancelCouponAmount, commissionOf, revenueOf, PAID_STATUSES, closedReason, validatePickup, planPickupDates, applyEarlyBirdPrice, earlyBirdPercent,
   vendorSlotCapacity, windowMinutes,
 };
