@@ -26,7 +26,7 @@ import { usePlatformConfig } from "@/lib/platformConfig";
 import { netOfCommission, withCommission } from "@/lib/pricing";
 import type { MenuItem } from "@/types";
 import { ALLERGEN_LIST, DIETARY_TAGS, tagEn } from "@/types";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState, Switch, Tag } from "@/components/ds";
@@ -52,12 +52,15 @@ interface MenuDraft {
   name_en: string;
   price: number | null;
   category: string;
+  category_en?: string;
   dietary_tags: string[];
   allergens: string[];
   description: string;
 }
 
-const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", catalog: "", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
+// Blank category saves as "一般" (General); the field starts empty so the English UI doesn't open with Chinese in it
+const DEFAULT_CATEGORY = "一般";
+const EMPTY_FORM = { name: "", description: "", price: "", category: "", catalog: "", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
 
 // English name / description: Functions translate them automatically (translateMenuItem), and vendors can also edit them by hand.
 // A manually edited field sets i18n_src to the current Chinese, so the trigger treats it as "already translated" and won't overwrite it;
@@ -161,7 +164,7 @@ export default function VendorPortalMenu() {
         description: form.description,
         // When a bento has several mains, price stores the lowest main price (card shows "From $50", legacy code compatibility)
         price: bento.itemType === "bento" && mains.length > 0 ? Math.min(...mains.map((m) => m.price)) : Number(form.price),
-        category: form.category,
+        category: form.category.trim() || DEFAULT_CATEGORY,
         catalog: form.catalog.trim() || null,
         is_available: form.isAvailable,
         image: form.image || null, // Firestore SDK throws on `undefined` field values
@@ -406,8 +409,8 @@ export default function VendorPortalMenu() {
                 <div key={`${d.name}-${i}`} className="flex items-center gap-3 bg-card rounded-lg border px-3 py-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium">{d.name}</span>
-                      <span className="text-xs text-muted-foreground">{d.category}</span>
+                      <span className="font-medium">{tr(d.name, d.name_en || d.name)}</span>
+                      <span className="text-xs text-muted-foreground">{tr(d.category, d.category_en || d.category)}</span>
                       {d.dietary_tags.map((tag) => <Badge key={tag} variant="outline" className="text-xs text-success-text border-success/40">{tr(tag, tagEn(tag))}</Badge>)}
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -441,10 +444,10 @@ export default function VendorPortalMenu() {
               <div key={key}>
                 {hasCatalogs && first && (
                   <p className="mb-4 flex items-center gap-2 border-b border-ink pb-2 font-heading text-xl font-semibold">
-                    <FolderTree className="w-5 h-5 text-primary" aria-hidden="true" />{catalogName || tr("未分目錄", "No catalog")}
+                    <FolderTree className="w-5 h-5 text-primary" aria-hidden="true" />{catalogName ? loc(sectionItems[0], "catalog") || catalogName : tr("未分目錄", "No catalog")}
                   </p>
                 )}
-                <h2 className="font-heading text-2xl font-semibold mb-3">{cat}</h2>
+                <h2 className="font-heading text-2xl font-semibold mb-3">{loc(sectionItems[0], "category") || cat}</h2>
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   {sectionItems.map(item => (
                     <Card key={item.id}>
@@ -455,7 +458,7 @@ export default function VendorPortalMenu() {
                         })()}
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <button type="button" className="font-heading text-lg font-semibold text-left hover:underline" onClick={() => openEdit(item)}>{item.name}</button>
+                            <button type="button" className="font-heading text-lg font-semibold text-left hover:underline" onClick={() => openEdit(item)}>{loc(item, "name")}</button>
                             {!item.is_available && <Badge variant="secondary" className="text-xs">{tr("已下架", "Unavailable")}</Badge>}
                             {hasAiDraft(item) && (
                               <Badge variant="outline" className="text-xs text-accent-foreground border-brand/40"><Sparkles className="w-3 h-3 mr-0.5" />{tr("AI 草稿", "AI draft")}</Badge>
@@ -489,13 +492,13 @@ export default function VendorPortalMenu() {
                           })()}
                         </div>
                         <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" className="w-8 h-8" aria-label={tr(`編輯「${item.name}」`, `Edit ${item.name}`)} onClick={() => openEdit(item)}>
+                          <Button variant="ghost" size="icon" className="w-8 h-8" aria-label={tr(`編輯「${item.name}」`, `Edit ${loc(item, "name")}`)} onClick={() => openEdit(item)}>
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon" className="w-8 h-8 text-danger-text"
-                            aria-label={tr(`刪除「${item.name}」`, `Delete ${item.name}`)}
+                            aria-label={tr(`刪除「${item.name}」`, `Delete ${loc(item, "name")}`)}
                             onClick={async () => {
-                              if (await confirm({ title: tr(`要刪除「${item.name}」嗎？`, `Delete ${item.name}?`), description: tr("刪除後無法復原。", "This can't be undone."), confirmLabel: tr("確定刪除", "Delete"), destructive: true })) {
+                              if (await confirm({ title: tr(`要刪除「${item.name}」嗎？`, `Delete ${loc(item, "name")}?`), description: tr("刪除後無法復原。", "This can't be undone."), confirmLabel: tr("確定刪除", "Delete"), destructive: true })) {
                                 deleteMutation.mutate(item.id);
                               }
                             }}>
@@ -533,7 +536,7 @@ export default function VendorPortalMenu() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor="menu-item-category">{tr("分類", "Category")}</Label>
-                      <Input id="menu-item-category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder={tr("例：便當、湯品", "e.g. Bento, Soup")} />
+                      <Input id="menu-item-category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder={tr("留空＝一般；例：便當、湯品", "Blank = General; e.g. Bento, Soup")} />
                     </div>
                     {bento.itemType !== "bento" && (
                       <div>

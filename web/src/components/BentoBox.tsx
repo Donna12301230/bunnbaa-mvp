@@ -1,7 +1,7 @@
 import { HelpCircle, Plus } from "lucide-react";
 import { componentGroup, GROUP_CELL, type FoodGroup } from "@/lib/foodColors";
 import { costIssue, itemDishes } from "@/lib/prep";
-import { tr } from "@/lib/i18n";
+import { dishName, loc, tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Component, Ingredient, MenuItem } from "@/types";
 
@@ -28,7 +28,7 @@ export function dishCell(key: string, name: string, componentId: string | null |
   const issue = costIssue(componentId, componentsById, ingredientsById);
   return {
     key,
-    name: name || comp?.name || "?",
+    name: name || loc(comp, "name") || "?",
     sub: cellSub(comp, portions),
     group: rice ? "rice" : componentGroup(comp, ingredientsById),
     missing: !!issue && issue.kind !== "no_price",
@@ -42,12 +42,12 @@ export function itemCells(item: MenuItem, componentsById: Record<string, Compone
   if (isBento) {
     if (item.rice_component_id) cells.push(dishCell("rice", tr("白飯", "Rice"), item.rice_component_id, componentsById, ingredientsById, 1, true));
     const main = item.mains?.[0] ?? item.main;
-    if (main?.name) cells.push(dishCell("main", main.name, main.component_id, componentsById, ingredientsById));
-    (item.fixed ?? []).forEach((f, i) => cells.push(dishCell(`fixed${i}`, f.name, f.component_id, componentsById, ingredientsById, f.portions ?? 1)));
-    (item.slots ?? []).forEach((s, i) => s.default?.name && cells.push(dishCell(`slot${i}`, s.default.name, s.default.component_id, componentsById, ingredientsById)));
+    if (main?.name) cells.push(dishCell("main", dishName(item, main.name), main.component_id, componentsById, ingredientsById));
+    (item.fixed ?? []).forEach((f, i) => cells.push(dishCell(`fixed${i}`, dishName(item, f.name), f.component_id, componentsById, ingredientsById, f.portions ?? 1)));
+    (item.slots ?? []).forEach((s, i) => s.default?.name && cells.push(dishCell(`slot${i}`, dishName(item, s.default.name), s.default.component_id, componentsById, ingredientsById)));
   } else {
     const dishes = itemDishes(item);
-    dishes.forEach((d, i) => cells.push(dishCell(`part${i}`, d.name, d.component_id, componentsById, ingredientsById, item.fixed?.[i - (item.component_id ? 1 : 0)]?.portions ?? 1)));
+    dishes.forEach((d, i) => cells.push(dishCell(`part${i}`, d.name && dishName(item, d.name), d.component_id, componentsById, ingredientsById, item.fixed?.[i - (item.component_id ? 1 : 0)]?.portions ?? 1)));
   }
   return cells;
 }

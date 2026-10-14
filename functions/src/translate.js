@@ -103,6 +103,8 @@ const TRANSLATED_FIELDS = {
   draws: ["item_name"],
   // Vendors' semi-finished items (vendors/{id}/components), shown on the prep page
   components: ["name"],
+  // Vendors' raw ingredients (vendors/{id}/ingredients), named in cost warnings on the menu page
+  ingredients: ["name"],
 };
 
 module.exports = { translateTexts, translationPatch, dishNames, dishNamesPatch, TRANSLATED_FIELDS };
