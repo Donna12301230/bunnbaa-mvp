@@ -127,7 +127,12 @@ function DisasterContent() {
 function AnomalyContent() {
   const [itemList, setItems] = useState<Anomaly[] | null>(null);
   const items = itemList ?? [];
-  useEffect(() => onSnapshot(query(collection(db, "anomalies"), orderBy("created_at", "desc"), limit(100)), (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Anomaly))), []);
+  const { toast } = useToast();
+  useEffect(() => onSnapshot(query(collection(db, "anomalies"), orderBy("created_at", "desc"), limit(100)), (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Anomaly)), (err) => {
+    // A denied read would otherwise leave the skeleton up forever
+    setItems([]);
+    toast({ variant: "destructive", title: tr("讀不到異常標記", "Couldn't load anomalies"), description: err.message });
+  }), []);
   return (
     <Card>
       <CardContent className="p-4 space-y-2 text-sm">
