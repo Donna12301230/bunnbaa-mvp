@@ -20,7 +20,7 @@
 |---|---|
 | 🌐 **Live prototype** | https://bunnbaa-mvp-5474.web.app/?lang=en |
 | 🎬 **Demo video (3 min)** | https://youtu.be/ZhRAGfqUVDs |
-| 📑 **Proposal deck** | https://drive.google.com/file/d/12HaDFSHFi3qUULo1gubD2nUdA0K6k-5Y/view?usp=sharing |
+| 📑 **Proposal deck** | https://drive.google.com/file/d/1lCIUQT7b4yIjJHR374zpvZdCi7eHmjUa/view?usp=sharing |
 
 ### Try it
 

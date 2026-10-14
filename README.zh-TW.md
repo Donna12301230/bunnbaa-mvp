@@ -20,7 +20,7 @@
 |---|---|
 | 🌐 **線上版** | https://bunnbaa-mvp-5474.web.app |
 | 🎬 **展示影片（3 分鐘）** | https://youtu.be/ZhRAGfqUVDs |
-| 📑 **提案簡報** | https://drive.google.com/file/d/12HaDFSHFi3qUULo1gubD2nUdA0K6k-5Y/view?usp=sharing |
+| 📑 **提案簡報** | https://drive.google.com/file/d/1lCIUQT7b4yIjJHR374zpvZdCi7eHmjUa/view?usp=sharing |
 
 ### 試用
 
