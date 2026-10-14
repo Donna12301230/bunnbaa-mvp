@@ -6,7 +6,7 @@
 // Forecast: average portions on the same weekday over the past 4 weeks, excluding work-suspension days, national holidays (vendor closed days) and vendor-flagged anomaly weeks;
 // for a new vendor's first 4 weeks, the vendor's self-reported forecast (vendors.forecast_daily: { menu_item_id: portions }).
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { REGION, db, onCall, FieldValue, callerVendorId, notifyVendor, loadVendorCatalog, forEachVendor } = require("./common");
+const { REGION, db, onCall, FieldValue, t, callerVendorId, notifyVendor, loadVendorCatalog, forEachVendor } = require("./common");
 const { loadPlatformConfig } = require("./config");
 const { componentPortions, rawNeeds, roundToPurchaseUnit, splitDeliveries, ACTIVE_LOCK_STATUSES } = require("./prep");
 const { taipeiToday, addDays, mondayOf, weekdayOf } = require("./calendar");
@@ -186,11 +186,14 @@ exports.buildWeeklyPurchase = onSchedule({ schedule: "0 12 * * 6", timeZone: "As
   const weekStart = mondayOf(addDays(taipeiToday(), 7));
   await forEachVendor("buildWeeklyPurchase", async (vendor) => {
     const r = await buildWeekly(vendor, weekStart);
-    await notifyVendor(vendor.id, {
-      title: "下週叫貨單已產生",
-      body: `${r.lines} 項原物料${r.uncounted ? "（本週未盤點，以理論庫存計算）" : ""}，可一鍵傳給小盤商。`,
+    await notifyVendor(vendor.id, () => ({
+      title: t("下週叫貨單已產生", "Next week's supplier order is ready"),
+      body: t(
+        `${r.lines} 項原物料${r.uncounted ? "（本週未盤點，以理論庫存計算）" : ""}，可一鍵傳給小盤商。`,
+        `${r.lines} ingredients${r.uncounted ? " (no stock count this week, so theoretical stock was used)" : ""}. Send it to your supplier in one tap.`,
+      ),
       link: "/vendor-portal/purchasing",
-    });
+    }));
   });
 });
 

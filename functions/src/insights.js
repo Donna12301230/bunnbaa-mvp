@@ -109,7 +109,7 @@ exports.onFavoriteCreated = onDocumentCreated({ document: "users/{uid}/favorites
  * Counted once per person per item per day (users/{uid}.viewed_items records items viewed that day).
  */
 exports.recordItemView = onCall({}, async (request) => {
-  assertSignedInUser(request, "記錄瀏覽");
+  assertSignedInUser(request, "記錄瀏覽", "record views");
   const uid = request.auth.uid;
   const itemId = String(request.data?.menu_item_id || "");
   if (!itemId) throw new HttpsError("invalid-argument", "menu_item_id is required");
@@ -142,7 +142,7 @@ exports.recordItemView = onCall({}, async (request) => {
  * Counted by people: repeat wishes by the same person count once; only the last 30 days count. The screen notes "wishes don't guarantee availability".
  */
 exports.placeOpenWish = onCall({}, async (request) => {
-  assertSignedInUser(request, "許願");
+  assertSignedInUser(request, "許願", "make a wish");
   const uid = request.auth.uid;
   const vendorId = String(request.data?.vendor_id || "");
   if (!vendorId) throw new HttpsError("invalid-argument", "vendor_id is required");
@@ -191,16 +191,19 @@ async function tallyVendor(vendor, config) {
     const prev = existing.docs.find((d) => d.id === key)?.data() || {};
     const count = g.users.size;
     const hit = count >= config.openWishThreshold && !prev.notified;
-    if (hit) reached.push(`${g.name}（${count} 人）`);
+    if (hit) reached.push({ name: g.name, count });
     batch.set(tallyRef.doc(key), { name: g.name, count, notified: prev.notified || hit, updated_at: FieldValue.serverTimestamp() }, { merge: true });
   }
   await batch.commit();
   if (reached.length > 0) {
-    await notifyVendor(vendor.id, {
-      title: "開放許願達門檻，已列入參考名單",
-      body: `${reached.join("、")}，要不要上架試試？`,
+    await notifyVendor(vendor.id, () => ({
+      title: t("開放許願達門檻，已列入參考名單", "Dish wishes reached the threshold and were added to your shortlist"),
+      body: t(
+        `${reached.map((r) => `${r.name}（${r.count} 人）`).join("、")}，要不要上架試試？`,
+        `${reached.map((r) => `${r.name} (${r.count} people)`).join(", ")} — want to try adding them to your menu?`,
+      ),
       link: "/vendor-portal/insights",
-    });
+    }));
   }
 }
 
@@ -224,12 +227,12 @@ exports.notifyWishersListed = onCall({}, async (request) => {
   const vendor = (await db().collection("vendors").doc(vendorId).get()).data();
   const users = [...new Set(snap.docs.map((d) => d.data().user_id))];
   for (const uid of users) {
-    await notifyUser(uid, {
+    await notifyUser(uid, () => ({
       kind: "wish",
       title: t("你許願的菜上架了！", "The dish you wished for is on the menu!"),
-      body: t(`「${vendor.name}」開始供應「${snap.docs[0]?.data().dish_name}」`, `${vendor.name} now serves ${snap.docs[0]?.data().dish_name}`),
+      body: t(`「${vendor.name}」開始供應「${snap.docs[0]?.data().dish_name}」`, `${vendor.name_en || vendor.name} now serves ${snap.docs[0]?.data().dish_name}`),
       link: `/vendor/${vendorId}`,
-    });
+    }));
   }
   await db().collection("vendors").doc(vendorId).collection("wishTally").doc(key).set({ listed: true }, { merge: true });
   return { notified: users.length };
@@ -264,7 +267,7 @@ async function normalizeDish(text) {
 }
 
 exports.normalizeDishName = onCall({}, async (request) => {
-  assertSignedInUser(request, "查詢菜名");
+  assertSignedInUser(request, "查詢菜名", "look up dish names");
   const text = String(request.data?.text || "").trim().slice(0, 30);
   if (!text) throw new HttpsError("invalid-argument", "text is required");
   return normalizeDish(text);
@@ -279,11 +282,14 @@ exports.draftRecipe = onCall({ timeoutSeconds: 60 }, async (request) => {
 只給合理的起始值，不要自稱精確。輸出 JSON：
 {"component": {"name": string, "portion_grams": number（每份熟重 g）, "prep_minutes": number（每批製程分鐘）, "equipment": "炒鍋"|"電鍋"|"炸鍋"|"烤箱"|"滷鍋"|"蒸籠"|"工作台", "batch_capacity": number（每批份數）, "advance_hours": number（可提前幾小時做）, "method": "炸"|"滷"|"烤"|"炒"|"蒸"|"煮"|"涼拌", "flavors": string[]（從 辣、清淡、甜 選）},
  "ingredients": [{"name": string, "category": "雞"|"豬"|"牛"|"海鮮"|"素"|"蛋"|"豆"|"葉菜"|"根莖"|"瓜類"|"米"|"調味"|"乾貨"|"包材"|"其他", "grams": number（每份用到的熟重 g；以個計的填個數）, "unit": "g"|"個", "yield_rate": number（熟成率，熟重/生重）, "loss_rate": number（0-1）, "purchase_unit_label": string, "purchase_unit_size": number, "shelf_days": number, "frequency": "monthly"|"weekly"|"daily"}],
- "note": string（一句提醒店家要自己調整的地方）}`,
+ "note": string（一句提醒店家要自己調整的地方；${t("用繁體中文", "write this one sentence in English")}）}`,
     userPrompt: JSON.stringify({ dish: name, template: request.data?.template || null }),
     temperature: 0.3,
   });
-  return { ...out, disclaimer: "AI 產生的草稿，份量與數字請依店內實際狀況修改後再儲存" };
+  return {
+    ...out,
+    disclaimer: t("AI 產生的草稿，份量與數字請依店內實際狀況修改後再儲存", "AI-generated draft — adjust portions and numbers to your kitchen before saving"),
+  };
 });
 
 /* ------------------------------------------------------------------ *

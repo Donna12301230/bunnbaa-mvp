@@ -159,22 +159,23 @@ async function processEvent(ref, event) {
               // Since 2026-10-09 all refunds go to platform points (to the payer), usable at checkout or refundable to LINE Pay from the member center
               const d = doc.data();
               const payer = d.payer_uid || d.buyer_uid;
-              await notifyUser(d.buyer_uid, {
+              const itemEn = d.item_name_en || d.item_name;
+              await notifyUser(d.buyer_uid, () => ({
                 kind: "disaster",
                 title: t("停班停課，訂單已自動取消", "Work suspension — order cancelled"),
                 body: payer === d.buyer_uid
                   ? t(`${date}「${d.item_name}」已取消，款項已全額退成平台點數，可結帳折抵或到會員中心退回 LINE Pay；折價券已退回。`,
-                    `${date} ${d.item_name} was cancelled. The full amount is back as BunnBaa points — use them at checkout or send them back to LINE Pay from My account.`)
-                  : t(`${date}「${d.item_name}」已取消，款項已全額退成點數給原付款人。`, `${date} ${d.item_name} was cancelled; the payer got the full amount back as points.`),
+                    `${date} ${itemEn} was cancelled. The full amount is back as BunnBaa points — use them at checkout or send them back to LINE Pay from My account.`)
+                  : t(`${date}「${d.item_name}」已取消，款項已全額退成點數給原付款人。`, `${date} ${itemEn} was cancelled; the payer got the full amount back as points.`),
                 link: payer === d.buyer_uid ? "/profile?tab=points" : "/my-bookings",
-              });
+              }));
               if (payer !== d.buyer_uid) {
-                await notifyUser(payer, {
+                await notifyUser(payer, () => ({
                   kind: "refund",
                   title: t("停班停課，款項已退成點數", "Work suspension — refunded as points"),
-                  body: t(`你付款的「${d.item_name}」（${date}）因停班停課取消，款項已全額退成平台點數。`, `${d.item_name} (${date}), which you paid for, was cancelled; the full amount is back as points.`),
+                  body: t(`你付款的「${d.item_name}」（${date}）因停班停課取消，款項已全額退成平台點數。`, `${itemEn} (${date}), which you paid for, was cancelled; the full amount is back as points.`),
                   link: "/profile?tab=points",
-                });
+                }));
               }
             }
           } catch (err) {
@@ -184,11 +185,11 @@ async function processEvent(ref, event) {
         }
         await db().collection("vendors").doc(vendor.id).set({ disaster_dates: FieldValue.arrayUnion(date) }, { merge: true });
       }
-      await notifyVendor(vendor.id, {
+      await notifyVendor(vendor.id, () => ({
         title: t("停班停課：訂單已自動取消退款", "Work suspension: orders cancelled and refunded"),
         body: t(`${(event.dates || []).join("、")} 的訂單已全額退成消費者的平台點數，不計入營業額與抽獎券，平台不收抽成。`, `Orders on ${(event.dates || []).join(", ")} were refunded to customers as points; they don't count toward revenue, tickets or commission.`),
         link: "/vendor-portal/orders",
-      });
+      }));
     } else if (event.type === "typhoon_warning") {
       const upcoming = [];
       for (const date of event.dates || []) {
@@ -197,20 +198,26 @@ async function processEvent(ref, event) {
       await db().collection("vendors").doc(vendor.id).set({ typhoon_notice: { dates: event.dates, event_id: ref.id } }, { merge: true });
       if (upcoming.length > 0) {
         result.notified++;
-        await notifyVendor(vendor.id, {
-          title: "颱風警報：請留意採購",
-          body: `${upcoming.join("、")} 有訂單。建議葉菜延後到貨、預設配菜暫改耐放菜；停班時訂單會自動取消退款。`,
+        await notifyVendor(vendor.id, () => ({
+          title: t("颱風警報：請留意採購", "Typhoon warning: check your purchasing"),
+          body: t(
+            `${upcoming.join("、")} 有訂單。建議葉菜延後到貨、預設配菜暫改耐放菜；停班時訂單會自動取消退款。`,
+            `You have orders on ${upcoming.join(", ")}. Consider delaying leafy-green deliveries and switching default sides to dishes that keep well; if work is suspended, orders are cancelled and refunded automatically.`,
+          ),
           link: "/vendor-portal/purchasing",
-        });
+        }));
       }
     } else if (event.type === "price_spike") {
       await recalcPortionLevels(vendor.id);
       result.notified++;
-      await notifyVendor(vendor.id, {
-        title: "菜價變動：份量級距已重算",
-        body: "未截單日期的候選菜份量級距已依最新單價重算；已截單訂單可在「每日備料」等值替換配菜。",
+      await notifyVendor(vendor.id, () => ({
+        title: t("菜價變動：份量級距已重算", "Produce prices changed: portion levels recalculated"),
+        body: t(
+          "未截單日期的候選菜份量級距已依最新單價重算；已截單訂單可在「每日備料」等值替換配菜。",
+          "Candidate-dish portion levels for dates not yet cut off were recalculated at the latest prices. For orders already cut off, you can swap in an equivalent side under Daily prep.",
+        ),
         link: "/vendor-portal/menu",
-      });
+      }));
     }
   }
   const ok = result.failed === 0;
@@ -261,12 +268,12 @@ exports.substituteDish = onCall({}, async (request) => {
     if (!hit) continue;
     await doc.ref.update({ slots });
     changed++;
-    await notifyUser(lock.buyer_uid, {
+    await notifyUser(lock.buyer_uid, () => ({
       kind: "disaster",
       title: t("配菜等值替換通知", "Side dish substituted"),
-      body: t(`因天災／菜價異常，「${vendor.name}」${date} 的「${from}」改為「${to}」。`, `${vendor.name} replaced ${from} with ${to} on ${date}.`),
+      body: t(`因天災／菜價異常，「${vendor.name}」${date} 的「${from}」改為「${to}」。`, `Due to a natural disaster or unusual produce prices, ${vendor.name_en || vendor.name} replaced ${from} with ${to} on ${date}.`),
       link: "/my-bookings",
-    });
+    }));
   }
   const planRef = db().collection("vendors").doc(vendorId).collection("prepPlans").doc(date);
   await planRef.set({ substitutions: FieldValue.arrayUnion({ from, to }) }, { merge: true });

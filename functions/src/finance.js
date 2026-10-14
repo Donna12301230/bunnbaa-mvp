@@ -61,11 +61,11 @@ exports.syncMinimumWage = onSchedule({ schedule: "10 0 * * *", timeZone: "Asia/T
     if (Object.keys(patch).length === 0) return;
     await db().collection("vendors").doc(vendor.id).update(patch);
     if (raised.length > 0) {
-      await notifyVendor(vendor.id, {
+      await notifyVendor(vendor.id, () => ({
         title: t("基本工資調整", "Minimum wage updated"),
         body: t(`${wage.effectiveFrom} 起基本工資為時薪 ${wage.hourly}、月薪 ${wage.monthly}，已自動調整：${raised.join("、")}。`, `From ${wage.effectiveFrom} the minimum wage is ${wage.hourly}/h, ${wage.monthly}/month. Adjusted: ${raised.join(", ")}.`),
         link: "/vendor-portal/settings",
-      });
+      }));
     }
   });
 });
