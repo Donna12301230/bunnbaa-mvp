@@ -26,6 +26,18 @@ function isAdminRequest(request) {
   return !!email && ADMIN_EMAILS.includes(email);
 }
 
+// Read-only demo admin from the login page (its password is public). It may call
+// read-only admin callables via assertAdminViewerOrEmulator, never anything that
+// writes or costs money. Keep in sync with firestore.rules isAdminViewer().
+const DEMO_ADMIN_EMAIL = "admin@bunnbaa.test";
+
+function assertAdminViewerOrEmulator(request) {
+  if (isEmulator()) return;
+  if (!isAdminRequest(request) && request.auth?.token?.email !== DEMO_ADMIN_EMAIL) {
+    throw new HttpsError("permission-denied", "This action is restricted to platform admins.");
+  }
+}
+
 function assertAdminOrEmulator(request) {
   if (isEmulator()) return;
   if (!isAdminRequest(request)) {
@@ -188,7 +200,7 @@ function distanceMeters(a, b) {
 }
 
 module.exports = {
-  REGION, db, onCall, HttpsError, logger, FieldValue, t, ADMIN_EMAILS, isEmulator, isAdminRequest,
+  REGION, db, onCall, HttpsError, logger, FieldValue, t, ADMIN_EMAILS, isEmulator, isAdminRequest, assertAdminViewerOrEmulator,
   assertAdminOrEmulator, assertSignedInUser, assertAdminOrVendorOwner, callerVendorId, notifyUser, notifyVendor,
   loadVendorCatalog, allVendors, forEachVendor, BatchWriter, countyOf, distanceMeters, decodeGeohash,
 };

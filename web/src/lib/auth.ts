@@ -12,13 +12,14 @@ import {
 } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { ADMIN_EMAILS } from "./adminAuth";
+import { ADMIN_EMAILS, DEMO_ADMIN_EMAIL } from "./adminAuth";
 import type { UserProfile } from "@/types";
 import { tr } from "./i18n";
 
 // Platform sign-in now uses real Firebase Auth (email/password), replacing the old mockAuth.ts.
 // Role resolution:
 //   - admin: email is on the ADMIN_EMAILS allowlist (same list as firestore.rules / Functions)
+//     or is the read-only demo admin (DEMO_ADMIN_EMAIL, readOnlyAdmin: rules and Functions refuse its writes)
 //   - vendor: some vendors/{id}.owner_uid equals this uid (same logic as assertAdminOrVendorOwner)
 //   - every other account is a customer
 // Since 2026-09-24 anonymous sign-in is no longer used: lock / order / resale all require sign-in (firestore.rules
@@ -45,7 +46,7 @@ async function resolveProfile(u: User): Promise<UserProfile> {
 
   // Phone-number sign-in has no email, and admin is always the email allowlist, so this can't misidentify;
   // vendor is likewise looked up by owner_uid, regardless of email/phone sign-in.
-  if (email && ADMIN_EMAILS.includes(email)) {
+  if (email && (ADMIN_EMAILS.includes(email) || email === DEMO_ADMIN_EMAIL)) {
     role = "admin";
   } else {
     // vendors is publicly readable, so query owner_uid directly; if the query fails treat them as a regular user and don't block sign-in
@@ -91,6 +92,7 @@ async function resolveProfile(u: User): Promise<UserProfile> {
     phone,
     department: extra.department || undefined,
     role,
+    readOnlyAdmin: email === DEMO_ADMIN_EMAIL,
     vendorId,
     orderBanned: extra.orderBanned || false,
     noPickupCount: extra.noPickupCount || 0,

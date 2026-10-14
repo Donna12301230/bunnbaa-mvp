@@ -85,8 +85,10 @@ export default function LoginPage() {
     if (!signedIn || authLoading || !user) return;
     const back = takeReturnPath();
     if (user.role === "vendor") navigate(back?.startsWith("/vendor-portal") || back?.startsWith("/lock/vendor") ? back : "/vendor-portal/dashboard");
+    // The read-only demo admin is only here to look around the admin backend, so take it straight there
+    else if (user.readOnlyAdmin) navigate(back ?? "/admin/vendors");
     else navigate(back ?? "/home");
-  }, [signedIn, authLoading, user?.id, user?.role]);
+  }, [signedIn, authLoading, user?.id, user?.role, user?.readOnlyAdmin]);
 
   const loginMutation = useMutation({
     mutationFn: () => login(username, password),

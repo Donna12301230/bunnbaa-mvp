@@ -28,6 +28,7 @@ const results = [];
   const OWNER = env.authenticatedContext("owner1", tok("o1@test")).firestore();
   const OWNER2 = env.authenticatedContext("owner2", tok("o2@test")).firestore();
   const ADMIN = env.authenticatedContext("admin", tok("suw192336@gmail.com")).firestore();
+  const DEMO_ADMIN = env.authenticatedContext("demoAdmin", tok("admin@bunnbaa.test")).firestore();
   const ANON = env.unauthenticatedContext().firestore();
 
   // Seed data
@@ -271,6 +272,20 @@ const results = [];
     await assertFails(setDoc(fav(B, "userA", "v2"), { vendor_id: "v2", created_at: serverTimestamp() }));
     await assertFails(deleteDoc(fav(B, "userA", "v1")));
     await assertSucceeds(deleteDoc(fav(A, "userA", "v1")));
+  });
+
+  await t("R-31", "唯讀管理員體驗帳號：可以讀管理員能讀的資料，但任何寫入都被拒", async () => {
+    for (const p of ["locks/lA", "users/userB", "payouts/p2", "accuracy_reports/r2", "admin_audit_logs/log1", "coupons/cB", "areaInsights/v2", "resale_matches/lA"]) {
+      await assertSucceeds(getDoc(doc(DEMO_ADMIN, p)));
+    }
+    await assertFails(updateDoc(doc(DEMO_ADMIN, "locks/lA"), { status: "fulfilled" }));
+    await assertFails(updateDoc(doc(DEMO_ADMIN, "users/userB"), { orderBanned: true }));
+    await assertFails(updateDoc(doc(DEMO_ADMIN, "vendors/v1"), { name: "改名" }));
+    await assertFails(setDoc(doc(DEMO_ADMIN, "vendors/vDemo"), { name: "新店" }));
+    await assertFails(setDoc(doc(DEMO_ADMIN, "platformConfig/main"), { x: 1 }));
+    await assertFails(setDoc(doc(DEMO_ADMIN, "dishLibrary/dDemo"), { name: "x" }));
+    await assertFails(setDoc(doc(DEMO_ADMIN, "admin_audit_logs/logDemo"), { admin_email: "admin@bunnbaa.test" }));
+    await assertFails(setDoc(doc(DEMO_ADMIN, "disasterEvents/eDemo"), { type: "typhoon" }));
   });
 
   await t("N-SEC-04", "draws/reviews 公開內容無完整 uid", async () => {
