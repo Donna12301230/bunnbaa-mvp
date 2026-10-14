@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { TAIWAN_DISTRICTS } from "@/constants/taiwanDistricts";
-import { areaLabel, setSelectedArea, useSelectedArea } from "@/lib/location";
+import { areaLabel, areaName, setSelectedArea, useSelectedArea } from "@/lib/location";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 
@@ -67,7 +67,7 @@ export default function AreaPicker({ className }: { className?: string }) {
               >
                 <option value="">{t("全部縣市", "All cities / counties")}</option>
                 {TAIWAN_DISTRICTS.map((d) => (
-                  <option key={d.county} value={d.county}>{d.county}</option>
+                  <option key={d.county} value={d.county}>{areaName(d.county)}</option>
                 ))}
               </select>
             </div>
@@ -82,7 +82,7 @@ export default function AreaPicker({ className }: { className?: string }) {
               >
                 <option value="">{county ? t("全部鄉鎮市區", "All districts") : t("請先選縣市", "Choose a city / county first")}</option>
                 {towns.map((name) => (
-                  <option key={name} value={name}>{name}</option>
+                  <option key={name} value={name}>{areaName(county, name)}</option>
                 ))}
               </select>
             </div>

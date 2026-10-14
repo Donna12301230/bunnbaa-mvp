@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
 import { todayStr } from "@/lib/pickupSlots";
-import { tr } from "@/lib/i18n";
+import { dishName, loc, tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { CharityMeal } from "@/types";
 
@@ -107,8 +107,8 @@ export default function CharityPanel({ meals, result, onGoScan }: {
                 <span className="font-mono text-xl font-extrabold tracking-widest">{m.pickup_code ?? "—"}</span>
                 <span className="text-[11px] text-muted-foreground">{m.source === "donated" ? tr("客人捐的", "donated") : tr("沒來拿", "no-show")}</span>
               </div>
-              <p className="text-sm font-semibold leading-tight line-clamp-1">{m.item_name}</p>
-              <p className="text-xs text-muted-foreground line-clamp-1">{(m.sides ?? []).join("・")}</p>
+              <p className="text-sm font-semibold leading-tight line-clamp-1">{loc(m, "item_name")}</p>
+              <p className="text-xs text-muted-foreground line-clamp-1">{(m.sides ?? []).map((d) => dishName(m, d)).join(tr("・", " · "))}</p>
               {canGive ? (
                 <Button size="sm" className="mt-1" disabled={busy === m.id} onClick={() => giveOnsite(m.id)}><Gift /> {tr("現場送出", "Give")}</Button>
               ) : (

@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ds";
 import { formatDateTime } from "@/lib/format";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 
 const REASON: Record<string, () => string> = {
   disaster: () => tr("停班停課退款", "Work-suspension refund"),
@@ -18,7 +18,7 @@ const REASON: Record<string, () => string> = {
 };
 
 function entryLabel(e: WalletEntry): string {
-  if (e.type === "credit") return `${REASON[e.reason ?? ""]?.() ?? tr("退款", "Refund")}${e.text ? `・${e.text}` : ""}`;
+  if (e.type === "credit") return `${REASON[e.reason ?? ""]?.() ?? tr("退款", "Refund")}${e.text ? `${tr("・", " · ")}${loc(e, "text")}` : ""}`;
   if (e.type === "spend") return tr("結帳折抵", "Used at checkout");
   if (e.type === "release") return tr("付款未完成，點數已退還", "Payment not completed — points returned");
   return tr("退回 LINE Pay", "Sent back to LINE Pay");

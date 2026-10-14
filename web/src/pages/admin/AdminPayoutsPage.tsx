@@ -1,4 +1,4 @@
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -59,7 +59,7 @@ function PayoutsContent() {
           {payouts.map((p) => (
             <Card key={p.id} className="p-4 flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-sm">{vendors[p.vendor_id]?.name ?? p.vendor_id}</h3>
+                <h3 className="font-semibold text-sm">{loc(vendors[p.vendor_id], "name") || p.vendor_id}</h3>
                 <p className="text-xs text-muted-foreground">{tr(`${p.lock_count} 筆已履約訂單`, `${p.lock_count} fulfilled orders`)}</p>
               </div>
               <div className="text-right">

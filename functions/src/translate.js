@@ -105,6 +105,10 @@ const TRANSLATED_FIELDS = {
   components: ["name"],
   // Vendors' raw ingredients (vendors/{id}/ingredients), named in cost warnings on the menu page
   ingredients: ["name"],
+  // The dish library diners pick from when making an open wish
+  dishLibrary: ["name"],
+  // Vendors' suppliers (vendors/{id}/suppliers), for the English vendor UI only; LINE purchase messages to suppliers stay Chinese
+  suppliers: ["name", "note"],
 };
 
 module.exports = { translateTexts, translationPatch, dishNames, dishNamesPatch, TRANSLATED_FIELDS };

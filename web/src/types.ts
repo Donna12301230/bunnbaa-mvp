@@ -191,6 +191,7 @@ export interface Lock {
   vendor_id: string;
   item_name: string;
   item_name_en?: string | null; // Copied from menu_items.name_en at order time
+  dish_names_en?: Record<string, string> | null; // Copied from menu_items.dish_names_en at order time
   pickup_window: string;
   pickup_date: string; // YYYY-MM-DD
   discount_percent: number;
@@ -384,9 +385,11 @@ export interface Component {
 export interface Supplier {
   id: string;
   name: string;
+  name_en?: string; // Auto-translated by Functions (translateSupplier)
   phone?: string;
   line_id?: string;
   note?: string;
+  note_en?: string;
 }
 
 export interface Coupon {
@@ -446,6 +449,7 @@ export interface CharityMeal {
   pickup_code?: string | null;
   item_name: string;
   item_name_en?: string;
+  dish_names_en?: Record<string, string> | null; // Copied from the order (lock) it came from
   sides: string[];
   deadline: unknown;
 }

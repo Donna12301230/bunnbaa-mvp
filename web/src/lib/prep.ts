@@ -174,7 +174,7 @@ export function craftItems(needs: Map<string, number>, ingredientsById: Record<s
   return [...needs].flatMap(([id, need]) => {
     const ing = ingredientsById[id];
     if (!ing || !(need > 0)) return [];
-    return [{ id, name: ing.name, need, unit: ing.unit || "g", have: stock ? stock[id] ?? 0 : undefined, minor: MINOR_CATEGORIES.includes(ing.category) }];
+    return [{ id, name: loc(ing, "name"), need, unit: ing.unit || "g", have: stock ? stock[id] ?? 0 : undefined, minor: MINOR_CATEGORIES.includes(ing.category) }];
   }).sort((a, b) => Number(a.minor) - Number(b.minor) || b.need - a.need);
 }
 

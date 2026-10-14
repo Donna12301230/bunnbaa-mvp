@@ -1,4 +1,4 @@
-import { tr, loc } from "@/lib/i18n";
+import { dishName, tr, loc } from "@/lib/i18n";
 import { formatNT, formatPickupDate } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
@@ -102,12 +102,12 @@ export default function PaymentConfirmPage() {
                   {(l.slots?.length ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {[
-                        l.main_dish ? `${tr("主菜：", "Main: ")}${l.main_dish}` : null,
-                        ...l.slots!.map(slotText),
-                        extraSideText(l.extra_side),
-                        ...customOptionTexts(l.custom_options),
+                        l.main_dish ? `${tr("主菜：", "Main: ")}${dishName(l, l.main_dish)}` : null,
+                        ...l.slots!.map((s) => slotText(s, l)),
+                        extraSideText(l.extra_side, l),
+                        ...customOptionTexts(l.custom_options, l),
                         riceLabel(l.rice),
-                      ].filter(Boolean).join("／")}
+                      ].filter(Boolean).join(tr("／", " / "))}
                     </p>
                   )}
                 </li>

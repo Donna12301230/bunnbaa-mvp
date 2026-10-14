@@ -1,4 +1,4 @@
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { ADMIN_EMAILS } from "@/lib/adminAuth";
@@ -56,7 +56,7 @@ function VendorVerificationCard() {
           {vendors.map((vendor) => (
             <div key={vendor.id} className="flex items-center justify-between gap-3 py-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">{vendor.name}</span>
+                <span className="text-sm font-medium">{loc(vendor, "name")}</span>
                 {vendor.verified && <Badge className="bg-secondary text-accent-foreground border-0">{tr("已認證", "Verified")}</Badge>}
               </div>
               <Button
@@ -86,12 +86,12 @@ function TranslationBackfillCard() {
       // The server runs for up to 9 minutes; don't let the client give up at the default 70 seconds
       const fn = httpsCallable(functions, "translateAllContent", { timeout: 540_000 });
       const res = await fn({});
-      const c = res.data as { vendors: number; menu_items: number; meal_plans: number; reviews: number; draws: number; components?: number; ingredients?: number; locks: number; failed: number };
+      const c = res.data as { vendors: number; menu_items: number; meal_plans: number; reviews: number; draws: number; components?: number; ingredients?: number; dishLibrary?: number; suppliers?: number; locks: number; lock_dishes?: number; failed: number };
       toast({
         title: tr("英文翻譯已更新", "English translations updated"),
         description: tr(
-          `店家 ${c.vendors}、菜單 ${c.menu_items}、方案 ${c.meal_plans}、評價 ${c.reviews}、抽獎 ${c.draws}、半成品 ${c.components ?? 0}、原物料 ${c.ingredients ?? 0}、訂單 ${c.locks}${c.failed ? `，失敗 ${c.failed}（可再按一次重試）` : ""}`,
-          `Vendors ${c.vendors}, menu items ${c.menu_items}, plans ${c.meal_plans}, reviews ${c.reviews}, draws ${c.draws}, recipes ${c.components ?? 0}, ingredients ${c.ingredients ?? 0}, orders ${c.locks}${c.failed ? `, ${c.failed} failed (run again to retry)` : ""}`
+          `店家 ${c.vendors}、菜單 ${c.menu_items}、方案 ${c.meal_plans}、評價 ${c.reviews}、抽獎 ${c.draws}、半成品 ${c.components ?? 0}、原物料 ${c.ingredients ?? 0}、菜色庫 ${c.dishLibrary ?? 0}、供應商 ${c.suppliers ?? 0}、訂單 ${c.locks}、訂單菜名 ${c.lock_dishes ?? 0}${c.failed ? `，失敗 ${c.failed}（可再按一次重試）` : ""}`,
+          `Vendors ${c.vendors}, menu items ${c.menu_items}, plans ${c.meal_plans}, reviews ${c.reviews}, draws ${c.draws}, recipes ${c.components ?? 0}, ingredients ${c.ingredients ?? 0}, dish library ${c.dishLibrary ?? 0}, suppliers ${c.suppliers ?? 0}, orders ${c.locks}, order dishes ${c.lock_dishes ?? 0}${c.failed ? `, ${c.failed} failed (run again to retry)` : ""}`
         ),
       });
     } catch (err) {

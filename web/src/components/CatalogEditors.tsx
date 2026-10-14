@@ -14,7 +14,7 @@ import { queryClient } from "@/lib/queryClient";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
 import { componentCost, rawAmount } from "@/lib/bento";
-import { tr } from "@/lib/i18n";
+import { getLang, loc, tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Component, Ingredient } from "@/types";
 
@@ -53,8 +53,10 @@ const EN_LABEL: Record<string, string> = {
 };
 /** Display text for category / equipment / method / flavor; unknown values are shown as is */
 export const catalogLabel = (v: string) => tr(v, EN_LABEL[v] ?? v);
-// Units of measure are vendor-defined; these are only suggestions
+// Units of measure are vendor-defined; these are only suggestions. Weight checks accept both g/克 and ml/毫升, and count units
+// are free text, so the English UI suggests English units without changing anything stored
 const UNIT_SUGGESTIONS = ["克", "片", "顆", "塊", "毫升", "支", "張", "g", "ml", "個"];
+const UNIT_SUGGESTIONS_EN = ["g", "ml", "piece", "slice", "pack", "sheet", "stick"];
 const NEW_ING = "__new__";
 
 export type ComponentDraft = Omit<Component, "id"> & { id?: string };
@@ -103,7 +105,7 @@ function PriceImpact({ vendorId, draft }: { vendorId: string | undefined; draft:
       const price = item.mains?.[0]?.price || item.price || 0;
       const c0 = portionsCost(portions, catalog.componentsById, before);
       const c1 = portionsCost(portions, catalog.componentsById, after);
-      return [{ id: item.id, name: item.name, price, c0, c1 }];
+      return [{ id: item.id, name: loc(item, "name"), price, c0, c1 }];
     });
   }, [catalog, items, draft]);
   const original = draft.id ? catalog?.ingredientsById[draft.id] : undefined;
@@ -167,7 +169,7 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
               </select></div>
             <div><Label>{tr("用量單位", "Unit")}</Label>
               <Input list="ing-unit-suggestions" value={ing.unit} maxLength={6} onChange={(e) => setIng({ ...ing, unit: e.target.value.trim() })} placeholder={tr("克、片、顆…", "g, slice, piece…")} />
-              <datalist id="ing-unit-suggestions">{UNIT_SUGGESTIONS.map((u) => <option key={u} value={u} />)}</datalist>
+              <datalist id="ing-unit-suggestions">{(getLang() === "en" ? UNIT_SUGGESTIONS_EN : UNIT_SUGGESTIONS).map((u) => <option key={u} value={u} />)}</datalist>
               <span className="text-micro text-muted-foreground">{tr("以片、顆計的熟成率填 1、損耗率填 0", "For pieces, set yield 1 and loss 0")}</span></div>
             <div><Label>{tr("採購單位名稱", "Purchase unit")}</Label><Input value={ing.purchase_unit_label} onChange={(e) => setIng({ ...ing, purchase_unit_label: e.target.value })} placeholder={tr("盒、公斤、袋", "box, kg, bag")} /></div>
             <div><Label>{tr(`每採購單位 = 幾 ${ing.unit}`, `Units per purchase unit (${ing.unit})`)}</Label><Input type="number" value={ing.purchase_unit_size} onChange={(e) => setIng({ ...ing, purchase_unit_size: Number(e.target.value) })} /></div>
@@ -182,7 +184,7 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
             <div><Label>{tr("供應商", "Supplier")}</Label>
               <select className={SELECT} value={ing.supplier_id ?? ""} onChange={(e) => setIng({ ...ing, supplier_id: e.target.value || null })}>
                 <option value="">—</option>
-                {catalog?.suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {catalog?.suppliers.map((s) => <option key={s.id} value={s.id}>{loc(s, "name")}</option>)}
               </select></div>
             <PriceImpact vendorId={vendorId} draft={ing} />
             <p className="col-span-2 text-xs text-muted-foreground">{tr("生料用量 = 熟重 × 份數 ÷（熟成率 ×（1 − 損耗率））。例：100 g 熟重、熟成率 0.8、損耗 10% → 生料 139 g。", "Raw = cooked × portions ÷ (yield × (1 − loss)).")}{" "}{ing.name && `${tr("試算", "e.g.")} 100${ing.unit} → ${rawAmount(100, ing).toFixed(0)}${ing.unit}`}</p>
@@ -305,7 +307,7 @@ export function ComponentDialog({ vendorId, value, onClose, onSaved }: {
                           aria-label={tr("原物料", "Ingredient")}
                         >
                           <option value="">{tr("選原物料…", "Pick an ingredient…")}</option>
-                          {catalog?.ingredients.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                          {catalog?.ingredients.map((i) => <option key={i.id} value={i.id}>{loc(i, "name")}</option>)}
                           <option value={NEW_ING}>{tr("＋ 新增原物料…", "+ New ingredient…")}</option>
                         </select>
                         <Input

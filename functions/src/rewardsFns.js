@@ -95,7 +95,7 @@ async function countLock(lockRef) {
       }, { merge: true });
       for (let i = 0; i < tickets; i++) {
         tx.set(db().collection("rewardTickets").doc(), {
-          vendor_id: vendorId, vendor_name: vendor.name || "", user_id: payer, period_id: periodId, lock_id: lockRef.id,
+          vendor_id: vendorId, vendor_name: vendor.name || "", vendor_name_en: vendor.name_en || null, user_id: payer, period_id: periodId, lock_id: lockRef.id,
           status: "pending", created_at: FieldValue.serverTimestamp(),
         });
       }
@@ -105,17 +105,18 @@ async function countLock(lockRef) {
       }, { merge: true });
     }
     tx.update(lockRef, { reward_counted: true, tickets_issued: tickets, reward_period: periodId });
-    return { vendorId, payer, tickets, name: vendor.name };
+    return { vendorId, payer, tickets, name: vendor.name, nameEn: vendor.name_en || vendor.name };
   });
   if (result) {
     await refreshRewardStatus(result.vendorId);
     if (result.tickets > 0) {
-      await notifyUser(result.payer, {
+      // Firestore trigger: no request language, so build the text in the payer's users.lang
+      await notifyUser(result.payer, () => ({
         kind: "reward",
         title: t(`獲得 ${result.tickets} 張抽獎券`, `You got ${result.tickets} draw ticket(s)`),
-        body: t(`「${result.name}」的回饋池開池後就能抽，人人有獎。`, `Draw once ${result.name}'s reward pool opens — everyone wins something.`),
+        body: t(`「${result.name}」的回饋池開池後就能抽，人人有獎。`, `Draw once ${result.nameEn}'s reward pool opens — everyone wins something.`),
         link: "/rewards",
-      });
+      }));
     }
   }
 }
@@ -169,7 +170,8 @@ async function closePeriodFor(vendor, periodId, config) {
     const tier = tierInfo(code);
     for (let i = 0; i < n; i++) {
       await writer.set(db().collection("coupons").doc(), {
-        vendor_id: vendor.id, vendor_name: vendor.name || "", tier: code, label: tier.label, discount: tier.discount,
+        vendor_id: vendor.id, vendor_name: vendor.name || "", vendor_name_en: vendor.name_en || null, tier: code,
+        label: tier.label, label_en: tier.label_en || null, discount: tier.discount,
         status: "issued", pool_period: periodId, issued_at: FieldValue.serverTimestamp(),
       });
     }
@@ -183,18 +185,18 @@ async function closePeriodFor(vendor, periodId, config) {
   // Negative revenue never opens a pool, so totalRevenue ≥ 0 here; the next period starts from 0
   const holders = new Set(pending.docs.map((d) => d.data().user_id));
   for (const uid of holders) {
-    await notifyUser(uid, {
+    await notifyUser(uid, () => ({
       kind: "reward",
-      title: t(`「${vendor.name}」開獎了！`, `${vendor.name}'s reward pool is open!`),
+      title: t(`「${vendor.name}」開獎了！`, `${vendor.name_en || vendor.name}'s reward pool is open!`),
       body: t(`${config.drawWindowDays} 天內可以抽，人人有獎。`, `Draw within ${config.drawWindowDays} days — everyone wins.`),
       link: "/rewards",
-    });
+    }));
   }
-  await notifyVendor(vendor.id, {
+  await notifyVendor(vendor.id, () => ({
     title: t("本期回饋池已開池", "This period's reward pool is open"),
     body: t(`回饋池 ${pool} 元，${N} 張抽獎券。`, `Pool NT$${pool}, ${N} tickets.`),
     link: "/vendor-portal/growth",
-  });
+  }));
   return "pooled";
 }
 
@@ -230,7 +232,7 @@ exports.triggerRewardPeriodNow = onCall({}, async (request) => {
 
 /** Draw: sampling without replacement inside a transaction, weighted by remaining count per tier */
 exports.drawTicket = onCall({}, async (request) => {
-  assertSignedInUser(request, "抽獎");
+  assertSignedInUser(request, "抽獎", "enter the draw");
   const uid = request.auth.uid;
   const config = await loadPlatformConfig(db());
   let ticketRef;
@@ -265,11 +267,15 @@ exports.drawTicket = onCall({}, async (request) => {
     tx.update(couponRef, { status: "owned", user_id: uid, owned_at: FieldValue.serverTimestamp(), expires_at: expiresAt, ticket_id: ticketRef.id });
     tx.update(ticketRef, { status: "drawn", coupon_id: couponRef.id, drawn_at: FieldValue.serverTimestamp() });
     const tier = tierInfo(code);
-    return { coupon_id: couponRef.id, tier: code, label: tier.label, discount: tier.discount, expires_at: expiresAt.toMillis(), vendor_id: ticket.vendor_id };
+    return {
+      coupon_id: couponRef.id, tier: code, label: tier.label, label_en: tier.label_en || null, discount: tier.discount,
+      expires_at: expiresAt.toMillis(), vendor_id: ticket.vendor_id,
+    };
   });
   // Public winners ticker (no uid)
   await db().collection("draws").add({
-    vendor_id: result.vendor_id, buyer_tag: uid.slice(-4), tier: result.tier, label: result.label, discount: result.discount,
+    vendor_id: result.vendor_id, buyer_tag: uid.slice(-4), tier: result.tier, label: result.label, label_en: result.label_en,
+    discount: result.discount,
     created_at: FieldValue.serverTimestamp(),
   }).catch((err) => logger.warn("draw ticker write failed", err));
   await refreshRewardStatus(result.vendor_id);
@@ -313,12 +319,15 @@ exports.couponReminders = onSchedule({ schedule: "every day 10:00", timeZone: "A
   for (const d of snap.docs) {
     const c = d.data();
     if (c.reminded) continue;
-    await notifyUser(c.user_id, {
+    await notifyUser(c.user_id, () => ({
       kind: "reward",
       title: t("折價券快到期了", "Your coupon expires soon"),
-      body: t(`「${c.vendor_name}」折 ${c.discount} 元券 ${c.expires_at.toDate().toLocaleDateString("zh-TW", { timeZone: "Asia/Taipei" })} 到期`, `${c.vendor_name} NT$${c.discount} off coupon expires soon`),
+      body: t(
+        `「${c.vendor_name}」折 ${c.discount} 元券 ${c.expires_at.toDate().toLocaleDateString("zh-TW", { timeZone: "Asia/Taipei" })} 到期`,
+        `Your NT$${c.discount} off coupon for ${c.vendor_name_en || c.vendor_name} expires on ${c.expires_at.toDate().toLocaleDateString("en-US", { timeZone: "Asia/Taipei", month: "short", day: "numeric" })}`,
+      ),
       link: "/rewards",
-    });
+    }));
     await d.ref.update({ reminded: true });
   }
 });
@@ -358,7 +367,7 @@ exports.detectAnomalies = onSchedule({ schedule: "every day 03:00", timeZone: "A
   for (const [k, n] of byUser) {
     if (n < 3) continue;
     const [uid, vendorId] = k.split("|");
-    findings.push({ type: "refunds", user_id: uid, vendor_id: vendorId, detail: `7 天內退款 ${n} 筆` });
+    findings.push({ type: "refunds", user_id: uid, vendor_id: vendorId, detail: `7 天內退款 ${n} 筆`, detail_en: `${n} refunds within 7 days` });
   }
   const tickets = await db().collection("rewardTickets").where("created_at", ">=", Timestamp.fromMillis(Date.now() - 14 * 86400000)).get();
   const perPeriod = new Map();
@@ -374,7 +383,11 @@ exports.detectAnomalies = onSchedule({ schedule: "every day 03:00", timeZone: "A
     for (const [uid, n] of m) {
       if (total >= 20 && n / total > 0.2) {
         const [vendorId, period] = key.split("|");
-        findings.push({ type: "ticket_share", user_id: uid, vendor_id: vendorId, detail: `${period} 期占 ${Math.round((n / total) * 100)}%（${n}/${total} 張）` });
+        const pct = Math.round((n / total) * 100);
+        findings.push({
+          type: "ticket_share", user_id: uid, vendor_id: vendorId, detail: `${period} 期占 ${pct}%（${n}/${total} 張）`,
+          detail_en: `${pct}% of period ${period}'s tickets (${n}/${total})`,
+        });
       }
     }
   }
@@ -387,14 +400,14 @@ exports.detectAnomalies = onSchedule({ schedule: "every day 03:00", timeZone: "A
     if (device) byDevice.set(device, [...(byDevice.get(device) || []), uid]);
   }
   for (const [device, list] of byDevice) {
-    if (list.length > 2) findings.push({ type: "device", user_id: list.join(","), vendor_id: null, detail: `同一裝置 ${list.length} 個帳號領券（${device.slice(0, 8)}…）` });
+    if (list.length > 2) findings.push({ type: "device", user_id: list.join(","), vendor_id: null, detail: `同一裝置 ${list.length} 個帳號領券（${device.slice(0, 8)}…）`, detail_en: `${list.length} accounts claimed coupons on one device (${device.slice(0, 8)}…)` });
   }
   const today = taipeiToday();
   for (const f of findings) {
     const id = `${today}_${f.type}_${f.user_id.slice(0, 40)}_${f.vendor_id || "all"}`.replace(/[^\w-]/g, "_");
     await db().collection("anomalies").doc(id).set({ ...f, date: today, status: "open", created_at: FieldValue.serverTimestamp() }, { merge: true });
     if (f.vendor_id) {
-      await notifyVendor(f.vendor_id, { title: t("異常提醒", "Anomaly flagged"), body: f.detail, link: "/vendor-portal/growth" });
+      await notifyVendor(f.vendor_id, () => ({ title: t("異常提醒", "Anomaly flagged"), body: t(f.detail, f.detail_en), link: "/vendor-portal/growth" }));
     }
   }
 });

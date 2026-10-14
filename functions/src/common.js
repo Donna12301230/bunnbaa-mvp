@@ -4,7 +4,7 @@ const { onCall: rawOnCall, HttpsError } = require("firebase-functions/v2/https")
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
-const { withLang, t } = require("./i18n");
+const { withLang, inLang, t } = require("./i18n");
 
 const REGION = "asia-east1";
 const db = () => admin.firestore();
@@ -33,9 +33,10 @@ function assertAdminOrEmulator(request) {
   }
 }
 
-function assertSignedInUser(request, action) {
+/** zhAction/enAction: what the user was trying to do, e.g. ("結帳", "check out") */
+function assertSignedInUser(request, zhAction, enAction = "continue") {
   if (!request.auth || request.auth.token?.firebase?.sign_in_provider === "anonymous") {
-    throw new HttpsError("unauthenticated", t(`請先登入才能${action}`, `Please log in to ${action}`));
+    throw new HttpsError("unauthenticated", t(`請先登入才能${zhAction}`, `Please log in to ${enAction}`));
   }
 }
 
@@ -64,12 +65,16 @@ async function callerVendorId(request, requested) {
 /**
  * In-app notification + best-effort push. notifications is the user's own readable inbox (the notification bell);
  * FCM tokens live in userTokens/{uid}; push failures don't affect the main flow.
+ * message is { title, body, link, kind } or a builder () => ({ ... }): a builder runs inside inLang(users/{uid}.lang),
+ * so t() in it follows the RECIPIENT's language rather than the caller's (or Chinese in schedules/triggers).
  */
-async function notifyUser(uid, { title, body, link = null, kind = "general" }) {
+async function notifyUser(uid, message) {
   if (!uid) return;
   try {
-    // Notification kinds turned off in the member center (e.g. charity meals): neither in-app nor push is sent
     const prefs = await db().collection("users").doc(uid).get();
+    const lang = prefs.exists ? prefs.data().lang : null;
+    const { title, body, link = null, kind = "general" } = typeof message === "function" ? inLang(lang, message) : message;
+    // Notification kinds turned off in the member center (e.g. charity meals): neither in-app nor push is sent
     const muted = prefs.exists ? prefs.data().muted_kinds || [] : [];
     if (muted.includes(kind)) return;
     await db().collection("notifications").add({
@@ -87,10 +92,12 @@ async function notifyUser(uid, { title, body, link = null, kind = "general" }) {
   }
 }
 
+/** message: object or builder, as in notifyUser (a builder follows the vendor owner's language) */
 async function notifyVendor(vendorId, message) {
   const snap = await db().collection("vendors").doc(vendorId).get();
   const owner = snap.exists ? snap.data().owner_uid : null;
-  if (owner) await notifyUser(owner, { kind: "vendor", ...message });
+  if (!owner) return;
+  await notifyUser(owner, typeof message === "function" ? () => ({ kind: "vendor", ...message() }) : { kind: "vendor", ...message });
 }
 
 /** Load a vendor's items, components and ingredients in one go (needed for prep, purchasing and tags) */

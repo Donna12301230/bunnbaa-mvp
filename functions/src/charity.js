@@ -34,6 +34,7 @@ function mealFromLock(lockId, lock, vendor, source, deadline) {
     pickup_code: lock.pickup_code || null,
     item_name: lock.item_name,
     item_name_en: lock.item_name_en || "",
+    dish_names_en: lock.dish_names_en || null,
     sides: [
       ...(lock.slots || []).filter((s) => !s.removed).map((s) => s.resolved || s.default_dish),
       lock.extra_side?.mode === "addon" ? lock.extra_side.resolved || lock.extra_side.dish : null,
@@ -60,12 +61,12 @@ async function notifyNearby(vendor, count) {
     const sent = log.date === today ? log.count || 0 : 0;
     if (sent >= 2) continue;
     await doc.ref.set({ charity_push_log: { date: today, count: sent + 1 } }, { merge: true });
-    await notifyUser(doc.id, {
+    await notifyUser(doc.id, () => ({
       kind: "charity_nearby",
       title: t("附近有愛心餐", "Charity meals nearby"),
-      body: t(`「${vendor.name}」有 ${count} 份愛心餐開放領取`, `${vendor.name} has ${count} charity meal(s) open`),
+      body: t(`「${vendor.name}」有 ${count} 份愛心餐開放領取`, `${vendor.name_en || vendor.name} has ${count} charity meal(s) open`),
       link: "/my-bookings?tab=charity",
-    });
+    }));
   }
 }
 
@@ -81,7 +82,7 @@ function periodDeadline(end, config) {
 
 /** Diner donates on the pickup day (before the pickup slot ends): opens for claiming immediately and counts toward their charity record */
 exports.donateLock = onCall({}, async (request) => {
-  assertSignedInUser(request, "捐出愛心餐");
+  assertSignedInUser(request, "捐出愛心餐", "donate a charity meal");
   const lockId = request.data?.lock_id;
   const ref = db().collection("locks").doc(String(lockId || "_"));
   const snap = await ref.get();
@@ -139,7 +140,7 @@ exports.convertToCharity = onSchedule({ schedule: "every 5 minutes", timeZone: "
       await planRef.set({ [flag]: true, charity_noshow_count: FieldValue.increment(converted.length) }, { merge: true });
       await notifyNearby(vendor, converted.length);
       for (const uid of converted) {
-        await notifyUser(uid, {
+        await notifyUser(uid, () => ({
           kind: "charity",
           title: t("今天的便當沒有領到", "You didn't pick up today's meal"),
           body: t(
@@ -147,15 +148,15 @@ exports.convertToCharity = onSchedule({ schedule: "every 5 minutes", timeZone: "
             "To avoid waste, it's now a charity meal for someone in need. Your draw tickets were still issued. Next time, tap \"Donate\" before pickup so the meal is fresher."
           ),
           link: "/my-bookings",
-        });
+        }));
       }
       if (converted.length > 0) {
         const closeAt = deadline.toLocaleTimeString("en-GB", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit" });
-        await notifyVendor(vendor.id, {
+        await notifyVendor(vendor.id, () => ({
           title: t(`${label} ${converted.length} 份未取餐已轉為愛心餐`, `${converted.length} unclaimed meals are now charity meals`),
           body: t(`開放預約與現場領取，${closeAt} 截止後請輸入現場送出份數。`, `Open for reservations and walk-ins until ${closeAt}.`),
           link: "/vendor-portal/charity",
-        });
+        }));
       }
     }
   });
@@ -178,11 +179,11 @@ exports.closeCharity = onSchedule({ schedule: "every 10 minutes", timeZone: "Asi
       const mine = meals.docs.filter((d) => d.data().deadline?.toMillis?.() <= deadline.getTime());
       const open = mine.filter((d) => d.data().status === "available");
       if (mine.length > 0) {
-        await notifyVendor(vendor.id, {
+        await notifyVendor(vendor.id, () => ({
           title: t(`${label}愛心餐已截止`, "Charity meals closed"),
           body: t(`還有 ${open.length} 份未被預約，請輸入現場送出份數，其餘記為報廢。`, `${open.length} weren't reserved. Enter how many you gave out on site.`),
           link: "/vendor-portal/charity",
-        });
+        }));
       }
     }
   });
@@ -192,7 +193,7 @@ exports.closeCharity = onSchedule({ schedule: "every 10 minutes", timeZone: "Asi
  * Online reservation: phone-verified account, 1 per person per day, arrive within 10 minutes; released on timeout, no ban.
  */
 exports.reserveCharity = onCall({}, async (request) => {
-  assertSignedInUser(request, "預約愛心餐");
+  assertSignedInUser(request, "預約愛心餐", "reserve a charity meal");
   const uid = request.auth.uid;
   if (!request.auth.token?.phone_number && !isEmulator()) {
     const user = await db().collection("users").doc(uid).get();
@@ -253,12 +254,12 @@ exports.expireCharityReservation = onSchedule({ schedule: "every 1 minutes", tim
         tx.update(mealRef, { status: meal.deadline.toMillis() > Date.now() ? "available" : "wasted", reservation_id: FieldValue.delete() });
       }
     });
-    await notifyUser(res.user_id, {
+    await notifyUser(res.user_id, () => ({
       kind: "charity",
       title: t("愛心餐預約已逾時", "Charity reservation expired"),
       body: t(`預約後 ${config.charityReserveMinutes} 分鐘內未到場，餐點已釋出給下一位。還有剩的話可以再預約。`, `You didn't arrive within ${config.charityReserveMinutes} minutes, so the meal went to the next person. You can reserve again if any are left.`),
       link: "/my-bookings?tab=charity",
-    });
+    }));
   }
   const old = await db().collection("charityReservations").where("date", "<", addDays(taipeiToday(), -30)).limit(300).get();
   const batch = db().batch();
@@ -322,12 +323,12 @@ exports.submitCharityResult = onCall({}, async (request) => {
       if (lock?.buyer_uid) owners.add(lock.buyer_uid);
     }
     for (const uid of owners) {
-      await notifyUser(uid, {
+      await notifyUser(uid, () => ({
         kind: "charity",
         title: t("今天的愛心餐都送出去了", "All of today's charity meals were given out"),
         body: t("謝謝你，今天沒有浪費任何一份便當。", "Thank you — not a single meal went to waste today."),
         link: "/my-bookings",
-      });
+      }));
     }
   }
   return { wasted, given: Math.min(given, open.length), claimed };

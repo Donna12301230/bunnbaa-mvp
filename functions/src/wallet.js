@@ -54,8 +54,11 @@ function takeFunding(funding, amount) {
   return { taken, rest, short: left };
 }
 
-/** Credit points, split into lots by source. Works inside an outer transaction (pass tx) or standalone. */
-function writeCredit(tx, uid, sources, { reason, lockId = null, text = "" }) {
+/**
+ * Credit points, split into lots by source. Works inside an outer transaction (pass tx) or standalone.
+ * text / textEn: the item name shown on the wallet entry (text_en falls back to text when there's no English name).
+ */
+function writeCredit(tx, uid, sources, { reason, lockId = null, text = "", textEn = "" }) {
   const total = sources.reduce((s, x) => s + int(x.amount), 0);
   if (total <= 0) return 0;
   for (const s of sources) {
@@ -66,7 +69,9 @@ function writeCredit(tx, uid, sources, { reason, lockId = null, text = "" }) {
     });
   }
   tx.set(walletRef(uid), { balance: FieldValue.increment(total), updated_at: FieldValue.serverTimestamp() }, { merge: true });
-  tx.set(entryRef(uid), { type: "credit", amount: total, reason, lock_id: lockId, text, created_at: FieldValue.serverTimestamp() });
+  tx.set(entryRef(uid), { type: "credit", amount: total, reason, lock_id: lockId, text, text_en: textEn || text,
+    created_at: FieldValue.serverTimestamp(),
+  });
   return total;
 }
 
@@ -191,7 +196,7 @@ function splitFunding(prices, cashTx, pointSources) {
 
 /** Member center: refund to LINE Pay. Each lot goes back to its recorded original transaction; failed ones stay, and the result reports what didn't go through. */
 exports.withdrawPoints = onCall({}, async (request) => {
-  assertSignedInUser(request, "退回點數");
+  assertSignedInUser(request, "退回點數", "refund points");
   const uid = request.auth.uid;
   const lots = (await lotsOf(uid).where("remaining", ">", 0).get()).docs.filter((d) => d.data().source_tx);
   let withdrawn = 0;
@@ -243,27 +248,28 @@ exports.refundLockAsPoints = onCall({}, async (request) => {
     if (lock.status === "cancelled") throw new HttpsError("failed-precondition", t("這份已經取消／退款過了", "Already cancelled or refunded"));
     const payer = lock.payer_uid || lock.buyer_uid;
     const { sources, funding, amount } = refundSources(lock, Infinity);
-    writeCredit(tx, payer, sources, { reason: "vendor_failed", lockId, text: lock.item_name || "" });
+    writeCredit(tx, payer, sources, { reason: "vendor_failed", lockId, text: lock.item_name || "", textEn: lock.item_name_en || "" });
     tx.update(ref, {
       status: "cancelled", cancel_reason: "vendor_failed", cancel_note: note || null,
       refunded_amount: (lock.refunded_amount || 0) + amount, funding, cancelled_at: FieldValue.serverTimestamp(),
     });
-    return { payer, amount, item: lock.item_name };
+    return { payer, amount, item: lock.item_name, itemEn: lock.item_name_en || lock.item_name };
   });
   if (result.amount > 0) {
-    await notifyUser(result.payer, {
+    // Admin action: the text follows the payer's language, not the admin's
+    await notifyUser(result.payer, () => ({
       kind: "refund",
       title: t("已全額退成平台點數", "Refunded as BunnBaa points"),
-      body: t(`「${result.item}」已全額退成 ${result.amount} 點，可在結帳時折抵，或到會員中心退回 LINE Pay。`, `${result.item} was refunded as ${result.amount} points — use them at checkout or send them back to LINE Pay from My account.`),
+      body: t(`「${result.item}」已全額退成 ${result.amount} 點，可在結帳時折抵，或到會員中心退回 LINE Pay。`, `${result.itemEn} was refunded as ${result.amount} points — use them at checkout or send them back to LINE Pay from My account.`),
       link: "/profile?tab=points",
-    }).catch(() => undefined);
+    })).catch(() => undefined);
   }
   return { refunded_points: result.amount };
 });
 
 /** Cancelled on the payment page (redirected back from the LINE Pay cancel URL): return the held points */
 exports.cancelPaymentIntent = onCall({}, async (request) => {
-  assertSignedInUser(request, "取消付款");
+  assertSignedInUser(request, "取消付款", "cancel a payment");
   const orderId = String(request.data?.order_id || "");
   if (!orderId) throw new HttpsError("invalid-argument", "order_id is required");
   const ref = db().collection("payment_intents").doc(orderId);

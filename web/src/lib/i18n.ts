@@ -48,6 +48,9 @@ function applyHtmlLang(lang: Lang) {
   document.documentElement.lang = lang === "en" ? "en" : "zh-Hant-TW";
   // The tab title in index.html is Chinese; English visitors (e.g. ?lang=en) would otherwise see it on the tab
   document.title = lang === "en" ? "BunnBaa | Book early, eat happy" : "BunnBaa 飯飽｜越早訂，越開心";
+  document.querySelector('meta[name="description"]')?.setAttribute("content", lang === "en"
+    ? "Pre-order lunch from great spots near campus at up to 20% off. Pick up on time — no queues, no waste. Can't make it? Transfer it to a classmate."
+    : "提前預約學校附近的好店午餐，最高 8 折早鳥價；時間到直接取餐，不排隊、不浪費。去不了還能轉讓給同學。");
 }
 
 export function setLang(lang: Lang) {
@@ -91,7 +94,7 @@ export function loc<T extends object>(obj: T | null | undefined, field: keyof T 
  * Dish names, side categories and custom-field text inside a menu item: the English UI reads the item's dish_names_en map
  * (filled by Functions translateMenuItem), falling back to the original Chinese. E.g. dishName(item, slot.default.name).
  */
-export function dishName(item: { dish_names_en?: Record<string, string> } | null | undefined, name: string): string {
+export function dishName(item: { dish_names_en?: Record<string, string> | null } | null | undefined, name: string): string {
   if (current === "en") {
     const en = item?.dish_names_en?.[name];
     if (typeof en === "string" && en.trim()) return en;

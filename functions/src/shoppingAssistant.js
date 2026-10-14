@@ -598,7 +598,7 @@ async function runAssistant({ messages, lang, area, taste, now = new Date(), onT
  * Returns { reply, cards[], disclaimer }.
  */
 exports.askShoppingAssistant = onCall({ timeoutSeconds: 120, memory: "512MiB" }, async (request) => {
-  assertSignedInUser(request, "使用預購助理");
+  assertSignedInUser(request, "使用預購助理", "use the pre-order assistant");
   const uid = request.auth.uid;
   const lang = request.data?.lang === "en" ? "en" : "zh";
   const messages = cleanMessages(request.data?.messages);

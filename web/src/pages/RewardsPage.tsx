@@ -15,8 +15,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMyCoupons, useMyTickets, millis } from "@/hooks/useMyRewards";
 import { useVendors } from "@/hooks/useVendors";
-import { couponTitle, openProgress, tierLabel } from "@/lib/rewards";
+import { ALL_TIERS, couponTitle, openProgress, tierLabel } from "@/lib/rewards";
 import { loc, tr } from "@/lib/i18n";
+import { paren } from "@/lib/format";
 import type { RewardStatus } from "@/types";
 
 /**
@@ -34,7 +35,7 @@ export default function RewardsPage() {
   const vendorName = (id: string, fallback?: string) => loc(vendors.find((v) => v.id === id), "name") || fallback || "";
   const [statuses, setStatuses] = useState<RewardStatus[]>([]);
   const [drawing, setDrawing] = useState<string | null>(null);
-  const [result, setResult] = useState<{ label: string; discount: number; expires_at: number; vendor: string } | null>(null);
+  const [result, setResult] = useState<{ label: string; tier?: string; discount: number; expires_at: number; vendor: string } | null>(null);
 
   useEffect(() => onSnapshot(collection(db, "rewardStatus"), (snap) => {
     setStatuses(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as RewardStatus));
@@ -55,7 +56,7 @@ export default function RewardsPage() {
     setDrawing(vendorId);
     try {
       const res = await httpsCallable(functions, "drawTicket")({ vendor_id: vendorId });
-      const data = res.data as { label: string; discount: number; expires_at: number };
+      const data = res.data as { label: string; tier?: string; discount: number; expires_at: number };
       setResult({ ...data, vendor: name });
     } catch (err) {
       toast({ title: tr("抽獎失敗", "Draw failed"), description: (err as Error).message, variant: "destructive" });
@@ -135,9 +136,9 @@ export default function RewardsPage() {
               <p className="text-xs text-muted-foreground">{tr(`折價券只能在發券店家使用、綁定帳號不可轉讓；每筆訂單限用一張，折抵不超過訂單小計、不找零。訂單取消（取餐 ${liveConfig().cancelHoursBefore} 小時前）時，用掉的券會退回並保留原到期日。`, `Coupons are for the issuing vendor only and can't be transferred. One per order, no change given. If you cancel the order (up to ${liveConfig().cancelHoursBefore} hours before pickup), the coupon you used comes back with its original expiry.`)}</p>
               {pastCoupons.length > 0 && (
                 <details className="text-sm">
-                  <summary className="cursor-pointer text-muted-foreground">{tr("已使用／過期", "Used / expired")}（{pastCoupons.length}）</summary>
+                  <summary className="cursor-pointer text-muted-foreground">{tr("已使用／過期", "Used / expired")}{paren(pastCoupons.length)}</summary>
                   <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                    {pastCoupons.map((c) => <li key={c.id}>{vendorName(c.vendor_id, c.vendor_name)} {couponTitle(c.discount)}・{c.status === "redeemed" ? tr("已使用", "used") : tr("已過期", "expired")}</li>)}
+                    {pastCoupons.map((c) => <li key={c.id}>{vendorName(c.vendor_id, c.vendor_name)} {couponTitle(c.discount)}{tr("・", " · ")}{c.status === "redeemed" ? tr("已使用", "used") : tr("已過期", "expired")}</li>)}
                   </ul>
                 </details>
               )}
@@ -155,7 +156,8 @@ export default function RewardsPage() {
           {result && (
             <>
               <p className="font-heading text-6xl font-semibold">{couponTitle(result.discount)}</p>
-              <p className="text-sm text-muted-foreground">{result.label}</p>
+              {/* The server label is the Chinese tier name from config; English UI uses the matching tier's English name */}
+              <p className="text-sm text-muted-foreground">{tr(result.label, ALL_TIERS.find((x) => x.code === result.tier)?.labelEn ?? result.label)}</p>
               <p className="text-xs text-muted-foreground">{tr(`${new Date(result.expires_at).toLocaleDateString()} 前有效，結帳時選用`, `Valid until ${new Date(result.expires_at).toLocaleDateString()} — apply it at checkout`)}</p>
             </>
           )}

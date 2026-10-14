@@ -230,7 +230,7 @@ export default function RevenueDashboardCard({ vendor }: { vendor: Vendor | null
                         const g = ingredientGroup(catalog?.ingredientsById[n.ingredient_id]?.category);
                         return (
                           <li key={n.ingredient_id} className="grid grid-cols-[5rem_1fr_auto] items-center gap-2 text-sm">
-                            <span className="truncate">{n.name}</span>
+                            <span className="truncate">{tr(n.name, loc(catalog?.ingredientsById[n.ingredient_id], "name") || n.name)}</span>
                             <div className="h-3 rounded-full bg-muted overflow-hidden"><div className={cn("h-full", GROUP_DOT[g])} style={{ width: `${(n.cost / needMax) * 100}%` }} /></div>
                             <span className="text-xs text-muted-foreground tabular-nums w-20 text-right">{nt(n.cost)}</span>
                           </li>

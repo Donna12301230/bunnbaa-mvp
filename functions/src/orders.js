@@ -209,6 +209,8 @@ async function buildDrafts(line, ctx) {
       menu_item_id: item.id,
       item_name: item.name,
       item_name_en: item.name_en ?? null,
+      // English names of the dishes / side categories / custom options in this order (zh -> en), for the English UI
+      dish_names_en: item.dish_names_en ?? null,
       pickup_window: pickupWindow,
       pickup_date: pickupDate,
       meal_period: mealPeriodOf(pickupWindow, ctx.config),
@@ -339,7 +341,7 @@ async function newContext(request) {
  * quantity, note, coupon_id }]. Lines may have different pickup dates (bookable up to bookingRangeDays, 30 days, ahead).
  */
 exports.createCartLinePayReservation = onCall({}, async (request) => {
-  assertSignedInUser(request, "結帳");
+  assertSignedInUser(request, "結帳", "check out");
   await assertNotBanned(request.auth.uid);
   const lines = request.data?.lines ?? request.data?.items;
   if (!Array.isArray(lines) || lines.length === 0) throw new HttpsError("invalid-argument", "lines must be a non-empty array");
@@ -362,7 +364,7 @@ exports.createCartLinePayReservation = onCall({}, async (request) => {
  * preview=true only returns each day's date and price (for the confirmation dialog) without creating a payment.
  */
 exports.createPlanLinePayReservation = onCall({}, async (request) => {
-  assertSignedInUser(request, "加入計畫");
+  assertSignedInUser(request, "加入計畫", "join a plan");
   await assertNotBanned(request.auth.uid);
   const { plan_id: planId, start_date: startDate, pickup_window: pickupWindow } = request.data || {};
   if (typeof planId !== "string" || !planId) throw new HttpsError("invalid-argument", "plan_id is required");
@@ -467,7 +469,7 @@ async function phoneLast3(request) {
 }
 
 exports.confirmLinePayPayment = onCall({}, async (request) => {
-  assertSignedInUser(request, "確認付款");
+  assertSignedInUser(request, "確認付款", "confirm payment");
   const { order_id: orderId } = request.data || {};
   if (!orderId) throw new HttpsError("invalid-argument", "order_id is required");
   const intentRef = db().collection("payment_intents").doc(orderId);
@@ -620,7 +622,7 @@ async function cancelAndRefund(lockRef, reason) {
     const couponRef = lock.coupon_id ? db().collection("coupons").doc(lock.coupon_id) : null;
     const coupon = couponRef ? (await tx.get(couponRef)).data() : null;
     const { sources, funding, amount } = wallet.refundSources(lock, Infinity);
-    wallet.writeCredit(tx, lock.payer_uid || lock.buyer_uid, sources, { reason, lockId: lockRef.id, text: lock.item_name || "" });
+    wallet.writeCredit(tx, lock.payer_uid || lock.buyer_uid, sources, { reason, lockId: lockRef.id, text: lock.item_name || "", textEn: lock.item_name_en || "" });
     tx.update(lockRef, {
       status: "cancelled", cancel_reason: reason, refunded_amount: (lock.refunded_amount || 0) + amount, refunded_as: "points", funding,
       cancelled_at: FieldValue.serverTimestamp(),
@@ -648,7 +650,7 @@ async function loadOwnLock(request, lockId) {
 }
 
 exports.cancelLock = onCall({}, async (request) => {
-  assertSignedInUser(request, "取消訂單");
+  assertSignedInUser(request, "取消訂單", "cancel an order");
   const { ref, lock } = await loadOwnLock(request, request.data?.lock_id);
   if (lock.status !== "locked") throw new HttpsError("failed-precondition", t("這筆訂單目前不能取消（轉讓中請先取消轉讓）", "This order can't be cancelled right now"));
   if ((lock.payer_uid || lock.buyer_uid) !== request.auth.uid) {
@@ -683,7 +685,8 @@ async function cancelForCoupon(lockRef, config) {
     const expiresAt = Timestamp.fromMillis(Date.now() + config.couponValidDays * 86400000);
     if (amount > 0) {
       tx.set(couponRef, {
-        vendor_id: lock.vendor_id, vendor_name: vendor.name || "", tier: "refund", label: "取消補償券", discount: amount,
+        vendor_id: lock.vendor_id, vendor_name: vendor.name || "", vendor_name_en: vendor.name_en || null, tier: "refund",
+        label: "取消補償券", label_en: "Cancellation coupon", discount: amount,
         status: "owned", user_id: lock.buyer_uid, owned_at: FieldValue.serverTimestamp(), expires_at: expiresAt,
         source_lock_id: lockRef.id, issued_at: FieldValue.serverTimestamp(),
       });
@@ -752,7 +755,7 @@ function resaleProblem(lock, uid, now = Date.now()) {
 
 /** "Take over" (我要接手): hold this meal for 15 minutes, then request payment from LINE Pay (NT$0 goes straight to the confirmation page) */
 exports.createResaleLinePayReservation = onCall({}, async (request) => {
-  assertSignedInUser(request, "接手轉讓");
+  assertSignedInUser(request, "接手轉讓", "take over a transferred meal");
   await assertNotBanned(request.auth.uid);
   const lockId = request.data?.lock_id;
   if (typeof lockId !== "string" || !lockId) throw new HttpsError("invalid-argument", "lock_id is required");
@@ -930,7 +933,7 @@ async function confirmResale(request, intentRef, intent) {
   let refundStatus = "none";
   if (refundAmount > 0) {
     try {
-      await wallet.creditPoints(prev.payer_uid, refund.sources, { reason: "transfer", lockId: intent.lock_id, text: lock.item_name || "" });
+      await wallet.creditPoints(prev.payer_uid, refund.sources, { reason: "transfer", lockId: intent.lock_id, text: lock.item_name || "", textEn: lock.item_name_en || "" });
       refundStatus = "done";
     } catch (err) {
       logger.error(`resale points refund failed for lock ${intent.lock_id}`, err);
@@ -940,23 +943,25 @@ async function confirmResale(request, intentRef, intent) {
   await lockRef.update({
     transfer_refund: { intent_id: orderId, uid: prev.payer_uid, amount: refundAmount, as: "points", status: refundStatus, at: Timestamp.now() },
   });
+  // Recipients are the previous holder/payer, not the caller: the text follows each one's users.lang
+  const itemEn = lock.item_name_en || lock.item_name;
   const pointsText = (n) => t(`${n} 點已存入你的平台點數，可結帳折抵或到會員中心退回 LINE Pay。`, `${n} points were added to your BunnBaa balance — use them at checkout or send them back to LINE Pay from My account.`);
-  await notifyUser(prev.buyer_uid, {
+  await notifyUser(prev.buyer_uid, () => ({
     kind: "transfer",
     title: t("你轉讓的餐點已被接手", "Your listed meal was taken over"),
     body: refundStatus === "done" && prev.payer_uid === prev.buyer_uid
-      ? `${t(`「${lock.item_name}」已由別人付款接手。`, `${lock.item_name} was taken over. `)}${pointsText(refundAmount)}`
-      : t(`「${lock.item_name}」已由別人付款接手。`, `${lock.item_name} was taken over.`),
+      ? `${t(`「${lock.item_name}」已由別人付款接手。`, `${itemEn} was taken over. `)}${pointsText(refundAmount)}`
+      : t(`「${lock.item_name}」已由別人付款接手。`, `${itemEn} was taken over.`),
     link: refundStatus === "done" && prev.payer_uid === prev.buyer_uid ? "/profile?tab=points" : "/my-bookings",
-  }).catch((err) => logger.warn("notify seller failed", err));
+  })).catch((err) => logger.warn("notify seller failed", err));
   // Reselling a meal that was itself gifted or claimed for free: refund whoever originally paid
   if (refundStatus === "done" && prev.payer_uid !== prev.buyer_uid) {
-    await notifyUser(prev.payer_uid, {
+    await notifyUser(prev.payer_uid, () => ({
       kind: "transfer",
       title: t("餐點款項已退成點數", "Your payment came back as points"),
-      body: `${t(`你付款的「${lock.item_name}」已由別人付款接手。`, `Someone paid for ${lock.item_name}. `)}${pointsText(refundAmount)}`,
+      body: `${t(`你付款的「${lock.item_name}」已由別人付款接手。`, `Someone took over ${itemEn}, which you paid for. `)}${pointsText(refundAmount)}`,
       link: "/profile?tab=points",
-    }).catch((err) => logger.warn("notify payer failed", err));
+    })).catch((err) => logger.warn("notify payer failed", err));
   }
   // Impact metric for AI resale matching: was the taker a notified member (failures don't affect the takeover)
   await recordMatchedClaim(intent.lock_id, uid).catch((err) => logger.warn(`recordMatchedClaim ${intent.lock_id}`, err));
@@ -979,7 +984,7 @@ function currentChoices(lock) {
  * phase 1 requires cancelling and re-ordering. Each day of a meal plan also changes its slot through this.
  */
 exports.updateLockChoices = onCall({}, async (request) => {
-  assertSignedInUser(request, "修改訂單");
+  assertSignedInUser(request, "修改訂單", "change an order");
   const { ref, lock } = await loadOwnLock(request, request.data?.lock_id);
   if (lock.status !== "locked") throw new HttpsError("failed-precondition", t("這筆訂單目前不能修改", "This order can't be changed"));
   const [vendorSnap, itemSnap] = await Promise.all([
@@ -1023,6 +1028,7 @@ exports.updateLockChoices = onCall({}, async (request) => {
       ));
     }
     Object.assign(patch, {
+      dish_names_en: item?.dish_names_en ?? lock.dish_names_en ?? null,
       slots: choice.resolved.slots,
       extra_side: choice.extra,
       custom_options: choice.custom,
@@ -1066,7 +1072,7 @@ exports.updateLockChoices = onCall({}, async (request) => {
     }
     tx.update(ref, patch);
     if (refundCredit?.amount > 0) {
-      wallet.writeCredit(tx, lock.payer_uid || lock.buyer_uid, refundCredit.sources, { reason: "price_change", lockId: ref.id, text: lock.item_name || "" });
+      wallet.writeCredit(tx, lock.payer_uid || lock.buyer_uid, refundCredit.sources, { reason: "price_change", lockId: ref.id, text: lock.item_name || "", textEn: lock.item_name_en || "" });
     }
   });
   if (changesChoices) {
@@ -1134,7 +1140,7 @@ function randomProxyCode() {
 
 /** The holder gets (or generates for the first time) the proxy pickup code for this meal */
 exports.getProxyPickupCode = onCall({}, async (request) => {
-  assertSignedInUser(request, "產生代領碼");
+  assertSignedInUser(request, "產生代領碼", "create a proxy pickup code");
   const lockId = request.data?.lock_id;
   if (typeof lockId !== "string" || !lockId) throw new HttpsError("invalid-argument", "lock_id is required");
   const ref = db().collection("locks").doc(lockId);
@@ -1167,7 +1173,7 @@ exports.issuePickupQr = onCall({}, async (request) => {
   let { lock_id: lockId } = request.data || {};
   const nonce = crypto.randomBytes(6).toString("hex");
   if (reservationId) {
-    assertSignedInUser(request, "領取愛心餐");
+    assertSignedInUser(request, "領取愛心餐", "claim a charity meal");
     const ref = db().collection("charityReservations").doc(reservationId);
     const snap = await ref.get();
     if (!snap.exists || snap.data().user_id !== request.auth.uid) throw new HttpsError("permission-denied", t("找不到這筆預約", "Reservation not found"));
@@ -1219,6 +1225,8 @@ function lockSummary(id, lock, extra = {}) {
     lock_id: id,
     pickup_code: lock.pickup_code,
     item_name: lock.item_name,
+    item_name_en: lock.item_name_en || null,
+    dish_names_en: lock.dish_names_en || null,
     pickup_date: lock.pickup_date,
     pickup_window: lock.pickup_window,
     main_dish: lock.main_dish || null,
@@ -1305,7 +1313,7 @@ async function completeCharityReservation(parsed, vendorId, preview) {
     }
     const mealRef = db().collection("charityMeals").doc(res.meal_id);
     const meal = (await tx.get(mealRef)).data();
-    const summary = { kind: "charity", reservation_id: parsed.id, pickup_code: meal?.pickup_code, item_name: meal?.item_name, sides: meal?.sides || [] };
+    const summary = { kind: "charity", reservation_id: parsed.id, pickup_code: meal?.pickup_code, item_name: meal?.item_name, item_name_en: meal?.item_name_en || null, dish_names_en: meal?.dish_names_en || null, sides: meal?.sides || [] };
     if (preview) return summary;
     tx.update(resRef, { status: "claimed", claimed_at: FieldValue.serverTimestamp(), qr_nonce: FieldValue.delete() });
     tx.update(mealRef, { status: "claimed", claimed_at: FieldValue.serverTimestamp() });
@@ -1389,7 +1397,9 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
     const extraJudge = extra?.wished ? judge(item, extra.slot, extra.candidate_index, extra.dish) : { ok: true };
     let backupFree = extra?.mode === "backup" && extraJudge.ok;
     let backupUsedFor = null;
+    // Notes are builders: they're turned into text later inside notifyUser, in the buyer's language
     const notes = [];
+    const dishEn = (name) => item?.dish_names_en?.[name] || name;
     const slots = (lock.slots || []).map((slot, slotIdx) => {
       if (slot.removed) return slot;
       if (slot.wished == null) return { ...slot, resolved: slot.default_dish };
@@ -1400,10 +1410,10 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
       if (backupFree) {
         backupFree = false;
         backupUsedFor = slotIdx;
-        notes.push(t(`「${slot.wished}」這次差 ${short} 人未成立，已幫你換成備案「${extra.dish}」`, `${slot.wished} was ${short} short — swapped to your backup ${extra.dish}`));
+        notes.push(() => t(`「${slot.wished}」這次差 ${short} 人未成立，已幫你換成備案「${extra.dish}」`, `${dishEn(slot.wished)} needed ${short} more orders — swapped to your backup ${dishEn(extra.dish)}`));
         return { ...slot, resolved: extra.dish, resolved_component_id: extra.component_id || null, backup_used: true, portion_level: extra.portion_level ?? 1 };
       }
-      notes.push(t(`「${slot.wished}」這次差 ${short} 人未成立，已幫你換回「${slot.default_dish}」`, `${slot.wished} was ${short} short — swapped back to ${slot.default_dish}`));
+      notes.push(() => t(`「${slot.wished}」這次差 ${short} 人未成立，已幫你換回「${slot.default_dish}」`, `${dishEn(slot.wished)} needed ${short} more orders — swapped back to ${dishEn(slot.default_dish)}`));
       return { ...slot, resolved: slot.default_dish, portion_level: 1 };
     });
     let extraSide = extra;
@@ -1414,7 +1424,7 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
         extraSide = extraJudge.ok
           ? { ...extra, resolved: extra.dish }
           : { ...extra, resolved: fallback?.name || null, resolved_component_id: fallback?.component_id || null, portion_level: 1 };
-        if (!extraJudge.ok) notes.push(t(`加菜「${extra.dish}」未成立，已改為「${fallback?.name || "預設菜"}」`, `Add-on ${extra.dish} didn't make it — you'll get ${fallback?.name || "the default"}`));
+        if (!extraJudge.ok) notes.push(() => t(`加菜「${extra.dish}」未成立，已改為「${fallback?.name || "預設菜"}」`, `Add-on ${dishEn(extra.dish)} didn't make it — you'll get ${fallback?.name ? dishEn(fallback.name) : "the default side"}`));
       } else {
         extraSide = { ...extra, resolved: backupUsedFor != null ? extra.dish : null, used_for_slot: backupUsedFor };
       }
@@ -1473,18 +1483,18 @@ async function runLockOrders(vendor, date, { force = false } = {}) {
   await batch.commit();
 
   for (const [uid, notes] of failedWishes) {
-    await notifyUser(uid, {
+    await notifyUser(uid, () => ({
       kind: "wish",
       title: t("配菜許願未成立", "Side-dish wish didn't make it"),
-      body: t(`${date}：${notes.join("；")}。訂單照常成立。`, `${date}: ${notes.join("; ")}. Your order stands.`),
+      body: t(`${date}：${notes.map((n) => n()).join("；")}。訂單照常成立。`, `${date}: ${notes.map((n) => n()).join("; ")}. Your order still stands.`),
       link: "/my-bookings",
-    });
+    }));
   }
-  await notifyVendor(vendor.id, {
+  await notifyVendor(vendor.id, () => ({
     title: t(`${date} 備料清單已產生`, `Prep list for ${date} is ready`),
     body: t(`共 ${locks.length} 份${shortages.length ? `，有 ${shortages.length} 項缺料需臨時補貨` : ""}`, `${locks.length} meals${shortages.length ? `, ${shortages.length} shortages` : ""}`),
     link: "/vendor-portal/prep",
-  });
+  }));
   return { order_count: locks.length, shortages: shortages.length };
 }
 

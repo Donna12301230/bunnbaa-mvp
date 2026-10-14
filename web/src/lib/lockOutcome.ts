@@ -66,6 +66,8 @@ export interface PickupSummary {
   reservation_id?: string;
   pickup_code?: string;
   item_name?: string;
+  item_name_en?: string | null;
+  dish_names_en?: Record<string, string> | null;
   pickup_date?: string;
   pickup_window?: string;
   main_dish?: string | null;

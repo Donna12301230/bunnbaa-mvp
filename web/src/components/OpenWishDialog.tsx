@@ -9,12 +9,13 @@ import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
 import { useRequireLogin } from "@/hooks/useRequireLogin";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface Dish {
   id: string;
   name: string;
+  name_en?: string; // Auto-translated by Functions (translateDish)
   aliases?: string[];
   category?: string;
 }
@@ -45,7 +46,8 @@ export default function OpenWishDialog({ open, onOpenChange, vendorId, vendorNam
   const matches = useMemo(() => {
     const q = text.trim();
     if (!q) return dishes.slice(0, 12);
-    return dishes.filter((d) => d.name.includes(q) || d.aliases?.some((a) => a.includes(q))).slice(0, 12);
+    const lower = q.toLowerCase();
+    return dishes.filter((d) => d.name.includes(q) || d.aliases?.some((a) => a.includes(q)) || d.name_en?.toLowerCase().includes(lower)).slice(0, 12);
   }, [dishes, text]);
 
   async function submit() {
@@ -54,8 +56,8 @@ export default function OpenWishDialog({ open, onOpenChange, vendorId, vendorNam
     try {
       const fn = httpsCallable(functions, "placeOpenWish");
       const res = await fn(picked ? { vendor_id: vendorId, dish_id: picked.id } : { vendor_id: vendorId, text: text.trim() });
-      const { dish_name: name } = res.data as { dish_name: string };
-      toast({ title: tr("已許願", "Wish sent"), description: tr(`「${name}」已記下，店家上架時會通知你。`, `We noted "${name}" and will let you know if it's added.`) });
+      const { dish_name: name, dish_name_en: nameEn } = res.data as { dish_name: string; dish_name_en?: string | null };
+      toast({ title: tr("已許願", "Wish sent"), description: tr(`「${name}」已記下，店家上架時會通知你。`, `We noted "${nameEn || name}" and will let you know if it's added.`) });
       setText("");
       setPicked(null);
       onOpenChange(false);
@@ -74,7 +76,7 @@ export default function OpenWishDialog({ open, onOpenChange, vendorId, vendorNam
           <DialogDescription>{tr("先從菜色庫挑，找不到就直接輸入，我們會幫你歸類成標準菜名。同一道菜重複許願只算一次。", "Pick from the dish library, or type it in and we'll match it. Repeat wishes for the same dish count once.")}</DialogDescription>
         </DialogHeader>
         <Input
-          value={picked ? picked.name : text}
+          value={picked ? loc(picked, "name") : text}
           onChange={(e) => {
             setPicked(null);
             setText(e.target.value);
@@ -91,7 +93,7 @@ export default function OpenWishDialog({ open, onOpenChange, vendorId, vendorNam
               onClick={() => setPicked(d)}
               className={cn("px-2.5 py-1 rounded-full border text-xs", picked?.id === d.id ? "border-primary bg-accent text-accent-foreground" : "border-border")}
             >
-              {d.name}
+              {loc(d, "name")}
             </button>
           ))}
         </div>

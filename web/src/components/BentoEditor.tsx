@@ -18,7 +18,7 @@ const commissionPct = () => Math.round(liveConfig().commissionRate * 1000) / 10;
 import { componentPortionsForLock, costIssue, costIssueText, craftItems, portionsCost, rawNeeds, type CostIssue } from "@/lib/prep";
 import { liveConfig } from "@/lib/platformConfig";
 import { MEAL_PERIODS, mealPeriodLabel } from "@/lib/pickupSlots";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { BentoCustomField, BentoMain, BentoSlot, Component, Ingredient, LockSlot, MealPeriod, MenuItem, RiceOption, SlotChoice } from "@/types";
 
@@ -94,8 +94,9 @@ const SELECT_CLASS = selectClass("md", "min-w-0 flex-1");
  * Combination preview: use dropdowns to build one serving from what's filled in above (rice, main, sides, custom fields);
  * below, a crafting grid lists all ingredients for this combination (on hand / needed), plus cost, price and margin. Preview only; nothing is saved.
  */
-function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsById, vendorId, orderCount }: {
+function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsById, vendorId, orderCount, label }: {
   value: BentoForm;
+  label: (name: string, componentId?: string | null) => string;
   itemName?: string;
   itemPrice?: number;
   componentsById: Record<string, Component>;
@@ -120,15 +121,15 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
 
   const chips: string[] = [];
   const unlinked: string[] = [];
-  const check = (name: string, id: string | null | undefined) => { if (!id) unlinked.push(name); };
+  const check = (name: string, id: string | null | undefined) => { if (!id) unlinked.push(label(name, id)); };
   let price = isBento ? main?.price || 0 : itemPrice || 0;
   if (hasRice) {
     const r = RICE_OPTIONS.find((o) => o.value === rice)!;
     chips.push(tr(`白飯 ${r.label}`, `Rice: ${r.labelEn}`));
     price += rice === "add" ? cfg.riceAddPrice : rice === "less" ? cfg.riceLessPrice : 0;
   }
-  if (main) { chips.push(main.name); check(main.name, main.component_id); }
-  for (const p of parts) { chips.push(`${p.name}${portionsText(p.portions)}`); check(p.name, p.component_id); }
+  if (main) { chips.push(label(main.name, main.component_id)); check(main.name, main.component_id); }
+  for (const p of parts) { chips.push(`${label(p.name, p.component_id)}${portionsText(p.portions)}`); check(p.name, p.component_id); }
   const lockSlots: Partial<LockSlot>[] = [];
   if (isBento) slots.forEach((slot, i) => {
     const c = sides[i] ?? "default";
@@ -136,13 +137,13 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
       price += cfg.slotRemovePrice;
       lockSlots.push({ removed: true });
     } else if (c === "default") {
-      chips.push(slot.default.name);
+      chips.push(label(slot.default.name, slot.default.component_id));
       check(slot.default.name, slot.default.component_id);
       lockSlots.push({ removed: false, wished: null, resolved: null, default_component_id: slot.default.component_id ?? null });
     } else {
       const cand = slot.candidates.filter((x) => x.name)[c as number];
       if (cand) {
-        chips.push(`${cand.name}${cand.portion_level < 1 ? tr("（半份）", " (half)") : ""}`);
+        chips.push(`${label(cand.name, cand.component_id)}${cand.portion_level < 1 ? tr("（半份）", " (half)") : ""}`);
         check(cand.name, cand.component_id);
         lockSlots.push({ removed: false, wished: cand.name, resolved: cand.name, wished_component_id: cand.component_id ?? null, portion_level: cand.portion_level });
       } else lockSlots.push({ removed: false, default_component_id: slot.default.component_id ?? null });
@@ -151,7 +152,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
   if (isBento) fields.forEach((f, i) => {
     const opts = f.options.filter((o) => o.name);
     const o = opts[picks[i] ?? 0] ?? opts[0];
-    chips.push(`${f.label}：${o.name}`);
+    chips.push(`${label(f.label)}${tr("：", ": ")}${label(o.name)}`);
     price += o.price || 0;
   });
 
@@ -175,7 +176,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
           <select className={SELECT_CLASS} value={rice} onChange={(e) => setRice(e.target.value as RiceOption)}>
             {RICE_OPTIONS.map((o) => {
               const d = o.value === "add" ? cfg.riceAddPrice : o.value === "less" ? cfg.riceLessPrice : 0;
-              return <option key={o.value} value={o.value}>{tr(o.label, o.labelEn)}{d ? `（${priceDeltaText(d)}）` : ""}</option>;
+              return <option key={o.value} value={o.value}>{tr(o.label, o.labelEn)}{d ? paren(priceDeltaText(d)) : ""}</option>;
             })}
           </select>
         </label>
@@ -184,7 +185,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
         <label className="flex items-center gap-2 text-sm">
           <span className="w-20 shrink-0 text-xs text-muted-foreground">{tr("主菜", "Main")}</span>
           <select className={SELECT_CLASS} value={Math.min(mainIdx, mains.length - 1)} onChange={(e) => setMainIdx(Number(e.target.value))}>
-            {mains.map((m, i) => <option key={i} value={i}>{m.name}{paren(m.price || 0)}</option>)}
+            {mains.map((m, i) => <option key={i} value={i}>{label(m.name, m.component_id)}{paren(m.price || 0)}</option>)}
           </select>
         </label>
       )}
@@ -199,17 +200,17 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
               setSides(slots.map((_, j) => (j === i ? (v === "default" || v === "none" ? v : Number(v)) : sides[j] ?? "default")));
             }}
           >
-            <option value="default">{slot.default.name}{tr("（預設）", " (default)")}</option>
-            {slot.candidates.filter((c) => c.name).map((c, ci) => <option key={ci} value={ci}>{c.name}{paren(portionLabel(c.portion_level))}</option>)}
+            <option value="default">{label(slot.default.name, slot.default.component_id)}{tr("（預設）", " (default)")}</option>
+            {slot.candidates.filter((c) => c.name).map((c, ci) => <option key={ci} value={ci}>{label(c.name, c.component_id)}{paren(portionLabel(c.portion_level))}</option>)}
             <option value="none">{tr(`不要（${priceDeltaText(cfg.slotRemovePrice)}）`, `None (${priceDeltaText(cfg.slotRemovePrice)})`)}</option>
           </select>
         </label>
       ))}
       {isBento && fields.map((f, i) => (
         <label key={`f${i}`} className="flex items-center gap-2 text-sm">
-          <span className="w-20 shrink-0 text-xs text-muted-foreground truncate">{f.label}</span>
+          <span className="w-20 shrink-0 text-xs text-muted-foreground truncate">{label(f.label)}</span>
           <select className={SELECT_CLASS} value={picks[i] ?? 0} onChange={(e) => setPicks(fields.map((_, j) => (j === i ? Number(e.target.value) : picks[j] ?? 0)))}>
-            {f.options.filter((o) => o.name).map((o, oi) => <option key={oi} value={oi}>{o.name}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</option>)}
+            {f.options.filter((o) => o.name).map((o, oi) => <option key={oi} value={oi}>{label(o.name)}{o.price ? paren(priceDeltaText(o.price)) : ""}</option>)}
           </select>
         </label>
       ))}
@@ -265,7 +266,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
  *   ratio ≥ 0.75 full portion, 0.5–0.75 half portion, below 0.5 not allowed as an alternative
  * - Custom fields: extra vendor dropdowns below the sides (e.g. soup, drink, spice level); options can adjust the price, and the first option is the default
  */
-export default function BentoEditor({ value, onChange, components, ingredientsById, vendorId, itemName, itemPrice, orderCount }: {
+export default function BentoEditor({ value, onChange, components, ingredientsById, vendorId, itemName, itemPrice, orderCount, dishNamesEn }: {
   itemName?: string;
   itemPrice?: number;
   value: BentoForm;
@@ -275,9 +276,17 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
   vendorId: string | undefined;
   /** Preset servings for the preview, e.g. 42 already ordered for tomorrow */
   orderCount?: { label: string; n: number };
+  /** The saved item's dish_names_en (dish names stay Chinese in the form; the English UI shows these) */
+  dishNamesEn?: Record<string, string>;
 }) {
   const { toast } = useToast();
   const byId = Object.fromEntries(components.map((c) => [c.id, c]));
+  // Display text for a dish name: the English UI uses the item's translation, else the English name of the component it's named after
+  const dishLabel = (name: string, componentId?: string | null) => {
+    if (!name) return name;
+    const comp = (componentId ? byId[componentId] : undefined) ?? components.find((c) => c.name === name);
+    return tr(name, dishNamesEn?.[name] || (comp?.name === name ? loc(comp, "name") : "") || name);
+  };
   const cost = (id?: string | null) => (id ? componentCost(byId[id], ingredientsById) : 0);
   const setSlot = (i: number, slot: BentoSlot) => onChange({ ...value, slots: value.slots.map((s, j) => (j === i ? slot : s)) });
   const setCustom = (i: number, field: BentoCustomField) => onChange({ ...value, customFields: value.customFields.map((f, j) => (j === i ? field : f)) });
@@ -341,7 +350,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
   }
 
   const picker = (v: DishValue, set: (v: DishValue) => void, placeholder?: string) => (
-    <DishPicker value={v} onChange={set} components={components} placeholder={placeholder} onCreate={(name, withRecipe) => createComponent(name, withRecipe, (id, n) => set({ name: v.name || n, component_id: id }))} />
+    <DishPicker value={v} onChange={set} components={components} placeholder={placeholder} label={dishLabel} onCreate={(name, withRecipe) => createComponent(name, withRecipe, (id, n) => set({ name: v.name || n, component_id: id }))} />
   );
 
   // Prep composition: every item breaks down into semi-finished items, with servings of each; the vendor's daily prep and purchasing are computed from this
@@ -379,10 +388,10 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
   if (isBento) {
     if (value.riceComponentId) cells.push({ ...dishCell("rice", tr("白飯", "Rice"), value.riceComponentId, byId, ingredientsById, 1, true), onClick: () => openCell(tr("白飯", "Rice"), value.riceComponentId, (id) => onChange({ ...value, riceComponentId: id })) });
     const m = value.mains[0];
-    if (m?.name) cells.push({ ...dishCell("main", m.name, m.component_id, byId, ingredientsById), onClick: () => openCell(m.name, m.component_id, (id, n) => setMain(0, { ...m, component_id: id, name: m.name || n })) });
+    if (m?.name) cells.push({ ...dishCell("main", dishLabel(m.name, m.component_id), m.component_id, byId, ingredientsById), onClick: () => openCell(m.name, m.component_id, (id, n) => setMain(0, { ...m, component_id: id, name: m.name || n })) });
   }
-  value.parts.forEach((p, i) => (p.name || p.component_id) && cells.push({ ...dishCell(`part${i}`, p.name, p.component_id, byId, ingredientsById, p.portions || 1), onClick: () => openCell(p.name, p.component_id, (id, n) => setPart(i, { ...p, component_id: id, name: p.name || n })) }));
-  if (isBento) value.slots.forEach((sl, i) => sl.default.name && cells.push({ ...dishCell(`slot${i}`, sl.default.name, sl.default.component_id, byId, ingredientsById), onClick: () => openCell(sl.default.name, sl.default.component_id, (id, n) => setSlot(i, { ...sl, default: { ...sl.default, component_id: id, name: sl.default.name || n } })) }));
+  value.parts.forEach((p, i) => (p.name || p.component_id) && cells.push({ ...dishCell(`part${i}`, dishLabel(p.name, p.component_id), p.component_id, byId, ingredientsById, p.portions || 1), onClick: () => openCell(p.name, p.component_id, (id, n) => setPart(i, { ...p, component_id: id, name: p.name || n })) }));
+  if (isBento) value.slots.forEach((sl, i) => sl.default.name && cells.push({ ...dishCell(`slot${i}`, dishLabel(sl.default.name, sl.default.component_id), sl.default.component_id, byId, ingredientsById), onClick: () => openCell(sl.default.name, sl.default.component_id, (id, n) => setSlot(i, { ...sl, default: { ...sl.default, component_id: id, name: sl.default.name || n } })) }));
   const commitAdd = (v: DishValue) => {
     if (!v.component_id) { setAdding(v); return; }
     if (isBento) onChange({ ...value, slots: [...value.slots.filter((sl) => sl.default.name), { category: "青菜類", default: { name: v.name, component_id: v.component_id }, candidates: [] }] });
@@ -396,14 +405,14 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
       <BentoBox size="edit" cells={cells} onAdd={canAdd && !adding ? () => setAdding({ name: "", component_id: null }) : undefined} />
       {adding && (
         <div className="flex gap-2 items-start">
-          <DishPicker value={adding} onChange={commitAdd} components={components} placeholder={tr("新的一格：打菜名找或建立", "New cell: type a dish")} onCreate={(name, withRecipe) => createComponent(name, withRecipe, (id, n) => commitAdd({ name: adding.name || n, component_id: id }))} />
+          <DishPicker value={adding} onChange={commitAdd} components={components} label={dishLabel} placeholder={tr("新的一格：打菜名找或建立", "New cell: type a dish")} onCreate={(name, withRecipe) => createComponent(name, withRecipe, (id, n) => commitAdd({ name: adding.name || n, component_id: id }))} />
           <Button variant="ghost" size="sm" onClick={() => setAdding(null)}>{tr("取消", "Cancel")}</Button>
         </div>
       )}
     </div>
   );
 
-  const preview = <BentoPreview value={value} itemName={itemName} itemPrice={itemPrice} componentsById={byId} ingredientsById={ingredientsById} vendorId={vendorId} orderCount={orderCount} />;
+  const preview = <BentoPreview value={value} itemName={itemName} itemPrice={itemPrice} componentsById={byId} ingredientsById={ingredientsById} vendorId={vendorId} orderCount={orderCount} label={dishLabel} />;
 
   return (
     <div className="border rounded-lg p-3 space-y-3 bg-accent/40">
@@ -469,7 +478,7 @@ export default function BentoEditor({ value, onChange, components, ingredientsBy
             <div className="flex gap-2 items-center">
               <select className={SELECT_CLASS} value={value.riceComponentId} onChange={(e) => onChange({ ...value, riceComponentId: e.target.value })}>
                 <option value="">{tr("沒有白飯（不能選飯量）", "No rice")}</option>
-                {components.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {components.map((c) => <option key={c.id} value={c.id}>{loc(c, "name")}</option>)}
               </select>
               {value.riceComponentId && costBadge(value.riceComponentId, tr("白飯", "Rice"), (id) => onChange({ ...value, riceComponentId: id }))}
             </div>

@@ -21,12 +21,12 @@ import { httpsCallable } from "@/lib/callable";
 import { imageToBase64 } from "@/lib/imageData";
 import { myVendorDocKey, useMyVendor } from "@/hooks/useMyVendor";
 import MenuCatalogManager from "@/components/MenuCatalogManager";
-import { catalogOrder, groupByCatalog } from "@/lib/menuCatalog";
+import { catalogEnNames, catalogOrder, groupByCatalog } from "@/lib/menuCatalog";
 import { usePlatformConfig } from "@/lib/platformConfig";
 import { netOfCommission, withCommission } from "@/lib/pricing";
 import type { MenuItem } from "@/types";
 import { ALLERGEN_LIST, DIETARY_TAGS, tagEn } from "@/types";
-import { loc, tr } from "@/lib/i18n";
+import { getLang, loc, tr } from "@/lib/i18n";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState, Switch, Tag } from "@/components/ds";
@@ -60,18 +60,19 @@ interface MenuDraft {
 
 // Blank category saves as "一般" (General); the field starts empty so the English UI doesn't open with Chinese in it
 const DEFAULT_CATEGORY = "一般";
-const EMPTY_FORM = { name: "", description: "", price: "", category: "", catalog: "", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
+const EMPTY_FORM = { name: "", description: "", price: "", category: "", catalog: "", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "", categoryEn: "" };
 
-// English name / description: Functions translate them automatically (translateMenuItem), and vendors can also edit them by hand.
+// English name / description / category: Functions translate them automatically (translateMenuItem), and vendors can also edit them by hand
+// (in the English UI the main Name / Category / Description fields edit the English, and the Chinese moves to "Chinese version").
 // A manually edited field sets i18n_src to the current Chinese, so the trigger treats it as "already translated" and won't overwrite it;
 // clearing it = hand it back to auto translation (deletes the English and i18n_src, and the trigger re-translates);
 // leaving the English alone and changing only the Chinese = the trigger re-translates automatically as usual.
 function englishOverrides(
-  form: { name: string; description: string; nameEn: string; descriptionEn: string },
+  form: { name: string; description: string; category: string; nameEn: string; descriptionEn: string; categoryEn: string },
   original: MenuItem | null
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const [field, en] of [["name", form.nameEn], ["description", form.descriptionEn]] as const) {
+  for (const [field, en] of [["name", form.nameEn], ["description", form.descriptionEn], ["category", form.categoryEn]] as const) {
     const before = (original?.[`${field}_en`] as string | undefined) ?? "";
     const value = en.trim();
     if (value === before.trim()) continue;
@@ -114,8 +115,15 @@ export default function VendorPortalMenu() {
   const nextWeekLocked = !!myVendor?.menu_locked_week && myVendor.menu_locked_week >= mondayOf(addDaysStr(todayStr(), 7));
 
   const { data: items = [], isLoading } = useVendorMenu(VENDOR_ID);
+  // English UI: the form's main fields edit the English text (the route tree remounts on a language switch)
+  const isEn = getLang() === "en";
+  const editingItem = editId ? items.find((i) => i.id === editId) : undefined;
   const gaps = useRecipeGaps();
   const catalogNames = useMemo(() => catalogOrder(myVendor?.menu_catalogs, items), [myVendor?.menu_catalogs, items]);
+  // English UI: the catalog field shows and accepts English names; typing an existing catalog's English name picks that catalog
+  const catalogEn = useMemo(() => catalogEnNames(items), [items]);
+  const catalogShown = (zh: string) => (isEn ? catalogEn.get(zh) ?? zh : zh);
+  const catalogFromInput = (text: string) => (isEn ? catalogNames.find((zh) => catalogEn.get(zh)?.toLowerCase() === text.trim().toLowerCase()) ?? text : text);
   /** Items with an AI-generated recipe the vendor hasn't confirmed yet */
   const hasAiDraft = (item: MenuItem) => !!catalog && [item.rice_component_id, item.main?.component_id, ...(item.mains ?? []).map((m) => m.component_id), ...(item.fixed ?? []).map((f) => f.component_id), ...(item.slots ?? []).map((sl) => sl.default?.component_id)]
     .some((id) => !!id && !!catalog.componentsById[id]?.ai_draft);
@@ -158,13 +166,16 @@ export default function VendorPortalMenu() {
         name: m.name, component_id: m.component_id || null, price: m.price, image_url: m.image_url || null, portion_text: withPortion(m.component_id, m.name),
       }));
       if (bento.itemType === "bento" && mains.length === 0) throw new Error(tr("便當至少要有一道有價格的主菜", "A bento needs at least one main with a price"));
+      // No Chinese typed (English UI, new item): the English doubles as the Chinese so the item still has a name everywhere
+      const nameZh = form.name.trim() || form.nameEn.trim();
+      const categoryZh = form.category.trim() || form.categoryEn.trim() || DEFAULT_CATEGORY;
       const data = {
         vendor_id: myVendor.id,
-        name: form.name,
+        name: nameZh,
         description: form.description,
         // When a bento has several mains, price stores the lowest main price (card shows "From $50", legacy code compatibility)
         price: bento.itemType === "bento" && mains.length > 0 ? Math.min(...mains.map((m) => m.price)) : Number(form.price),
-        category: form.category.trim() || DEFAULT_CATEGORY,
+        category: categoryZh,
         catalog: form.catalog.trim() || null,
         is_available: form.isAvailable,
         image: form.image || null, // Firestore SDK throws on `undefined` field values
@@ -198,7 +209,7 @@ export default function VendorPortalMenu() {
         component_id: null,
       };
       const original = editId ? items.find((i) => i.id === editId) ?? null : null;
-      const english = englishOverrides(form, original);
+      const english = englishOverrides({ ...form, name: nameZh, category: categoryZh }, original);
       if (editId) {
         await updateDoc(doc(db, "menu_items", editId), { ...data, ...english });
       } else {
@@ -227,7 +238,7 @@ export default function VendorPortalMenu() {
         setDrafts((list) => list.filter((_, i) => i !== activeDraft));
         setActiveDraft(null);
       }
-      toast({ title: editId ? tr("已更新", "Updated") : tr("已新增", "Added"), description: form.name });
+      toast({ title: editId ? tr("已更新", "Updated") : tr("已新增", "Added"), description: tr(form.name, form.nameEn || form.name) });
     },
     onError: (err: any) => {
       const description = err?.code === "permission-denied"
@@ -286,6 +297,7 @@ export default function VendorPortalMenu() {
       allergens: d.allergens,
       dietaryTags: d.dietary_tags,
       nameEn: d.name_en,
+      categoryEn: d.category_en ?? "",
     });
     setBento(EMPTY_BENTO);
     setMoreOpen(true); // An AI draft needs the vendor to confirm dietary tags
@@ -305,7 +317,7 @@ export default function VendorPortalMenu() {
     setActiveDraft(null);
     setMoreOpen(false);
     setEditId(item.id);
-    setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, catalog: item.catalog ?? "", isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [], nameEn: item.name_en ?? "", descriptionEn: item.description_en ?? "" });
+    setForm({ name: item.name, description: item.description, price: String(item.price), category: item.category, catalog: item.catalog ?? "", isAvailable: item.is_available, image: item.image ?? "", allergens: item.allergens ?? [], dietaryTags: item.dietary_tags ?? [], nameEn: item.name_en ?? "", descriptionEn: item.description_en ?? "", categoryEn: item.category_en ?? "" });
     const isBentoItem = item.item_type ? item.item_type === "bento" : (item.slots?.length ?? 0) > 0;
     setBento({
       itemType: isBentoItem ? "bento" : "single",
@@ -531,12 +543,12 @@ export default function VendorPortalMenu() {
                 <div className="space-y-3">
                   <div>
                     <Label htmlFor="menu-item-name">{tr("名稱 *", "Name *")}</Label>
-                    <Input id="menu-item-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={tr("例：招牌雞腿便當", "e.g. Signature chicken bento")} />
+                    <Input id="menu-item-name" value={isEn ? form.nameEn : form.name} onChange={e => setForm(f => (isEn ? { ...f, nameEn: e.target.value } : { ...f, name: e.target.value }))} placeholder={tr("例：招牌雞腿便當", "e.g. Signature chicken bento")} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor="menu-item-category">{tr("分類", "Category")}</Label>
-                      <Input id="menu-item-category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder={tr("留空＝一般；例：便當、湯品", "Blank = General; e.g. Bento, Soup")} />
+                      <Input id="menu-item-category" value={isEn ? form.categoryEn : form.category} onChange={e => setForm(f => (isEn ? { ...f, categoryEn: e.target.value } : { ...f, category: e.target.value }))} placeholder={tr("留空＝一般；例：便當、湯品", "Blank = General; e.g. Bento, Soup")} />
                     </div>
                     {bento.itemType !== "bento" && (
                       <div>
@@ -573,7 +585,7 @@ export default function VendorPortalMenu() {
               {nextWeekLocked && bento.itemType === "bento" && (
                 <p className="text-xs text-warning-text bg-warning-soft rounded p-2">{tr("下週叫貨單已產生，下週主菜已鎖定；請只做等值的配菜替換。", "Next week's purchase list is out, so mains are locked — only swap sides for equivalents.")}</p>
               )}
-              <BentoEditor itemName={form.name} itemPrice={Number(form.price) || 0} value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} orderCount={editId && nextDay && nextDayCounts?.[editId] ? { label: tr(`${nextDay.slice(5)} 已訂`, `${nextDay.slice(5)} booked`), n: nextDayCounts[editId] } : undefined} />
+              <BentoEditor itemName={tr(form.name, form.nameEn || form.name)} dishNamesEn={editingItem?.dish_names_en} itemPrice={Number(form.price) || 0} value={bento} onChange={setBento} components={catalog?.components ?? []} ingredientsById={catalog?.ingredientsById ?? {}} vendorId={VENDOR_ID} orderCount={editId && nextDay && nextDayCounts?.[editId] ? { label: tr(`${nextDay.slice(5)} 已訂`, `${nextDay.slice(5)} booked`), n: nextDayCounts[editId] } : undefined} />
             </section>
 
             {/* Allergen labeling (required by food safety law): the only label that must be seen, so it stays outside */}
@@ -591,12 +603,12 @@ export default function VendorPortalMenu() {
 
             <details className="rounded-lg border border-border" open={moreOpen} onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}>
               <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">
-                {tr("更多設定（說明、飲食標記、英文版、目錄）", "More (description, dietary tags, English, catalog)")}
+                {tr("更多設定（說明、飲食標記、英文版、目錄）", "More (description, dietary tags, Chinese, catalog)")}
               </summary>
               <div className="space-y-3 px-3 pb-3">
                 <div>
                   <Label htmlFor="menu-item-desc">{tr("說明", "Description")}</Label>
-                  <Textarea id="menu-item-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
+                  <Textarea id="menu-item-desc" value={isEn ? form.descriptionEn : form.description} onChange={e => setForm(f => (isEn ? { ...f, descriptionEn: e.target.value } : { ...f, description: e.target.value }))} rows={2} />
                 </div>
                 <div>
                   <Label className="block mb-1.5">{tr("飲食標記", "Dietary tags")}</Label>
@@ -608,32 +620,30 @@ export default function VendorPortalMenu() {
                     ))}
                   </div>
                 </div>
-                {/* English version (for customers using the English UI) */}
-                <div className="border rounded-lg p-3 space-y-2 bg-background">
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    {tr("英文版（自動翻譯，可修改）", "English (auto-translated, editable)")}
-                  </p>
-                  <Input
-                    value={form.nameEn}
-                    onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
-                    placeholder={tr("英文名稱，留空＝自動翻譯", "English name — leave blank to auto-translate")}
-                    aria-label={tr("英文名稱", "English name")}
-                  />
-                  <Textarea
-                    value={form.descriptionEn}
-                    onChange={e => setForm(f => ({ ...f, descriptionEn: e.target.value }))}
-                    placeholder={tr("英文說明，留空＝自動翻譯", "English description — leave blank to auto-translate")}
-                    aria-label={tr("英文說明", "English description")}
-                    rows={2}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {tr("儲存後約幾秒會自動翻好。只改中文、沒改英文時，英文會重新自動翻譯。", "Translations appear a few seconds after saving. If you change the Chinese but not the English, the English is re-translated automatically.")}
-                  </p>
-                </div>
+                {/* The other language: Chinese UI edits the English here; English UI edits the Chinese (what Chinese-UI customers see) */}
+                {isEn ? (
+                  <div className="border rounded-lg p-3 space-y-2 bg-background">
+                    <p className="text-xs font-semibold text-muted-foreground">Chinese version (shown to customers using Chinese)</p>
+                    <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Chinese name — blank = use the English name" aria-label="Chinese name" />
+                    <Input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="Chinese category — blank = use the English category" aria-label="Chinese category" />
+                    <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Chinese description" aria-label="Chinese description" rows={2} />
+                    <p className="text-xs text-muted-foreground">
+                      English you edit above is kept as is. If you change only the Chinese here, the English is re-translated automatically a few seconds after saving.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg p-3 space-y-2 bg-background">
+                    <p className="text-xs font-semibold text-muted-foreground">英文版（自動翻譯，可修改）</p>
+                    <Input value={form.nameEn} onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))} placeholder="英文名稱，留空＝自動翻譯" aria-label="英文名稱" />
+                    <Input value={form.categoryEn} onChange={e => setForm(f => ({ ...f, categoryEn: e.target.value }))} placeholder="英文分類，留空＝自動翻譯" aria-label="英文分類" />
+                    <Textarea value={form.descriptionEn} onChange={e => setForm(f => ({ ...f, descriptionEn: e.target.value }))} placeholder="英文說明，留空＝自動翻譯" aria-label="英文說明" rows={2} />
+                    <p className="text-xs text-muted-foreground">儲存後約幾秒會自動翻好。只改中文、沒改英文時，英文會重新自動翻譯。</p>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="menu-item-catalog">{tr("目錄（分類的上一層，選填）", "Catalog (above category, optional)")}</Label>
-                  <Input id="menu-item-catalog" list="menu-catalog-options" maxLength={30} value={form.catalog} onChange={e => setForm(f => ({ ...f, catalog: e.target.value }))} placeholder={tr("例：午餐便當；可選現有的或直接打新的", "e.g. Lunch bentos — pick one or type a new one")} />
-                  <datalist id="menu-catalog-options">{catalogNames.map((n) => <option key={n} value={n} />)}</datalist>
+                  <Input id="menu-item-catalog" list="menu-catalog-options" maxLength={30} value={catalogShown(form.catalog)} onChange={e => setForm(f => ({ ...f, catalog: catalogFromInput(e.target.value) }))} placeholder={tr("例：午餐便當；可選現有的或直接打新的", "e.g. Lunch bentos — pick one or type a new one")} />
+                  <datalist id="menu-catalog-options">{catalogNames.map((n) => <option key={n} value={catalogShown(n)} />)}</datalist>
                 </div>
               </div>
             </details>
@@ -643,7 +653,7 @@ export default function VendorPortalMenu() {
             <Button
               
               onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending || !form.name || (bento.itemType !== "bento" && !form.price)}
+              disabled={saveMutation.isPending || !(form.name.trim() || form.nameEn.trim()) || (bento.itemType !== "bento" && !form.price)}
             >
               {saveMutation.isPending ? tr("儲存中…", "Saving…") : tr("儲存", "Save")}
             </Button>

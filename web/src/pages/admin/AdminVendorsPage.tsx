@@ -1,4 +1,4 @@
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
@@ -139,7 +139,7 @@ export default function AdminVendorsPage() {
 
   async function handleUnbind(vendor: Vendor) {
     const ok = await confirm({
-      title: tr(`解除「${vendor.name}」的帳號綁定？`, `Unlink the account for ${vendor.name}?`),
+      title: tr(`解除「${vendor.name}」的帳號綁定？`, `Unlink the account for ${loc(vendor, "name")}?`),
       description: tr("解除後原本的店家帳號就進不了店家後台，也看不到撥款與校準報告。", "The vendor account will lose access to the vendor portal, payouts and calibration reports."),
       confirmLabel: tr("解除綁定", "Unlink"),
       destructive: true,
@@ -178,7 +178,7 @@ export default function AdminVendorsPage() {
                   <SelectContent>
                     <SelectItem value={NEW_VENDOR}>{tr(`建立新店家「${app.store_name}」`, `Create new vendor "${app.store_name}"`)}</SelectItem>
                     {unboundVendors.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>{tr("綁定到既有店家：", "Link to existing vendor: ")}{v.name}</SelectItem>
+                      <SelectItem key={v.id} value={v.id}>{tr("綁定到既有店家：", "Link to existing vendor: ")}{loc(v, "name")}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -218,7 +218,7 @@ export default function AdminVendorsPage() {
             <Card key={vendor.id}>
               <CardContent className="py-3 text-sm flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-semibold truncate">{vendor.name}</div>
+                  <div className="font-semibold truncate">{loc(vendor, "name")}</div>
                   <div className="text-xs text-muted-foreground truncate">
                     {vendor.id}{vendor.status === "disabled" ? tr(" · 已停用", " · disabled") : ""}
                   </div>

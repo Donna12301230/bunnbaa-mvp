@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { tr } from "@/lib/i18n";
+import { getLang, tr } from "@/lib/i18n";
 import { MemberNotice, VendorNotice } from "@/components/TermsNotices";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { takeReturnPath } from "@/lib/returnPath";
 import { demoAccounts, type DemoAccount } from "@/lib/demoAccounts";
 import type { ConfirmationResult } from "firebase/auth";
 import TAIWAN_UNIV_DEPTS from "@/constants/taiwanUnivDepts.json";
+import { UNIV_EN } from "@/constants/taiwanUnivEn";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ShoppingBag, Clock, Tag, Store, Eye, EyeOff, Smartphone, Mail, ShieldCheck, UserRound, Zap } from "lucide-react";
 
@@ -437,14 +438,15 @@ export default function LoginPage() {
                             </SelectTrigger>
                             <SelectContent>
                               {Object.keys(TAIWAN_UNIV_DEPTS).map(u => (
-                                <SelectItem key={u} value={u}>{u}</SelectItem>
+                                <SelectItem key={u} value={u}>{tr(u, UNIV_EN[u] ?? u)}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
                         <div>
                           <Label>{tr("科系", "Department")}</Label>
-                          {(TAIWAN_UNIV_DEPTS as Record<string, string[]>)[school]?.length > 0 ? (
+                          {/* The department list is Chinese only (5,000+ names), so the English UI types the department instead */}
+                          {getLang() !== "en" && (TAIWAN_UNIV_DEPTS as Record<string, string[]>)[school]?.length > 0 ? (
                             <Select value={department} onValueChange={setDepartment}>
                               <SelectTrigger>
                                 <SelectValue placeholder={tr("選擇科系", "Choose a department")} />

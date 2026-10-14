@@ -16,6 +16,17 @@ export function catalogOrder(listed: string[] | undefined, items: WithCatalog[])
   return out;
 }
 
+/** English catalog names (zh -> en) from the items' auto-translated catalog_en; catalogs are stored and grouped by their Chinese name */
+export function catalogEnNames(items: (WithCatalog & { catalog_en?: string | null })[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const item of items) {
+    const zh = catalogOf(item);
+    const en = (item.catalog_en ?? "").trim();
+    if (zh && en && !out.has(zh)) out.set(zh, en);
+  }
+  return out;
+}
+
 export interface CatalogGroup<T> {
   catalog: string; // "" = uncataloged
   categories: { category: string; items: T[] }[];

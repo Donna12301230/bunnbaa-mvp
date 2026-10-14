@@ -109,7 +109,7 @@ exports.onFavoriteCreated = onDocumentCreated({ document: "users/{uid}/favorites
  * Counted once per person per item per day (users/{uid}.viewed_items records items viewed that day).
  */
 exports.recordItemView = onCall({}, async (request) => {
-  assertSignedInUser(request, "記錄瀏覽");
+  assertSignedInUser(request, "記錄瀏覽", "record views");
   const uid = request.auth.uid;
   const itemId = String(request.data?.menu_item_id || "");
   if (!itemId) throw new HttpsError("invalid-argument", "menu_item_id is required");
@@ -142,11 +142,12 @@ exports.recordItemView = onCall({}, async (request) => {
  * Counted by people: repeat wishes by the same person count once; only the last 30 days count. The screen notes "wishes don't guarantee availability".
  */
 exports.placeOpenWish = onCall({}, async (request) => {
-  assertSignedInUser(request, "許願");
+  assertSignedInUser(request, "許願", "make a wish");
   const uid = request.auth.uid;
   const vendorId = String(request.data?.vendor_id || "");
   if (!vendorId) throw new HttpsError("invalid-argument", "vendor_id is required");
   let name = null;
+  let nameEn = null;
   let dishId = null;
   let tags = [];
   if (request.data?.dish_id) {
@@ -154,21 +155,23 @@ exports.placeOpenWish = onCall({}, async (request) => {
     if (!d.exists) throw new HttpsError("not-found", "dish not found");
     dishId = d.id;
     name = d.data().name;
+    nameEn = d.data().name_en || null;
     tags = d.data().tags || [];
   } else {
     const text = String(request.data?.text || "").trim().slice(0, 30);
     if (text.length < 1) throw new HttpsError("invalid-argument", t("請輸入想吃的菜", "Enter a dish"));
     const normalized = await normalizeDish(text);
     name = normalized.name;
+    nameEn = normalized.name_en || null;
     dishId = normalized.dish_id;
     tags = normalized.tags || [];
   }
   const key = dishKey(name);
   await db().collection("openWishes").doc(`${vendorId}_${uid}_${key}`).set({
-    user_id: uid, vendor_id: vendorId, dish_id: dishId, dish_key: key, dish_name: name, created_at: FieldValue.serverTimestamp(),
+    user_id: uid, vendor_id: vendorId, dish_id: dishId, dish_key: key, dish_name: name, dish_name_en: nameEn, created_at: FieldValue.serverTimestamp(),
   });
   await bumpTaste(uid, new Map(tags.map((tag) => [tag, SIGNAL.open_wish])));
-  return { dish_name: name, dish_key: key };
+  return { dish_name: name, dish_name_en: nameEn, dish_key: key };
 });
 
 /** Daily: people in the last 30 days; when the threshold is reached, notify the vendor and add it to the reference list */
@@ -178,7 +181,7 @@ async function tallyVendor(vendor, config) {
   const groups = new Map();
   snap.docs.forEach((d) => {
     const w = d.data();
-    const g = groups.get(w.dish_key) ?? { name: w.dish_name, users: new Set() };
+    const g = groups.get(w.dish_key) ?? { name: w.dish_name, nameEn: w.dish_name_en || null, users: new Set() };
     g.users.add(w.user_id);
     groups.set(w.dish_key, g);
   });
@@ -191,16 +194,19 @@ async function tallyVendor(vendor, config) {
     const prev = existing.docs.find((d) => d.id === key)?.data() || {};
     const count = g.users.size;
     const hit = count >= config.openWishThreshold && !prev.notified;
-    if (hit) reached.push(`${g.name}（${count} 人）`);
-    batch.set(tallyRef.doc(key), { name: g.name, count, notified: prev.notified || hit, updated_at: FieldValue.serverTimestamp() }, { merge: true });
+    if (hit) reached.push({ name: g.name, nameEn: g.nameEn || g.name, count });
+    batch.set(tallyRef.doc(key), { name: g.name, name_en: g.nameEn, count, notified: prev.notified || hit, updated_at: FieldValue.serverTimestamp() }, { merge: true });
   }
   await batch.commit();
   if (reached.length > 0) {
-    await notifyVendor(vendor.id, {
-      title: "開放許願達門檻，已列入參考名單",
-      body: `${reached.join("、")}，要不要上架試試？`,
+    await notifyVendor(vendor.id, () => ({
+      title: t("開放許願達門檻，已列入參考名單", "Dish wishes reached the threshold and were added to your shortlist"),
+      body: t(
+        `${reached.map((r) => `${r.name}（${r.count} 人）`).join("、")}，要不要上架試試？`,
+        `${reached.map((r) => `${r.nameEn} (${r.count} people)`).join(", ")} — want to try adding them to your menu?`,
+      ),
       link: "/vendor-portal/insights",
-    });
+    }));
   }
 }
 
@@ -224,12 +230,12 @@ exports.notifyWishersListed = onCall({}, async (request) => {
   const vendor = (await db().collection("vendors").doc(vendorId).get()).data();
   const users = [...new Set(snap.docs.map((d) => d.data().user_id))];
   for (const uid of users) {
-    await notifyUser(uid, {
+    await notifyUser(uid, () => ({
       kind: "wish",
       title: t("你許願的菜上架了！", "The dish you wished for is on the menu!"),
-      body: t(`「${vendor.name}」開始供應「${snap.docs[0]?.data().dish_name}」`, `${vendor.name} now serves ${snap.docs[0]?.data().dish_name}`),
+      body: t(`「${vendor.name}」開始供應「${snap.docs[0]?.data().dish_name}」`, `${vendor.name_en || vendor.name} now serves ${snap.docs[0]?.data().dish_name_en || snap.docs[0]?.data().dish_name}`),
       link: `/vendor/${vendorId}`,
-    });
+    }));
   }
   await db().collection("vendors").doc(vendorId).collection("wishTally").doc(key).set({ listed: true }, { merge: true });
   return { notified: users.length };
@@ -242,21 +248,23 @@ exports.notifyWishersListed = onCall({}, async (request) => {
 
 async function normalizeDish(text) {
   const lib = await db().collection("dishLibrary").get();
-  const dishes = lib.docs.map((d) => ({ id: d.id, name: d.data().name, aliases: d.data().aliases || [] }));
+  const dishes = lib.docs.map((d) => ({ id: d.id, name: d.data().name, name_en: d.data().name_en || null, aliases: d.data().aliases || [] }));
   const exact = dishes.find((d) => d.name === text || d.aliases.includes(text));
-  if (exact) return { dish_id: exact.id, name: exact.name, tags: lib.docs.find((d) => d.id === exact.id).data().tags || [] };
+  if (exact) return { dish_id: exact.id, name: exact.name, name_en: exact.name_en, tags: lib.docs.find((d) => d.id === exact.id).data().tags || [] };
   try {
     const out = await generateJSON({
       systemInstruction: `你把台灣便當店的自由輸入菜名歸類成標準菜名。
 若輸入和清單中某道菜是同一道菜（錯字、簡稱、地方叫法），回傳該菜的 id；否則 id 為 null，並給一個簡潔的標準菜名（繁體中文，不加形容詞）。
 同時給這道菜的標籤，只能從這些值選：雞、豬、牛、海鮮、素、炸、滷、烤、炒、蒸、辣、清淡、甜、葉菜、根莖、瓜類。
-輸出 JSON：{"id": string|null, "name": string, "category": "青菜類"|"肉類配菜"|"蛋豆類"|"主菜"|"其他", "tags": string[]}`,
+另外給這道菜自然的英文名 name_en（專有名詞用漢語拼音）。
+輸出 JSON：{"id": string|null, "name": string, "name_en": string, "category": "青菜類"|"肉類配菜"|"蛋豆類"|"主菜"|"其他", "tags": string[]}`,
       userPrompt: JSON.stringify({ input: text, library: dishes.map(({ id, name, aliases }) => ({ id, name, aliases })) }),
       temperature: 0.1,
     });
     const hit = out.id && dishes.find((d) => d.id === out.id);
-    if (hit) return { dish_id: hit.id, name: hit.name, tags: lib.docs.find((d) => d.id === hit.id).data().tags || [] };
-    return { dish_id: null, name: String(out.name || text).slice(0, 20), category: out.category || "其他", tags: Array.isArray(out.tags) ? out.tags : [] };
+    if (hit) return { dish_id: hit.id, name: hit.name, name_en: hit.name_en, tags: lib.docs.find((d) => d.id === hit.id).data().tags || [] };
+    const nameEn = typeof out.name_en === "string" && out.name_en.trim() ? out.name_en.trim().slice(0, 40) : null;
+    return { dish_id: null, name: String(out.name || text).slice(0, 20), name_en: nameEn, category: out.category || "其他", tags: Array.isArray(out.tags) ? out.tags : [] };
   } catch (err) {
     logger.warn("normalizeDish via Gemini failed, using raw text", err);
     return { dish_id: null, name: text, tags: [] };
@@ -264,7 +272,7 @@ async function normalizeDish(text) {
 }
 
 exports.normalizeDishName = onCall({}, async (request) => {
-  assertSignedInUser(request, "查詢菜名");
+  assertSignedInUser(request, "查詢菜名", "look up dish names");
   const text = String(request.data?.text || "").trim().slice(0, 30);
   if (!text) throw new HttpsError("invalid-argument", "text is required");
   return normalizeDish(text);
@@ -279,11 +287,14 @@ exports.draftRecipe = onCall({ timeoutSeconds: 60 }, async (request) => {
 只給合理的起始值，不要自稱精確。輸出 JSON：
 {"component": {"name": string, "portion_grams": number（每份熟重 g）, "prep_minutes": number（每批製程分鐘）, "equipment": "炒鍋"|"電鍋"|"炸鍋"|"烤箱"|"滷鍋"|"蒸籠"|"工作台", "batch_capacity": number（每批份數）, "advance_hours": number（可提前幾小時做）, "method": "炸"|"滷"|"烤"|"炒"|"蒸"|"煮"|"涼拌", "flavors": string[]（從 辣、清淡、甜 選）},
  "ingredients": [{"name": string, "category": "雞"|"豬"|"牛"|"海鮮"|"素"|"蛋"|"豆"|"葉菜"|"根莖"|"瓜類"|"米"|"調味"|"乾貨"|"包材"|"其他", "grams": number（每份用到的熟重 g；以個計的填個數）, "unit": "g"|"個", "yield_rate": number（熟成率，熟重/生重）, "loss_rate": number（0-1）, "purchase_unit_label": string, "purchase_unit_size": number, "shelf_days": number, "frequency": "monthly"|"weekly"|"daily"}],
- "note": string（一句提醒店家要自己調整的地方）}`,
+ "note": string（一句提醒店家要自己調整的地方；${t("用繁體中文", "write this one sentence in English")}）}`,
     userPrompt: JSON.stringify({ dish: name, template: request.data?.template || null }),
     temperature: 0.3,
   });
-  return { ...out, disclaimer: "AI 產生的草稿，份量與數字請依店內實際狀況修改後再儲存" };
+  return {
+    ...out,
+    disclaimer: t("AI 產生的草稿，份量與數字請依店內實際狀況修改後再儲存", "AI-generated draft — adjust portions and numbers to your kitchen before saving"),
+  };
 });
 
 /* ------------------------------------------------------------------ *

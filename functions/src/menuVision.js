@@ -73,7 +73,12 @@ exports.extractMenuFromImage = onCall({ timeoutSeconds: 120, memory: "512MiB" },
   try {
     result = await generateJSONFromImage({
       systemInstruction: SYSTEM_INSTRUCTION,
-      userPrompt: JSON.stringify({ task: "extract_menu_items", output_schema: OUTPUT_SCHEMA }),
+      // note is shown to the owner as is, so it follows the caller's language; item fields stay as specified above
+      userPrompt: JSON.stringify({
+        task: "extract_menu_items",
+        output_schema: OUTPUT_SCHEMA,
+        note_language: t("note 用繁體中文", "Write note in English"),
+      }),
       imageBase64: image,
       mimeType,
     });

@@ -63,10 +63,10 @@ const DEFAULT_MINIMUM_WAGE = {
 // Phase 1 keeps only 3 types (free meal, half price, base 5%-off); the 90%-, 70%- and 20%-off coupons are left for a later release.
 // The first entry is the grand prize (used for the grand-prize guarantee); the last is the tier remaining budget keeps upgrading into.
 const COUPON_TIERS = [
-  { code: "free", label: "免費餐券", discount: 100, cost: 95, weight: 0.3 },
-  { code: "t50", label: "半價券", discount: 50, cost: 45, weight: 0.7 },
+  { code: "free", label: "免費餐券", label_en: "Free meal coupon", discount: 100, cost: 95, weight: 0.3 },
+  { code: "t50", label: "半價券", label_en: "Half-price coupon", discount: 50, cost: 45, weight: 0.7 },
 ];
-const BASE_TIER = { code: "t95", label: "九五折券", discount: 5 };
+const BASE_TIER = { code: "t95", label: "九五折券", label_en: "5% off coupon", discount: 5 };
 
 async function loadPlatformConfig(db) {
   const snap = await db.collection("platformConfig").doc("global").get();

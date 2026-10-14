@@ -9,6 +9,7 @@ export interface WalletEntry {
   amount: number;
   reason?: string;
   text?: string;
+  text_en?: string; // English item name (Functions writeCredit); older entries only have text
   created_at?: { toDate?: () => Date };
 }
 

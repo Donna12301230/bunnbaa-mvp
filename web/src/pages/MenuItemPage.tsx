@@ -377,7 +377,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
                   <Select aria-label={tr("飯量", "Rice amount")} value={rice} onChange={(e) => setRice(e.target.value as RiceOption)}>
                     {RICE_OPTIONS.map((opt) => {
                       const price = opt.value === "add" ? config?.riceAddPrice ?? 10 : opt.value === "less" ? config?.riceLessPrice ?? -5 : 0;
-                      return <option key={opt.value} value={opt.value}>{tr(opt.label, opt.labelEn)}{price !== 0 ? `（${price > 0 ? `+${price}` : price}）` : ""}</option>;
+                      return <option key={opt.value} value={opt.value}>{tr(opt.label, opt.labelEn)}{price !== 0 ? paren(price > 0 ? `+${price}` : price) : ""}</option>;
                     })}
                   </Select>
                 </DishSelectRow>
@@ -386,7 +386,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               {mains.length > 0 && (
                 <DishSelectRow label={tr("主菜", "Main")} image={main?.image_url}>
                   <Select aria-label={tr("主菜", "Main")} value={String(mainIndex ?? 0)} disabled={mains.length === 1} onChange={(e) => setMainIndex(Number(e.target.value))}>
-                    {mains.map((m, i) => <option key={i} value={i}>{dn(m.name)}{mains.length > 1 ? `（NT$${m.price}）` : ""}</option>)}
+                    {mains.map((m, i) => <option key={i} value={i}>{dn(m.name)}{mains.length > 1 ? paren(`NT$${m.price}`) : ""}</option>)}
                   </Select>
                 </DishSelectRow>
               )}
@@ -455,7 +455,7 @@ export function MenuItemOrder({ id, dialog = false, onAdded }: { id: string; dia
               {custom.map((f, i) => (
                 <DishSelectRow key={`custom-${i}`} label={dn(f.label)}>
                   <Select aria-label={dn(f.label)} value={String(customPicks[i] ?? 0)} onChange={(e) => setCustomPicks((prev) => custom.map((_, j) => (j === i ? Number(e.target.value) : prev[j] ?? 0)))}>
-                    {f.options.map((o, oi) => <option key={oi} value={oi}>{dn(o.name)}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</option>)}
+                    {f.options.map((o, oi) => <option key={oi} value={oi}>{dn(o.name)}{o.price ? paren(priceDeltaText(o.price)) : ""}</option>)}
                   </Select>
                 </DishSelectRow>
               ))}

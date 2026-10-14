@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2, Star, HeartHandshake, XCircle, Users, Pencil, List, CalendarRange } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
-import { getLang, tr, loc } from "@/lib/i18n";
+import { dishName, getLang, tr, loc } from "@/lib/i18n";
 import { enUS } from "date-fns/locale";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import PageHero from "@/components/PageHero";
@@ -447,10 +447,10 @@ export default function MyBookingsPage() {
                       </p>
                       {(lock.slots?.length ?? 0) > 0 && (
                         <ul className="text-caption text-muted-foreground space-y-0.5">
-                          {lock.main_dish && <li>• {tr("主菜：", "Main: ")}{lock.main_dish}</li>}
-                          {lock.slots!.map((slot, i) => <li key={i}>• {slotText(slot)}</li>)}
-                          {extraSideText(lock.extra_side) && <li>• {extraSideText(lock.extra_side)}</li>}
-                          {customOptionTexts(lock.custom_options).map((text, i) => <li key={`c${i}`}>• {text}</li>)}
+                          {lock.main_dish && <li>• {tr("主菜：", "Main: ")}{dishName(lock, lock.main_dish)}</li>}
+                          {lock.slots!.map((slot, i) => <li key={i}>• {slotText(slot, lock)}</li>)}
+                          {extraSideText(lock.extra_side, lock) && <li>• {extraSideText(lock.extra_side, lock)}</li>}
+                          {customOptionTexts(lock.custom_options, lock).map((text, i) => <li key={`c${i}`}>• {text}</li>)}
                           {riceLabel(lock.rice) && <li>• {riceLabel(lock.rice)}</li>}
                         </ul>
                       )}
@@ -591,7 +591,7 @@ export default function MyBookingsPage() {
                       {canFeedback && (
                         <>
                           {hasFeedback && (
-                            <p className="text-caption text-muted-foreground pt-1">{tr("已回饋：", "Your feedback: ")}「{lock.consumer_feedback}」</p>
+                            <p className="text-caption text-muted-foreground pt-1">{tr(`已回饋：「${lock.consumer_feedback}」`, `Your feedback: "${lock.consumer_feedback}"`)}</p>
                           )}
                           {reviewedIds.has(lock.id) && (
                             <p className="text-caption text-muted-foreground">{tr("已評分，謝謝！", "Thanks for rating!")}</p>
@@ -743,7 +743,7 @@ export default function MyBookingsPage() {
                     {MEAL_PERIODS.map((p) => (
                       <span key={p} className="inline-flex items-center gap-1.5">
                         <span className={`h-3 border-l-[3px] ${PERIOD_BORDER[p]}`} aria-hidden="true" />
-                        {PERIOD_SHORT[p]()}＝{mealPeriodLabel(p)}
+                        {PERIOD_SHORT[p]()}{tr("＝", " = ")}{mealPeriodLabel(p)}
                       </span>
                     ))}
                     <span>{tr("括號內是取餐時間", "Pickup time in brackets")}</span>

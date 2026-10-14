@@ -21,6 +21,7 @@
 //   shelf_days, frequency: monthly|weekly|daily, supplier_id, unit_price (per purchase unit)
 
 const { DEFAULT_PLATFORM_CONFIG } = require("./config");
+const { t } = require("./i18n");
 
 const RICE_OPTIONS = ["add", "normal", "less"];
 
@@ -92,7 +93,7 @@ function resolveMain(item, mainIndex) {
   }
   const idx = mainIndex == null || mainIndex === "" ? 0 : Number(mainIndex);
   const main = Number.isInteger(idx) ? mains[idx] : null;
-  if (!main) return { problem: "選的主菜不存在" };
+  if (!main) return { problem: t("選的主菜不存在", "The selected main doesn't exist") };
   return { main: { name: main.name || "", component_id: main.component_id || null, index: idx }, price: Number(main.price) };
 }
 
@@ -115,17 +116,17 @@ function sideOptions(item) {
  */
 function resolveExtraSide(item, extra, resolvedSlots, config = DEFAULT_PLATFORM_CONFIG) {
   if (!extra || extra.mode == null) return { extra: null };
-  if (!["backup", "addon"].includes(extra.mode)) return { problem: "第四道只能選「備案」或「加菜」" };
-  if (!isBento(item)) return { problem: "這個品項不能加配菜" };
+  if (!["backup", "addon"].includes(extra.mode)) return { problem: t("第四道只能選「備案」或「加菜」", "The fourth side must be either \"backup\" or \"add-on\"") };
+  if (!isBento(item)) return { problem: t("這個品項不能加配菜", "This item can't take extra sides") };
   const standard = item.slots.length;
-  if (standard + 1 > (config.maxSides || 4)) return { problem: `配菜最多 ${config.maxSides || 4} 道` };
-  if (resolvedSlots.some((s) => s.removed)) return { problem: "要先選滿標準配菜數，才能加第四道" };
+  if (standard + 1 > (config.maxSides || 4)) return { problem: t(`配菜最多 ${config.maxSides || 4} 道`, `At most ${config.maxSides || 4} sides`) };
+  if (resolvedSlots.some((s) => s.removed)) return { problem: t("要先選滿標準配菜數，才能加第四道", "Choose all the standard sides before adding a fourth") };
   const slotIdx = Number(extra.slot);
   const cand = extra.candidate == null || extra.candidate === "default" ? null : Number(extra.candidate);
   const option = sideOptions(item).find((o) => o.slot === slotIdx && o.candidate === cand);
-  if (!option) return { problem: "第四道選的配菜不存在" };
+  if (!option) return { problem: t("第四道選的配菜不存在", "The selected fourth side doesn't exist") };
   const chosen = new Set(resolvedSlots.map((s) => s.wished || s.default_dish));
-  if (chosen.has(option.name)) return { problem: `「${option.name}」已經在便當裡了，請選別道` };
+  if (chosen.has(option.name)) return { problem: t(`「${option.name}」已經在便當裡了，請選別道`, `"${item.dish_names_en?.[option.name] || option.name}" is already in the bento — please pick another`) };
   return {
     extra: {
       slot: slotIdx,
@@ -170,7 +171,7 @@ function resolveChoices(item, choices) {
     const idx = Number(choice);
     const cand = Number.isInteger(idx) ? slot.candidates?.[idx] : null;
     if (!cand) {
-      out.push({ problem: `第 ${i + 1} 格的選擇不存在` });
+      out.push({ problem: t(`第 ${i + 1} 格的選擇不存在`, `The choice for slot ${i + 1} doesn't exist`) });
       return;
     }
     out.push({
@@ -200,7 +201,7 @@ function resolveCustomPicks(item, picks) {
   for (let i = 0; i < fields.length; i++) {
     const idx = list[i] ?? 0;
     const opt = Number.isInteger(idx) ? fields[i].options[idx] : null;
-    if (!opt) return { problem: `「${fields[i].label}」的選擇不存在` };
+    if (!opt) return { problem: t(`「${fields[i].label}」的選擇不存在`, `The choice for "${item.dish_names_en?.[fields[i].label] || fields[i].label}" doesn't exist`) };
     custom.push({ label: fields[i].label, index: idx, choice: opt.name, price: Number(opt.price) || 0 });
   }
   return { custom, amount: custom.reduce((s, c) => s + c.price, 0) };

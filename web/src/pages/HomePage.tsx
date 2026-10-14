@@ -19,7 +19,7 @@ import WaiverText from "@/components/WaiverText";
 import { policy } from "@/lib/policy";
 import { liveConfig } from "@/lib/platformConfig";
 import { useWallet } from "@/hooks/useWallet";
-import { formatNT } from "@/lib/format";
+import { formatNT, paren } from "@/lib/format";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { auth, db, functions } from "@/lib/firebase";
 import type { Vendor, MenuItem, MealPlan, Lock, MealPeriod, RewardStatus } from "@/types";
@@ -516,7 +516,7 @@ export default function HomePage() {
                           </p>
                           <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
                             {planRatings.get(plan.id) ? (
-                              <><Star className="w-3 h-3 fill-warning text-warning" /> {planRatings.get(plan.id)!.average}（{planRatings.get(plan.id)!.count}）</>
+                              <><Star className="w-3 h-3 fill-warning text-warning" /> {planRatings.get(plan.id)!.average}{paren(planRatings.get(plan.id)!.count)}</>
                             ) : t("尚無評分", "No ratings yet")}
                           </p>
                           <Button className="mt-auto w-full text-sm" onClick={() => openPlanDialog(group.vendor, plan)}>

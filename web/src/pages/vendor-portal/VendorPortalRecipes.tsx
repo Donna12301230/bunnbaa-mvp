@@ -26,7 +26,8 @@ import { httpsCallable } from "@/lib/callable";
 import { componentCost } from "@/lib/bento";
 import { componentUsage, costIssue, costIssueText, ingredientIssues } from "@/lib/prep";
 import { setPendingEdit, takePendingEdit } from "@/lib/pendingEdit";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
+import { paren } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { componentGroup, GROUP_CELL, GROUP_DOT, groupLabel, ingredientGroup, type FoodGroup } from "@/lib/foodColors";
 import type { Component, Ingredient, Supplier } from "@/types";
@@ -228,7 +229,7 @@ export default function VendorPortalRecipes() {
     if (!vendorId) return;
     try {
       await saveCatalogDoc(vendorId, "ingredients", { ...i, ...patch });
-      toast({ title: tr(`已更新 ${i.name}`, `Updated ${i.name}`) });
+      toast({ title: tr(`已更新 ${i.name}`, `Updated ${loc(i, "name")}`) });
       // Editing the unit price by clicking the price also recomputes candidate-dish portion tiers, same as the edit dialog
       if (patch.unit_price !== undefined && patch.unit_price !== i.unit_price) void recalcPortionLevelsAfterPrice(vendorId);
     } catch (err) {
@@ -286,12 +287,12 @@ export default function VendorPortalRecipes() {
             <div className="flex flex-wrap items-center gap-2">
               {noPrice.map((i) => (
                 <button key={`p${i.id}`} type="button" className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-3 py-1 text-sm font-medium text-danger-text hover:bg-danger/25" onClick={() => setPriceEdit({ id: i.id, value: "" })}>
-                  <AlertTriangle className="w-3.5 h-3.5" />{tr(`${i.name}：缺單價`, `${i.name}: no price`)}
+                  <AlertTriangle className="w-3.5 h-3.5" />{tr(`${i.name}：缺單價`, `${loc(i, "name")}: no price`)}
                 </button>
               ))}
               {noSupplier.filter((i) => i.unit_price > 0).map((i) => (
                 <button key={`s${i.id}`} type="button" className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-3 py-1 text-sm font-medium text-warning-text hover:bg-warning/30" onClick={() => setTab("suppliers")}>
-                  <Store className="w-3.5 h-3.5" />{tr(`${i.name}：沒供應商`, `${i.name}: no supplier`)}
+                  <Store className="w-3.5 h-3.5" />{tr(`${i.name}：沒供應商`, `${loc(i, "name")}: no supplier`)}
                 </button>
               ))}
             </div>
@@ -325,10 +326,10 @@ export default function VendorPortalRecipes() {
                           <CardContent className="p-3 space-y-2">
                             <div className="flex items-start gap-2">
                               <button type="button" className="flex-1 min-w-0 text-left" onClick={() => setIng(i)}>
-                                <p className="text-lg font-semibold leading-tight hover:underline">{i.name}</p>
+                                <p className="text-lg font-semibold leading-tight hover:underline">{loc(i, "name")}</p>
                                 <p className="text-xs text-muted-foreground">{catalogLabel(i.category)}{i.frequency === "monthly" ? tr("・久放", " · long-life") : ""}</p>
                               </button>
-                              <Button variant="ghost" size="icon" className="w-8 h-8 -mr-1 text-muted-foreground" aria-label={tr(`刪除 ${i.name}`, `Delete ${i.name}`)} onClick={() => remove("ingredients", i.id, i.name)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                              <Button variant="ghost" size="icon" className="w-8 h-8 -mr-1 text-muted-foreground" aria-label={tr(`刪除 ${i.name}`, `Delete ${loc(i, "name")}`)} onClick={() => remove("ingredients", i.id, loc(i, "name"))}><Trash2 className="w-3.5 h-3.5" /></Button>
                             </div>
 
                             {/* Price: edited most often, large text, tap to edit */}
@@ -339,11 +340,11 @@ export default function VendorPortalRecipes() {
                                 <span className="text-sm text-muted-foreground">/ {i.purchase_unit_label}</span>
                               </div>
                             ) : (
-                              <button type="button" onClick={() => setPriceEdit({ id: i.id, value: priced ? String(i.unit_price) : "" })} className={cn("w-full flex items-baseline gap-1 rounded-lg px-2 py-1 -mx-2 text-left hover:bg-accent", !priced && "text-danger-text")} aria-label={tr(`改 ${i.name} 的單價`, `Edit price of ${i.name}`)}>
+                              <button type="button" onClick={() => setPriceEdit({ id: i.id, value: priced ? String(i.unit_price) : "" })} className={cn("w-full flex items-baseline gap-1 rounded-lg px-2 py-1 -mx-2 text-left hover:bg-accent", !priced && "text-danger-text")} aria-label={tr(`改 ${i.name} 的單價`, `Edit price of ${loc(i, "name")}`)}>
                                 {priced ? (
                                   <>
                                     <span className="text-2xl font-bold">NT${i.unit_price}</span>
-                                    <span className="text-sm text-muted-foreground">/ {i.purchase_unit_label}{i.purchase_unit_size !== 1 ? `（${i.purchase_unit_size}${i.unit}）` : ""}</span>
+                                    <span className="text-sm text-muted-foreground">/ {i.purchase_unit_label}{i.purchase_unit_size !== 1 ? paren(`${i.purchase_unit_size}${i.unit}`) : ""}</span>
                                     <Pencil className="ml-auto w-3.5 h-3.5 text-muted-foreground self-center" />
                                   </>
                                 ) : <span className="text-base font-semibold flex items-center gap-1"><AlertTriangle className="w-4 h-4" />{tr("點我填單價", "Tap to add price")}</span>}
@@ -365,7 +366,7 @@ export default function VendorPortalRecipes() {
 
                             {users.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
-                                {users.map((u) => <button key={u.id} type="button" className={cn("rounded-md border px-1.5 py-0.5 text-xs", GROUP_CELL[componentGroup(u, ingById)])} onClick={() => { setTab("components"); setComp(u); }}>{u.name}</button>)}
+                                {users.map((u) => <button key={u.id} type="button" className={cn("rounded-md border px-1.5 py-0.5 text-xs", GROUP_CELL[componentGroup(u, ingById)])} onClick={() => { setTab("components"); setComp(u); }}>{loc(u, "name")}</button>)}
                               </div>
                             ) : issues.some((x) => x.code === "unused") && <p className="text-xs text-muted-foreground">{tr("還沒有配菜用到", "Not used yet")}</p>}
                           </CardContent>
@@ -388,10 +389,10 @@ export default function VendorPortalRecipes() {
                     <div className="flex flex-wrap gap-2">
                       {noSupplier.map((i) => (
                         <label key={i.id} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-1 py-1 text-sm">
-                          <span className={cn("w-2.5 h-2.5 rounded-sm", GROUP_DOT[ingredientGroup(i.category)])} />{i.name}
-                          <select className={selectClass("sm", "rounded-full px-2")} value="" onChange={(e) => e.target.value && quickSave(i, { supplier_id: e.target.value })} aria-label={tr(`${i.name} 的供應商`, `Supplier for ${i.name}`)}>
+                          <span className={cn("w-2.5 h-2.5 rounded-sm", GROUP_DOT[ingredientGroup(i.category)])} />{loc(i, "name")}
+                          <select className={selectClass("sm", "rounded-full px-2")} value="" onChange={(e) => e.target.value && quickSave(i, { supplier_id: e.target.value })} aria-label={tr(`${i.name} 的供應商`, `Supplier for ${loc(i, "name")}`)}>
                             <option value="">{tr("選供應商…", "Pick…")}</option>
-                            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {suppliers.map((s) => <option key={s.id} value={s.id}>{loc(s, "name")}</option>)}
                           </select>
                         </label>
                       ))}
@@ -408,11 +409,11 @@ export default function VendorPortalRecipes() {
                         <div className="flex items-center gap-3">
                           <span className="w-12 h-12 shrink-0 rounded-full bg-secondary text-accent-foreground flex items-center justify-center text-xl font-bold" aria-hidden="true">{s.name.slice(0, 1)}</span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-lg font-semibold leading-tight truncate">{s.name}</p>
-                            <p className="text-xs text-muted-foreground">{tr(`${mine.length} 樣食材`, `${mine.length} ingredients`)}{s.note ? `・${s.note}` : ""}</p>
+                            <p className="text-lg font-semibold leading-tight truncate">{loc(s, "name")}</p>
+                            <p className="text-xs text-muted-foreground">{tr(`${mine.length} 樣食材`, `${mine.length} ingredients`)}{s.note ? `${tr("・", " · ")}${loc(s, "note")}` : ""}</p>
                           </div>
-                          <Button variant="ghost" size="icon" className="w-8 h-8" aria-label={tr(`編輯 ${s.name}`, `Edit ${s.name}`)} onClick={() => setSup(s)}><Pencil className="w-3.5 h-3.5" /></Button>
-                          <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" aria-label={tr(`刪除 ${s.name}`, `Delete ${s.name}`)} onClick={() => remove("suppliers", s.id, s.name)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="w-8 h-8" aria-label={tr(`編輯 ${s.name}`, `Edit ${loc(s, "name")}`)} onClick={() => setSup(s)}><Pencil className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" aria-label={tr(`刪除 ${s.name}`, `Delete ${loc(s, "name")}`)} onClick={() => remove("suppliers", s.id, s.name)}><Trash2 className="w-3.5 h-3.5" /></Button>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {s.phone ? <Button size="sm" variant="outline" asChild><a href={`tel:${s.phone}`}><Phone /> {s.phone}</a></Button> : null}
@@ -423,7 +424,7 @@ export default function VendorPortalRecipes() {
                           <div className="flex flex-wrap gap-1.5 pt-2 border-t">
                             {mine.map((i) => (
                               <button key={i.id} type="button" onClick={() => { setTab("ingredients"); setIng(i); }} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-sm hover:bg-border">
-                                <span className={cn("w-2.5 h-2.5 rounded-sm", GROUP_DOT[ingredientGroup(i.category)])} />{i.name}
+                                <span className={cn("w-2.5 h-2.5 rounded-sm", GROUP_DOT[ingredientGroup(i.category)])} />{loc(i, "name")}
                                 <span className={cn("text-xs", i.unit_price > 0 ? "text-muted-foreground" : "text-danger-text font-semibold")}>{i.unit_price > 0 ? `$${i.unit_price}` : tr("缺價", "no price")}</span>
                               </button>
                             ))}
@@ -460,7 +461,7 @@ export default function VendorPortalRecipes() {
                     <Card key={c.id} className={cn("overflow-hidden border-2", issue && issue.kind !== "no_price" && "border-dashed")}>
                       <button type="button" onClick={() => setComp(c)} className={cn("w-full border-b-2 px-3 py-3 text-left", issue && issue.kind !== "no_price" ? "bg-card border-dashed border-input" : GROUP_CELL[componentGroup(c, ingById)])}>
                         <span className="flex items-start gap-2">
-                          <span className="flex-1 text-lg font-semibold leading-tight">{c.name}</span>
+                          <span className="flex-1 text-lg font-semibold leading-tight">{loc(c, "name")}</span>
                           {c.ai_draft && <span className="inline-flex items-center gap-0.5 rounded-full bg-card/80 px-2 py-0.5 text-[11px] font-semibold text-accent-foreground"><Sparkles className="w-3 h-3" />{tr("AI 草稿", "AI draft")}</span>}
                         </span>
                         <span className="block text-sm opacity-80">{c.portion_grams}g・{c.method && catalogLabel(c.method)}</span>
@@ -472,7 +473,7 @@ export default function VendorPortalRecipes() {
                           ) : (
                             <><span className="text-2xl font-bold">NT${cost.toFixed(1)}</span><span className="text-sm text-muted-foreground">{tr("/ 份", "/ portion")}</span></>
                           )}
-                          <Button variant="ghost" size="icon" className="ml-auto w-8 h-8 text-muted-foreground" aria-label={tr(`刪除 ${c.name}`, `Delete ${c.name}`)} onClick={() => remove("components", c.id, c.name)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="ml-auto w-8 h-8 text-muted-foreground" aria-label={tr(`刪除 ${c.name}`, `Delete ${loc(c, "name")}`)} onClick={() => remove("components", c.id, loc(c, "name"))}><Trash2 className="w-3.5 h-3.5" /></Button>
                         </div>
                         {c.ingredients.length > 0 && (
                           <div className="flex flex-wrap gap-1">
@@ -480,7 +481,7 @@ export default function VendorPortalRecipes() {
                               const ing = ingById[l.ingredient_id];
                               return (
                                 <span key={k} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
-                                  <span className={cn("w-2 h-2 rounded-sm", GROUP_DOT[ingredientGroup(ing?.category)])} />{ing?.name ?? "?"} {Math.round(l.grams * 10) / 10}{ing?.unit ?? "g"}
+                                  <span className={cn("w-2 h-2 rounded-sm", GROUP_DOT[ingredientGroup(ing?.category)])} />{ing ? loc(ing, "name") : "?"} {Math.round(l.grams * 10) / 10}{ing?.unit ?? "g"}
                                 </span>
                               );
                             })}
@@ -489,7 +490,7 @@ export default function VendorPortalRecipes() {
                         {users.length > 0 ? (
                           <div className="flex flex-wrap items-center gap-1 text-xs pt-1 border-t">
                             <UtensilsCrossed className="w-3.5 h-3.5 text-muted-foreground" aria-label={tr("用在", "Used in")} />
-                            {users.map((u) => <button key={u.id} type="button" className="rounded-md bg-accent px-1.5 py-0.5 hover:bg-secondary" onClick={() => openMenuItem(u.id)}>{u.name}</button>)}
+                            {users.map((u) => <button key={u.id} type="button" className="rounded-md bg-accent px-1.5 py-0.5 hover:bg-secondary" onClick={() => openMenuItem(u.id)}>{loc(u, "name")}</button>)}
                           </div>
                         ) : <p className="text-xs text-muted-foreground pt-1 border-t">{tr("還沒放進菜單", "Not on the menu")}</p>}
                       </CardContent>

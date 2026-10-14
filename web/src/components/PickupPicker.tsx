@@ -1,4 +1,4 @@
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { useEffect } from "react";
 import { AlertTriangle, CalendarOff } from "lucide-react";
 import PriceDateStrip from "@/components/PriceDateStrip";
@@ -84,7 +84,7 @@ export default function PickupPicker({ date, window, onDateChange, onWindowChang
           <span>
             {tr(
               `提醒：你在這個時段已經有 ${conflicts.length} 筆訂單（${conflicts.map((l) => l.item_name).join("、")}）。確定要再訂一份嗎？（例如幫朋友帶可以直接繼續）`,
-              `Heads up: you already have ${conflicts.length} order(s) in this slot (${conflicts.map((l) => l.item_name).join(", ")}). Order another one? (e.g. if it's for a friend, just continue)`
+              `Heads up: you already have ${conflicts.length} order(s) in this slot (${conflicts.map((l) => loc(l, "item_name")).join(", ")}). Order another one? (e.g. if it's for a friend, just continue)`
             )}
           </span>
         </div>
