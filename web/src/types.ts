@@ -385,9 +385,11 @@ export interface Component {
 export interface Supplier {
   id: string;
   name: string;
+  name_en?: string; // Auto-translated by Functions (translateSupplier)
   phone?: string;
   line_id?: string;
   note?: string;
+  note_en?: string;
 }
 
 export interface Coupon {

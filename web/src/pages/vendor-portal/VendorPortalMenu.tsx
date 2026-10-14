@@ -21,7 +21,7 @@ import { httpsCallable } from "@/lib/callable";
 import { imageToBase64 } from "@/lib/imageData";
 import { myVendorDocKey, useMyVendor } from "@/hooks/useMyVendor";
 import MenuCatalogManager from "@/components/MenuCatalogManager";
-import { catalogOrder, groupByCatalog } from "@/lib/menuCatalog";
+import { catalogEnNames, catalogOrder, groupByCatalog } from "@/lib/menuCatalog";
 import { usePlatformConfig } from "@/lib/platformConfig";
 import { netOfCommission, withCommission } from "@/lib/pricing";
 import type { MenuItem } from "@/types";
@@ -120,6 +120,10 @@ export default function VendorPortalMenu() {
   const editingItem = editId ? items.find((i) => i.id === editId) : undefined;
   const gaps = useRecipeGaps();
   const catalogNames = useMemo(() => catalogOrder(myVendor?.menu_catalogs, items), [myVendor?.menu_catalogs, items]);
+  // English UI: the catalog field shows and accepts English names; typing an existing catalog's English name picks that catalog
+  const catalogEn = useMemo(() => catalogEnNames(items), [items]);
+  const catalogShown = (zh: string) => (isEn ? catalogEn.get(zh) ?? zh : zh);
+  const catalogFromInput = (text: string) => (isEn ? catalogNames.find((zh) => catalogEn.get(zh)?.toLowerCase() === text.trim().toLowerCase()) ?? text : text);
   /** Items with an AI-generated recipe the vendor hasn't confirmed yet */
   const hasAiDraft = (item: MenuItem) => !!catalog && [item.rice_component_id, item.main?.component_id, ...(item.mains ?? []).map((m) => m.component_id), ...(item.fixed ?? []).map((f) => f.component_id), ...(item.slots ?? []).map((sl) => sl.default?.component_id)]
     .some((id) => !!id && !!catalog.componentsById[id]?.ai_draft);
@@ -638,8 +642,8 @@ export default function VendorPortalMenu() {
                 )}
                 <div>
                   <Label htmlFor="menu-item-catalog">{tr("目錄（分類的上一層，選填）", "Catalog (above category, optional)")}</Label>
-                  <Input id="menu-item-catalog" list="menu-catalog-options" maxLength={30} value={form.catalog} onChange={e => setForm(f => ({ ...f, catalog: e.target.value }))} placeholder={tr("例：午餐便當；可選現有的或直接打新的", "e.g. Lunch bentos — pick one or type a new one")} />
-                  <datalist id="menu-catalog-options">{catalogNames.map((n) => <option key={n} value={n} />)}</datalist>
+                  <Input id="menu-item-catalog" list="menu-catalog-options" maxLength={30} value={catalogShown(form.catalog)} onChange={e => setForm(f => ({ ...f, catalog: catalogFromInput(e.target.value) }))} placeholder={tr("例：午餐便當；可選現有的或直接打新的", "e.g. Lunch bentos — pick one or type a new one")} />
+                  <datalist id="menu-catalog-options">{catalogNames.map((n) => <option key={n} value={catalogShown(n)} />)}</datalist>
                 </div>
               </div>
             </details>

@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { tr } from "@/lib/i18n";
-import { catalogOf, catalogOrder } from "@/lib/menuCatalog";
+import { catalogEnNames, catalogOf, catalogOrder } from "@/lib/menuCatalog";
 import type { MenuItem } from "@/types";
 
 const MAX_CATALOGS = 30; // Matches the menu_catalogs limit in firestore.rules
@@ -29,11 +29,17 @@ export default function MenuCatalogManager({ open, onClose, vendorId, listed, it
   const [rows, setRows] = useState<{ name: string; original: string | null }[]>([]);
   const [busy, setBusy] = useState(false);
 
+  // English UI: rows show each catalog's English name; a row left as shown keeps its stored (Chinese) name,
+  // and a row edited in English renames the catalog to that text
+  const enNames = catalogEnNames(items);
+  const shown = (name: string) => tr(name, enNames.get(name) ?? name);
+  const finalName = (r: { name: string; original: string | null }) => (r.original && r.name.trim() === shown(r.original) ? r.original : r.name.trim());
+
   useEffect(() => {
-    if (open) setRows(catalogOrder(listed, items).map((name) => ({ name, original: name })));
+    if (open) setRows(catalogOrder(listed, items).map((name) => ({ name: shown(name), original: name })));
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const names = rows.map((r) => r.name.trim());
+  const names = rows.map(finalName);
   const problem = names.some((n) => !n)
     ? tr("目錄名稱不能空白", "Catalog names can't be blank")
     : new Set(names).size !== names.length
@@ -58,7 +64,7 @@ export default function MenuCatalogManager({ open, onClose, vendorId, listed, it
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, "vendors", vendorId), { menu_catalogs: names });
-      const renamed = new Map(rows.filter((r) => r.original && r.original !== r.name.trim()).map((r) => [r.original!, r.name.trim()]));
+      const renamed = new Map(rows.filter((r) => r.original && r.original !== finalName(r)).map((r) => [r.original!, finalName(r)]));
       const kept = new Set(rows.map((r) => r.original).filter(Boolean));
       for (const item of items) {
         const current = catalogOf(item);

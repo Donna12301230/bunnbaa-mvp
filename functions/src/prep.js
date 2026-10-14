@@ -101,7 +101,7 @@ function buildTimeline(portionsByComponent, componentsById, pickupStart) {
     const batches = Math.max(1, Math.ceil(count / capacity));
     const minutes = Number(comp.prep_minutes) > 0 ? Number(comp.prep_minutes) : 20;
     if (Number(comp.advance_hours) >= OVERNIGHT_ADVANCE_HOURS) {
-      overnight.push({ component_id: componentId, name: comp.name, portions: count });
+      overnight.push({ component_id: componentId, name: comp.name, name_en: comp.name_en || comp.name, portions: count });
       continue;
     }
     jobs.push({ componentId, comp, count, capacity, batches, minutes, total: batches * minutes });
@@ -124,12 +124,16 @@ function buildTimeline(portionsByComponent, componentsById, pickupStart) {
         task: job.batches > 1
           ? `${job.comp.name}（第 ${b + 1}/${job.batches} 批，${batchPortions} 份）`
           : `${job.comp.name} ${job.count} 份`,
+        // English copy for the English vendor UI (the plan is generated once, outside any request language)
+        task_en: job.batches > 1
+          ? `${job.comp.name_en || job.comp.name} (batch ${b + 1}/${job.batches}, ${batchPortions})`
+          : `${job.comp.name_en || job.comp.name} × ${job.count}`,
       });
     }
   }
   slots.sort((a, b) => a.start.localeCompare(b.start));
   return {
-    overnight: overnight.map((o) => ({ ...o, task: `${o.name} ${o.portions} 份` })),
+    overnight: overnight.map((o) => ({ ...o, task: `${o.name} ${o.portions} 份`, task_en: `${o.name_en} × ${o.portions}` })),
     slots,
     packing: { start: fromMinutes(packStart), task: "裝盒、貼出餐標籤" },
   };
@@ -145,17 +149,31 @@ function buildLabels(locks, itemsById) {
       if (extra?.mode === "addon" && (extra.resolved || extra.dish)) sides.push(`＋${extra.resolved || extra.dish}`);
       for (const c of lock.custom_options || []) sides.push(`${c.label}：${c.choice}`);
       const rice = lock.rice === "add" ? "白飯一碗半" : lock.rice === "less" ? "白飯半碗" : null;
+      // English copy of the label text for the English vendor UI: dish names from the order's (or item's) dish_names_en
+      const names = lock.dish_names_en || item?.dish_names_en || {};
+      const n = (s) => (s && names[s]) || s;
+      const main = lock.main_dish || item?.main?.name || null;
+      const sidesEn = (lock.slots || []).map((s) => (s.removed ? `${s.category ? n(s.category) : "Side"}: none` : n(s.resolved || s.default_dish))).filter(Boolean);
+      if (extra?.mode === "addon" && (extra.resolved || extra.dish)) sidesEn.push(`+ ${n(extra.resolved || extra.dish)}`);
+      for (const c of lock.custom_options || []) sidesEn.push(`${n(c.label)}: ${n(c.choice)}`);
       return {
         lock_id: lock.id,
         pickup_code: lock.pickup_code || lock.id.slice(-4).toUpperCase(),
         pickup_window: lock.pickup_window,
         meal_period: lock.meal_period || null,
         item: lock.item_name || item?.name || "",
-        main: lock.main_dish || item?.main?.name || null,
+        main,
         fixed: (item?.fixed || []).map((f) => f.name),
         sides,
         rice,
         note: lock.note || null,
+        en: {
+          item: lock.item_name_en || item?.name_en || lock.item_name || item?.name || "",
+          main: main ? n(main) : null,
+          fixed: (item?.fixed || []).map((f) => n(f.name)),
+          sides: sidesEn,
+          rice: lock.rice === "add" ? "1.5 bowls of rice" : lock.rice === "less" ? "Half bowl of rice" : null,
+        },
       };
     })
     .sort((a, b) => a.pickup_code.localeCompare(b.pickup_code));

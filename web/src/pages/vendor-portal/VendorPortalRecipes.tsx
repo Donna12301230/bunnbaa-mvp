@@ -392,7 +392,7 @@ export default function VendorPortalRecipes() {
                           <span className={cn("w-2.5 h-2.5 rounded-sm", GROUP_DOT[ingredientGroup(i.category)])} />{loc(i, "name")}
                           <select className={selectClass("sm", "rounded-full px-2")} value="" onChange={(e) => e.target.value && quickSave(i, { supplier_id: e.target.value })} aria-label={tr(`${i.name} 的供應商`, `Supplier for ${loc(i, "name")}`)}>
                             <option value="">{tr("選供應商…", "Pick…")}</option>
-                            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {suppliers.map((s) => <option key={s.id} value={s.id}>{loc(s, "name")}</option>)}
                           </select>
                         </label>
                       ))}
@@ -409,11 +409,11 @@ export default function VendorPortalRecipes() {
                         <div className="flex items-center gap-3">
                           <span className="w-12 h-12 shrink-0 rounded-full bg-secondary text-accent-foreground flex items-center justify-center text-xl font-bold" aria-hidden="true">{s.name.slice(0, 1)}</span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-lg font-semibold leading-tight truncate">{s.name}</p>
-                            <p className="text-xs text-muted-foreground">{tr(`${mine.length} 樣食材`, `${mine.length} ingredients`)}{s.note ? `・${s.note}` : ""}</p>
+                            <p className="text-lg font-semibold leading-tight truncate">{loc(s, "name")}</p>
+                            <p className="text-xs text-muted-foreground">{tr(`${mine.length} 樣食材`, `${mine.length} ingredients`)}{s.note ? `${tr("・", " · ")}${loc(s, "note")}` : ""}</p>
                           </div>
-                          <Button variant="ghost" size="icon" className="w-8 h-8" aria-label={tr(`編輯 ${s.name}`, `Edit ${s.name}`)} onClick={() => setSup(s)}><Pencil className="w-3.5 h-3.5" /></Button>
-                          <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" aria-label={tr(`刪除 ${s.name}`, `Delete ${s.name}`)} onClick={() => remove("suppliers", s.id, s.name)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="w-8 h-8" aria-label={tr(`編輯 ${s.name}`, `Edit ${loc(s, "name")}`)} onClick={() => setSup(s)}><Pencil className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" aria-label={tr(`刪除 ${s.name}`, `Delete ${loc(s, "name")}`)} onClick={() => remove("suppliers", s.id, s.name)}><Trash2 className="w-3.5 h-3.5" /></Button>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {s.phone ? <Button size="sm" variant="outline" asChild><a href={`tel:${s.phone}`}><Phone /> {s.phone}</a></Button> : null}

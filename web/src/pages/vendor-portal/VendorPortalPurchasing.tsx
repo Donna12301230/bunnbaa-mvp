@@ -189,7 +189,7 @@ export default function VendorPortalPurchasing() {
     const map = new Map<string, Line[]>();
     for (const l of weekly.lines) map.set(l.supplier_id ?? "", [...(map.get(l.supplier_id ?? "") ?? []), l]);
     return [...map.entries()]
-      .map(([sid, lines]) => ({ sid, name: suppliers.find((s) => s.id === sid)?.name ?? tr("未指定供應商", "No supplier"), lines }))
+      .map(([sid, lines]) => ({ sid, name: loc(suppliers.find((s) => s.id === sid), "name") || tr("未指定供應商", "No supplier"), lines }))
       .sort((a, b) => Number(!a.sid) - Number(!b.sid) || a.name.localeCompare(b.name, "zh-Hant"));
   }, [weekly, suppliers]);
   const total = weekly ? weekly.lines.reduce((s, l) => s + costOf(l), 0) : 0;

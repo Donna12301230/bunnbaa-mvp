@@ -32,13 +32,14 @@ import { httpsCallable } from "@/lib/callable";
 import { MEAL_PERIODS, addDaysStr, bookableDateRange, cutoffAt, isPastCutoff, mealPeriodLabel, todayStr, vendorCutoffTime } from "@/lib/pickupSlots";
 import type { MealPeriod } from "@/types";
 import { PENDING_STATUSES } from "@/lib/lockOutcome";
-import { tr, loc, dishName } from "@/lib/i18n";
+import { getLang, tr, loc, dishName } from "@/lib/i18n";
 import { catalogLabel } from "@/components/CatalogEditors";
 import type { Lock } from "@/types";
 
 interface Timeline {
-  overnight: { component_id: string; task: string }[];
-  slots: { start: string; end: string; equipment: string; component_id: string; task: string }[];
+  // task_en: English copy written by Functions (prep.js); older plans don't have it
+  overnight: { component_id: string; task: string; task_en?: string }[];
+  slots: { start: string; end: string; equipment: string; component_id: string; task: string; task_en?: string }[];
   packing: { start: string; task: string };
 }
 
@@ -47,10 +48,10 @@ function TimelineTable({ timeline }: { timeline: Timeline }) {
     <table className="w-full">
       <tbody>
         {timeline.overnight.length > 0 && (
-          <tr className="align-top"><td className="pr-3 py-1 font-semibold whitespace-nowrap">{tr("前一晚", "Night before")}</td><td className="py-1">{timeline.overnight.map((o) => o.task).join("、")}</td></tr>
+          <tr className="align-top"><td className="pr-3 py-1 font-semibold whitespace-nowrap">{tr("前一晚", "Night before")}</td><td className="py-1">{timeline.overnight.map((o) => tr(o.task, o.task_en ?? o.task)).join(tr("、", ", "))}</td></tr>
         )}
         {timeline.slots.map((s, i) => (
-          <tr key={i} className="align-top"><td className="pr-3 py-1 font-mono whitespace-nowrap">{s.start}</td><td className="py-1">{s.task} <span className="text-xs text-muted-foreground">{paren(catalogLabel(s.equipment))}</span></td></tr>
+          <tr key={i} className="align-top"><td className="pr-3 py-1 font-mono whitespace-nowrap">{s.start}</td><td className="py-1">{tr(s.task, s.task_en ?? s.task)} <span className="text-xs text-muted-foreground">{paren(catalogLabel(s.equipment))}</span></td></tr>
         ))}
         <tr className="align-top"><td className="pr-3 py-1 font-mono">{timeline.packing.start}</td><td className="py-1">{tr("裝盒、貼出餐標籤", "Pack & label")}</td></tr>
       </tbody>
@@ -116,7 +117,11 @@ interface PrepPlan {
   timeline: Timeline;
   // the timeline works backward from each meal period's pickup start time
   timelines?: Partial<Record<MealPeriod, Timeline & { range: string; order_count: number }>>;
-  labels: { lock_id: string; pickup_code: string; pickup_window: string; item: string; main: string | null; fixed?: string[]; sides: string[]; rice: string | null; note: string | null }[];
+  labels: {
+    lock_id: string; pickup_code: string; pickup_window: string; item: string; main: string | null; fixed?: string[]; sides: string[]; rice: string | null; note: string | null;
+    // English copy of the label text (Functions prep.js); older plans don't have it
+    en?: { item: string; main: string | null; fixed: string[]; sides: string[]; rice: string | null };
+  }[];
   shortages: { ingredient_id: string; name: string; unit: string; need: number; have: number; short: number }[];
   raw_needs?: Record<string, number>;
   wish_results: Record<string, { dish: string; count: number; min_qty: number; ok: boolean }>;
@@ -419,6 +424,8 @@ export default function VendorPortalPrep() {
     : [];
   const doneCount = plan ? tiles.filter((t) => plan.done?.[t.key]).length : 0;
   const dishes = plan ? [...new Set(plan.labels.flatMap((l) => l.sides))].filter((s) => !s.includes("不要")) : [];
+  // English names of those sides, paired by position with each label's en.sides (the option values stay Chinese)
+  const sideEn = new Map(plan ? plan.labels.flatMap((l) => l.sides.map((s, i) => [s, l.en?.sides[i] ?? s] as const)) : []);
   const total = plan ? plan.order_count : locks.length;
   const loadingDay = !!vendorId && (loadedLocksDate !== date || loadedPlanDate !== date);
   const dayLabel = date === today ? tr("今天", "Today") : date < today ? tr("昨天", "Yesterday") : tr("下一個營業日", "Next day");
@@ -582,7 +589,7 @@ export default function VendorPortalPrep() {
                 <CardContent className="flex flex-wrap gap-2 items-center">
                   <select className={selectClass()} value={sub.from} onChange={(e) => setSub({ ...sub, from: e.target.value })} aria-label={tr("原配菜", "From")}>
                     <option value="">{tr("原配菜", "From")}</option>
-                    {dishes.map((d) => <option key={d}>{d}</option>)}
+                    {dishes.map((d) => <option key={d} value={d}>{tr(d, sideEn.get(d) ?? d)}</option>)}
                   </select>
                   <span>→</span>
                   <Input className="w-40 h-10" value={sub.to} onChange={(e) => setSub({ ...sub, to: e.target.value })} placeholder={tr("替換成", "To")} />
@@ -634,10 +641,18 @@ export default function VendorPortalPrep() {
                 {plan.labels.map((l) => (
                   <div key={l.lock_id} className="border border-dashed border-input rounded p-2 text-xs bg-card break-inside-avoid">
                     <div className="flex justify-between items-baseline"><span className="text-xl font-extrabold tracking-widest">{l.pickup_code}</span><span>{l.pickup_window}</span></div>
-                    <p className="font-semibold">{itemLabel(l.item)}</p>
-                    {l.main && <p>{l.main}{l.fixed?.length ? `＋${l.fixed.join("、")}` : ""}</p>}
-                    <p>{l.sides.join("・")}</p>
-                    {l.rice && <p className="font-bold">{l.rice}</p>}
+                    {(() => {
+                      // English UI: the plan's English copy when it has one (older plans: only the item name is translated)
+                      const t = getLang() === "en" && l.en ? l.en : { ...l, item: itemLabel(l.item), fixed: l.fixed ?? [] };
+                      return (
+                        <>
+                          <p className="font-semibold">{t.item}</p>
+                          {t.main && <p>{t.main}{t.fixed.length ? `${tr("＋", " + ")}${t.fixed.join(tr("、", ", "))}` : ""}</p>}
+                          <p>{t.sides.join(tr("・", " · "))}</p>
+                          {t.rice && <p className="font-bold">{t.rice}</p>}
+                        </>
+                      );
+                    })()}
                     {l.note && <p className="italic">{l.note}</p>}
                   </div>
                 ))}

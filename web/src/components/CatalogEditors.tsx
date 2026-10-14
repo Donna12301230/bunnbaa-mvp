@@ -184,7 +184,7 @@ export function IngredientDialog({ vendorId, value, onClose, onSaved }: {
             <div><Label>{tr("供應商", "Supplier")}</Label>
               <select className={SELECT} value={ing.supplier_id ?? ""} onChange={(e) => setIng({ ...ing, supplier_id: e.target.value || null })}>
                 <option value="">—</option>
-                {catalog?.suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {catalog?.suppliers.map((s) => <option key={s.id} value={s.id}>{loc(s, "name")}</option>)}
               </select></div>
             <PriceImpact vendorId={vendorId} draft={ing} />
             <p className="col-span-2 text-xs text-muted-foreground">{tr("生料用量 = 熟重 × 份數 ÷（熟成率 ×（1 − 損耗率））。例：100 g 熟重、熟成率 0.8、損耗 10% → 生料 139 g。", "Raw = cooked × portions ÷ (yield × (1 − loss)).")}{" "}{ing.name && `${tr("試算", "e.g.")} 100${ing.unit} → ${rawAmount(100, ing).toFixed(0)}${ing.unit}`}</p>

@@ -107,6 +107,8 @@ const TRANSLATED_FIELDS = {
   ingredients: ["name"],
   // The dish library diners pick from when making an open wish
   dishLibrary: ["name"],
+  // Vendors' suppliers (vendors/{id}/suppliers), for the English vendor UI only; LINE purchase messages to suppliers stay Chinese
+  suppliers: ["name", "note"],
 };
 
 module.exports = { translateTexts, translationPatch, dishNames, dishNamesPatch, TRANSLATED_FIELDS };
