@@ -40,11 +40,11 @@
 消費者端（手機）與商家後台，在正式站以英文介面截圖。店名、菜名由 Gemini 從中文翻成英文。
 
 <p>
-  <img src="assets/screenshots/diner-home.png" alt="Diner home" width="190">
-  <img src="assets/screenshots/diner-today.png" alt="Pre-order with early-bird prices" width="190">
+  <img src="assets/screenshots/diner-menu.png" alt="Pre-order: pick a date for 20% off, then Book" width="190">
+  <img src="assets/screenshots/diner-dish.png" alt="Dish details: early-bird price per date, add to cart" width="190">
   <img src="assets/screenshots/diner-my-meals.png" alt="A locked meal: show the pickup code, transfer or gift it" width="190">
 </p>
-<p><img src="assets/screenshots/vendor-dashboard.png" alt="Vendor portal overview" width="780"></p>
+<p><img src="assets/screenshots/vendor-dashboard.png" alt="Vendor portal overview: pickups, prep and this month's profit" width="780"></p>
 
 ## 要解決的問題
 
@@ -273,7 +273,7 @@ npm run dev:emulator:reset    # 清掉本機資料，重新灌種子資料
 ```
 
 要在 emulator 裡呼叫 Vertex AI，先執行 `gcloud auth application-default login`。
-測試帳號（密碼 `demo1234`）：`customer@bunnbaa.test`（顧客）、`vendor@bunnbaa.test`（店家）。
+emulator 測試帳號（密碼 `demo1234`，只限本機；線上版的密碼見[試用](#試用)）：`customer@bunnbaa.test`（顧客）、`vendor@bunnbaa.test`（店家）。
 
 ### 4. 部署
 

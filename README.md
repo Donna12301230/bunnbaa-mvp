@@ -40,11 +40,11 @@ Payments run in the LINE Pay **sandbox**, so no real money moves.
 Diner app (mobile) and vendor portal, taken on the live prototype in English. Vendor and dish names are translated from Chinese by Gemini.
 
 <p>
-  <img src="assets/screenshots/diner-home.png" alt="Diner home" width="190">
-  <img src="assets/screenshots/diner-today.png" alt="Pre-order with early-bird prices" width="190">
+  <img src="assets/screenshots/diner-menu.png" alt="Pre-order: pick a date for 20% off, then Book" width="190">
+  <img src="assets/screenshots/diner-dish.png" alt="Dish details: early-bird price per date, add to cart" width="190">
   <img src="assets/screenshots/diner-my-meals.png" alt="A locked meal: show the pickup code, transfer or gift it" width="190">
 </p>
-<p><img src="assets/screenshots/vendor-dashboard.png" alt="Vendor portal overview" width="780"></p>
+<p><img src="assets/screenshots/vendor-dashboard.png" alt="Vendor portal overview: pickups, prep and this month's profit" width="780"></p>
 
 ## The problem
 
@@ -275,7 +275,7 @@ npm run dev:emulator:reset    # wipe local data and reload the seed data
 ```
 
 To call Vertex AI from the emulator, run `gcloud auth application-default login` first.
-Demo accounts (password `demo1234`): `customer@bunnbaa.test` (diner) and `vendor@bunnbaa.test` (vendor).
+Emulator demo accounts (password `demo1234`, local only; the live prototype uses the passwords in [Try it](#try-it)): `customer@bunnbaa.test` (diner) and `vendor@bunnbaa.test` (vendor).
 
 ### 4. Deploy
 

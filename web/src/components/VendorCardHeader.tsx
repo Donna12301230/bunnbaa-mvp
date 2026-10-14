@@ -15,7 +15,7 @@ export default function VendorCardHeader({ vendor, subtitle, reward }: { vendor:
           ? <img src={vendor.cover_image} alt="" loading="lazy" className="w-full h-full object-cover" />
           : <Store className="w-5 h-5 text-secondary-foreground/70" aria-hidden="true" />}
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-[12rem] flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-heading text-xl font-semibold">{name}</h3>
           {vendor.verified && (

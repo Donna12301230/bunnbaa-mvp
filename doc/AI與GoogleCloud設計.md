@@ -135,7 +135,7 @@ flowchart LR
 
 ### 4.5 平台儀表板（Looker Studio）
 
-`bigquery/sql/02_dashboard.sql` 建立 `dash_daily_ops`、`dash_forecast_vs_actual`、`dash_forecast_next`、`dash_segments`。管理後台「平台儀表板」（`/admin/analytics`）呼叫 `getPlatformDashboard`（限管理員）即時查這四個 view，用 Recharts 畫總數卡、每日預訂與救回、預測 vs 實際、未來預估、客群表（英文介面用 `label_en`）。同一組 view 也接 Looker Studio 報表，頁面上有「在 Looker Studio 開啟」按鈕，網址存在 `platformConfig/analytics.lookerStudioEmbedUrl`。目前數字：3,659 份裡救回 408 份（轉讓 296＋愛心餐 112），全平台預測誤差（WAPE）6～15%。
+`bigquery/sql/02_dashboard.sql` 建立 `dash_daily_ops`、`dash_forecast_vs_actual`、`dash_forecast_next`、`dash_segments`。管理後台「平台儀表板」（`/admin/analytics`）呼叫 `getPlatformDashboard`（限管理員）即時查這四個 view，用 Recharts 畫總數卡、每日預訂與救回、預測 vs 實際、未來預估、客群表（英文介面用 `label_en`）。同一組 view 也接 Looker Studio 報表，頁面上有「在 Looker Studio 開啟」按鈕，網址存在 `platformConfig/analytics.lookerStudioEmbedUrl`。目前數字（原型 demo 資料：種子訂單加模擬需求，2026-10-13）：3,659 份裡救回 408 份（轉讓 296＋愛心餐 112），全平台隔日預測誤差近 16 天 WAPE 5.7%。
 
 ### 4.6 前端讀取格式
 
