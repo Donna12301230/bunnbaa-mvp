@@ -28,7 +28,8 @@ export function dishCell(key: string, name: string, componentId: string | null |
   const issue = costIssue(componentId, componentsById, ingredientsById);
   return {
     key,
-    name: name || loc(comp, "name") || "?",
+    // A dish named after its component shows the component's English name in the English UI
+    name: (comp && name === comp.name ? loc(comp, "name") : name) || loc(comp, "name") || "?",
     sub: cellSub(comp, portions),
     group: rice ? "rice" : componentGroup(comp, ingredientsById),
     missing: !!issue && issue.kind !== "no_price",
