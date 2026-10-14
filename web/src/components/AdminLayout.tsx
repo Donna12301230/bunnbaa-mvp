@@ -1,7 +1,7 @@
 import { tr } from "@/lib/i18n";
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { AreaChart, Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings, SlidersHorizontal, BookMarked, CloudLightning, AlertOctagon } from "lucide-react";
+import { AreaChart, Store, ShieldAlert, ArrowLeft, ClipboardList, Wallet, Settings, SlidersHorizontal, BookMarked, CloudLightning, AlertOctagon, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
@@ -27,7 +27,7 @@ const navItems = () => [
 // VendorPortalLayout.tsx so the two backends share one visual language.
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
-  const { user, isAdmin, isLoading } = useAuth();
+  const { user, isAdmin, isReadOnlyAdmin, isLoading } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -116,6 +116,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         {/* Content */}
         <main className="flex-1 min-w-0 p-4 md:p-8 pb-24 md:pb-10">
+          {/* Read-only demo admin: firestore.rules and Functions refuse its writes, so say so up front */}
+          {isReadOnlyAdmin && (
+            <div role="status" className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-accent px-4 py-3 text-sm text-accent-foreground">
+              <Eye className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+              <span>{tr("你正在使用管理員體驗帳號：可以瀏覽所有後台頁面，但新增、修改、退款等操作都不會生效。", "You're using the demo admin account: you can browse every admin page, but creating, editing or refunding won't go through.")}</span>
+            </div>
+          )}
           {children}
         </main>
       </div>

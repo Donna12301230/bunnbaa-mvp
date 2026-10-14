@@ -1,11 +1,14 @@
 import { tr } from "@/lib/i18n";
+import { DEMO_ADMIN_EMAIL } from "@/lib/adminAuth";
 
 // Demo accounts for the login page's "Demo accounts" one-click sign-in.
 // These are public shared accounts anyone can use (the passwords are right here), so never put real data on them.
 // Local emulator accounts are created by scripts/seed.js and use different passwords from production:
 //   - diner: one password on the emulator, another on production
 //   - vendor: demo1234 on both; on production it owns cafe-renheya-demo (仁和雅咖啡), so anyone can open that store's portal
-//   - admin: emulator only. Admins can refund, ban and change platform settings, so production has no one-click admin sign-in
+//   - admin: on the emulator, a real admin (full access). On production, the read-only demo admin admin@bunnbaa.test
+//     (password demo1234, lib/adminAuth.ts DEMO_ADMIN_EMAIL): it can browse the admin backend, but firestore.rules
+//     (isAdminViewer) and Functions refuse every write, since anyone can sign in with it
 export interface DemoAccount {
   key: "customer" | "vendor" | "admin";
   email: string;
@@ -33,5 +36,9 @@ export function demoAccounts(): DemoAccount[] {
       { key: "admin", email: "suw192336@gmail.com", password: "demo1234", label: tr("管理員", "Admin"), hint: tr("只在本機 emulator", "Local emulator only") },
     ];
   }
-  return [{ ...customer, password: "demo123" }, vendor];
+  return [
+    { ...customer, password: "demo123" },
+    vendor,
+    { key: "admin", email: DEMO_ADMIN_EMAIL, password: "demo1234", label: tr("管理員", "Admin"), hint: tr("唯讀：瀏覽管理後台，不能修改資料", "Read-only: browse the admin backend") },
+  ];
 }

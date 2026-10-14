@@ -2,7 +2,7 @@
 // and returns them as JSON so the site draws the charts itself (the same views also back the Looker Studio report).
 // Queried live on each call: the views are tiny (one row per day / segment), so there's no snapshot to keep in sync.
 const { BigQuery } = require("@google-cloud/bigquery");
-const { onCall, assertAdminOrEmulator } = require("./common");
+const { onCall, assertAdminViewerOrEmulator } = require("./common");
 
 const DATASET = "bunnbaa_analytics";
 const BQ_LOCATION = "asia-east1";
@@ -36,9 +36,9 @@ async function loadPlatformDashboard() {
   return { ...Object.fromEntries(entries), generated_at: new Date().toISOString() };
 }
 
-/** Admin console platform dashboard data (admins only) */
+/** Admin console platform dashboard data (admins, plus the read-only demo admin) */
 exports.getPlatformDashboard = onCall({ timeoutSeconds: 60 }, async (request) => {
-  assertAdminOrEmulator(request);
+  assertAdminViewerOrEmulator(request);
   return loadPlatformDashboard();
 });
 

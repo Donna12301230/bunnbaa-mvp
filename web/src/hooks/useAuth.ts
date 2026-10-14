@@ -12,6 +12,7 @@ export function useAuth() {
     isAuthenticated: !!user,
     isVendor: user?.role === "vendor",
     isAdmin: user?.role === "admin",
+    isReadOnlyAdmin: user?.readOnlyAdmin ?? false,
     isCustomer: !user || user.role === "customer",
     isOrderBanned: user?.orderBanned ?? false,
   };

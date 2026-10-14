@@ -11,6 +11,16 @@ service cloud.firestore {
         && request.auth.token.email in ['suw192336@gmail.com', 'ckchildlikekid@gmail.com'];
     }
 
+    // Read-only demo admin (the login page's one-tap "admin" demo account): its
+    // password is public, so it may read what admins read but never write.
+    // Only used in `allow read` rules; every write still checks isAdmin().
+    // Keep in sync with DEMO_ADMIN_EMAIL in web/src/lib/adminAuth.ts and
+    // functions/src/common.js.
+    function isAdminViewer() {
+      return isAdmin()
+        || (request.auth != null && request.auth.token.email == 'admin@bunnbaa.test');
+    }
+
     // Consumers must log in with a real account to lock, resell, gift or claim
     // meals (2026-09-24: anonymous sign-in is no longer used). Also reused for
     // users/ and vendor_applications/ so an anonymous token can't create either.
@@ -124,7 +134,7 @@ service cloud.firestore {
                   // Previous owners keep read access so "My transfers" (我的轉讓) can show what
                   // happened to a lock after someone else took it over.
                   || (request.auth != null && request.auth.uid in resource.data.get('transferred_from_uids', []))
-                  || isAdmin()
+                  || isAdminViewer()
                   || isVendorOwner(resource.data.vendor_id);
       // Locks are only created by confirmLinePayPayment (Admin SDK, bypasses
       // rules) after LINE Pay captures the money. The last client-side path,
@@ -225,13 +235,13 @@ service cloud.firestore {
                     && request.resource.data.fcm_token.size() < 4096
                     && request.resource.data.buyer_uid == request.auth.uid
                     && get(/databases/$(database)/documents/locks/$(lockId)).data.buyer_uid == request.auth.uid;
-      allow read: if (isSignedInUser() && resource.data.buyer_uid == request.auth.uid) || isAdmin();
+      allow read: if (isSignedInUser() && resource.data.buyer_uid == request.auth.uid) || isAdminViewer();
       allow update, delete: if false;
     }
 
     // admin_audit_logs: append-only record of admin overrides (ISO 27001 A.8.15).
     match /admin_audit_logs/{logId} {
-      allow read: if isAdmin();
+      allow read: if isAdminViewer();
       allow create: if isAdmin() && request.resource.data.admin_email == request.auth.token.email;
       allow update, delete: if false;
     }
@@ -246,7 +256,7 @@ service cloud.firestore {
 
     // accuracy_reports: written only by Cloud Functions (admin SDK bypasses rules)
     match /accuracy_reports/{reportId} {
-      allow read: if isAdmin() || isVendorOwner(resource.data.vendor_id);
+      allow read: if isAdminViewer() || isVendorOwner(resource.data.vendor_id);
       allow write: if false;
     }
 
@@ -258,7 +268,7 @@ service cloud.firestore {
 
     // payouts: written only by settleVendorPayouts (Cloud Function)
     match /payouts/{payoutId} {
-      allow read: if isAdmin() || isVendorOwner(resource.data.vendor_id);
+      allow read: if isAdminViewer() || isVendorOwner(resource.data.vendor_id);
       allow write: if false;
     }
 
@@ -369,7 +379,7 @@ service cloud.firestore {
     // user's ban (users/{uid} rule below), done client-side as a batch in
     // AdminAppealsPage.tsx.
     match /ban_appeals/{appealId} {
-      allow read: if isAdmin() || (request.auth != null && resource.data.buyer_uid == request.auth.uid);
+      allow read: if isAdminViewer() || (request.auth != null && resource.data.buyer_uid == request.auth.uid);
       allow create: if isSignedInUser() && isBanned()
                     && request.resource.data.buyer_uid == request.auth.uid
                     && request.resource.data.status == 'pending'
@@ -386,7 +396,7 @@ service cloud.firestore {
     // SDK bypasses rules); the isAdmin() branch below is only for resetting
     // them when an appeal is approved.
     match /users/{uid} {
-      allow read: if (request.auth != null && request.auth.uid == uid) || isAdmin();
+      allow read: if (request.auth != null && request.auth.uid == uid) || isAdminViewer();
       // lang: UI language (zh / en); pickup reminder pushes use it to pick the language
       allow create: if isSignedInUser() && request.auth.uid == uid
                     && request.resource.data.keys().hasOnly(
@@ -414,7 +424,7 @@ service cloud.firestore {
     // must start "pending"); only an admin decides it. Approval itself binds
     // vendors/{id}.owner_uid, which admins can already write.
     match /vendor_applications/{uid} {
-      allow read: if (request.auth != null && request.auth.uid == uid) || isAdmin();
+      allow read: if (request.auth != null && request.auth.uid == uid) || isAdminViewer();
       allow create: if isSignedInUser() && request.auth.uid == uid
                     && request.resource.data.status == 'pending'
                     && request.resource.data.keys().hasOnly(
@@ -443,7 +453,7 @@ service cloud.firestore {
     // A vendor's recipes and purchasing data are trade secrets (ISO 27001 A.5.34): only the vendor owner and admins can read/write.
     // Supplier orders, prep plans, reward periods and wish tallies are generated by Functions; the vendor owner can only tick prep as done (done).
     match /vendors/{vendorId}/{sub}/{docId} {
-      allow read: if isAdmin() || isVendorOwner(vendorId);
+      allow read: if isAdminViewer() || isVendorOwner(vendorId);
       allow write: if (isAdmin() || isVendorOwner(vendorId))
                    && sub in ['ingredients', 'components', 'suppliers', 'inventory'];
       allow update: if isVendorOwner(vendorId) && sub == 'prepPlans'
@@ -457,7 +467,7 @@ service cloud.firestore {
     }
     // Open wishes: users can read their own; vendors only see the wishTally aggregate
     match /openWishes/{id} {
-      allow read: if isAdmin() || (request.auth != null && resource.data.user_id == request.auth.uid);
+      allow read: if isAdminViewer() || (request.auth != null && resource.data.user_id == request.auth.uid);
       allow write: if false;
     }
 
@@ -467,17 +477,17 @@ service cloud.firestore {
       allow write: if false;
     }
     match /userSpend/{id} {
-      allow read: if isAdmin() || (request.auth != null && resource.data.user_id == request.auth.uid);
+      allow read: if isAdminViewer() || (request.auth != null && resource.data.user_id == request.auth.uid);
       allow write: if false;
     }
     match /rewardTickets/{id} {
-      allow read: if isAdmin()
+      allow read: if isAdminViewer()
                   || (request.auth != null && resource.data.user_id == request.auth.uid)
                   || isVendorOwner(resource.data.vendor_id);
       allow write: if false;
     }
     match /coupons/{id} {
-      allow read: if isAdmin()
+      allow read: if isAdminViewer()
                   || (request.auth != null && resource.data.get('user_id', null) == request.auth.uid)
                   || isVendorOwner(resource.data.vendor_id);
       allow write: if false;
@@ -509,7 +519,7 @@ service cloud.firestore {
     }
     // Area insights: aggregates only, visible only to that vendor's owner
     match /areaInsights/{id} {
-      allow read: if isAdmin() || isVendorOwner(resource.data.vendor_id);
+      allow read: if isAdminViewer() || isVendorOwner(resource.data.vendor_id);
       allow write: if false;
     }
 
@@ -534,7 +544,7 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /anomalies/{id} {
-      allow read: if isAdmin();
+      allow read: if isAdminViewer();
       allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'note']);
       allow create, delete: if false;
     }
@@ -554,7 +564,7 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /resale_matches/{id} {
-      allow read: if isAdmin();
+      allow read: if isAdminViewer();
       allow write: if false;
     }
     match /assistant_cache/{id} {

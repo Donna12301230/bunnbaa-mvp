@@ -322,6 +322,7 @@ export interface UserProfile {
   studentId?: string;
   department?: string;
   role: "customer" | "vendor" | "admin";
+  readOnlyAdmin?: boolean; // The read-only demo admin (lib/adminAuth.ts DEMO_ADMIN_EMAIL): can browse the admin backend but not change anything
   vendorId?: string; // When role is vendor, the vendors/{id} whose owner_uid is bound to this account
   orderBanned?: boolean;
   noPickupCount?: number;
