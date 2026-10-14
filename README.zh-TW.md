@@ -14,13 +14,13 @@
 ![React](https://img.shields.io/badge/React_18-TypeScript-61DAFB?logo=react&logoColor=black)
 ![Node](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 
-**Google AI Builder Cup 2026** · 賽題：*零售與商業：智慧客戶與商業體驗* · 領域：**永續 Sustainability**（減少剩食）
+**Google Cloud AI Builder Cup 2026** · 賽題：*零售與商業：智慧客戶與商業體驗* · 領域：**永續 Sustainability**（減少剩食）
 
 | | |
 |---|---|
 | 🌐 **線上版** | https://bunnbaa-mvp-5474.web.app |
-| 🎬 **展示影片（3 分鐘）** | [YouTube 連結] |
-| 📑 **提案簡報** | [PDF 連結] |
+| 🎬 **展示影片（3 分鐘）** | https://youtu.be/ZhRAGfqUVDs |
+| 📑 **提案簡報** | https://drive.google.com/file/d/12HaDFSHFi3qUULo1gubD2nUdA0K6k-5Y/view?usp=sharing |
 
 ### 試用
 
@@ -332,6 +332,6 @@ AI 與 Google Cloud 的設計：[`doc/AI與GoogleCloud設計.md`](doc/AI與Googl
 
 ## 團隊與授權
 
-由鍾雅婷、蘇雅雯、陳信喜為 Google AI Builder Cup 2026 打造。
+由鍾雅婷、蘇雅雯、陳信喜為 Google Cloud AI Builder Cup 2026 打造。
 
 授權：[MIT License](LICENSE)

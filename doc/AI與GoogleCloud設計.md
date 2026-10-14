@@ -1,6 +1,6 @@
 # BunnBaa AI 與 Google Cloud 設計
 
-Google AI Builder Cup 2026 · Retail & Commerce — Intelligent Customer and Business Experiences
+Google Cloud AI Builder Cup 2026 · Retail & Commerce — Intelligent Customer and Business Experiences
 
 本文件說明 AI 功能與 Google Cloud 分析層的設計和實作現況（2026-10-12）。BigQuery SQL 見 [`bigquery/README.zh-TW.md`](../bigquery/README.zh-TW.md)，助理評估見 [evaluation/](evaluation/)。
 

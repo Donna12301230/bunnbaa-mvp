@@ -14,13 +14,13 @@
 ![React](https://img.shields.io/badge/React_18-TypeScript-61DAFB?logo=react&logoColor=black)
 ![Node](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 
-**Google AI Builder Cup 2026** · Theme: *Retail & Commerce: Intelligent Customer and Business Experiences* · Domain: **Sustainability** (food waste reduction)
+**Google Cloud AI Builder Cup 2026** · Theme: *Retail & Commerce: Intelligent Customer and Business Experiences* · Domain: **Sustainability** (food waste reduction)
 
 | | |
 |---|---|
 | 🌐 **Live prototype** | https://bunnbaa-mvp-5474.web.app/?lang=en |
-| 🎬 **Demo video (3 min)** | [YouTube link] |
-| 📑 **Proposal deck** | [PDF link] |
+| 🎬 **Demo video (3 min)** | https://youtu.be/ZhRAGfqUVDs |
+| 📑 **Proposal deck** | https://drive.google.com/file/d/12HaDFSHFi3qUULo1gubD2nUdA0K6k-5Y/view?usp=sharing |
 
 ### Try it
 
@@ -334,6 +334,6 @@ The AI and Google Cloud design (in Chinese) is in [`doc/AI與GoogleCloud設計.m
 
 ## Team & license
 
-Built by 鍾雅婷, 蘇雅雯 and 陳信喜 for the Google AI Builder Cup 2026.
+Built by 鍾雅婷, 蘇雅雯 and 陳信喜 for the Google Cloud AI Builder Cup 2026.
 
 Released under the [MIT License](LICENSE).
