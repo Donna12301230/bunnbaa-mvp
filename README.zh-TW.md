@@ -37,12 +37,12 @@
 
 ## 畫面
 
-消費者端（手機）與商家後台，英文介面。在本機 emulator 用示範資料截的，所以店名、菜名還沒翻譯；正式站上由 Gemini 自動翻成英文。
+消費者端（手機）與商家後台，在正式站以英文介面截圖。店名、菜名由 Gemini 從中文翻成英文。
 
 <p>
   <img src="assets/screenshots/diner-home.png" alt="Diner home" width="190">
   <img src="assets/screenshots/diner-today.png" alt="Pre-order with early-bird prices" width="190">
-  <img src="assets/screenshots/diner-resale-market.png" alt="Resale market" width="190">
+  <img src="assets/screenshots/diner-my-meals.png" alt="A locked meal: show the pickup code, transfer or gift it" width="190">
 </p>
 <p><img src="assets/screenshots/vendor-dashboard.png" alt="Vendor portal overview" width="780"></p>
 

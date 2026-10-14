@@ -37,12 +37,12 @@ Payments run in the LINE Pay **sandbox**, so no real money moves.
 
 ## Screenshots
 
-Diner app (mobile) and vendor portal, English UI. Taken on the local emulators with seeded demo data, so vendor and dish names are not translated yet; on production they are translated by Gemini.
+Diner app (mobile) and vendor portal, taken on the live prototype in English. Vendor and dish names are translated from Chinese by Gemini.
 
 <p>
   <img src="assets/screenshots/diner-home.png" alt="Diner home" width="190">
   <img src="assets/screenshots/diner-today.png" alt="Pre-order with early-bird prices" width="190">
-  <img src="assets/screenshots/diner-resale-market.png" alt="Resale market" width="190">
+  <img src="assets/screenshots/diner-my-meals.png" alt="A locked meal: show the pickup code, transfer or gift it" width="190">
 </p>
 <p><img src="assets/screenshots/vendor-dashboard.png" alt="Vendor portal overview" width="780"></p>
 
