@@ -493,7 +493,7 @@ function LandingContent() {
               ))}
               <svg className="lp-hero__badge" viewBox="0 0 120 120">
                 <defs><path id="lp-circle" d="M60 60 m-44 0 a44 44 0 1 1 88 0 a44 44 0 1 1 -88 0" /></defs>
-                <text><textPath href="#lp-circle">BOOK EARLY · EAT HAPPY · 越早訂越開心 · </textPath></text>
+                <text><textPath href="#lp-circle">{isEn ? "BOOK EARLY · EAT HAPPY · SAVE MORE · " : "BOOK EARLY · EAT HAPPY · 越早訂越開心 · "}</textPath></text>
                 <circle cx="60" cy="60" r="20" />
               </svg>
               {heroItem && (

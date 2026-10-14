@@ -11,7 +11,7 @@ import LockOrderRow from "@/components/LockOrderRow";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 import { completePickup, DONE_STATUSES, PENDING_STATUSES, type PickupSummary } from "@/lib/lockOutcome";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { customOptionTexts } from "@/lib/bento";
 import { cn } from "@/lib/utils";
 import type { Lock } from "@/types";
@@ -136,7 +136,7 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
               <span className="text-5xl font-extrabold tracking-widest">{s.pickup_code}</span>
               {s.kind === "lock" && <span className="text-sm text-muted-foreground">{s.pickup_window}</span>}
             </div>
-            <p className="text-lg font-semibold">{s.item_name}</p>
+            <p className="text-lg font-semibold">{loc(s, "item_name")}</p>
             {s.main_dish && <p className="text-sm">{tr("主菜：", "Main: ")}<strong>{s.main_dish}</strong></p>}
             {s.slots && s.slots.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
@@ -148,7 +148,7 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
                 ))}
               </div>
             )}
-            {s.sides && s.sides.length > 0 && <p className="text-sm">{s.sides.join("、")}</p>}
+            {s.sides && s.sides.length > 0 && <p className="text-sm">{s.sides.join(tr("、", ", "))}</p>}
             {s.extra_side && <p className="text-sm">{s.extra_side.mode === "addon" ? tr(`加菜：${s.extra_side.dish}`, `Add-on: ${s.extra_side.dish}`) : s.extra_side.used ? tr(`備案已遞補：${s.extra_side.dish}`, `Backup used: ${s.extra_side.dish}`) : tr(`備案（未用到）：${s.extra_side.dish}`, `Backup (unused): ${s.extra_side.dish}`)}</p>}
             {customOptionTexts(s.custom_options).map((text, k) => <p key={k} className="text-sm">{text}</p>)}
             {s.rice && s.rice !== "normal" && <p className="text-base font-bold text-warning-text">{s.rice === "add" ? tr("白飯一碗半", "1.5 bowls of rice") : tr("白飯半碗", "Half bowl of rice")}</p>}

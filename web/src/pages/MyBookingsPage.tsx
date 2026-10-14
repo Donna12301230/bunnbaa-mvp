@@ -591,7 +591,7 @@ export default function MyBookingsPage() {
                       {canFeedback && (
                         <>
                           {hasFeedback && (
-                            <p className="text-caption text-muted-foreground pt-1">{tr("已回饋：", "Your feedback: ")}「{lock.consumer_feedback}」</p>
+                            <p className="text-caption text-muted-foreground pt-1">{tr(`已回饋：「${lock.consumer_feedback}」`, `Your feedback: "${lock.consumer_feedback}"`)}</p>
                           )}
                           {reviewedIds.has(lock.id) && (
                             <p className="text-caption text-muted-foreground">{tr("已評分，謝謝！", "Thanks for rating!")}</p>
@@ -743,7 +743,7 @@ export default function MyBookingsPage() {
                     {MEAL_PERIODS.map((p) => (
                       <span key={p} className="inline-flex items-center gap-1.5">
                         <span className={`h-3 border-l-[3px] ${PERIOD_BORDER[p]}`} aria-hidden="true" />
-                        {PERIOD_SHORT[p]()}＝{mealPeriodLabel(p)}
+                        {PERIOD_SHORT[p]()}{tr("＝", " = ")}{mealPeriodLabel(p)}
                       </span>
                     ))}
                     <span>{tr("括號內是取餐時間", "Pickup time in brackets")}</span>

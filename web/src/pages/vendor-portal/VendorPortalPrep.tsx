@@ -32,7 +32,8 @@ import { httpsCallable } from "@/lib/callable";
 import { MEAL_PERIODS, addDaysStr, bookableDateRange, cutoffAt, isPastCutoff, mealPeriodLabel, todayStr, vendorCutoffTime } from "@/lib/pickupSlots";
 import type { MealPeriod } from "@/types";
 import { PENDING_STATUSES } from "@/lib/lockOutcome";
-import { tr, loc } from "@/lib/i18n";
+import { tr, loc, dishName } from "@/lib/i18n";
+import { catalogLabel } from "@/components/CatalogEditors";
 import type { Lock } from "@/types";
 
 interface Timeline {
@@ -49,7 +50,7 @@ function TimelineTable({ timeline }: { timeline: Timeline }) {
           <tr className="align-top"><td className="pr-3 py-1 font-semibold whitespace-nowrap">{tr("前一晚", "Night before")}</td><td className="py-1">{timeline.overnight.map((o) => o.task).join("、")}</td></tr>
         )}
         {timeline.slots.map((s, i) => (
-          <tr key={i} className="align-top"><td className="pr-3 py-1 font-mono whitespace-nowrap">{s.start}</td><td className="py-1">{s.task} <span className="text-xs text-muted-foreground">{paren(s.equipment)}</span></td></tr>
+          <tr key={i} className="align-top"><td className="pr-3 py-1 font-mono whitespace-nowrap">{s.start}</td><td className="py-1">{s.task} <span className="text-xs text-muted-foreground">{paren(catalogLabel(s.equipment))}</span></td></tr>
         ))}
         <tr className="align-top"><td className="pr-3 py-1 font-mono">{timeline.packing.start}</td><td className="py-1">{tr("裝盒、貼出餐標籤", "Pack & label")}</td></tr>
       </tbody>
@@ -324,6 +325,10 @@ export default function VendorPortalPrep() {
 
   // Orders and labels carry the original item name; show the menu's translated name in the English UI
   const itemLabel = (name: string) => loc(menuItems.find((m) => m.name === name), "name") || name;
+  // Shortages carry the ingredient's Chinese name snapshot; the English UI looks up its English name
+  const ingName = (id: string, name: string) => tr(name, loc(ingById[id], "name") || name);
+  // Wish result keys are `${vendor}_${date}_${itemId}_${slot}_${candidate}`; find the item to translate the dish name
+  const wishDish = (key: string, dish: string) => dishName(menuItems.find((m) => key.includes(`_${m.id}_`)), dish);
 
   async function runCutoff(force: boolean) {
     if (!isPastCutoff(date, vendor) && !(await confirm({
@@ -500,17 +505,17 @@ export default function VendorPortalPrep() {
               <Card className="border-danger/40 print:hidden">
                 <CardContent className="p-3 flex flex-wrap items-center gap-2">
                   <button type="button" className="flex-1 min-w-[12rem] flex items-center gap-1.5 text-left font-semibold text-danger-text" onClick={() => toggleFold("short")} aria-expanded={!!fold.short}>
-                    <AlertTriangle className="w-4 h-4 shrink-0" />{tr(`缺料：${plan.shortages.map((s) => s.name).join("、")}`, `Short: ${plan.shortages.map((s) => s.name).join(", ")}`)}
+                    <AlertTriangle className="w-4 h-4 shrink-0" />{tr(`缺料：${plan.shortages.map((s) => s.name).join("、")}`, `Short: ${plan.shortages.map((s) => ingName(s.ingredient_id, s.name)).join(", ")}`)}
                     {fold.short ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                   <Button size="sm" onClick={shareShortages} disabled={!catalog}><MessageCircle /> {tr("LINE 叫貨", "Order via LINE")}</Button>
                   {fold.short && (
                     <div className="w-full space-y-2 pt-1">
-                      <RecipeCraft items={plan.shortages.map((s) => ({ id: s.ingredient_id, name: s.name, need: s.need, unit: s.unit, have: s.have }))} compact />
+                      <RecipeCraft items={plan.shortages.map((s) => ({ id: s.ingredient_id, name: ingName(s.ingredient_id, s.name), need: s.need, unit: s.unit, have: s.have }))} compact />
                       <p className="text-xs text-muted-foreground">{plan.shortages.map((s) => {
                         const ing = ingById[s.ingredient_id];
-                        return tr(`${s.name} 缺 ${amountText(s.short, s.unit)}${ing ? `（叫 ${toPurchaseUnits(s.short, ing.purchase_unit_size)} ${ing.purchase_unit_label}）` : ""}`, `${s.name}: short ${amountText(s.short, s.unit)}`);
-                      }).join("、")}</p>
+                        return tr(`${s.name} 缺 ${amountText(s.short, s.unit)}${ing ? `（叫 ${toPurchaseUnits(s.short, ing.purchase_unit_size)} ${ing.purchase_unit_label}）` : ""}`, `${ingName(s.ingredient_id, s.name)}: short ${amountText(s.short, s.unit)}`);
+                      }).join(tr("、", "; "))}</p>
                     </div>
                   )}
                 </CardContent>
@@ -535,11 +540,11 @@ export default function VendorPortalPrep() {
                     {detailComp ? (
                       <>
                         <p className="font-semibold">{loc(detailComp, "name")}{tr("・", " · ")}{tr(`${Math.round(detailPortions * 10) / 10} 份`, `× ${detailPortions}`)}</p>
-                        <p className="text-xs text-muted-foreground">{tr(`${detailComp.equipment}・每批 ${detailComp.batch_capacity} 份 → 做 ${Math.ceil(detailPortions / Math.max(1, detailComp.batch_capacity))} 批・每批 ${detailComp.prep_minutes} 分鐘`, `${detailComp.equipment} · ${Math.ceil(detailPortions / Math.max(1, detailComp.batch_capacity))} batch(es) × ${detailComp.prep_minutes} min`)}</p>
+                        <p className="text-xs text-muted-foreground">{tr(`${detailComp.equipment}・每批 ${detailComp.batch_capacity} 份 → 做 ${Math.ceil(detailPortions / Math.max(1, detailComp.batch_capacity))} 批・每批 ${detailComp.prep_minutes} 分鐘`, `${catalogLabel(detailComp.equipment)} · ${Math.ceil(detailPortions / Math.max(1, detailComp.batch_capacity))} batch(es) × ${detailComp.prep_minutes} min`)}</p>
                         <RecipeCraft
                           items={detailComp.ingredients.flatMap((l) => {
                             const ing = ingById[l.ingredient_id];
-                            return ing ? [{ id: l.ingredient_id, name: ing.name, need: rawAmount((l.grams || 0) * detailPortions, ing), unit: ing.unit || "g" }] : [];
+                            return ing ? [{ id: l.ingredient_id, name: loc(ing, "name"), need: rawAmount((l.grams || 0) * detailPortions, ing), unit: ing.unit || "g" }] : [];
                           })}
                           target={{ name: loc(detailComp, "name"), sub: tr(`${Math.round(detailPortions * 10) / 10} 份`, `× ${detailPortions}`) }}
                           compact
@@ -555,8 +560,8 @@ export default function VendorPortalPrep() {
             {Object.keys(plan.wish_results ?? {}).length > 0 && (
               <Fold className="print:hidden" title={<span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-accent-foreground" />{tr("配菜許願結果", "Side-dish wishes")}</span>} open={!!fold.wish} onToggle={() => toggleFold("wish")}>
                 <div className="text-sm space-y-1">
-                  {Object.values(plan.wish_results).map((w, i) => (
-                    <div key={i} className="flex justify-between"><span>{w.dish}</span><span className={w.ok ? "text-success-text" : "text-muted-foreground"}>{w.count}/{w.min_qty} {w.ok ? tr("成立", "on") : tr("未成立，改預設菜", "off")}</span></div>
+                  {Object.entries(plan.wish_results).map(([key, w], i) => (
+                    <div key={i} className="flex justify-between"><span>{wishDish(key, w.dish)}</span><span className={w.ok ? "text-success-text" : "text-muted-foreground"}>{w.count}/{w.min_qty} {w.ok ? tr("成立", "on") : tr("未成立，改預設菜", "off")}</span></div>
                   ))}
                 </div>
               </Fold>
@@ -629,7 +634,7 @@ export default function VendorPortalPrep() {
                 {plan.labels.map((l) => (
                   <div key={l.lock_id} className="border border-dashed border-input rounded p-2 text-xs bg-card break-inside-avoid">
                     <div className="flex justify-between items-baseline"><span className="text-xl font-extrabold tracking-widest">{l.pickup_code}</span><span>{l.pickup_window}</span></div>
-                    <p className="font-semibold">{l.item}</p>
+                    <p className="font-semibold">{itemLabel(l.item)}</p>
                     {l.main && <p>{l.main}{l.fixed?.length ? `＋${l.fixed.join("、")}` : ""}</p>}
                     <p>{l.sides.join("・")}</p>
                     {l.rice && <p className="font-bold">{l.rice}</p>}

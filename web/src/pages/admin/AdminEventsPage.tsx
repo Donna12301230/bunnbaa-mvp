@@ -13,6 +13,7 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { db, functions } from "@/lib/firebase";
 import { httpsCallable } from "@/lib/callable";
 import { tr } from "@/lib/i18n";
+import { paren } from "@/lib/format";
 import PortalPageHeader from "@/components/PortalPageHeader";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
@@ -32,6 +33,10 @@ const ANOMALY_LABEL: Record<string, { zh: string; en: string }> = {
   device: { zh: "同一裝置 > 2 帳號領券", en: "> 2 accounts claiming coupons on one device" },
 };
 const typeLabel = (t: string) => (TYPE_LABEL[t] ? tr(TYPE_LABEL[t].zh, TYPE_LABEL[t].en) : t);
+// Manually created events store a fixed Chinese summary; the English UI rebuilds it from the type (NCDR summaries stay as fetched)
+const MANUAL_SUFFIX = "（管理員手動建立）";
+const summaryText = (e: DisasterEvent) =>
+  e.source === "manual" && e.summary?.endsWith(MANUAL_SUFFIX) ? tr(e.summary, `${typeLabel(e.type)} (created manually by an admin)`) : e.summary;
 const anomalyLabel = (t: string) => (ANOMALY_LABEL[t] ? tr(ANOMALY_LABEL[t].zh, ANOMALY_LABEL[t].en) : t);
 
 /** Disaster events: fetched automatically from NCDR (aggregating the Central Weather Administration and DGPA); admins create them manually when the source fails. */
@@ -62,7 +67,7 @@ function DisasterContent() {
     }))) return;
     const id = `manual_${Date.now()}`;
     await setDoc(doc(db, "disasterEvents", id), {
-      type: form.type, counties, whole_counties: counties, towns: [], dates, source: "manual", summary: `${label}（管理員手動建立）`, processed: false, created_at: new Date(),
+      type: form.type, counties, whole_counties: counties, towns: [], dates, source: "manual", summary: `${label}${MANUAL_SUFFIX}`, processed: false, created_at: new Date(),
     });
     toast({ title: tr("已建立，後端處理中", "Created — processing") });
   }
@@ -102,13 +107,13 @@ function DisasterContent() {
             <div key={e.id} className="border-b pb-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="muted">{typeLabel(e.type)}</Badge>
-                <span>{(e.counties ?? []).join("、") || tr("全部縣市", "All counties")}{e.towns?.length ? `（${e.towns.join("、")}）` : ""}</span>
-                <span className="text-muted-foreground">{(e.dates ?? []).join("、")}</span>
+                <span>{(e.counties ?? []).join(tr("、", ", ")) || tr("全部縣市", "All counties")}{e.towns?.length ? paren(e.towns.join(tr("、", ", "))) : ""}</span>
+                <span className="text-muted-foreground">{(e.dates ?? []).join(tr("、", ", "))}</span>
                 <span className="text-xs text-muted-foreground">{e.source}</span>
                 {e.processed ? <Badge variant="muted" className="bg-success-soft text-success-text">{tr("已處理", "Processed")}</Badge> : <Badge variant="muted" className="bg-warning-soft text-warning-text">{tr("待處理／有失敗", "Pending")}</Badge>}
                 {!e.processed && <Button size="sm" variant="outline" disabled={busy} onClick={() => call("reprocessDisasterEvent", { event_id: e.id })}>{tr("重新處理", "Reprocess")}</Button>}
               </div>
-              {e.summary && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{e.summary}</p>}
+              {e.summary && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{summaryText(e)}</p>}
               {e.result && <p className="text-xs mt-1">{tr(`影響 ${e.result.vendors} 家店、取消退款 ${e.result.cancelled} 筆、失敗 ${e.result.failed}、通知 ${e.result.notified}`, `${e.result.vendors} vendors affected, ${e.result.cancelled} cancelled & refunded, ${e.result.failed} failed, ${e.result.notified} notified`)}</p>}
             </div>
           ))}

@@ -29,7 +29,7 @@ import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { currentPosition } from "@/lib/geo";
 import type { MenuItem } from "@/types";
-import { dateLocale, getLang, tr } from "@/lib/i18n";
+import { dateLocale, getLang, loc, tr } from "@/lib/i18n";
 import type { BusinessHour } from "@/types";
 
 const ORDER_DEADLINE_OFFSET = 30;
@@ -474,8 +474,8 @@ export default function VendorPortalSettings() {
                     <div className="px-4 pb-4 space-y-2">
                       {menuItems.map((item) => (
                         <div key={item.id} className="flex items-center gap-2 text-sm">
-                          <span className="flex-1 truncate">{item.name}</span>
-                          <Stepper value={Number(forecast[item.id]) || 0} step={1} onChange={(n) => setForecast((f) => ({ ...f, [item.id]: String(n) }))} label={item.name} />
+                          <span className="flex-1 truncate">{loc(item, "name")}</span>
+                          <Stepper value={Number(forecast[item.id]) || 0} step={1} onChange={(n) => setForecast((f) => ({ ...f, [item.id]: String(n) }))} label={loc(item, "name")} />
                         </div>
                       ))}
                     </div>
@@ -504,7 +504,7 @@ export default function VendorPortalSettings() {
               <p className="text-sm">{tr(`平台從每份餐點的實付金額抽 ${commissionPct}%，撥款時直接扣除；沒有訂單就沒有費用。`, `The platform takes ${commissionPct}% of what the customer pays for each meal, deducted at payout. No orders, no fee.`)}</p>
               <p className="text-sm text-muted-foreground">{tr(`定價時請把抽成加進去：想實收 100 元，售價訂 ${withCommission(100, commissionPct / 100)} 元。菜單編輯畫面的價格欄位旁有「加 ${commissionPct}%」可以一鍵換算。`, `Add the commission when pricing: to net NT$100, list at NT$${withCommission(100, commissionPct / 100)}. The menu editor has a one-tap "+${commissionPct}%" next to the price.`)}</p>
               <div className="flex flex-wrap gap-2 pt-1">
-                <Button asChild size="sm" variant="outline"><a href={`mailto:${PLATFORM_CONTACT_EMAIL}?subject=${encodeURIComponent(`合作方案：${realVendor.name}`)}`}><Mail /> {tr("聯絡平台", "Contact us")}</a></Button>
+                <Button asChild size="sm" variant="outline"><a href={`mailto:${PLATFORM_CONTACT_EMAIL}?subject=${encodeURIComponent(tr(`合作方案：${realVendor.name}`, `Partnership: ${realVendor.name}`))}`}><Mail /> {tr("聯絡平台", "Contact us")}</a></Button>
               </div>
             </CardContent>
           </Card>

@@ -107,7 +107,7 @@ export default function PaymentConfirmPage() {
                         extraSideText(l.extra_side),
                         ...customOptionTexts(l.custom_options),
                         riceLabel(l.rice),
-                      ].filter(Boolean).join("／")}
+                      ].filter(Boolean).join(tr("／", " / "))}
                     </p>
                   )}
                 </li>

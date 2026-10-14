@@ -1,4 +1,4 @@
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { ADMIN_EMAILS } from "@/lib/adminAuth";
@@ -56,7 +56,7 @@ function VendorVerificationCard() {
           {vendors.map((vendor) => (
             <div key={vendor.id} className="flex items-center justify-between gap-3 py-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">{vendor.name}</span>
+                <span className="text-sm font-medium">{loc(vendor, "name")}</span>
                 {vendor.verified && <Badge className="bg-secondary text-accent-foreground border-0">{tr("已認證", "Verified")}</Badge>}
               </div>
               <Button

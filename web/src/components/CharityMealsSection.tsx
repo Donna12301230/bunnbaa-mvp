@@ -104,7 +104,8 @@ export default function CharityMealsSection() {
     if (!requireLogin()) return;
     const ok = await confirm({
       title: tr("預約愛心餐", "Reserve a charity meal"),
-      description: `${policy.charityReserve()}。`,
+      // The policy text is a mid-sentence clause; as a standalone English sentence it needs a capital and a period
+      description: tr(`${policy.charityReserve()}。`, `${policy.charityReserve().replace(/^./, (c) => c.toUpperCase())}.`),
       confirmLabel: tr("我了解，預約", "I understand — reserve"),
     });
     if (!ok) return;
@@ -131,7 +132,7 @@ export default function CharityMealsSection() {
 
       {activeReservation && (
         <div className="rounded-card bg-card border-2 border-ink p-5 max-w-sm">
-          <p className="font-semibold">{tr("你的愛心餐預約", "Your reservation")}：{loc(activeReservation, "vendor_name")}</p>
+          <p className="font-semibold">{tr("你的愛心餐預約：", "Your reservation: ")}{loc(activeReservation, "vendor_name")}</p>
           <p className="text-xs text-muted-foreground">
             {tr(`請在 ${new Date(millis(activeReservation.expires_at)).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })} 前到場`, `Arrive by ${new Date(millis(activeReservation.expires_at)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`)}
           </p>

@@ -47,7 +47,7 @@ export default function LockOrderRow({ lock, showDate = true }: { lock: Lock; sh
             {showDate && <>{formatPickupDate(lock.pickup_date)} · </>}{lock.pickup_window} · {formatNT(lock.locked_price)}
           </p>
           {(lock.slots?.length ?? 0) > 0 && (
-            <p className="text-xs text-muted-foreground">{[...lock.slots!.map(slotText), ...customOptionTexts(lock.custom_options)].join("／")}{riceLabel(lock.rice) ? `／${riceLabel(lock.rice)}` : ""}</p>
+            <p className="text-xs text-muted-foreground">{[...lock.slots!.map(slotText), ...customOptionTexts(lock.custom_options)].join(tr("／", " / "))}{riceLabel(lock.rice) ? `${tr("／", " / ")}${riceLabel(lock.rice)}` : ""}</p>
           )}
           {lock.note && <p className="text-xs text-warning-text mt-0.5">{tr("備註：", "Note: ")}{lock.note}</p>}
         </div>

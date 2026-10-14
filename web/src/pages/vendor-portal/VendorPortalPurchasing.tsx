@@ -13,6 +13,7 @@ import PortalPageHeader from "@/components/PortalPageHeader";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { useMyVendor } from "@/hooks/useMyVendor";
 import { useVendorCatalog } from "@/hooks/useVendorCatalog";
+import { useVendorMenu } from "@/hooks/useVendorMenu";
 import AiDraftWarning, { useConfirmAiDrafts } from "@/components/AiDraftWarning";
 import { useToast } from "@/hooks/use-toast";
 import { db, functions } from "@/lib/firebase";
@@ -22,7 +23,7 @@ import { amountText } from "@/lib/prep";
 import { purchaseText, shareToLine, toPurchaseUnits } from "@/lib/purchaseShare";
 import { setPendingEdit } from "@/lib/pendingEdit";
 import { ingredientGroup, GROUP_DOT } from "@/lib/foodColors";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Ingredient } from "@/types";
 
@@ -111,6 +112,7 @@ export default function VendorPortalPurchasing() {
   const { data: vendor } = useMyVendor();
   const vendorId = vendor?.id;
   const { data: catalog } = useVendorCatalog(vendorId);
+  const { data: menuItems = [] } = useVendorMenu(vendorId);
   const confirmAiDrafts = useConfirmAiDrafts(vendorId);
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -165,6 +167,9 @@ export default function VendorPortalPurchasing() {
 
   const suppliers = catalog?.suppliers ?? [];
   const ingById = catalog?.ingredientsById ?? {};
+  // Lines and shortages carry the Chinese name snapshot; the English UI looks up the current ingredient / item for its English name
+  const ingName = (id: string, name: string) => tr(name, loc(ingById[id], "name") || name);
+  const itemName = (id: string, name: string) => tr(name, loc(menuItems.find((m) => m.id === id), "name") || name);
   const theoretical = (id: string) => counted?.counts?.[id] ?? weekly?.lines.find((l) => l.ingredient_id === id)?.stock ?? 0;
   const stockOf = (id: string) => (editable && counts[id] !== undefined ? counts[id] : theoretical(id));
   const changed = Object.keys(counts).length;
@@ -289,14 +294,14 @@ export default function VendorPortalPurchasing() {
             onClick={() => toggleBought(l.ingredient_id)}
             disabled={enough}
             aria-pressed={done}
-            aria-label={done ? tr(`${l.name} 已買到`, `${l.name} bought`) : tr(`${l.name} 還沒買`, `${l.name} not bought`)}
+            aria-label={done ? tr(`${l.name} 已買到`, `${ingName(l.ingredient_id, l.name)} bought`) : tr(`${l.name} 還沒買`, `${ingName(l.ingredient_id, l.name)} not bought`)}
             className={cn("w-8 h-8 shrink-0 rounded-full border-2 flex items-center justify-center print:border-black", done ? "border-success bg-success-strong text-white" : "border-input", enough && "invisible")}
           >
             {done && <Check className="w-4 h-4" />}
           </button>
           <button type="button" className="flex-1 min-w-[6rem] text-left flex items-center gap-1.5" onClick={() => setOpenLine(open ? null : l.ingredient_id)} aria-expanded={open}>
             <span className={cn("w-2.5 h-2.5 rounded-sm shrink-0", GROUP_DOT[ingredientGroup(ing?.category)])} aria-hidden="true" />
-            <span className={cn("font-medium", done && "line-through")}>{l.name}</span>
+            <span className={cn("font-medium", done && "line-through")}>{ingName(l.ingredient_id, l.name)}</span>
             <span className="print:hidden text-muted-foreground">{open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}</span>
           </button>
           <span className="print:hidden">{stepper(l.ingredient_id, l.purchase_unit_size, l.purchase_unit_label)}</span>
@@ -314,7 +319,7 @@ export default function VendorPortalPurchasing() {
               <ul className="space-y-0.5">
                 {l.sources.map((s) => (
                   <li key={s.menu_item_id} className="flex flex-wrap gap-x-2">
-                    <button type="button" className="text-primary underline" onClick={() => { setPendingEdit("menu_item", s.menu_item_id); navigate("/vendor-portal/menu"); }}>{s.name}</button>
+                    <button type="button" className="text-primary underline" onClick={() => { setPendingEdit("menu_item", s.menu_item_id); navigate("/vendor-portal/menu"); }}>{itemName(s.menu_item_id, s.name)}</button>
                     <span>{tr(`${s.confirmed + s.forecast} 份（已訂 ${s.confirmed} ＋ 預測 ${s.forecast}）`, `${s.confirmed + s.forecast} meals (${s.confirmed} booked + ${s.forecast} forecast)`)}</span>
                     <span className="text-muted-foreground">→ {amountText(s.amount, l.unit)}</span>
                   </li>
@@ -352,11 +357,11 @@ export default function VendorPortalPurchasing() {
           <Card key={d} className="border-danger/40 print:hidden">
             <CardContent className="p-3 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="flex-1 min-w-[12rem] font-semibold text-danger-text flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" />{tr(`臨時補貨（${d === todayStr() ? "今天" : d.slice(5)}）：${restock[d].map((s) => s.name).join("、")}`, `Restock for ${d}: ${restock[d].map((s) => s.name).join(", ")}`)}</p>
+                <p className="flex-1 min-w-[12rem] font-semibold text-danger-text flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" />{tr(`臨時補貨（${d === todayStr() ? "今天" : d.slice(5)}）：${restock[d].map((s) => s.name).join("、")}`, `Restock for ${d}: ${restock[d].map((s) => ingName(s.ingredient_id, s.name)).join(", ")}`)}</p>
                 <Button size="sm" variant="outline" onClick={() => navigate("/vendor-portal/prep")}>{tr("看備料", "View prep")}</Button>
                 <Button size="sm" onClick={() => shareRestock(d, restock[d])} disabled={!catalog}><MessageCircle /> {tr("傳 LINE", "Send via LINE")}</Button>
               </div>
-              <RecipeCraft items={restock[d].map((s) => ({ id: s.ingredient_id, name: s.name, need: s.need, unit: s.unit, have: s.have }))} compact />
+              <RecipeCraft items={restock[d].map((s) => ({ id: s.ingredient_id, name: ingName(s.ingredient_id, s.name), need: s.need, unit: s.unit, have: s.have }))} compact />
             </CardContent>
           </Card>
         ))}
@@ -448,7 +453,7 @@ export default function VendorPortalPurchasing() {
                   {others.map((ing) => (
                     <div key={ing.id} className="flex flex-wrap items-center gap-2 text-sm">
                       <span className={cn("w-2.5 h-2.5 rounded-sm shrink-0", GROUP_DOT[ingredientGroup(ing.category)])} aria-hidden="true" />
-                      <span className="flex-1">{ing.name}</span>
+                      <span className="flex-1">{loc(ing, "name")}</span>
                       {stepper(ing.id, ing.purchase_unit_size, ing.purchase_unit_label || ing.unit)}
                     </div>
                   ))}

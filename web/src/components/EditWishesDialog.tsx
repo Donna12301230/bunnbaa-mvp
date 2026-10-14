@@ -12,7 +12,7 @@ import { RICE_OPTIONS, adjustAmount, itemListPrice, itemMains, portionLabel, sid
 import { mealPeriodLabel, mealPeriodOf, slotLabel } from "@/lib/pickupSlots";
 import { useSlotAvailability } from "@/hooks/useSlotAvailability";
 import { usePlatformConfig } from "@/lib/platformConfig";
-import { tr } from "@/lib/i18n";
+import { dishName, tr } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { ExtraSideChoice, Lock, MenuItem, RiceOption, SlotChoice, Vendor } from "@/types";
 
@@ -122,7 +122,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
           <label className="block space-y-1">
             <span className="text-xs font-semibold text-muted-foreground">{tr("主菜", "Main")}</span>
             <select className={selectClass("md", "w-full")} value={mainIndex ?? 0} onChange={(e) => setMainIndex(Number(e.target.value))}>
-              {mains.map((m, i) => <option key={i} value={i}>{m.name}（NT${m.price}）</option>)}
+              {mains.map((m, i) => <option key={i} value={i}>{dishName(item, m.name)}{paren(`NT$${m.price}`)}</option>)}
             </select>
           </label>
         )}
@@ -142,7 +142,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
 
         {bento && item?.slots?.map((slot, i) => (
           <label key={i} className="block space-y-1">
-            <span className="text-xs font-semibold text-muted-foreground">{slot.category}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{dishName(item, slot.category)}</span>
             <select
               className={selectClass("md", "w-full")}
               value={String(choices[i] ?? "default")}
@@ -152,8 +152,8 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
                 if (v === "none") setExtra(null);
               }}
             >
-              <option value="default">{slot.default.name}{tr("（預設）", " (default)")}</option>
-              {slot.candidates.map((c, ci) => !c.disabled && <option key={ci} value={ci}>{c.name}{paren(portionLabel(c.portion_level))}</option>)}
+              <option value="default">{dishName(item, slot.default.name)}{tr("（預設）", " (default)")}</option>
+              {slot.candidates.map((c, ci) => !c.disabled && <option key={ci} value={ci}>{dishName(item, c.name)}{paren(portionLabel(c.portion_level))}</option>)}
               <option value="none">{tr(`少一道（−${Math.abs(config?.slotRemovePrice ?? 5)}）`, `None (−${Math.abs(config?.slotRemovePrice ?? 5)})`)}</option>
             </select>
           </label>
@@ -173,7 +173,7 @@ export default function EditWishesDialog({ lock, onClose }: { lock: Lock | null;
                 }}
               >
                 <option value="">{tr("不加", "None")}</option>
-                {options.filter((o) => !chosen.has(o.name)).map((o) => <option key={`${o.slot}:${o.candidate ?? "d"}`} value={`${o.slot}:${o.candidate ?? "d"}`}>{o.name}</option>)}
+                {options.filter((o) => !chosen.has(o.name)).map((o) => <option key={`${o.slot}:${o.candidate ?? "d"}`} value={`${o.slot}:${o.candidate ?? "d"}`}>{dishName(item, o.name)}</option>)}
               </select>
               {extra && (
                 <select className={selectClass()} value={extra.mode} onChange={(e) => setExtra({ ...extra, mode: e.target.value as ExtraSideChoice["mode"] })}>

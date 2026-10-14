@@ -1,4 +1,4 @@
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import { lockStatus } from "@/lib/lockOutcome";
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, writeBatch } from "firebase/firestore";
@@ -69,7 +69,7 @@ function LocksContent() {
   /** Vendor didn't serve the meal as scheduled (or another platform-confirmed case): full refund to the payer as platform points (functions/src/wallet.js refundLockAsPoints) */
   async function refundAsPoints(lock: Lock) {
     const note = await prompt({
-      title: tr(`「${lock.item_name}」全額退成點數？`, `Refund ${lock.item_name} in full as points?`),
+      title: tr(`「${lock.item_name}」全額退成點數？`, `Refund ${loc(lock, "item_name")} in full as points?`),
       description: tr(`NT$${lock.paid_amount ?? lock.locked_price} 會退成平台點數給付款人，訂單改為已取消、不撥款給店家。確認店家確實沒有出餐再按。`, `NT$${lock.paid_amount ?? lock.locked_price} goes back to the payer as points; the order is cancelled and not paid out to the vendor.`),
       inputLabel: tr("原因（例：店家當天沒開）", "Reason (e.g. the vendor was closed)"),
       confirmLabel: tr("全額退成點數", "Refund as points"),
@@ -142,7 +142,7 @@ function LocksContent() {
           <SelectContent>
             <SelectItem value="all">{tr("全部店家", "All vendors")}</SelectItem>
             {Object.values(vendors).map((v) => (
-              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+              <SelectItem key={v.id} value={v.id}>{loc(v, "name")}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -158,9 +158,9 @@ function LocksContent() {
             <Card key={lock.id} className="p-4">
               <div className="flex items-start justify-between mb-1">
                 <div>
-                  <h3 className="font-semibold text-sm">{lock.item_name}</h3>
+                  <h3 className="font-semibold text-sm">{loc(lock, "item_name")}</h3>
                   <p className="text-xs text-muted-foreground">
-                    {vendors[lock.vendor_id]?.name ?? lock.vendor_id} · {lock.pickup_window} · NT${lock.locked_price}
+                    {loc(vendors[lock.vendor_id], "name") || lock.vendor_id} · {lock.pickup_window} · NT${lock.locked_price}
                   </p>
                   <p className="text-xs text-muted-foreground">#{lock.id.slice(-8).toUpperCase()}</p>
                 </div>

@@ -25,7 +25,7 @@ import { couponTitle } from "@/lib/rewards";
 import { tr, loc, dishName } from "@/lib/i18n";
 import UsePointsToggle, { usePointsPreview } from "@/components/UsePointsToggle";
 import WaiverText from "@/components/WaiverText";
-import { formatNT } from "@/lib/format";
+import { formatNT, paren } from "@/lib/format";
 
 // Cart: each line is one bento with its own pickup date (up to bookingRangeDays, 30 days, ahead), pickup slot, sides and rice adjustment;
 // each line (each meal) can use one coupon, discount = min(coupon value, subtotal after adjustments). Amounts are only a preview;
@@ -171,7 +171,7 @@ export default function CartPage() {
                     })()}
                     {customFields(line.menuItem).map((f, i) => {
                       const o = f.options[line.customPicks?.[i] ?? 0];
-                      return o ? <p key={i} className="text-xs text-muted-foreground">{dishName(line.menuItem, f.label)}{tr("：", ": ")}{dishName(line.menuItem, o.name)}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</p> : null;
+                      return o ? <p key={i} className="text-xs text-muted-foreground">{dishName(line.menuItem, f.label)}{tr("：", ": ")}{dishName(line.menuItem, o.name)}{o.price ? paren(priceDeltaText(o.price)) : ""}</p> : null;
                     })}
                     {riceLabel(line.rice) && <p className="text-xs text-muted-foreground">{riceLabel(line.rice)}</p>}
                     {line.note && <p className="text-xs text-muted-foreground">{tr("備註：", "Note: ")}{line.note}</p>}
@@ -191,7 +191,7 @@ export default function CartPage() {
                           <option value="">{tr("不使用折價券", "No coupon")}</option>
                           {vendorCoupons.map((c) => (
                             <option key={c.id} value={c.id} disabled={usedCoupons.has(c.id) && line.couponId !== c.id}>
-                              {couponTitle(c.discount)}（{tr("到期", "exp.")} {new Date(millis(c.expires_at)).toLocaleDateString()}）
+                              {couponTitle(c.discount)}{paren(`${tr("到期", "exp.")} ${new Date(millis(c.expires_at)).toLocaleDateString()}`)}
                             </option>
                           ))}
                         </select>

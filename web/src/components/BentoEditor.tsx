@@ -176,7 +176,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
           <select className={SELECT_CLASS} value={rice} onChange={(e) => setRice(e.target.value as RiceOption)}>
             {RICE_OPTIONS.map((o) => {
               const d = o.value === "add" ? cfg.riceAddPrice : o.value === "less" ? cfg.riceLessPrice : 0;
-              return <option key={o.value} value={o.value}>{tr(o.label, o.labelEn)}{d ? `（${priceDeltaText(d)}）` : ""}</option>;
+              return <option key={o.value} value={o.value}>{tr(o.label, o.labelEn)}{d ? paren(priceDeltaText(d)) : ""}</option>;
             })}
           </select>
         </label>
@@ -210,7 +210,7 @@ function BentoPreview({ value, itemName, itemPrice, componentsById, ingredientsB
         <label key={`f${i}`} className="flex items-center gap-2 text-sm">
           <span className="w-20 shrink-0 text-xs text-muted-foreground truncate">{label(f.label)}</span>
           <select className={SELECT_CLASS} value={picks[i] ?? 0} onChange={(e) => setPicks(fields.map((_, j) => (j === i ? Number(e.target.value) : picks[j] ?? 0)))}>
-            {f.options.filter((o) => o.name).map((o, oi) => <option key={oi} value={oi}>{label(o.name)}{o.price ? `（${priceDeltaText(o.price)}）` : ""}</option>)}
+            {f.options.filter((o) => o.name).map((o, oi) => <option key={oi} value={oi}>{label(o.name)}{o.price ? paren(priceDeltaText(o.price)) : ""}</option>)}
           </select>
         </label>
       ))}
