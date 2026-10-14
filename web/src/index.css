@@ -163,7 +163,9 @@
   }
 }
 
-body { margin: 0; background: var(--legacy-bg); color: var(--ink); }
+/* Light like ThemeRoot: Radix overlays (Dialog, Select, Sheet) portal into body outside ThemeRoot and inherit this color.
+   Using --ink here flipped to light text under system dark mode while the overlay card stayed light. */
+body { margin: 0; background: var(--bg); color: var(--text); }
 
 /* The whole site is wrapped in <ThemeRoot> (light); legacy prototype pages still follow the system dark mode and set their own background and text colors */
 .legacy-ui { min-height: 100vh; background: var(--legacy-bg); color: var(--ink); }
