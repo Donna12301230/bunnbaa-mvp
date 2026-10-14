@@ -41,8 +41,12 @@ function LocksContent() {
 
   useEffect(() => {
     const q = query(collection(db, "locks"), orderBy("created_at", "desc"), limit(300));
+    // Without an error callback a denied read (e.g. firestore.rules not deployed yet) leaves the skeleton up forever
     const unsub = onSnapshot(q, (snap) => {
       setLocks(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock));
+    }, (err) => {
+      setLocks([]);
+      toast({ variant: "destructive", title: tr("讀不到訂單資料", "Couldn't load orders"), description: err.message });
     });
     return () => unsub();
   }, []);

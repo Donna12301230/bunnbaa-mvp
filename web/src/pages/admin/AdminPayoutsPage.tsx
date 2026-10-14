@@ -11,6 +11,7 @@ import { Wallet } from "lucide-react";
 import { EmptyState } from "@/components/ds";
 import PortalPageHeader from "@/components/PortalPageHeader";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { toast } from "@/hooks/use-toast";
 
 /**
  * Read-only — payouts are only ever written by settleVendorPayouts
@@ -23,8 +24,12 @@ function PayoutsContent() {
 
   useEffect(() => {
     const q = query(collection(db, "payouts"), orderBy("created_at", "desc"), limit(100));
+    // Without an error callback a denied read (e.g. firestore.rules not deployed yet) leaves the skeleton up forever
     const unsub = onSnapshot(q, (snap) => {
       setPayouts(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as Payout));
+    }, (err) => {
+      setPayouts([]);
+      toast({ variant: "destructive", title: tr("讀不到撥款資料", "Couldn't load payouts"), description: err.message });
     });
     return () => unsub();
   }, []);
