@@ -52,12 +52,15 @@ interface MenuDraft {
   name_en: string;
   price: number | null;
   category: string;
+  category_en?: string;
   dietary_tags: string[];
   allergens: string[];
   description: string;
 }
 
-const EMPTY_FORM = { name: "", description: "", price: "", category: "一般", catalog: "", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
+// Blank category saves as "一般" (General); the field starts empty so the English UI doesn't open with Chinese in it
+const DEFAULT_CATEGORY = "一般";
+const EMPTY_FORM = { name: "", description: "", price: "", category: "", catalog: "", isAvailable: true, image: "", allergens: [] as string[], dietaryTags: [] as string[], nameEn: "", descriptionEn: "" };
 
 // English name / description: Functions translate them automatically (translateMenuItem), and vendors can also edit them by hand.
 // A manually edited field sets i18n_src to the current Chinese, so the trigger treats it as "already translated" and won't overwrite it;
@@ -161,7 +164,7 @@ export default function VendorPortalMenu() {
         description: form.description,
         // When a bento has several mains, price stores the lowest main price (card shows "From $50", legacy code compatibility)
         price: bento.itemType === "bento" && mains.length > 0 ? Math.min(...mains.map((m) => m.price)) : Number(form.price),
-        category: form.category,
+        category: form.category.trim() || DEFAULT_CATEGORY,
         catalog: form.catalog.trim() || null,
         is_available: form.isAvailable,
         image: form.image || null, // Firestore SDK throws on `undefined` field values
@@ -407,7 +410,7 @@ export default function VendorPortalMenu() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">{tr(d.name, d.name_en || d.name)}</span>
-                      <span className="text-xs text-muted-foreground">{d.category}</span>
+                      <span className="text-xs text-muted-foreground">{tr(d.category, d.category_en || d.category)}</span>
                       {d.dietary_tags.map((tag) => <Badge key={tag} variant="outline" className="text-xs text-success-text border-success/40">{tr(tag, tagEn(tag))}</Badge>)}
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -533,7 +536,7 @@ export default function VendorPortalMenu() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor="menu-item-category">{tr("分類", "Category")}</Label>
-                      <Input id="menu-item-category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder={tr("例：便當、湯品", "e.g. Bento, Soup")} />
+                      <Input id="menu-item-category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder={tr("留空＝一般；例：便當、湯品", "Blank = General; e.g. Bento, Soup")} />
                     </div>
                     {bento.itemType !== "bento" && (
                       <div>

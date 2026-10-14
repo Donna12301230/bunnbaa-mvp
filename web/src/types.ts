@@ -352,6 +352,7 @@ export interface Review {
 export interface Ingredient {
   id: string;
   name: string;
+  name_en?: string; // Auto-translated by Functions (translateIngredient)
   category: string;
   unit: string; // g / piece
   purchase_unit_label: string; // e.g. box, kg, bag

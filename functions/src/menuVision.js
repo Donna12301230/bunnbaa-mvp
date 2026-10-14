@@ -15,7 +15,7 @@ const SYSTEM_INSTRUCTION = `你是台灣小吃店、便當店的上架助手。�
 規則：
 - 只列出照片裡確實看得到的品項，不要自行補充或猜測沒出現的品項；價格看不清楚就填 null。
 - name 用照片上的中文品名；name_en 給自然的英文譯名（專有名詞用漢語拼音）。
-- category 用簡短中文分類，例如「便當」「麵食」「湯品」「飲料」「小菜」。
+- category 用簡短中文分類，例如「便當」「麵食」「湯品」「飲料」「小菜」；category_en 給對應的英文分類（例：Bento、Noodles、Soup）。
 - dietary_tags 只能從 ${JSON.stringify(DIETARY_TAGS)} 挑；看得出有肉就標「葷食」，確定無肉才標「素食」，不確定就留空陣列。
 - allergens 只能從 ${JSON.stringify(ALLERGENS)} 挑，依品名常識推斷可能含有的成分（例：蛋餅→蛋、小麥/麩質）；這只是提醒，店主會再確認。
 - description 用一句話描述內容（主菜、配菜、口味），照片沒資訊就留空字串。
@@ -29,6 +29,7 @@ const OUTPUT_SCHEMA = {
     name_en: "string",
     price: "number | null（新台幣整數）",
     category: "string",
+    category_en: "string",
     dietary_tags: "string[]",
     allergens: "string[]",
     description: "string",
@@ -45,6 +46,7 @@ function cleanItem(raw) {
     name_en: typeof raw.name_en === "string" ? raw.name_en.trim().slice(0, 80) : "",
     price: Number.isFinite(price) && price > 0 ? Math.round(price) : null,
     category: typeof raw.category === "string" && raw.category.trim() ? raw.category.trim().slice(0, 20) : "一般",
+    category_en: typeof raw.category_en === "string" && raw.category_en.trim() ? raw.category_en.trim().slice(0, 30) : "General",
     dietary_tags: pick(raw.dietary_tags, DIETARY_TAGS),
     allergens: pick(raw.allergens, ALLERGENS),
     description: typeof raw.description === "string" ? raw.description.trim().slice(0, 200) : "",

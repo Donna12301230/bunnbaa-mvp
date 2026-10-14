@@ -320,6 +320,7 @@ exports.translateMealPlan = translationTrigger("meal_plans");
 exports.translateReview = translationTrigger("reviews");
 exports.translateDraw = translationTrigger("draws");
 exports.translateComponent = translationTrigger("components", "vendors/{vendorId}/components/{docId}");
+exports.translateIngredient = translationTrigger("ingredients", "vendors/{vendorId}/ingredients/{docId}");
 
 /**
  * Admin backfill: translate every existing vendor / menu item / meal plan /
@@ -329,10 +330,11 @@ exports.translateComponent = translationTrigger("components", "vendors/{vendorId
  */
 exports.translateAllContent = onCall({ region: "asia-east1", timeoutSeconds: 540 }, async (request) => {
   assertAdminOrEmulator(request);
-  const counts = { vendors: 0, menu_items: 0, meal_plans: 0, reviews: 0, draws: 0, components: 0, locks: 0, failed: 0 };
+  const counts = { vendors: 0, menu_items: 0, meal_plans: 0, reviews: 0, draws: 0, components: 0, ingredients: 0, locks: 0, failed: 0 };
   for (const collection of Object.keys(TRANSLATED_FIELDS)) {
-    // components is a subcollection under each vendor
-    const snap = await (collection === "components" ? db.collectionGroup(collection) : db.collection(collection)).get();
+    // components and ingredients are subcollections under each vendor
+    const sub = collection === "components" || collection === "ingredients";
+    const snap = await (sub ? db.collectionGroup(collection) : db.collection(collection)).get();
     for (const doc of snap.docs) {
       try {
         if (await translateDoc(doc.ref, doc.data(), collection)) counts[collection]++;

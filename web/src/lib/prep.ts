@@ -1,6 +1,6 @@
 import { componentCost, rawAmount } from "@/lib/bento";
 import { liveConfig } from "@/lib/platformConfig";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import type { Component, Ingredient, Lock, MenuItem, RiceOption } from "@/types";
 
 // Prep portion / raw-ingredient calculations (frontend copy). Same rules as componentPortionsForLock and rawNeeds in functions/src/prep.js; change both together:
@@ -98,7 +98,7 @@ export function costIssue(componentId: string | null | undefined, componentsById
   const lines = (comp.ingredients ?? []).filter((l) => ingredientsById[l.ingredient_id]);
   if (lines.length === 0) return { kind: "no_ingredients", componentId };
   const unpriced = lines.map((l) => ingredientsById[l.ingredient_id]).find((i) => !(i.unit_price > 0));
-  if (unpriced) return { kind: "no_price", componentId, ingredientId: unpriced.id, name: unpriced.name };
+  if (unpriced) return { kind: "no_price", componentId, ingredientId: unpriced.id, name: loc(unpriced, "name") };
   return null;
 }
 
