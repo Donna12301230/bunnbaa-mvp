@@ -91,7 +91,7 @@ export function loc<T extends object>(obj: T | null | undefined, field: keyof T 
  * Dish names, side categories and custom-field text inside a menu item: the English UI reads the item's dish_names_en map
  * (filled by Functions translateMenuItem), falling back to the original Chinese. E.g. dishName(item, slot.default.name).
  */
-export function dishName(item: { dish_names_en?: Record<string, string> } | null | undefined, name: string): string {
+export function dishName(item: { dish_names_en?: Record<string, string> | null } | null | undefined, name: string): string {
   if (current === "en") {
     const en = item?.dish_names_en?.[name];
     if (typeof en === "string" && en.trim()) return en;

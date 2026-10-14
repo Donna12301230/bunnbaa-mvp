@@ -26,7 +26,7 @@ interface Insight {
   open_wishes?: { dish: string; dish_en?: string; dish_key: string; people: number }[];
   gaps?: { tag: string; share: number; suppliers: number }[];
 }
-interface Tally { id: string; name: string; count: number; notified?: boolean; listed?: boolean }
+interface Tally { id: string; name: string; name_en?: string | null; count: number; notified?: boolean; listed?: boolean }
 
 /** One bar row: name, colored bar, value */
 function Bar({ label, value, max, text, cls = "bg-brand" }: { label: string; value: number; max: number; text: string; cls?: string }) {
@@ -111,7 +111,7 @@ export default function AreaPanel({ vendorId, onHeadline }: { vendorId: string |
             return (
               <div key={t.id} className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="font-medium">{t.name}</span>
+                  <span className="font-medium">{loc(t, "name")}</span>
                   <span className="inline-flex items-center gap-0.5 text-muted-foreground"><Users className="w-3.5 h-3.5" />{t.count}</span>
                   {hot && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-accent-foreground">🔥 {tr("夠多人了", "Popular")}</span>}
                   <span className="ml-auto">

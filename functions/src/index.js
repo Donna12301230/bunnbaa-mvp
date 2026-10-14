@@ -321,6 +321,7 @@ exports.translateReview = translationTrigger("reviews");
 exports.translateDraw = translationTrigger("draws");
 exports.translateComponent = translationTrigger("components", "vendors/{vendorId}/components/{docId}");
 exports.translateIngredient = translationTrigger("ingredients", "vendors/{vendorId}/ingredients/{docId}");
+exports.translateDish = translationTrigger("dishLibrary");
 
 /**
  * Admin backfill: translate every existing vendor / menu item / meal plan /
@@ -330,7 +331,7 @@ exports.translateIngredient = translationTrigger("ingredients", "vendors/{vendor
  */
 exports.translateAllContent = onCall({ region: "asia-east1", timeoutSeconds: 540 }, async (request) => {
   assertAdminOrEmulator(request);
-  const counts = { vendors: 0, menu_items: 0, meal_plans: 0, reviews: 0, draws: 0, components: 0, ingredients: 0, locks: 0, failed: 0 };
+  const counts = { vendors: 0, menu_items: 0, meal_plans: 0, reviews: 0, draws: 0, components: 0, ingredients: 0, dishLibrary: 0, locks: 0, lock_dishes: 0, failed: 0 };
   for (const collection of Object.keys(TRANSLATED_FIELDS)) {
     // components and ingredients are subcollections under each vendor
     const sub = collection === "components" || collection === "ingredients";
@@ -366,6 +367,25 @@ exports.translateAllContent = onCall({ region: "asia-east1", timeoutSeconds: 540
     if (!en) continue;
     batch.update(doc.ref, { item_name_en: en });
     counts.locks++;
+    if (++pending === 400) {
+      await batch.commit();
+      batch = db.batch();
+      pending = 0;
+    }
+  }
+  if (pending) await batch.commit();
+
+  // Orders placed before locks carried dish_names_en: copy the (now translated) map from their menu item
+  const itemsSnap = await db.collection("menu_items").get();
+  const dishMaps = new Map(itemsSnap.docs.map((d) => [d.id, d.data().dish_names_en]).filter(([, m]) => m && typeof m === "object"));
+  batch = db.batch();
+  pending = 0;
+  for (const doc of lockSnap.docs) {
+    const lock = doc.data();
+    const map = dishMaps.get(lock.menu_item_id);
+    if (!map || lock.dish_names_en) continue;
+    batch.update(doc.ref, { dish_names_en: map });
+    counts.lock_dishes++;
     if (++pending === 400) {
       await batch.commit();
       batch = db.batch();

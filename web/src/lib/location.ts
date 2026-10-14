@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { Vendor } from "@/types";
+import { AREA_EN } from "@/constants/taiwanDistricts";
+import { tr } from "@/lib/i18n";
 
 // Top bar "Choose area": county/city + (optional) township/district; home / vendor list / resale market filter by vendor address.
 // Stored in localStorage as this device's browsing preference only; if reads/writes fail (private mode), treat it as nothing selected.
@@ -44,8 +46,15 @@ export function useSelectedArea(): SelectedArea | null {
   );
 }
 
+/** Display name of a county/city, or of a township/district within it (English UI: romanized; stored values stay Chinese) */
+export function areaName(county: string, town?: string): string {
+  const zh = town ?? county;
+  return tr(zh, AREA_EN[town ? `${county}|${town}` : county] ?? zh);
+}
+
 export function areaLabel(area: SelectedArea | null): string {
-  return area ? `${area.county}${area.town ? ` ${area.town}` : ""}` : "";
+  if (!area) return "";
+  return tr(`${area.county}${area.town ? ` ${area.town}` : ""}`, area.town ? `${areaName(area.county, area.town)}, ${areaName(area.county)}` : areaName(area.county));
 }
 
 // Addresses often mix 台 and 臺; normalize to 臺 before comparing

@@ -1,4 +1,5 @@
-import { tr } from "@/lib/i18n";
+import { dishName, tr } from "@/lib/i18n";
+import { paren } from "@/lib/format";
 import { applyEarlyBirdPrice } from "@/lib/pricing";
 import { DEFAULT_PLATFORM_CONFIG, liveConfig } from "@/lib/platformConfig";
 import type { BentoCustomField, BentoMain, Component, ExtraSideChoice, Ingredient, LockExtraSide, LockSlot, MenuItem, RiceOption, SlotChoice } from "@/types";
@@ -95,9 +96,12 @@ export function priceDeltaText(price: number): string {
   return price > 0 ? `+${price}` : price < 0 ? `−${Math.abs(price)}` : "";
 }
 
+/** An order's (or menu item's) zh -> en dish-name map; the English UI shows these names, falling back to the Chinese */
+export type DishNames = { dish_names_en?: Record<string, string> | null } | null | undefined;
+
 /** Custom field text on the order: "Soup: Corn soup (+10)" */
-export function customOptionTexts(options: { label: string; choice: string; price?: number }[] | null | undefined): string[] {
-  return (options || []).map((c) => `${c.label}：${c.choice}${c.price ? `（${priceDeltaText(c.price)}）` : ""}`);
+export function customOptionTexts(options: { label: string; choice: string; price?: number }[] | null | undefined, names?: DishNames): string[] {
+  return (options || []).map((c) => `${dishName(names, c.label)}${tr("：", ": ")}${dishName(names, c.choice)}${c.price ? paren(priceDeltaText(c.price)) : ""}`);
 }
 
 /** Price breakdown for one bento (early-bird discount applies only to the item base price, not to adjustments) */
@@ -118,11 +122,12 @@ export function priceBreakdown(
 }
 
 /** Fourth-side text on the order */
-export function extraSideText(extra: LockExtraSide | null | undefined): string | null {
+export function extraSideText(extra: LockExtraSide | null | undefined, names?: DishNames): string | null {
   if (!extra) return null;
-  if (extra.mode === "addon") return tr(`加菜：${extra.resolved || extra.dish}（+${liveConfig().addonSidePrice}）`, `Add-on: ${extra.resolved || extra.dish} (+${liveConfig().addonSidePrice})`);
-  if (extra.used_for_slot != null) return tr(`備案：${extra.dish}（已遞補）`, `Backup: ${extra.dish} (used)`);
-  return tr(`備案：${extra.dish}（前三道沒成立才遞補）`, `Backup: ${extra.dish} (used only if a wish fails)`);
+  const n = (s: string) => dishName(names, s);
+  if (extra.mode === "addon") return tr(`加菜：${extra.resolved || extra.dish}（+${liveConfig().addonSidePrice}）`, `Add-on: ${n(extra.resolved || extra.dish)} (+${liveConfig().addonSidePrice})`);
+  if (extra.used_for_slot != null) return tr(`備案：${extra.dish}（已遞補）`, `Backup: ${n(extra.dish)} (used)`);
+  return tr(`備案：${extra.dish}（前三道沒成立才遞補）`, `Backup: ${n(extra.dish)} (used only if a wish fails)`);
 }
 
 /** Raw quantity = cooked weight × portions ÷ (cooking yield × (1 − waste rate)) */
@@ -153,13 +158,15 @@ export function portionLevelFor(defaultCost: number, candidateCost: number): num
 }
 
 /** Actual side text per slot on the order (shows "wishing" before cut-off) */
-export function slotText(slot: LockSlot): string {
-  if (slot.removed) return tr(`${slot.category || "配菜"}：不要`, `${slot.category || "Side"}: none`);
-  if (slot.backup_used) return tr(`${slot.resolved}（${slot.wished} 未成立，遞補備案）`, `${slot.resolved} (backup for ${slot.wished})`);
+export function slotText(slot: LockSlot, names?: DishNames): string {
+  // dishName returns the Chinese as is in the Chinese UI, so the Chinese text is unchanged
+  const n = (s: string) => dishName(names, s);
+  if (slot.removed) return tr(`${slot.category || "配菜"}：不要`, `${slot.category ? n(slot.category) : "Side"}: none`);
+  if (slot.backup_used) return tr(`${slot.resolved}（${slot.wished} 未成立，遞補備案）`, `${n(slot.resolved ?? "")} (backup for ${n(slot.wished ?? "")})`);
   if (slot.resolved) {
-    const note = slot.substituted_from ? tr(`（原 ${slot.substituted_from}，等值替換）`, ` (replaced ${slot.substituted_from})`) : "";
-    return `${slot.resolved}${slot.wished && slot.resolved !== slot.wished ? tr("（許願未成立）", " (wish not met)") : ""}${note}`;
+    const note = slot.substituted_from ? tr(`（原 ${slot.substituted_from}，等值替換）`, ` (replaced ${n(slot.substituted_from)})`) : "";
+    return `${n(slot.resolved)}${slot.wished && slot.resolved !== slot.wished ? tr("（許願未成立）", " (wish not met)") : ""}${note}`;
   }
-  if (slot.wished) return tr(`許願：${slot.wished}（截單時判定，未成立改 ${slot.default_dish}）`, `Wish: ${slot.wished} (decided at cutoff, else ${slot.default_dish})`);
-  return slot.default_dish;
+  if (slot.wished) return tr(`許願：${slot.wished}（截單時判定，未成立改 ${slot.default_dish}）`, `Wish: ${n(slot.wished)} (decided at cutoff, else ${n(slot.default_dish)})`);
+  return n(slot.default_dish);
 }

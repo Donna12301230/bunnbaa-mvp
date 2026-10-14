@@ -209,6 +209,8 @@ async function buildDrafts(line, ctx) {
       menu_item_id: item.id,
       item_name: item.name,
       item_name_en: item.name_en ?? null,
+      // English names of the dishes / side categories / custom options in this order (zh -> en), for the English UI
+      dish_names_en: item.dish_names_en ?? null,
       pickup_window: pickupWindow,
       pickup_date: pickupDate,
       meal_period: mealPeriodOf(pickupWindow, ctx.config),
@@ -1026,6 +1028,7 @@ exports.updateLockChoices = onCall({}, async (request) => {
       ));
     }
     Object.assign(patch, {
+      dish_names_en: item?.dish_names_en ?? lock.dish_names_en ?? null,
       slots: choice.resolved.slots,
       extra_side: choice.extra,
       custom_options: choice.custom,
@@ -1223,6 +1226,7 @@ function lockSummary(id, lock, extra = {}) {
     pickup_code: lock.pickup_code,
     item_name: lock.item_name,
     item_name_en: lock.item_name_en || null,
+    dish_names_en: lock.dish_names_en || null,
     pickup_date: lock.pickup_date,
     pickup_window: lock.pickup_window,
     main_dish: lock.main_dish || null,
@@ -1309,7 +1313,7 @@ async function completeCharityReservation(parsed, vendorId, preview) {
     }
     const mealRef = db().collection("charityMeals").doc(res.meal_id);
     const meal = (await tx.get(mealRef)).data();
-    const summary = { kind: "charity", reservation_id: parsed.id, pickup_code: meal?.pickup_code, item_name: meal?.item_name, sides: meal?.sides || [] };
+    const summary = { kind: "charity", reservation_id: parsed.id, pickup_code: meal?.pickup_code, item_name: meal?.item_name, item_name_en: meal?.item_name_en || null, dish_names_en: meal?.dish_names_en || null, sides: meal?.sides || [] };
     if (preview) return summary;
     tx.update(resRef, { status: "claimed", claimed_at: FieldValue.serverTimestamp(), qr_nonce: FieldValue.delete() });
     tx.update(mealRef, { status: "claimed", claimed_at: FieldValue.serverTimestamp() });

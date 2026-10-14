@@ -10,12 +10,12 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { db } from "@/lib/firebase";
-import { tr } from "@/lib/i18n";
+import { loc, tr } from "@/lib/i18n";
 import PortalPageHeader from "@/components/PortalPageHeader";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 
-interface Dish { id: string; name: string; aliases?: string[]; category?: string; tags?: string[] }
+interface Dish { id: string; name: string; name_en?: string; aliases?: string[]; category?: string; tags?: string[] }
 interface Template { id: string; name: string; structure: string; items?: unknown[]; components?: unknown[] }
 
 const TAGS = ["雞", "豬", "牛", "海鮮", "素", "炸", "滷", "烤", "炒", "蒸", "辣", "清淡", "甜", "葉菜", "根莖", "瓜類"];
@@ -81,7 +81,7 @@ function DishesContent() {
           {dishList?.length === 0 && <EmptyState size="compact" title={tr("菜色庫還是空的", "The dish library is empty")} description={tr("用上方表單新增第一道標準菜名。", "Add the first dish with the form above.")} />}
           {dishes.map((d) => (
             <div key={d.id} className="flex items-center gap-2 text-sm border-b py-1">
-              <span className="w-28 font-medium">{d.name}</span>
+              <span className="w-28 font-medium">{loc(d, "name")}</span>
               <span className="w-20 text-xs text-muted-foreground">{d.category ? label(d.category) : ""}</span>
               <Input
                 className="h-8 flex-1"

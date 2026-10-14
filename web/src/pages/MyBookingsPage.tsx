@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { QrCode, Gift, Repeat, Copy, ClipboardList, Maximize2, Star, HeartHandshake, XCircle, Users, Pencil, List, CalendarRange } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
-import { getLang, tr, loc } from "@/lib/i18n";
+import { dishName, getLang, tr, loc } from "@/lib/i18n";
 import { enUS } from "date-fns/locale";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import PageHero from "@/components/PageHero";
@@ -447,10 +447,10 @@ export default function MyBookingsPage() {
                       </p>
                       {(lock.slots?.length ?? 0) > 0 && (
                         <ul className="text-caption text-muted-foreground space-y-0.5">
-                          {lock.main_dish && <li>• {tr("主菜：", "Main: ")}{lock.main_dish}</li>}
-                          {lock.slots!.map((slot, i) => <li key={i}>• {slotText(slot)}</li>)}
-                          {extraSideText(lock.extra_side) && <li>• {extraSideText(lock.extra_side)}</li>}
-                          {customOptionTexts(lock.custom_options).map((text, i) => <li key={`c${i}`}>• {text}</li>)}
+                          {lock.main_dish && <li>• {tr("主菜：", "Main: ")}{dishName(lock, lock.main_dish)}</li>}
+                          {lock.slots!.map((slot, i) => <li key={i}>• {slotText(slot, lock)}</li>)}
+                          {extraSideText(lock.extra_side, lock) && <li>• {extraSideText(lock.extra_side, lock)}</li>}
+                          {customOptionTexts(lock.custom_options, lock).map((text, i) => <li key={`c${i}`}>• {text}</li>)}
                           {riceLabel(lock.rice) && <li>• {riceLabel(lock.rice)}</li>}
                         </ul>
                       )}

@@ -34,6 +34,7 @@ function mealFromLock(lockId, lock, vendor, source, deadline) {
     pickup_code: lock.pickup_code || null,
     item_name: lock.item_name,
     item_name_en: lock.item_name_en || "",
+    dish_names_en: lock.dish_names_en || null,
     sides: [
       ...(lock.slots || []).filter((s) => !s.removed).map((s) => s.resolved || s.default_dish),
       lock.extra_side?.mode === "addon" ? lock.extra_side.resolved || lock.extra_side.dish : null,

@@ -63,7 +63,7 @@ export default function GiftClaimPage() {
             <p className="font-heading text-2xl font-semibold">{loc(lock, "item_name")}</p>
             <p className="text-sm text-muted-foreground">{formatPickupDate(lock.pickup_date)} {lock.pickup_window}</p>
             {(lock.slots?.length ?? 0) > 0 && (
-              <ul className="text-xs text-muted-foreground">{lock.slots!.map((s, i) => <li key={i}>• {slotText(s)}</li>)}</ul>
+              <ul className="text-xs text-muted-foreground">{lock.slots!.map((s, i) => <li key={i}>• {slotText(s, lock)}</li>)}</ul>
             )}
             <Button className="w-full h-12 text-base" disabled={busy || lock.buyer_uid === user?.id} onClick={accept}>
               {busy ? tr("處理中…", "Working…") : lock.buyer_uid === user?.id ? tr("這是你送出的", "You sent this") : tr("接受贈送", "Accept gift")}

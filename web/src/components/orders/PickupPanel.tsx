@@ -11,7 +11,7 @@ import LockOrderRow from "@/components/LockOrderRow";
 import { SkeletonBlocks } from "@/components/SkeletonBlocks";
 import { EmptyState } from "@/components/ds";
 import { completePickup, DONE_STATUSES, PENDING_STATUSES, type PickupSummary } from "@/lib/lockOutcome";
-import { loc, tr } from "@/lib/i18n";
+import { dishName, loc, tr } from "@/lib/i18n";
 import { customOptionTexts } from "@/lib/bento";
 import { cn } from "@/lib/utils";
 import type { Lock } from "@/types";
@@ -137,20 +137,20 @@ export default function PickupPanel({ todayLocks, loading }: { todayLocks: Lock[
               {s.kind === "lock" && <span className="text-sm text-muted-foreground">{s.pickup_window}</span>}
             </div>
             <p className="text-lg font-semibold">{loc(s, "item_name")}</p>
-            {s.main_dish && <p className="text-sm">{tr("主菜：", "Main: ")}<strong>{s.main_dish}</strong></p>}
+            {s.main_dish && <p className="text-sm">{tr("主菜：", "Main: ")}<strong>{dishName(s, s.main_dish)}</strong></p>}
             {s.slots && s.slots.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {s.slots.map((slot, i) => (
                   <span key={i} className={cn("rounded-md border px-2 py-0.5 text-sm", slot.removed ? "border-dashed text-muted-foreground line-through" : "bg-success-soft border-success/40")}>
-                    {slot.removed ? slot.category : slot.dish}
+                    {dishName(s, (slot.removed ? slot.category : slot.dish) ?? "")}
                     {slot.wished && slot.dish === slot.wished && <Badge variant="muted" className="ml-1 bg-secondary text-accent-foreground">{tr("許願", "wish")}</Badge>}
                   </span>
                 ))}
               </div>
             )}
-            {s.sides && s.sides.length > 0 && <p className="text-sm">{s.sides.join(tr("、", ", "))}</p>}
-            {s.extra_side && <p className="text-sm">{s.extra_side.mode === "addon" ? tr(`加菜：${s.extra_side.dish}`, `Add-on: ${s.extra_side.dish}`) : s.extra_side.used ? tr(`備案已遞補：${s.extra_side.dish}`, `Backup used: ${s.extra_side.dish}`) : tr(`備案（未用到）：${s.extra_side.dish}`, `Backup (unused): ${s.extra_side.dish}`)}</p>}
-            {customOptionTexts(s.custom_options).map((text, k) => <p key={k} className="text-sm">{text}</p>)}
+            {s.sides && s.sides.length > 0 && <p className="text-sm">{s.sides.map((d) => dishName(s, d)).join(tr("、", ", "))}</p>}
+            {s.extra_side && <p className="text-sm">{s.extra_side.mode === "addon" ? tr(`加菜：${s.extra_side.dish}`, `Add-on: ${dishName(s, s.extra_side.dish)}`) : s.extra_side.used ? tr(`備案已遞補：${s.extra_side.dish}`, `Backup used: ${dishName(s, s.extra_side.dish)}`) : tr(`備案（未用到）：${s.extra_side.dish}`, `Backup (unused): ${dishName(s, s.extra_side.dish)}`)}</p>}
+            {customOptionTexts(s.custom_options, s).map((text, k) => <p key={k} className="text-sm">{text}</p>)}
             {s.rice && s.rice !== "normal" && <p className="text-base font-bold text-warning-text">{s.rice === "add" ? tr("白飯一碗半", "1.5 bowls of rice") : tr("白飯半碗", "Half bowl of rice")}</p>}
             {s.note && <p className="text-sm text-warning-text">{tr("備註：", "Note: ")}{s.note}</p>}
             {s.kind === "lock" && (
