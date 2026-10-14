@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// Vendor cover images and menu item images (web/src/components/ImageUploadField.tsx).
+// Publicly readable (shown on vendor and menu pages); only that vendor's owner or an admin can write.
+// Vendor ownership comes from Firestore vendors/{vendorId}.owner_uid (cross-service rules).
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Keep in sync with isAdmin() in firestore.rules / ADMIN_EMAILS in web/src/lib/adminAuth.ts.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in ['suw192336@gmail.com', 'ckchildlikekid@gmail.com'];
+    }
+
+    function isVendorOwner(vendorId) {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/vendors/$(vendorId)).data.get('owner_uid', null) == request.auth.uid;
+    }
+
+    match /vendors/{vendorId}/{fileName} {
+      allow read: if true;
+      allow create, update: if (isVendorOwner(vendorId) || isAdmin())
+                            && request.resource.size <= 5 * 1024 * 1024
+                            && request.resource.contentType.matches('image/.*');
+      allow delete: if isVendorOwner(vendorId) || isAdmin();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

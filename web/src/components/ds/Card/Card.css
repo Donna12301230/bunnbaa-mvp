@@ -1,0 +1,115 @@
+/* ── Card ────────────────────────────────────────────────────────────────
+   .is-hover / .is-active / .is-focus are only for forcing states on the preview page. */
+.bb-card {
+  display: block;
+  position: relative;
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  transition:
+    transform var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard),
+    opacity var(--duration-base) var(--ease-standard);
+}
+/* The <button> version needs to fill the width */
+button.bb-card {
+  width: 100%;
+  font: inherit;
+}
+
+.bb-card--elevated {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.bb-card--outlined {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.bb-card--tinted {
+  background: var(--brand-orange-tint);
+  border: 1px solid transparent;
+}
+
+.bb-card--radius-md { border-radius: var(--radius-lg); }
+.bb-card--radius-lg { border-radius: var(--radius-xl); }
+
+.bb-card--pad-none { padding: 0; overflow: hidden; }
+.bb-card--pad-sm { padding: var(--space-3); }
+.bb-card--pad-md { padding: var(--space-4); }
+.bb-card--pad-lg { padding: var(--space-6); }
+
+/* Interactive: lift 2px on hover + deeper shadow */
+.bb-card--interactive {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bb-card--interactive:hover,
+.bb-card--interactive.is-hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+.bb-card--interactive:active,
+.bb-card--interactive.is-active {
+  transform: translateY(0) scale(0.99);
+  box-shadow: var(--shadow-sm);
+  transition-duration: var(--duration-fast);
+}
+.bb-card--interactive:focus-visible,
+.bb-card--interactive.is-focus {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.bb-card:disabled,
+.bb-card[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.bb-card.is-loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bb-card--interactive:hover,
+  .bb-card--interactive:active {
+    transform: none;
+  }
+}
+
+/* ── FeatureCard ── */
+.bb-feature {
+  display: flex;
+  gap: var(--space-3);
+}
+.bb-feature--vertical {
+  flex-direction: column;
+}
+.bb-feature--horizontal {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+.bb-feature__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.bb-feature__title {
+  font-size: var(--font-h3-size);
+  font-weight: var(--font-h3-weight);
+  line-height: var(--font-h3-lh);
+  color: var(--text);
+}
+.bb-feature__desc {
+  font-size: var(--font-body-sm-size);
+  line-height: var(--font-body-sm-lh);
+  color: var(--text-secondary);
+}

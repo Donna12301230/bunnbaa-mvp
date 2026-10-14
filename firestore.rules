@@ -1,0 +1,582 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Admin backend auth: no Cloud Functions custom claims yet (blocked on
+    // Blaze upgrade), so admin access is a plain email allowlist checked
+    // straight off the Firebase Auth token. Keep this in sync by hand with
+    // ADMIN_EMAILS in web/src/lib/adminAuth.ts.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in ['suw192336@gmail.com', 'ckchildlikekid@gmail.com'];
+    }
+
+    // Read-only demo admin (the login page's one-tap "admin" demo account): its
+    // password is public, so it may read what admins read but never write.
+    // Only used in `allow read` rules; every write still checks isAdmin().
+    // Keep in sync with DEMO_ADMIN_EMAIL in web/src/lib/adminAuth.ts and
+    // functions/src/common.js.
+    function isAdminViewer() {
+      return isAdmin()
+        || (request.auth != null && request.auth.token.email == 'admin@bunnbaa.test');
+    }
+
+    // Consumers must log in with a real account to lock, resell, gift or claim
+    // meals (2026-09-24: anonymous sign-in is no longer used). Also reused for
+    // users/ and vendor_applications/ so an anonymous token can't create either.
+    function isSignedInUser() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Repeated no-shows set users/{uid}.orderBanned (written server-side by
+    // markLockOutcome). Missing field/doc = not banned, so this never blocks
+    // someone who's never had a users/ doc written for them.
+    function isBanned() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('orderBanned', false) == true;
+    }
+
+    // A lock changing hands must append its previous owner to
+    // transferred_from_uids (arrayUnion semantics: existing entries kept, at
+    // most one added), so "My transfers" (我的轉讓) can still find it after buyer_uid moves on.
+    function recordsPreviousOwner() {
+      let before = resource.data.get('transferred_from_uids', []);
+      let after = request.resource.data.get('transferred_from_uids', []);
+      return after is list
+        && after.hasAll(before)
+        && resource.data.buyer_uid in after
+        && after.size() <= before.size() + 1;
+    }
+
+    // vendors: publicly readable (browsing); writes via admin backend only for MVP
+    match /vendors/{vendorId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      // The partnership plan became a per-meal commission (2026-10-05) with no monthly subscription, so vendor owners no longer have subscription fields to edit themselves.
+      allow update: if isAdmin()
+                    // Store profile + pickup schedule from the vendor portal's settings
+                    // page. Name stays admin-only (it's what buyers trust/recognise).
+                    // Element formats are checked again server-side at checkout
+                    // (functions/src/pricing.js); rules only bound types and sizes.
+                    || (isVendorOwner(vendorId)
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['description', 'address', 'phone', 'pickup_windows',
+                                       'business_hours', 'holidays', 'slot_capacity', 'cover_image',
+                                       'description_en', 'i18n_src',
+                                       // Vendor-adjustable settings: cut-off can only move earlier, safety stock, candidate-dish minimum quantity;
+                                       // pickup point coordinates (area insights, nearby charity meals), new-vendor self-reported forecast, anomaly weeks
+                                       'cutoff_time', 'safety_stock_rate', 'candidate_min_qty', 'lat', 'lng',
+                                       'forecast_daily', 'anomaly_weeks',
+                                       // names and order of the menu catalogs (two levels: catalog > category)
+                                       'menu_catalogs'])
+                        && request.resource.data.get('menu_catalogs', []) is list
+                        && request.resource.data.get('menu_catalogs', []).size() <= 30
+                        && (!request.resource.data.keys().hasAny(['cutoff_time'])
+                            || (request.resource.data.cutoff_time is string
+                                && request.resource.data.cutoff_time.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+                                && request.resource.data.cutoff_time <= '20:00'))
+                        && (!request.resource.data.keys().hasAny(['safety_stock_rate'])
+                            || (request.resource.data.safety_stock_rate is number
+                                && request.resource.data.safety_stock_rate >= 0
+                                && request.resource.data.safety_stock_rate <= 1))
+                        && (!request.resource.data.keys().hasAny(['candidate_min_qty'])
+                            || (request.resource.data.candidate_min_qty is int
+                                && request.resource.data.candidate_min_qty >= 1
+                                && request.resource.data.candidate_min_qty <= 500))
+                        && request.resource.data.get('description', '') is string
+                        && request.resource.data.get('description', '').size() <= 500
+                        && request.resource.data.get('address', '') is string
+                        && request.resource.data.get('address', '').size() <= 200
+                        && request.resource.data.get('phone', '') is string
+                        && request.resource.data.get('phone', '').size() <= 30
+                        && request.resource.data.get('pickup_windows', []) is list
+                        && request.resource.data.get('pickup_windows', []).size() <= 12
+                        && request.resource.data.get('business_hours', []) is list
+                        && request.resource.data.get('business_hours', []).size() <= 7
+                        && request.resource.data.get('holidays', []) is list
+                        && request.resource.data.get('holidays', []).size() <= 100
+                        && request.resource.data.get('slot_capacity', 0) is int
+                        && request.resource.data.get('slot_capacity', 0) >= 0
+                        && request.resource.data.get('slot_capacity', 0) <= 10000
+                        // Firebase Storage download URL from ImageUploadField; https only so it
+                        // can't carry a javascript:/data: URL into the storefront <img>.
+                        && request.resource.data.get('cover_image', '') is string
+                        && request.resource.data.get('cover_image', '').size() <= 500
+                        && request.resource.data.get('cover_image', '').matches('^$|^https://.*')
+                        // Manually edited English description (the rest of the English is auto-translated by the translateVendor Function);
+                        // i18n_src may only change description: like the vendor name itself, its English is changed only by admins / auto-translation
+                        && request.resource.data.get('description_en', '') is string
+                        && request.resource.data.get('description_en', '').size() <= 1000
+                        && request.resource.data.get('i18n_src', {}).get('name', null)
+                             == resource.data.get('i18n_src', {}).get('name', null));
+    }
+
+    // Booked meals per vendor + pickup date + window (capacity), written only
+    // by confirmLinePayPayment. Public read so the pickup picker can show
+    // "N left" (剩 N 份) — it holds counts only, no buyer data.
+    match /slot_counters/{counterId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // locks: consumer creates their own lock. Reads are limited (ISO 27001
+    // A.5.34 — buyer_uid is a registered account's uid since 2026-09-24, so a
+    // public read would let anyone link one person's whole order history):
+    // only listings currently up for resale/gift are public (the transfer
+    // market + gift links need them; list queries must filter on status so
+    // the rule can prove it), otherwise the buyer, that vendor's owner
+    // (redeem/prep pages), or an admin.
+    match /locks/{lockId} {
+      allow read: if resource.data.status in ['for_resale', 'for_gift']
+                  || (request.auth != null && resource.data.buyer_uid == request.auth.uid)
+                  // Previous owners keep read access so "My transfers" (我的轉讓) can show what
+                  // happened to a lock after someone else took it over.
+                  || (request.auth != null && request.auth.uid in resource.data.get('transferred_from_uids', []))
+                  || isAdminViewer()
+                  || isVendorOwner(resource.data.vendor_id);
+      // Locks are only created by confirmLinePayPayment (Admin SDK, bypasses
+      // rules) after LINE Pay captures the money. The last client-side path,
+      // HomePage's plan-join, moved to createPlanLinePayReservation on
+      // 2026-09-28 — until then a client could mint unpaid locks here. Bans
+      // are enforced server-side by assertNotBanned.
+      allow create: if false;
+      // status transitions (fulfilled, no_show) are normally done via Cloud
+      // Functions with admin rights; admin backend can also override directly
+      // since those Functions aren't deployed to prod yet (Blaze). Everything
+      // below this comment is deliberately expressed as a plain client-side
+      // rule instead of a Cloud Function, so it works today without waiting
+      // on the Blaze upgrade.
+      allow update: if isAdmin()
+                    // Buyer flips their own still-"locked" lock to "for_resale",
+                    // optionally attaching a resale_deadline (pickup-window-based,
+                    // bounded so it can't be back-dated or set absurdly far out — 31 days
+                    // covers the farthest bookable pickup window (bookingRangeDays=30);
+                    // once it's past, anyone may free-claim, see below).
+                    || (isSignedInUser() && resource.data.buyer_uid == request.auth.uid
+                        && resource.data.status == 'locked'
+                        && request.resource.data.status == 'for_resale'
+                        // Seller-set resale price (2026-10-05): 0 to the original price (item price + add-ons, excluding the early-bird discount);
+                        // no marking up. The server's resalePriceOf clamps it again. If unset, the early-bird price is used.
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resale_deadline', 'resale_price'])
+                        && (!request.resource.data.keys().hasAny(['resale_price'])
+                            || (request.resource.data.resale_price is int
+                                && request.resource.data.resale_price >= 0
+                                && request.resource.data.resale_price
+                                     <= resource.data.get('list_price', resource.data.locked_price) + resource.data.get('adjust_amount', 0)))
+                        && (!request.resource.data.keys().hasAny(['resale_deadline'])
+                            || (request.resource.data.resale_deadline is timestamp
+                                && request.resource.data.resale_deadline > request.time
+                                && request.resource.data.resale_deadline <= request.time + duration.value(31, 'd'))))
+                    // Buyer privately gifts their own still-"locked" lock — not
+                    // publicly listed anywhere, the recipient needs the lock_id/link
+                    // itself (same trust model as handing someone the pickup QR code).
+                    || (isSignedInUser() && resource.data.buyer_uid == request.auth.uid
+                        && resource.data.status == 'locked'
+                        && request.resource.data.status == 'for_gift'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+                    // Named friend claims a gifted lock — any signed-in user other
+                    // than the giver, since "naming" happens out-of-band (whoever
+                    // the giver shares the link/lock_id with).
+                    || (isSignedInUser() && resource.data.status == 'for_gift'
+                        && request.auth.uid != resource.data.buyer_uid
+                        && request.resource.data.status == 'locked'
+                        && request.resource.data.buyer_uid == request.auth.uid
+                        && recordsPreviousOwner()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer_uid', 'transferred_from_uids', 'share_token']))
+                    // Buyer cancels their own still-unclaimed for_resale/for_gift
+                    // listing back to locked. Only reachable while buyer_uid is still theirs —
+                    // once someone else claims it, buyer_uid has already moved on.
+                    // While someone is paying to take it over (resale_hold not expired), the seller can't cancel, or it would collide with the takeover transaction
+                    || (isSignedInUser() && resource.data.buyer_uid == request.auth.uid
+                        && resource.data.status in ['for_resale', 'for_gift']
+                        && !(resource.data.get('resale_hold', null) != null && resource.data.resale_hold.expires_at > request.time)
+                        && request.resource.data.status == 'locked'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resale_deadline', 'resale_price']))
+                    // Anyone claims an expired resale listing for free — replaces a
+                    // scheduled "release" Cloud Function with a lazy, rule-enforced
+                    // expiry checked at claim time.
+                    || (isSignedInUser() && resource.data.status == 'for_resale'
+                        && resource.data.get('resale_deadline', null) != null
+                        && resource.data.resale_deadline < request.time
+                        && request.resource.data.status == 'locked'
+                        && request.resource.data.buyer_uid == request.auth.uid
+                        && request.resource.data.locked_price == 0
+                        && recordsPreviousOwner()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyer_uid', 'locked_price', 'transferred_from_uids', 'share_token']))
+                    // Buyer leaves feedback once the lock is settled — one-shot (the
+                    // field must not already exist) so it can't be edited after the
+                    // fact; this feeds vendor calibration (functions/src/index.js
+                    // buildVendorHistory), so it shouldn't be revisable.
+                    || (isSignedInUser() && resource.data.buyer_uid == request.auth.uid
+                        // charity: in phase 1, no-shows and voluntary donations both become charity meals (MyBookingsPage FEEDBACK_ELIGIBLE)
+                        && resource.data.status in ['fulfilled', 'resold_and_fulfilled', 'no_show', 'charity']
+                        && !resource.data.keys().hasAny(['consumer_feedback'])
+                        && request.resource.data.consumer_feedback is string
+                        && request.resource.data.consumer_feedback.size() > 0
+                        && request.resource.data.consumer_feedback.size() <= 280
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['consumer_feedback']));
+      allow delete: if false;
+    }
+
+    // lock_tokens: FCM device tokens for pickup reminders, kept off the public
+    // locks docs. Known gap: only Cloud Functions (admin SDK) can delete/replace
+    // one, so after a gift/free-claim/resale handoff the previous buyer's stale
+    // token is left in place instead of being handed to the new buyer — same
+    // gap claimResoldLock used to have (it now deletes the token). Harmless for now since reminders are
+    // dormant pending VAPID key + Blaze deploy. The buyer creates
+    // one for a lock they own; only that buyer or
+    // an admin can read it; Cloud Functions (admin SDK) manage the rest.
+    match /lock_tokens/{lockId} {
+      allow create: if isSignedInUser()
+                    && request.resource.data.keys().hasOnly(['fcm_token', 'buyer_uid'])
+                    && request.resource.data.fcm_token is string
+                    && request.resource.data.fcm_token.size() < 4096
+                    && request.resource.data.buyer_uid == request.auth.uid
+                    && get(/databases/$(database)/documents/locks/$(lockId)).data.buyer_uid == request.auth.uid;
+      allow read: if (isSignedInUser() && resource.data.buyer_uid == request.auth.uid) || isAdminViewer();
+      allow update, delete: if false;
+    }
+
+    // admin_audit_logs: append-only record of admin overrides (ISO 27001 A.8.15).
+    match /admin_audit_logs/{logId} {
+      allow read: if isAdminViewer();
+      allow create: if isAdmin() && request.resource.data.admin_email == request.auth.token.email;
+      allow update, delete: if false;
+    }
+
+    // A vendor's owner is the Firebase Auth account whose uid an admin stored in
+    // vendors/{id}.owner_uid. Payout and calibration data is business-confidential
+    // (ISO 27001 A.5.34), so only that owner or an admin may read it.
+    function isVendorOwner(vendorId) {
+      return request.auth != null
+        && get(/databases/$(database)/documents/vendors/$(vendorId)).data.get('owner_uid', null) == request.auth.uid;
+    }
+
+    // accuracy_reports: written only by Cloud Functions (admin SDK bypasses rules)
+    match /accuracy_reports/{reportId} {
+      allow read: if isAdminViewer() || isVendorOwner(resource.data.vendor_id);
+      allow write: if false;
+    }
+
+    // discount_explanations cache: written only by Cloud Functions, publicly readable
+    match /discount_explanations/{cacheKey} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // payouts: written only by settleVendorPayouts (Cloud Function)
+    match /payouts/{payoutId} {
+      allow read: if isAdminViewer() || isVendorOwner(resource.data.vendor_id);
+      allow write: if false;
+    }
+
+    // growth_rewards: state such as the zero-value coupon stock and unlocked milestones (unlocked_milestones); only
+    // Cloud Functions (drawGrowthReward / syncGrowthUnlock; the admin SDK bypasses rules) can write it.
+    // Publicly readable: both the vendor portal and the diner side read it, and it only holds milestone ids, no amounts, so there's no privacy issue.
+    match /growth_rewards/{vendorId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // reviews/{lockId}: a diner rates a picked-up lock 1-5 stars (optionally with a public comment). Each lock
+    // can be reviewed only once (doc id = lock id; create can't overwrite an existing doc, and there's no update). Publicly readable:
+    // meal plan average ratings and the Landing student reviews both read from here. buyer_uid isn't stored; reviewer_label is
+    // built by the frontend as "department + student". vendor_id / meal_plan_id / item_name must match that lock.
+    function reviewableLock(lockId) {
+      let lock = get(/databases/$(database)/documents/locks/$(lockId)).data;
+      return lock.buyer_uid == request.auth.uid
+        && lock.status in ['fulfilled', 'resold_and_fulfilled']
+        && request.resource.data.vendor_id == lock.vendor_id
+        && request.resource.data.meal_plan_id == lock.get('meal_plan_id', null)
+        && request.resource.data.item_name == lock.item_name;
+    }
+    match /reviews/{lockId} {
+      allow read: if true;
+      allow create: if isSignedInUser()
+                    && request.resource.data.keys().hasOnly(['vendor_id', 'meal_plan_id', 'item_name', 'rating', 'comment', 'reviewer_label', 'created_at'])
+                    && request.resource.data.rating is int
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5
+                    && request.resource.data.comment is string
+                    && request.resource.data.comment.size() <= 280
+                    && request.resource.data.reviewer_label is string
+                    && request.resource.data.reviewer_label.size() <= 30
+                    && request.resource.data.created_at == request.time
+                    && reviewableLock(lockId);
+      allow delete: if isAdmin();
+    }
+
+    // platform_config: platform-level settings (growth reward milestones in growth, and fixed parameters other than
+    // the Landing event cards). Publicly readable; frontend and Functions read the same doc; only admins can change it.
+    match /platform_config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // landing_events: "Upcoming events" cards on the Landing page; publicly readable, only admins can change them.
+    match /landing_events/{eventId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // draws: draw records, likewise written only by drawGrowthReward. Publicly readable for the same reason: they only hold
+    // buyer_tag (last 6 chars of the uid; full buyer_uid no longer stored since 2026-09-24) / discount / item, no personal data or amounts.
+    match /draws/{drawId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // payment_intents: LINE Pay reserve/confirm bookkeeping (amount, LINE Pay
+    // transaction_id, draft lock fields). Only createLinePayReservation /
+    // confirmLinePayPayment (admin SDK, bypasses rules) ever touch this —
+    // the client only ever sees the order_id/payment_url they return.
+    match /payment_intents/{orderId} {
+      allow read, write: if false;
+    }
+
+    // Platform points (functions/src/wallet.js, 2026-10-09): balance, batches and history are readable only by the owner;
+    // credits, redemptions and refunds to LINE Pay are all written by Functions (Admin SDK); clients can never write.
+    match /wallets/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+      match /{sub}/{docId} {
+        allow read: if request.auth != null && request.auth.uid == uid && sub in ['lots', 'entries'];
+        allow write: if false;
+      }
+    }
+
+    // menu_items: real catalog backing VendorPage/MenuItemPage/CartPage
+    // (replaces the old mockMenuItems). Publicly readable for browsing;
+    // writes restricted to admin or that item's own vendor owner. The
+    // update rule pins vendor_id so an owner can't relabel their own item
+    // onto a different vendor's storefront.
+    match /menu_items/{itemId} {
+      allow read: if true;
+      allow create: if isAdmin() || (request.auth != null && isVendorOwner(request.resource.data.vendor_id));
+      allow update: if isAdmin() || (request.auth != null
+                      && isVendorOwner(resource.data.vendor_id)
+                      && request.resource.data.vendor_id == resource.data.vendor_id);
+      allow delete: if isAdmin() || (request.auth != null && isVendorOwner(resource.data.vendor_id));
+    }
+
+    // meal_plans: real multi-day subscription plan catalog backing
+    // HomePage.tsx's "Partner vendors and plans" (合作店家與計畫) cards (replaces mockVendorMealPlans).
+    // Same read/write shape as menu_items — public catalog, vendor-owner or
+    // admin writes.
+    match /meal_plans/{planId} {
+      allow read: if true;
+      allow create: if isAdmin() || (request.auth != null && isVendorOwner(request.resource.data.vendor_id));
+      allow update: if isAdmin() || (request.auth != null
+                      && isVendorOwner(resource.data.vendor_id)
+                      && request.resource.data.vendor_id == resource.data.vendor_id);
+      allow delete: if isAdmin() || (request.auth != null && isVendorOwner(resource.data.vendor_id));
+    }
+
+    // ban_appeals: a banned user files one for themselves (status must start
+    // "pending"); only an admin decides it. Approving one also resets the
+    // user's ban (users/{uid} rule below), done client-side as a batch in
+    // AdminAppealsPage.tsx.
+    match /ban_appeals/{appealId} {
+      allow read: if isAdminViewer() || (request.auth != null && resource.data.buyer_uid == request.auth.uid);
+      allow create: if isSignedInUser() && isBanned()
+                    && request.resource.data.buyer_uid == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.keys().hasOnly(
+                         ['buyer_uid', 'username', 'display_name', 'reason', 'status', 'created_at']);
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // users/{uid}: platform profile written at registration (web/src/lib/auth.ts).
+    // Deliberately holds no role — admin comes from the email allowlist and
+    // vendor from vendors/{id}.owner_uid, so nothing here can grant access.
+    // orderBanned/noPickupCount are set server-side by markLockOutcome (admin
+    // SDK bypasses rules); the isAdmin() branch below is only for resetting
+    // them when an appeal is approved.
+    match /users/{uid} {
+      allow read: if (request.auth != null && request.auth.uid == uid) || isAdminViewer();
+      // lang: UI language (zh / en); pickup reminder pushes use it to pick the language
+      allow create: if isSignedInUser() && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(
+                         ['display_name', 'phone', 'school', 'department', 'created_at', 'lang',
+                          'muted_kinds', 'device_id', 'home_geo', 'charity_nearby_push'])
+                    && request.resource.data.get('lang', 'zh') in ['zh', 'en'];
+      // diff().affectedKeys(), not the whole document's keys() — otherwise once
+      // orderBanned/noPickupCount exist on a doc (any past ban), the owner could
+      // never touch their own profile fields again, since the resulting document
+      // would always carry keys outside this allowlist.
+      // muted_kinds: which notifications are turned off (e.g. charity meal notices); device_id: anomaly detection (multiple accounts on one device);
+      // home_geo: usual location, stored only as a coarse geohash (about 150 m); no location history is stored
+      allow update: if isSignedInUser() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+                         ['display_name', 'phone', 'school', 'department', 'created_at', 'lang',
+                          'muted_kinds', 'device_id', 'home_geo', 'charity_nearby_push'])
+                    && request.resource.data.get('home_geo', '').size() <= 7
+                    && request.resource.data.get('lang', 'zh') in ['zh', 'en'];
+      allow update: if isAdmin()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['orderBanned', 'noPickupCount']);
+      allow delete: if false;
+    }
+
+    // vendor_applications/{uid}: the applicant files one for themselves (status
+    // must start "pending"); only an admin decides it. Approval itself binds
+    // vendors/{id}.owner_uid, which admins can already write.
+    match /vendor_applications/{uid} {
+      allow read: if (request.auth != null && request.auth.uid == uid) || isAdminViewer();
+      allow create: if isSignedInUser() && request.auth.uid == uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.keys().hasOnly(
+                         ['store_name', 'phone', 'email', 'status', 'created_at']);
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ── Bentos, recipes, rewards, charity meals ──────────────
+    // Draws, redemptions, opening pools, cut-off and refunds are all written by Cloud Functions (admin SDK).
+
+    // Platform-wide settings, dish library, fixed templates: publicly readable, only admins can change them
+    match /platformConfig/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /dishLibrary/{dishId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /templates/{templateId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // A vendor's recipes and purchasing data are trade secrets (ISO 27001 A.5.34): only the vendor owner and admins can read/write.
+    // Supplier orders, prep plans, reward periods and wish tallies are generated by Functions; the vendor owner can only tick prep as done (done).
+    match /vendors/{vendorId}/{sub}/{docId} {
+      allow read: if isAdminViewer() || isVendorOwner(vendorId);
+      allow write: if (isAdmin() || isVendorOwner(vendorId))
+                   && sub in ['ingredients', 'components', 'suppliers', 'inventory'];
+      allow update: if isVendorOwner(vendorId) && sub == 'prepPlans'
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done']);
+    }
+
+    // Wish counts for candidate dishes ("sweet potato leaves 7/10"); numbers only, no personal data, publicly readable
+    match /sideWishes/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+    // Open wishes: users can read their own; vendors only see the wishTally aggregate
+    match /openWishes/{id} {
+      allow read: if isAdminViewer() || (request.auth != null && resource.data.user_id == request.auth.uid);
+      allow write: if false;
+    }
+
+    // Growth rewards: public progress (no amounts), plus the user's own spending total / draw tickets / coupons
+    match /rewardStatus/{vendorId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /userSpend/{id} {
+      allow read: if isAdminViewer() || (request.auth != null && resource.data.user_id == request.auth.uid);
+      allow write: if false;
+    }
+    match /rewardTickets/{id} {
+      allow read: if isAdminViewer()
+                  || (request.auth != null && resource.data.user_id == request.auth.uid)
+                  || isVendorOwner(resource.data.vendor_id);
+      allow write: if false;
+    }
+    match /coupons/{id} {
+      allow read: if isAdminViewer()
+                  || (request.auth != null && resource.data.get('user_id', null) == request.auth.uid)
+                  || isVendorOwner(resource.data.vendor_id);
+      allow write: if false;
+    }
+
+    // Favorites: saved vendors, readable/writable only by the owner; also a positive taste-preference signal
+    match /users/{uid}/favorites/{vendorId} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create: if isSignedInUser() && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(['vendor_id', 'created_at'])
+                    && request.resource.data.vendor_id == vendorId
+                    && request.resource.data.created_at == request.time;
+      allow update: if false;
+    }
+
+    // Taste preferences: readable only by the owner; the owner can write only explicit settings (prefs) and allergies (allergies); scores are computed by the backend
+    match /tasteProfiles/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if isSignedInUser() && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(['prefs', 'allergies'])
+                    && request.resource.data.get('prefs', {}) is map
+                    && request.resource.data.get('allergies', []) is list
+                    && request.resource.data.get('allergies', []).size() <= 20;
+      allow update: if isSignedInUser() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prefs', 'allergies'])
+                    && request.resource.data.get('prefs', {}) is map
+                    && request.resource.data.get('allergies', []) is list
+                    && request.resource.data.get('allergies', []).size() <= 20;
+    }
+    // Area insights: aggregates only, visible only to that vendor's owner
+    match /areaInsights/{id} {
+      allow read: if isAdminViewer() || isVendorOwner(resource.data.vendor_id);
+      allow write: if false;
+    }
+
+    // Charity meals: the public list has no personal data; reservation records are readable by the owner, and vendors can't read personal fields
+    match /charityMeals/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /charityReservations/{id} {
+      allow read: if request.auth != null && resource.data.user_id == request.auth.uid;
+      allow write: if false;
+    }
+    match /charityBans/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Disaster events: publicly readable (frontend shows "may be cancelled due to typhoon"); admins can create them manually (fallback when the data source fails)
+    match /disasterEvents/{id} {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+    match /anomalies/{id} {
+      allow read: if isAdminViewer();
+      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'note']);
+      allow create, delete: if false;
+    }
+
+    // In-app notifications: readable by the owner, who can only mark them as read
+    match /notifications/{id} {
+      allow read: if request.auth != null && resource.data.user_id == request.auth.uid;
+      allow update: if request.auth != null && resource.data.user_id == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create, delete: if false;
+    }
+    // AI features (doc/AI與GoogleCloud設計.md): read/written only by Functions
+    // menu_embeddings: item embeddings (for resale matching); not readable by the frontend so item pages don't load vectors
+    // resale_matches: who resale matching notified and whether a notified user took it over (affects metrics); readable by admins
+    // assistant_cache: single-turn Q&A cache for the pre-order assistant
+    match /menu_embeddings/{id} {
+      allow read, write: if false;
+    }
+    match /resale_matches/{id} {
+      allow read: if isAdminViewer();
+      allow write: if false;
+    }
+    match /assistant_cache/{id} {
+      allow read, write: if false;
+    }
+    // Push tokens (at most 5 devices kept per user)
+    match /userTokens/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if isSignedInUser() && request.auth.uid == uid
+                            && request.resource.data.keys().hasOnly(['tokens'])
+                            && request.resource.data.tokens is list
+                            && request.resource.data.tokens.size() <= 5;
+    }
+  }
+}

@@ -1,0 +1,109 @@
+/* .is-hover / .is-focus / .is-active are only for forcing states on the preview page */
+.bb-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  color: var(--text);
+}
+.bb-switch--label-start {
+  flex-direction: row-reverse;
+  justify-content: space-between;
+}
+.bb-switch.is-disabled {
+  opacity: 0.5;
+}
+
+.bb-switch__track {
+  position: relative;
+  flex-shrink: 0;
+  width: 46px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: var(--border-control);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--duration-base) var(--ease-standard);
+}
+/* Enlarge the hit area to 44px tall */
+.bb-switch__track::before {
+  content: '';
+  position: absolute;
+  inset: -8px -2px;
+}
+.bb-switch__track:disabled {
+  cursor: not-allowed;
+}
+.bb-switch.is-loading .bb-switch__track {
+  cursor: progress;
+}
+
+.bb-switch__track:hover:not(:disabled),
+.bb-switch.is-hover .bb-switch__track {
+  background: color-mix(in srgb, var(--border-control) 85%, var(--text));
+}
+
+.bb-switch__track[aria-checked='true'] {
+  background: var(--brand-orange-strong);
+}
+.bb-switch__track[aria-checked='true']:hover:not(:disabled),
+.bb-switch.is-hover .bb-switch__track[aria-checked='true'] {
+  background: var(--brand-orange-strong-hover);
+}
+
+.bb-switch__track:focus-visible,
+.bb-switch.is-focus .bb-switch__track {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.bb-switch__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: #ffffff;
+  color: var(--brand-orange-strong);
+  box-shadow: 0 1px 3px rgba(80, 50, 20, 0.2);
+  transition:
+    transform var(--duration-base) var(--ease-standard),
+    width var(--duration-fast) var(--ease-standard);
+}
+.bb-switch__track[aria-checked='true'] .bb-switch__thumb {
+  transform: translateX(18px);
+}
+/* Stretch the thumb slightly while pressed for a softer feel */
+.bb-switch__track:active:not(:disabled) .bb-switch__thumb,
+.bb-switch.is-active .bb-switch__thumb {
+  width: 26px;
+}
+.bb-switch__track[aria-checked='true']:active:not(:disabled) .bb-switch__thumb,
+.bb-switch.is-active .bb-switch__track[aria-checked='true'] .bb-switch__thumb {
+  transform: translateX(14px);
+}
+
+.bb-switch__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.bb-switch__label {
+  font-size: var(--font-body-size);
+  line-height: 1.5;
+  cursor: pointer;
+}
+.bb-switch.is-disabled .bb-switch__label {
+  cursor: not-allowed;
+}
+.bb-switch__desc {
+  font-size: var(--font-body-sm-size);
+  line-height: var(--font-body-sm-lh);
+  color: var(--text-muted);
+}

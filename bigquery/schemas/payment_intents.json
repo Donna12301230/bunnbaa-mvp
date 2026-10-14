@@ -1,0 +1,24 @@
+{
+  "fields": [
+    {
+      "name": "status",
+      "type": "string"
+    },
+    {
+      "name": "amount",
+      "type": "number"
+    },
+    {
+      "name": "total",
+      "type": "number"
+    },
+    {
+      "name": "points_used",
+      "type": "number"
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp"
+    }
+  ]
+}

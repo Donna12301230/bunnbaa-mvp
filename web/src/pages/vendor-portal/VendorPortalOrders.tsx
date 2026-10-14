@@ -1,0 +1,92 @@
+import { useEffect, useMemo, useState } from "react";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
+import { CalendarDays, ClipboardList, HeartHandshake, ScanLine } from "lucide-react";
+import VendorPortalLayout from "@/components/VendorPortalLayout";
+import PickupPanel from "@/components/orders/PickupPanel";
+import OrdersListPanel from "@/components/orders/OrdersListPanel";
+import SlotsPanel from "@/components/orders/SlotsPanel";
+import CharityPanel from "@/components/orders/CharityPanel";
+import { useAuth } from "@/hooks/useAuth";
+import { useMyVendor } from "@/hooks/useMyVendor";
+import { useVendorLocks } from "@/hooks/useVendorLocks";
+import { db } from "@/lib/firebase";
+import { PENDING_STATUSES } from "@/lib/lockOutcome";
+import { todayStr } from "@/lib/pickupSlots";
+import { tr } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import TabNumberLoading from "@/components/TabNumberLoading";
+import PortalPageHeader from "@/components/PortalPageHeader";
+import type { CharityMeal, Lock } from "@/types";
+
+export type OrdersTab = "pickup" | "charity" | "orders" | "slots";
+
+/**
+ * Orders & pickup (merged 2026-10-06): the former "Orders", "Pickup scan", "Order slots" and "Charity meals" pages are now four tabs on one page.
+ * Charity meals are today's uncollected bentos, and claimants also scan a QR on the pickup tab, so they sit next to pickup.
+ * Old paths still work: /vendor-portal/orders, /lock/vendor/redeem (pickup), /vendor-portal/charity (charity meals), /vendor-portal/sessions (slots).
+ * The order list and slots use the latest 500 locks (vendor_id + created_at index); pickup uses today's orders (pickup_date query, not capped at 500).
+ */
+export function OrdersHub({ initial = "pickup" }: { initial?: OrdersTab }) {
+  const vendorId = useAuth().user?.vendorId;
+  const { data: vendor } = useMyVendor();
+  const [tab, setTab] = useState<OrdersTab>(initial);
+  const { locks, loading, truncated } = useVendorLocks(500);
+  const [todayLocks, setTodayLocks] = useState<Lock[]>([]);
+  const [loadingToday, setLoadingToday] = useState(true);
+  const today = todayStr();
+
+  useEffect(() => {
+    if (!vendorId) return;
+    return onSnapshot(query(collection(db, "locks"), where("vendor_id", "==", vendorId), where("pickup_date", "==", today)), (snap) => {
+      setTodayLocks(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Lock).sort((a, b) => (a.pickup_code ?? "").localeCompare(b.pickup_code ?? "")));
+      setLoadingToday(false);
+    }, () => setLoadingToday(false));
+  }, [vendorId, today]);
+
+  // Today's charity meals and end-of-day settlement
+  const [charity, setCharity] = useState<CharityMeal[]>([]);
+  const [charityLoaded, setCharityLoaded] = useState(false);
+  const [charityResult, setCharityResult] = useState<{ total: number; given_onsite: number; wasted: number; reserved_claimed: number } | null>(null);
+  useEffect(() => {
+    if (!vendorId) return;
+    const u1 = onSnapshot(query(collection(db, "charityMeals"), where("vendor_id", "==", vendorId), where("date", "==", today)), (s) => { setCharity(s.docs.map((d) => ({ id: d.id, ...d.data() }) as CharityMeal)); setCharityLoaded(true); }, () => { setCharity([]); setCharityLoaded(true); });
+    const u2 = onSnapshot(doc(db, "vendors", vendorId, "prepPlans", today), (s) => setCharityResult(s.exists() ? s.data().charity_result ?? null : null), () => setCharityResult(null));
+    return () => { u1(); u2(); };
+  }, [vendorId, today]);
+  const charityOpen = charity.filter((m) => m.status === "available" || m.status === "reserved").length;
+
+  const waitingToday = todayLocks.filter((l) => PENDING_STATUSES.has(l.status)).length;
+  const pendingAll = useMemo(() => locks.filter((l) => PENDING_STATUSES.has(l.status)).length, [locks]);
+  const upcoming = useMemo(() => locks.filter((l) => l.pickup_date >= today && l.status !== "cancelled" && l.status !== "no_show").length, [locks, today]);
+
+  const tabs = [
+    { key: "pickup" as const, icon: ScanLine, label: tr("取餐", "Pickup"), n: loadingToday ? null : waitingToday, sub: tr("今天待取", "waiting today") },
+    { key: "charity" as const, icon: HeartHandshake, label: tr("愛心餐", "Charity"), n: charityLoaded ? charityOpen : null, sub: tr("份等人領", "waiting") },
+    { key: "orders" as const, icon: ClipboardList, label: tr("訂單", "Orders"), n: loading ? null : pendingAll, sub: tr("待取餐", "to pick up") },
+    { key: "slots" as const, icon: CalendarDays, label: tr("時段", "Slots"), n: loading ? null : upcoming, sub: tr("份已訂", "booked ahead") },
+  ];
+
+  return (
+    <VendorPortalLayout>
+      <PortalPageHeader icon={ClipboardList} title={tr("訂單取餐", "Orders & pickup")} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5" role="tablist">
+        {tabs.map((t) => (
+          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
+            className={cn("rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", tab === t.key ? "border-foreground bg-card shadow-sm" : "border-border bg-card/60 hover:bg-card")}>
+            <span className="flex items-center gap-1.5 font-semibold"><t.icon className="w-5 h-5 text-accent-foreground" />{t.label}</span>
+            <span className="mt-1 block text-2xl font-bold leading-none tabular-nums">{t.n ?? <TabNumberLoading />}</span>
+            <span className="text-xs text-muted-foreground">{t.sub}</span>
+          </button>
+        ))}
+      </div>
+      {tab === "pickup" && <PickupPanel todayLocks={todayLocks} loading={loadingToday} />}
+      {tab === "charity" && <CharityPanel meals={charity} result={charityResult} onGoScan={() => setTab("pickup")} />}
+      {tab === "orders" && <OrdersListPanel locks={locks} loading={loading} truncated={truncated} />}
+      {tab === "slots" && <SlotsPanel vendor={vendor} locks={locks} loading={loading} />}
+    </VendorPortalLayout>
+  );
+}
+
+export default function VendorPortalOrders() {
+  return <OrdersHub initial="pickup" />;
+}

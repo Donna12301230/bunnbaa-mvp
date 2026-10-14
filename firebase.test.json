@@ -1,0 +1,14 @@
+{
+  "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" },
+  "functions": [{ "source": "functions", "codebase": "default" }],
+  "emulators": {
+    "auth": { "port": 9098 },
+    "functions": { "port": 5002 },
+    "firestore": { "port": 8081, "websocketPort": 9151 },
+    "hub": { "port": 4401 },
+    "logging": { "port": 4501 },
+    "eventarc": { "port": 9399 },
+    "tasks": { "port": 9599 },
+    "ui": { "enabled": false }
+  }
+}

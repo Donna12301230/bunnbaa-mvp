@@ -1,0 +1,12 @@
+.bb-anum {
+  display: inline-flex;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.bb-anum__value {
+  display: inline-block;
+}
+.bb-anum__value.is-fading {
+  animation: bb-fade-up var(--duration-slow) var(--ease-standard);
+}

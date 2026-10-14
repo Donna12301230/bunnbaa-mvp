@@ -1,0 +1,56 @@
+# Deploys Cloud Functions automatically when a push to master touches functions/ (the frontend is deployed by firebase-hosting-merge.yml).
+# Needs two repo secrets (GitHub repo → Settings → Secrets and variables → Actions):
+#   FIREBASE_SERVICE_ACCOUNT_BUNNBAA_MVP_5474: the service account key shared with Hosting (already exists).
+#     In GCP IAM, also grant this service account: Cloud Functions Admin, Service Account User,
+#     Artifact Registry Admin, Cloud Build Editor, Cloud Scheduler Admin (for scheduled functions),
+#     Eventarc Admin (for Firestore triggers), Firebase Admin Viewer
+#   FUNCTIONS_ENV: the full contents of the production functions/.env (LINE Pay, Gemini, pickup QR key...), pasted as is.
+#     If it is not set we skip the deploy; otherwise the deployed functions would lack these keys and payments would break.
+#     Whenever functions/.env changes, update this secret too.
+name: Deploy Cloud Functions on merge
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "functions/**"
+      - "firebase.json"
+      - ".github/workflows/firebase-functions-merge.yml"
+  workflow_dispatch:
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  deploy_functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: cd functions && npm ci
+      - name: Write functions/.env and credentials
+        env:
+          FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BUNNBAA_MVP_5474 }}
+        run: |
+          if [ -z "$FUNCTIONS_ENV" ]; then
+            echo "::error::FUNCTIONS_ENV secret is not set: save the production functions/.env as a repo secret, otherwise the deploy wipes the LINE Pay and other keys"
+            exit 1
+          fi
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT_BUNNBAA_MVP_5474 secret is not set"
+            exit 1
+          fi
+          printf '%s\n' "$FUNCTIONS_ENV" > functions/.env
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+      # No --force: functions deleted from the code are not removed automatically; the deploy fails with a prompt, and a person deletes them locally after checking
+      - run: npx --yes firebase-tools@latest deploy --only functions --project bunnbaa-mvp-5474 --non-interactive
+      - name: Remove credentials
+        if: always()
+        run: rm -f functions/.env "$RUNNER_TEMP/sa.json"

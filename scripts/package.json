@@ -1,0 +1,7 @@
+{
+  "name": "bunnbaa-scripts",
+  "private": true,
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

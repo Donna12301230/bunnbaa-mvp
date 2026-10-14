@@ -1,0 +1,43 @@
+.bb-divider {
+  --divider-space: var(--space-4);
+  flex-shrink: 0;
+  border: 0 var(--divider-style, solid) var(--border);
+}
+.bb-divider--dashed { --divider-style: dashed; }
+
+.bb-divider--horizontal {
+  width: 100%;
+  border-top-width: 1px;
+  margin-block: var(--divider-space);
+}
+.bb-divider--vertical {
+  align-self: stretch;
+  width: 0;
+  min-height: 1em;
+  border-left-width: 1px;
+  margin-inline: var(--divider-space);
+}
+
+.bb-divider--space-none { --divider-space: 0; }
+.bb-divider--space-sm { --divider-space: var(--space-2); }
+.bb-divider--space-md { --divider-space: var(--space-4); }
+.bb-divider--space-lg { --divider-space: var(--space-6); }
+
+/* With text: the line is drawn by the left and right pseudo-elements instead */
+.bb-divider--labelled.bb-divider--horizontal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  border-top-width: 0;
+}
+.bb-divider--labelled.bb-divider--horizontal::before,
+.bb-divider--labelled.bb-divider--horizontal::after {
+  content: '';
+  flex: 1;
+  border-top: 1px var(--divider-style, solid) var(--border);
+}
+.bb-divider__label {
+  font-size: var(--font-caption-size);
+  color: var(--text-muted);
+  white-space: nowrap;
+}

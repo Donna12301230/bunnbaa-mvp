@@ -1,0 +1,6 @@
+/* The portal container only carries the tokens; it should have no background or take up space */
+.bb-theme.bb-portal {
+  background: none;
+  position: relative;
+  z-index: var(--z-overlay);
+}

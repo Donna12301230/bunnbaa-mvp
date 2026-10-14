@@ -1,0 +1,366 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   BunnBaa 飯飽 — Cafe Look (<ThemeRoot look="cafe">)
+   ──────────────────────────────────────────────────────────────────────────
+   Modeled on a cafe brand site: dark cocoa brown + cream yellow as dual primaries, serif headings, 1px dark-brown borders
+   instead of static shadows, pill buttons, larger section radii.
+   Approach:
+   · Primary buttons become "dark brown background + cream text", accents become "cream yellow background + dark brown text",
+     so brand orange #F29E0C no longer has to be darkened for white-text contrast.
+   · Text colors carry warm brown instead of neutral grey.
+   · Only tokens and a few component styles are overridden; component APIs are unchanged.
+   · shadcn overlays rendered into body (Dialog etc.) sit outside ThemeRoot;
+     add className="bb-look" data-look="cafe" on the overlay element to get the same tokens.
+   Specificity: the light block (0,2,0) overrides the dark block in tokens.css,
+   so the dark block (0,3,0) must reset every token from the light block.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:is(.bb-theme, .bb-look)[data-look='cafe'] {
+  /* ── Brand ── */
+  --cafe-ink: #3b2314;              /* Dark cocoa brown: text, primary buttons, borders */
+  --cafe-ink-hover: #22130a;
+  --cafe-butter: #ffe1a1;           /* Cream yellow: accent backgrounds, selection, tags */
+  --cafe-butter-hover: #ffd37a;
+
+  --brand-brown: var(--cafe-ink);            /* Brand headings become dark brown: on bg 13.9:1 */
+  --brand-brown-dark: #6e3a1f;
+  --brand-orange-soft: var(--cafe-butter);
+  --brand-orange-tint: #fdf0d2;
+  --brand-orange-strong: var(--cafe-ink);    /* Primary buttons, checkmarks, focus ring */
+  --brand-orange-strong-hover: var(--cafe-ink-hover);
+  --brand-orange-text: #9a4a00;              /* on bg 5.96, on butter 5.07 */
+  --text-on-brand: #fff3d6;                  /* on ink 12.9:1 */
+
+  /* ── Neutrals (all warm brown) ── */
+  --bg: #fff8ec;
+  --surface: #fffdf7;
+  --surface-muted: #f8eedc;
+  --border: #e8d6bf;
+  --border-strong: #c9ae92;
+  --border-control: #7a5a48;
+  --border-ink: var(--cafe-ink);
+  --text: var(--cafe-ink);
+  --text-secondary: #6e4a3a;       /* on bg 7.4:1 */
+  --text-muted: #806050;           /* on bg 5.38, on surface-muted 4.91 */
+  --tooltip-bg: var(--cafe-ink);
+  --tooltip-text: #fff3d6;
+  --skeleton-base: #f3e6d0;
+
+  /* ── Banded surfaces ── */
+  --surface-inverse: #73472d;                /* Large color bands use a warm brown (not the near-black cocoa) */
+  --text-on-inverse: var(--cafe-butter);     /* 11.6:1 */
+  --surface-accent: var(--cafe-butter);
+  --text-on-accent: var(--cafe-ink);
+
+  /* ── Typography: serif headings, lighter weights, larger sizes ── */
+  /* Fraunces is Latin-only: English and digits use Fraunces, Chinese falls back to Noto Serif TC */
+  --font-heading: 'Fraunces', 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
+  --font-display-size: 40px; --font-display-weight: 600; --font-display-lh: 1.25;
+  --font-h1-size: 28px;      --font-h1-weight: 600;
+  --font-h2-size: 22px;      --font-h2-weight: 600;
+
+  /* ── Larger radii ── */
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 40px;
+
+  /* ── Shadows: none on static components; overlays keep a subtler one ── */
+  --shadow-sm: none;
+  --shadow-md: 0 8px 24px rgba(59, 35, 20, 0.12);
+  --shadow-lg: 0 16px 40px rgba(59, 35, 20, 0.18);
+}
+
+:is(.bb-theme, .bb-look)[data-look='cafe'][data-theme='dark'] {
+  --cafe-ink: #f6ead6;
+  --cafe-ink-hover: #ffffff;
+  --cafe-butter: #ffd98a;
+  --cafe-butter-hover: #ffe7b0;
+
+  --brand-brown: #ffd98a;
+  --brand-brown-dark: #f3c98a;
+  --brand-orange-soft: #4a3219;
+  --brand-orange-tint: #2e2016;
+  --brand-orange-strong: #ffd98a;            /* Dark-mode primary buttons: cream yellow background + dark brown text */
+  --brand-orange-strong-hover: #ffe7b0;
+  --brand-orange-text: #ffc766;
+  --text-on-brand: #2a1709;
+
+  --bg: #1c130d;
+  --surface: #271b13;
+  --surface-muted: #33251b;
+  --border: #45342a;
+  --border-strong: #5e4839;
+  --border-control: #a88d76;
+  --border-ink: #8a6f5a;
+  --text: #f6ead6;
+  --text-secondary: #dcc7ae;
+  --text-muted: #bfa992;
+  --tooltip-bg: #f6ead6;
+  --tooltip-text: #2a1709;
+  --skeleton-base: #3a2a1f;
+
+  --surface-inverse: #120b07;
+  --text-on-inverse: #ffd98a;
+  --surface-accent: #ffd98a;
+  --text-on-accent: #2a1709;
+
+  --shadow-sm: none;
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* ══ shadcn/ui variables (index.css) mapped to cafe tokens ═══════════════════════
+   Marketing pages (home etc.) use Tailwind + shadcn, so changing this set re-skins them.
+   References ds tokens, so dark mode follows automatically. */
+:is(.bb-theme, .bb-look)[data-look='cafe'] {
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--brand-orange-strong);
+  --primary-foreground: var(--text-on-brand);
+  --primary-hover: var(--brand-orange-strong-hover);
+  --secondary: var(--surface-accent);
+  --secondary-foreground: var(--text-on-accent);
+  --muted: var(--surface-muted);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--brand-orange-tint);
+  --accent-foreground: var(--text);
+  --input: var(--border-strong);
+  --ring: var(--focus-ring-color);
+  --brand-navy: var(--brand-orange-strong);
+  --brand-navy-hover: var(--brand-orange-strong-hover);
+  --surface-dark: var(--surface-inverse);
+  --btn-radius: 999px;
+  --font-sans: var(--font-family);
+  color: var(--text);
+
+  /* Tailwind brand scale (tokens.css --palette-*): the "primary" orange-500 → dark cocoa brown,
+     light orange-50/100/200 → cream yellows. orange-300/400 and status colors keep their values. */
+  --palette-orange-50: var(--brand-orange-tint);
+  --palette-orange-100: var(--brand-orange-soft);
+  --palette-orange-200: var(--cafe-butter-hover);
+  --palette-orange-500: var(--brand-orange-strong);
+  --palette-orange-600: var(--brand-orange-strong-hover);
+}
+
+/* Tailwind page cards (white background + border) get dark-brown borders; inputs and selects are excluded */
+:is(.bb-theme, .bb-look)[data-look='cafe'] :is(.bg-white, .bg-card):is(.border, .border-2) {
+  border-color: var(--border-ink);
+}
+
+/* All headings are serif */
+:is(.bb-theme, .bb-look)[data-look='cafe'] :is(h1, h2, h3, h4) {
+  font-family: var(--font-heading);
+}
+
+/* Legacy prototype pages (.legacy-ui, the --ink / --brand / --legacy-* variables in index.css) mapped to cafe colors */
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui {
+  --ink: #3b2314;
+  --sub: #6e4a3a;
+  --faint: #806050;
+  --brand: #3b2314;          /* Primary button background, emphasized text */
+  --brand-strong: #22130a;
+  --brand-light: #ffe1a1;    /* Tag backgrounds, tinted cards */
+  --on-brand: #fff3d6;       /* on #3B2314 12.9:1 */
+  --line: #e8d6bf;
+  --line-strong: #c9ae92;
+  --legacy-bg: #fff8ec;
+  --legacy-surface: #fffdf7;
+  --legacy-surface-muted: #f8eedc;
+  --focus: #3b2314;
+  --legacy-shadow-sm: none;
+  --status-locked: #9a4a00;  --status-locked-bg: #ffe1a1;
+}
+@media (prefers-color-scheme: dark) {
+  :is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui {
+    --ink: #f6ead6;
+    --sub: #dcc7ae;
+    --faint: #bfa992;
+    --brand: #ffd98a;
+    --brand-strong: #ffe7b0;
+    --brand-light: #4a3219;
+    --on-brand: #2a1709;
+    --line: #45342a;
+    --line-strong: #5e4839;
+    --legacy-bg: #1c130d;
+    --legacy-surface: #271b13;
+    --legacy-surface-muted: #33251b;
+    --focus: #ffd98a;
+    --status-locked: #ffc766;  --status-locked-bg: #4a3219;
+  }
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui :is(h1, h2) {
+  font-family: var(--font-heading);
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui .card {
+  border-color: var(--ink);
+  border-radius: 20px;
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui .card.tinted {
+  border-color: var(--ink);
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui button {
+  border-radius: 999px;
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui button.secondary {
+  background: var(--brand-light);
+  color: var(--ink);
+  border-color: var(--ink);
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .legacy-ui :is(.badge, .status-badge) {
+  border-radius: 999px;
+}
+
+/* ══ Component styles ════════════════════════════════════════════════════════════ */
+
+/* Heading-type components switch to serif too */
+.bb-theme[data-look='cafe'] :is(.bb-feature__title, .bb-modal__title, .bb-sheet__title, .bb-empty__title) {
+  font-family: var(--font-heading);
+}
+
+/* ── Button: pill ── */
+.bb-theme[data-look='cafe'] .bb-btn,
+.bb-theme[data-look='cafe'] .bb-btn--lg {
+  border-radius: var(--radius-full);
+}
+/* secondary: cream yellow background + dark brown border (the reference site's "Explore our menu") */
+.bb-theme[data-look='cafe'] .bb-btn--secondary {
+  --btn-bg: var(--surface-accent);
+  --btn-bg-hover: var(--cafe-butter-hover);
+  --btn-fg: var(--text-on-accent);
+  --btn-fg-hover: var(--text-on-accent);
+  --btn-border: var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-btn--outline {
+  --btn-bg: transparent;
+  --btn-bg-hover: var(--brand-orange-tint);
+  --btn-fg: var(--text);
+  --btn-fg-hover: var(--text);
+  --btn-border: var(--border-ink);
+  --btn-border-hover: var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-btn--text {
+  --btn-fg: var(--text);
+}
+/* Dark mode: primary is already solid cream yellow, so secondary uses a dark background + cream border to separate levels */
+.bb-theme[data-look='cafe'][data-theme='dark'] .bb-btn--secondary {
+  --btn-bg: var(--brand-orange-soft);
+  --btn-bg-hover: color-mix(in srgb, var(--brand-orange-soft) 80%, var(--cafe-butter));
+  --btn-fg: var(--cafe-butter);
+  --btn-fg-hover: var(--cafe-butter);
+  --btn-border: var(--cafe-butter);
+}
+
+/* ── Card: border instead of shadow; hover changes background, no lift ── */
+.bb-theme[data-look='cafe'] :is(.bb-card--elevated, .bb-card--outlined) {
+  background: var(--surface);
+  border-color: var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-card--tinted {
+  border-color: var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-card--interactive:hover,
+.bb-theme[data-look='cafe'] .bb-card--interactive.is-hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--border-ink);
+  background: var(--brand-orange-tint);
+}
+.bb-theme[data-look='cafe'] .bb-card--interactive:active,
+.bb-theme[data-look='cafe'] .bb-card--interactive.is-active {
+  transform: scale(0.99);
+  box-shadow: none;
+  background: var(--brand-orange-tint);
+}
+.bb-theme[data-look='cafe'] .bb-card:disabled,
+.bb-theme[data-look='cafe'] .bb-card[aria-disabled='true'] {
+  border-color: var(--border-strong);
+}
+
+/* ── IconBox: cream yellow background + dark brown border + dark brown icon ── */
+.bb-theme[data-look='cafe'] .bb-iconbox {
+  border: 1px solid var(--border-ink);
+  color: var(--text);
+}
+.bb-theme[data-look='cafe'] .bb-iconbox--brand {
+  background: var(--surface-accent);
+  color: var(--text-on-accent);
+}
+
+/* ── Tabs: selected = cream yellow pill + border (the reference site's nav bar) ── */
+.bb-theme[data-look='cafe'] .bb-tabs {
+  background: transparent;
+  border: 1px solid var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-tabs__indicator,
+.bb-theme[data-look='cafe'][data-theme='dark'] .bb-tabs__indicator {
+  background: var(--surface-accent);
+  box-shadow: inset 0 0 0 1px var(--border-ink);
+}
+.bb-theme[data-look='cafe'] .bb-tabs__tab[aria-selected='true'],
+.bb-theme[data-look='cafe'] .bb-tabs__tab[aria-selected='true'] .bb-tabs__icon {
+  color: var(--text-on-accent);
+}
+
+/* ── Badge: pill; the brand soft variant gets a border (the reference site's "Popular" tag) ── */
+.bb-theme[data-look='cafe'] .bb-badge {
+  border-radius: var(--radius-full);
+  padding-inline: 10px;
+}
+.bb-theme[data-look='cafe'] .bb-badge--brand:not(.bb-badge--solid) {
+  --badge-fg: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border-ink);
+}
+
+/* ── Tag: bordered pill; selected = cream yellow background ── */
+.bb-theme[data-look='cafe'] .bb-tag {
+  background: transparent;
+  border-color: var(--border-ink);
+  color: var(--text);
+}
+.bb-theme[data-look='cafe'] .bb-tag:hover:not(.is-disabled),
+.bb-theme[data-look='cafe'] .bb-tag.is-hover {
+  border-color: var(--border-ink);
+  background: var(--brand-orange-tint);
+  color: var(--text);
+}
+.bb-theme[data-look='cafe'] .bb-tag.is-selected {
+  background: var(--surface-accent);
+  border-color: var(--border-ink);
+  color: var(--text-on-accent);
+}
+
+/* ── Overlays: add a border ── */
+.bb-theme[data-look='cafe'] :is(.bb-modal__panel, .bb-sheet__panel, .bb-toast) {
+  border: 1px solid var(--border-ink);
+}
+
+/* ── EmptyState: bordered round badge + one-size-larger serif heading (2026-10-01 site redesign) ── */
+.bb-theme[data-look='cafe'] .bb-empty { padding-block: 72px; max-width: 460px; }
+.bb-theme[data-look='cafe'] .bb-empty__icon {
+  width: 104px;
+  height: 104px;
+  border: 1px solid var(--border-ink);
+  background: var(--surface-accent);
+  color: var(--text-on-accent);
+  box-shadow: 0 0 0 10px var(--bg), 0 0 0 11px color-mix(in srgb, var(--border-ink) 30%, transparent);
+}
+.bb-theme[data-look='cafe'] .bb-empty__title {
+  margin-top: var(--space-2);
+  font-family: var(--font-heading);
+  font-size: clamp(24px, 2.6vw, 32px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.bb-theme[data-look='cafe'] .bb-empty__desc { font-size: var(--font-body-size); }
+
+/* ── Legacy Tailwind cards (bg-white rounded-xl border) unified site-wide: cream-white background, larger radii ──
+   (2026-10-01 site redesign; brings the back office and pages not yet individually redesigned onto the new visual language at once) */
+:is(.bb-theme, .bb-look)[data-look='cafe'] .bg-white:is(.border, .border-2) {
+  background-color: var(--surface);
+}
+:is(.bb-theme, .bb-look)[data-look='cafe'] .bg-white.rounded-xl:is(.border, .border-2) {
+  border-radius: 1.5rem;
+}

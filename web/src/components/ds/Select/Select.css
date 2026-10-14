@@ -1,0 +1,27 @@
+.bb-select__native {
+  appearance: none;
+  -webkit-appearance: none;
+  /* Overlay the chevron on the select so the whole bar is clickable */
+  padding-right: 28px;
+  margin-right: -28px;
+  cursor: pointer;
+}
+.bb-select__native:disabled {
+  cursor: not-allowed;
+}
+
+/* Use the muted color while on the placeholder (value="") */
+.bb-select__native:has(option[value='']:checked) {
+  color: var(--text-muted);
+}
+.bb-select__native option {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.bb-select__chevron {
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+.bb-control:focus-within .bb-select__chevron {
+  color: var(--brand-orange-text);
+}

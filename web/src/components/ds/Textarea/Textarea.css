@@ -1,0 +1,18 @@
+.bb-control--textarea {
+  align-items: stretch;
+  padding: 0;
+}
+
+.bb-textarea__native {
+  height: auto;
+  min-height: 96px;
+  padding: 10px var(--space-3);
+  line-height: var(--font-body-lh);
+  resize: vertical;
+}
+
+.bb-textarea__spinner {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+}

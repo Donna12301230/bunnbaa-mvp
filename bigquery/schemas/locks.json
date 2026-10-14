@@ -1,0 +1,120 @@
+{
+  "fields": [
+    {
+      "name": "buyer_uid",
+      "type": "string"
+    },
+    {
+      "name": "payer_uid",
+      "type": "string"
+    },
+    {
+      "name": "vendor_id",
+      "type": "string"
+    },
+    {
+      "name": "menu_item_id",
+      "type": "string"
+    },
+    {
+      "name": "item_name",
+      "type": "string"
+    },
+    {
+      "name": "pickup_date",
+      "type": "string"
+    },
+    {
+      "name": "pickup_window",
+      "type": "string"
+    },
+    {
+      "name": "pickup_slot",
+      "type": "string"
+    },
+    {
+      "name": "main_dish_id",
+      "type": "string"
+    },
+    {
+      "name": "rice",
+      "type": "string"
+    },
+    {
+      "name": "plan_id",
+      "type": "string"
+    },
+    {
+      "name": "plan_day",
+      "type": "number"
+    },
+    {
+      "name": "list_price",
+      "type": "number"
+    },
+    {
+      "name": "early_bird_amount",
+      "type": "number"
+    },
+    {
+      "name": "adjust_amount",
+      "type": "number"
+    },
+    {
+      "name": "coupon_discount",
+      "type": "number"
+    },
+    {
+      "name": "locked_price",
+      "type": "number"
+    },
+    {
+      "name": "paid_amount",
+      "type": "number"
+    },
+    {
+      "name": "resale_price",
+      "type": "number"
+    },
+    {
+      "name": "discount_percent",
+      "type": "number"
+    },
+    {
+      "name": "coupon_id",
+      "type": "string"
+    },
+    {
+      "name": "status",
+      "type": "string"
+    },
+    {
+      "name": "charity_source",
+      "type": "string"
+    },
+    {
+      "name": "cancel_reason",
+      "type": "string"
+    },
+    {
+      "name": "refunded_amount",
+      "type": "number"
+    },
+    {
+      "name": "kept_amount",
+      "type": "number"
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp"
+    },
+    {
+      "name": "fulfilled_at",
+      "type": "timestamp"
+    },
+    {
+      "name": "cancelled_at",
+      "type": "timestamp"
+    }
+  ]
+}

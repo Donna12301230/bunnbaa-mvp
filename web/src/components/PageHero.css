@@ -1,0 +1,101 @@
+/* Shared page header: only uses variables from tokens.css / look-cafe.css */
+.bb-pagehero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-ink) 22%, transparent);
+  background: var(--bg);
+}
+.bb-pagehero__blob {
+  position: absolute;
+  z-index: -1;
+  right: -8%;
+  top: -60%;
+  width: min(620px, 70vw);
+  aspect-ratio: 1;
+  border-radius: 46% 54% 42% 58% / 52% 44% 56% 48%;
+  background: radial-gradient(circle at 35% 35%, var(--brand-orange-soft), transparent 70%);
+  animation: bb-pagehero-morph 18s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
+}
+@keyframes bb-pagehero-morph {
+  to { border-radius: 58% 42% 55% 45% / 42% 58% 42% 58%; rotate: 18deg; }
+}
+.bb-pagehero__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 56px 16px 40px;
+}
+/* Horizontal padding aligned with the nav bar (max-w-[1400px] px-4 md:px-6) */
+@media (min-width: 768px) {
+  .bb-pagehero__inner { padding: 88px 24px 56px; }
+}
+.bb-pagehero__copy { flex: 1 1 520px; max-width: 860px; animation: bb-pagehero-in 900ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes bb-pagehero-in {
+  from { opacity: 0; transform: translate3d(0, 20px, 0); }
+  to { opacity: 1; transform: none; }
+}
+.bb-pagehero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.bb-pagehero__rule { width: 32px; height: 1px; background: currentColor; opacity: 0.6; }
+.bb-pagehero__title {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-heading);
+  font-size: clamp(40px, 6vw, 84px);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.bb-pagehero__desc {
+  max-width: 62ch;
+  margin: 20px 0 0;
+  color: var(--text-secondary);
+  font-size: clamp(15px, 1.2vw, 17px);
+  line-height: 1.75;
+  text-wrap: pretty;
+}
+.bb-pagehero__aside { flex: 0 1 380px; animation: bb-pagehero-in 900ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both; }
+
+.bb-herosearch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: min(100%, 320px);
+  height: 56px;
+  padding: 0 20px;
+  border: 1px solid var(--border-ink);
+  border-radius: 999px;
+  background: var(--surface);
+  transition: box-shadow var(--duration-base) var(--ease-standard);
+}
+.bb-herosearch:focus-within { box-shadow: 0 0 0 3px var(--brand-orange-soft); }
+.bb-herosearch__icon { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); }
+.bb-herosearch__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+}
+.bb-herosearch__input::placeholder { color: var(--text-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bb-pagehero__blob, .bb-pagehero__copy, .bb-pagehero__aside { animation: none; }
+}

@@ -1,0 +1,108 @@
+/* ── Shared by Checkbox / Radio (.bb-choice) ─────────────────────────────────
+   .is-hover / .is-focus are only for forcing states on the preview page. */
+.bb-choice {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+.bb-choice.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.bb-choice__control {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 2px; /* align with the first line of text */
+}
+
+/* Native input sits on top of the custom look: keeps keyboard, form and screen-reader behavior */
+.bb-choice__input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.bb-choice__box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-control);
+  color: var(--text-on-brand);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.bb-choice:hover:not(.is-disabled) .bb-choice__box,
+.bb-choice.is-hover .bb-choice__box {
+  border-color: var(--brand-orange-strong);
+  background: var(--brand-orange-tint);
+}
+.bb-choice:active:not(.is-disabled) .bb-choice__box {
+  transform: scale(0.92);
+}
+
+.bb-choice__input:focus-visible + .bb-choice__box,
+.bb-choice.is-focus .bb-choice__box {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.bb-choice.is-invalid .bb-choice__box {
+  border-color: var(--danger-strong);
+}
+
+.bb-choice__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.bb-choice__label {
+  font-size: var(--font-body-size);
+  line-height: 1.5;
+}
+.bb-choice__desc {
+  font-size: var(--font-body-sm-size);
+  line-height: var(--font-body-sm-lh);
+  color: var(--text-muted);
+}
+
+/* ── Checkbox only ── */
+.bb-check__box {
+  border-radius: var(--radius-sm);
+}
+
+.bb-check__icon {
+  display: none;
+  stroke-width: 3 !important;
+}
+
+.bb-check .bb-choice__input:checked + .bb-choice__box,
+.bb-check .bb-choice__input:indeterminate + .bb-choice__box {
+  background: var(--brand-orange-strong);
+  border-color: var(--brand-orange-strong);
+}
+.bb-check:hover:not(.is-disabled) .bb-choice__input:is(:checked, :indeterminate) + .bb-choice__box {
+  background: var(--brand-orange-strong-hover);
+  border-color: var(--brand-orange-strong-hover);
+}
+
+.bb-check .bb-choice__input:checked:not(:indeterminate) + .bb-choice__box .bb-check__icon--check,
+.bb-check .bb-choice__input:indeterminate + .bb-choice__box .bb-check__icon--minus {
+  display: block;
+  animation: bb-fade-in var(--duration-fast) var(--ease-standard);
+}

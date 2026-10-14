@@ -1,0 +1,217 @@
+import { useEffect, useState } from "react";
+import { collection, limit, onSnapshot, query, where } from "firebase/firestore";
+import { Banknote, CheckCircle2, MessageCircleQuestion, ShoppingBag, Sparkles, TrendingUp } from "lucide-react";
+import { httpsCallable } from "@/lib/callable";
+import { db, functions } from "@/lib/firebase";
+import type { AccuracyReport, Lock } from "@/types";
+import { addDaysStr, todayStr } from "@/lib/pickupSlots";
+import { DONE_STATUSES, REVENUE_STATUSES, revenueOf } from "@/lib/lockOutcome";
+import { tr, loc, planBaseName } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { SkeletonBlocks } from "@/components/SkeletonBlocks";
+import { EmptyState } from "@/components/ds";
+import InfoTip from "@/components/InfoTip";
+import RevenueCostChart from "@/components/RevenueCostChart";
+import DemandForecastCard from "@/components/insights/DemandForecastCard";
+import CustomerInsightsCard from "@/components/insights/CustomerInsightsCard";
+
+export const REPORT_DAYS = 15;
+
+function reportRange() {
+  const end = todayStr();
+  return { start: addDaysStr(end, -(REPORT_DAYS - 1)), end };
+}
+
+interface ReportStats {
+  totalRevenue: number;
+  totalOrders: number;
+  avgOrder: number;
+  completedOrders: number;
+  // Orders whose pickup day has passed (or already picked up): the base for the pickup rate, so today's pending orders don't drag it down
+  settledOrders: number;
+  charityOrders: number;
+  topItems: { name: string; qty: number; revenue: number }[];
+}
+
+// Computed from locks whose pickup date falls in the last REPORT_DAYS days (including today); same basis as payouts (lockOutcome revenueOf):
+// prepaid locks count at the amount paid (no-shows included), money kept when a diner cancels for a coupon also counts, refunds to points don't. Portions count only served meals.
+function computeStats(locks: Lock[]): ReportStats | null {
+  const { start, end } = reportRange();
+  const inRange = locks.filter((l) => l.pickup_date >= start && l.pickup_date <= end);
+  const rows = inRange.filter((l) => REVENUE_STATUSES.has(l.status));
+  if (rows.length === 0 && !inRange.some((l) => revenueOf(l) > 0)) return null;
+  const totalRevenue = inRange.reduce((sum, l) => sum + revenueOf(l), 0);
+  const byItem = new Map<string, { qty: number; revenue: number }>();
+  for (const l of rows) {
+    const name = planBaseName(loc(l, "item_name")); // merge meal-plan items like "Plan A · Day 1/5" into one entry
+    const item = byItem.get(name) ?? { qty: 0, revenue: 0 };
+    item.qty += 1;
+    item.revenue += l.locked_price || 0;
+    byItem.set(name, item);
+  }
+  const settled = rows.filter((l) => l.pickup_date < end || DONE_STATUSES.has(l.status));
+  return {
+    totalRevenue,
+    totalOrders: rows.length,
+    avgOrder: rows.length ? Math.round(rows.reduce((s, l) => s + revenueOf(l), 0) / rows.length) : 0,
+    completedOrders: settled.filter((l) => DONE_STATUSES.has(l.status)).length,
+    settledOrders: settled.length,
+    charityOrders: settled.filter((l) => l.status === "charity").length,
+    topItems: [...byItem].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.qty - a.qty).slice(0, 10),
+  };
+}
+
+/** Revenue: four headline numbers for 15 days, daily revenue / ingredient cost / net profit chart, best-seller ranking (medals + bars), forecast accuracy gauge + ask AI */
+export default function RevenuePanel({ vendorId, onHeadline }: { vendorId: string | undefined; onHeadline?: (n: number | null) => void }) {
+  const [report, setReport] = useState<AccuracyReport | null>(null);
+  const [askOpen, setAskOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [locks, setLocks] = useState<Lock[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!vendorId) return;
+    // A single equality filter without orderBy avoids needing a composite index; pick the latest one on the client
+    const q = query(collection(db, "accuracy_reports"), where("vendor_id", "==", vendorId), limit(50));
+    return onSnapshot(q, (snap) => {
+      const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as AccuracyReport & { generated_at?: { toMillis?: () => number } });
+      docs.sort((a, b) => (b.generated_at?.toMillis?.() ?? 0) - (a.generated_at?.toMillis?.() ?? 0));
+      setReport(docs[0] ?? null);
+    }, () => setReport(null));
+  }, [vendorId]);
+
+  // Query the pickup-date range directly (vendor_id + pickup_date index) instead of "latest 500"; with many orders that gets truncated (BUG-13)
+  useEffect(() => {
+    if (!vendorId) return;
+    const { start, end } = reportRange();
+    const q = query(collection(db, "locks"), where("vendor_id", "==", vendorId), where("pickup_date", ">=", start), where("pickup_date", "<=", end));
+    return onSnapshot(q, (snap) => {
+      setLocks(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as Lock));
+      setLoading(false);
+    }, () => setLoading(false));
+  }, [vendorId]);
+  const stats = computeStats(locks);
+  useEffect(() => { onHeadline?.(loading ? null : stats?.totalRevenue ?? 0); }, [stats?.totalRevenue, loading]);
+
+  async function ask() {
+    const q = draft.trim();
+    if (!q || !vendorId) return;
+    setAsking(true);
+    setAnswer("");
+    try {
+      const res = await httpsCallable(functions, "askCalibrationScenario")({ vendor_id: vendorId, question: q });
+      setAnswer((res.data as { scenario_answer: string }).scenario_answer);
+    } catch (err) {
+      setAnswer(tr(`追問失敗：${(err as Error).message}`, `Couldn't get an answer: ${(err as Error).message}`));
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  if (loading) return <SkeletonBlocks count={3} height={128} className="space-y-3" />;
+
+  const medals = ["bg-warning/40 text-foreground", "bg-input text-foreground", "bg-brand/50 text-foreground"];
+  const acc = report ? Math.round(report.accuracy_rate * 100) : 0;
+
+  return (
+    <div className="space-y-4">
+      {!stats ? (
+        <EmptyState icon={<TrendingUp size={32} />} title={tr(`最近 ${REPORT_DAYS} 天沒有訂單`, `No orders in the last ${REPORT_DAYS} days`)} />
+      ) : (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { icon: Banknote, label: tr(`${REPORT_DAYS} 天收入`, `${REPORT_DAYS}-day revenue`), v: `NT$${stats.totalRevenue.toLocaleString()}`, cls: "text-accent-foreground" },
+              { icon: ShoppingBag, label: tr("訂單", "Orders"), v: String(stats.totalOrders), cls: "" },
+              { icon: TrendingUp, label: tr("每單平均", "Avg. order"), v: `NT$${stats.avgOrder}`, cls: "" },
+              {
+                icon: CheckCircle2,
+                label: stats.charityOrders > 0
+                  ? tr(`已取餐（另 ${Math.round((stats.charityOrders / stats.settledOrders) * 100)}% 轉愛心餐）`, `Picked up (+${Math.round((stats.charityOrders / stats.settledOrders) * 100)}% to charity)`)
+                  : tr("已取餐", "Picked up"),
+                v: stats.settledOrders > 0 ? `${Math.round((stats.completedOrders / stats.settledOrders) * 100)}%` : "—",
+                cls: "text-success-text",
+              },
+            ].map((x) => (
+              <Card key={x.label} className="border-2">
+                <CardContent className="p-4">
+                  <x.icon className="w-5 h-5 text-accent-foreground" />
+                  <p className={cn("mt-1 text-2xl md:text-3xl font-bold leading-tight tabular-nums", x.cls)}>{x.v}</p>
+                  <p className="text-xs text-muted-foreground">{x.label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <Card className="border-2">
+            <CardContent className="p-4 space-y-2">
+              <p className="font-semibold flex items-center gap-1">{tr("每天收入、材料成本與淨利", "Daily revenue, materials & net profit")}<InfoTip>{tr(`最近 ${REPORT_DAYS} 天，依取餐日；口徑跟撥款相同：預付制未取餐也算收入，顧客取消換券留下的款項也算，停班停課等退成點數的不算。`, `Last ${REPORT_DAYS} days by pickup date.`)}</InfoTip></p>
+              <RevenueCostChart vendorId={vendorId} />
+            </CardContent>
+          </Card>
+
+          <Card className="border-2">
+            <CardContent className="p-4 space-y-3">
+              <p className="font-semibold">{tr("賣最好的", "Best sellers")}</p>
+              {stats.topItems.map((item, idx) => (
+                <div key={item.name} className="flex items-center gap-3">
+                  <span className={cn("w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-bold", medals[idx] ?? "bg-muted text-muted-foreground")}>{idx + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between gap-2 text-sm">
+                      <span className="font-medium truncate">{item.name}</span>
+                      <span className="shrink-0"><b>{item.qty}</b> {tr("份", "")}<span className="text-muted-foreground"> · NT${item.revenue.toLocaleString()}</span></span>
+                    </div>
+                    <div className="mt-1 h-3 rounded-full bg-muted overflow-hidden">
+                      <div className={cn("h-full rounded-full", idx === 0 ? "bg-primary" : "bg-brand/50")} style={{ width: `${(item.qty / stats.topItems[0].qty) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      <DemandForecastCard vendorId={vendorId} />
+      <CustomerInsightsCard vendorId={vendorId} />
+
+      {/* Forecast accuracy: gauge; explanation and follow-up questions collapsed */}
+      <Card className="border-2">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Sparkles className="w-4 h-4 text-accent-foreground" />
+            <p className="font-semibold">{tr("預測準不準", "Forecast accuracy")}</p>
+            <InfoTip>{tr("每天由系統比對預測份數和實際取餐產生。僅供參考，不是備貨建議。", "Generated daily by comparing forecast vs actual pickups. For reference only.")}</InfoTip>
+            {report && <button type="button" className="ml-auto inline-flex items-center gap-1 text-sm text-primary underline" onClick={() => setAskOpen((v) => !v)}><MessageCircleQuestion className="w-4 h-4" />{tr("問 AI", "Ask AI")}</button>}
+          </div>
+          {report ? (
+            <>
+              <div className="flex flex-wrap items-center gap-4">
+                <p className="text-4xl font-bold tabular-nums">{acc}%</p>
+                <div className="flex-1 min-w-[12rem] space-y-1">
+                  <div className="relative h-4 rounded-full bg-gradient-to-r from-danger/50 via-warning/60 to-success">
+                    <span className="absolute -top-1 h-6 w-1.5 rounded-full bg-foreground" style={{ left: `calc(${acc}% - 3px)` }} aria-hidden="true" />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-muted-foreground"><span>0%</span><span>{tr("誤差", "error")} {loc(report, "error_range")}</span><span>100%</span></div>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">{loc(report, "pattern_note")}</p>
+              {askOpen && (
+                <div className="flex gap-2">
+                  <Input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") ask(); }} placeholder={tr("例如：鎖定量目標調高 10%，缺口會怎麼變？", "e.g. If I raise my target by 10%…")} className="text-sm" />
+                  <Button size="sm" onClick={ask} disabled={!draft.trim() || asking}>{asking ? tr("分析中…", "Analysing…") : tr("送出", "Ask")}</Button>
+                </div>
+              )}
+              {answer && <p className="rounded-lg bg-warning-soft p-3 text-sm text-warning-text">{answer}</p>}
+            </>
+          ) : <p className="text-sm text-muted-foreground">{tr("累積幾天的取餐紀錄後就會出現。", "Appears after a few days of pickups.")}</p>}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

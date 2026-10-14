@@ -1,0 +1,204 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   BunnBaa 飯飽 Design Tokens
+   ──────────────────────────────────────────────────────────────────────────
+   Scope: :root and .bb-theme (created by <ThemeRoot>).
+   Defined on :root so overlays that Radix etc. render into document.body (Dialog, Select menus)
+   also get the tokens. The old prototype pages' background variables were renamed to --legacy-*, so names no longer clash;
+   --border, shared with shadcn, has the same value on both sides.
+   Dark mode is still overridden via .bb-theme[data-theme='dark'] (affects only that subtree).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root,
+.bb-theme {
+  /* ── Brand colors (original spec values) ─────────────────────────────────────────────── */
+  --brand-brown: #b87a5a;        /* Headings, logo "Bunn" */
+  --brand-brown-dark: #8f5a3f;   /* hover / emphasized text */
+  /* Color of the rice glyph (sampled from public/飯飽wordR.png): background band for the resale market banner, the home page
+     resale section and the marquee. Nearly the same as --brand-brown, but the cafe look turns --brand-brown into dark cocoa brown,
+     while this one doesn't change with look or light/dark mode. White text is 3.6:1, so only for large or short bold text */
+  --brand-rice: #b67856;
+  --brand-rice-hover: #a86b4b;
+  --text-on-rice: #ffffff;
+  --brand-orange: #f29e0c;       /* Logo "Baa", icons, decoration */
+  --brand-orange-dark: #d98a00;
+  --brand-orange-soft: #fdebd3;  /* Icon backgrounds, selection background, tag backgrounds */
+  --brand-orange-tint: #fff4e3;  /* Large light areas */
+
+  /* ── Accessible derived colors (contrast ≥ 4.5:1) ─────────────────────────────────────
+     White text on #F29E0C is only 2.17:1 and on #D98A00 2.77:1, below 4.5:1;
+     per the spec ("darken the button color when contrast is insufficient"), primary buttons use the strong series. */
+  --brand-orange-strong: #b35a00;        /* Primary button background: white text 4.80:1 */
+  --brand-orange-strong-hover: #944a00;  /* Primary button hover/active: 6.48:1 */
+  --brand-orange-text: #a34f00;          /* Orange text/links: on bg 5.41, on soft 4.90 */
+
+  /* ── Neutrals ─────────────────────────────────────────────────────────── */
+  --bg: #fff8ec;
+  --surface: #ffffff;
+  --surface-muted: #f7f5f0;
+  --border: #ece6dc;
+  --border-strong: #dcd3c6;      /* Input hover outline (one step darker than --border, still a soft line) */
+  --border-control: #948778;     /* Checkbox/radio/switch outline: non-text elements ≥3:1 */
+  --text: #2b2b2b;
+  --text-secondary: #5c5c5c;
+  /* The spec value #8A8A8A on #FFF8EC is only 3.27:1, adjusted to warm grey #6F6B66 (5.01:1) */
+  --text-muted: #6f6b66;
+  --text-on-brand: #ffffff;
+  --text-on-danger: #ffffff;     /* on --danger-strong 4.73:1 */
+  /* Border line: same as --border in classic; dark cocoa brown in the cafe look */
+  --border-ink: var(--border);
+  /* Banded surfaces: full-width dark / accent sections */
+  --surface-inverse: #3a2f26;
+  --text-on-inverse: #fff4e3;
+  --surface-accent: var(--brand-orange-soft);
+  --text-on-accent: var(--brand-orange-text);
+  --overlay: rgba(43, 32, 22, 0.42);
+  --tooltip-bg: #3a2f26;         /* Warm dark brown instead of pure black; white text 13:1 */
+  --tooltip-text: #ffffff;
+  --skeleton-base: #f1ece3;
+  --skeleton-shine: rgba(255, 255, 255, 0.6);
+
+  /* ── Status colors (original spec values: for icons, borders, dots; use *-text for text) ─────────── */
+  --success: #5a9e6f;  --success-soft: #e6f2e9;  --success-text: #437552;
+  --warning: #e0a030;  --warning-soft: #fbf1dc;  --warning-text: #8f6315;
+  --danger:  #d0604a;  --danger-soft:  #f8e3de;  --danger-text:  #af432e;
+  --info:    #6b8fb3;  --info-soft:    #e6eef5;  --info-text:    #4a6d8f;
+  /* Danger button background: white text on #D0604A is only 3.85:1 → #C24E36 (4.73:1) */
+  /* Dark brown text on brand orange (badges, timeline), same in light and dark: on #F29E0C 8.6:1 */
+  --text-on-brand: #2b180d;
+  /* Cream yellow accent background (verified badge), same in light and dark, paired with --text-on-brand */
+  --highlight: #ffe1a1;
+  /* Fifth semantic color, "plum": packaging in ingredient groups, packing on the timeline, fees in the cost bar */
+  --plum: #9b86c4;  --plum-soft: #efeaf7;  --plum-text: #4b3a73;  --text-on-plum: #24183d;
+  --success-strong: #467d57;  /* Solid success background (white text 4.85:1), progress bars */
+  --danger-strong: #c24e36;
+  --danger-strong-hover: #a84030;
+
+  /* ── Focus ring ────────────────────────────────────────────────────────
+     The spec says --brand-orange, but #F29E0C on cream is only 2.06:1, below the
+     3:1 threshold for non-text elements, so the strong color is used. */
+  --focus-ring-color: var(--brand-orange-strong);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* ── Typography ───────────────────────────────────────────────────────────── */
+  --font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  --font-heading: var(--font-family);  /* Heading font; serif in the cafe look */
+
+  --font-display-size: 32px; --font-display-weight: 700; --font-display-lh: 1.3;
+  --font-h1-size: 24px;      --font-h1-weight: 700;      --font-h1-lh: 1.35;
+  --font-h2-size: 20px;      --font-h2-weight: 600;      --font-h2-lh: 1.4;
+  --font-h3-size: 17px;      --font-h3-weight: 600;      --font-h3-lh: 1.4;
+  --font-body-size: 15px;    --font-body-weight: 400;    --font-body-lh: 1.6;
+  --font-body-sm-size: 13px; --font-body-sm-weight: 400; --font-body-sm-lh: 1.5;
+  --font-caption-size: 12px; --font-caption-weight: 400; --font-caption-lh: 1.5;
+
+  /* ── Spacing (4px base) ─────────────────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── Radii ───────────────────────────────────────────────────────────── */
+  --radius-sm: 6px;    /* Tags */
+  --radius-md: 8px;    /* Buttons, inputs */
+  --radius-lg: 12px;   /* Small cards, icon boxes */
+  --radius-xl: 16px;   /* Large cards, dialogs */
+  --radius-2xl: 24px;  /* Large page sections (home menu section, recommendations) */
+  --radius-full: 999px;
+
+  /* ── Shadows (warm brown, not pure black) ─────────────────────────────────────── */
+  --shadow-sm: 0 2px 8px rgba(120, 80, 40, 0.05);
+  --shadow-md: 0 8px 24px rgba(120, 80, 40, 0.08);
+  --shadow-lg: 0 16px 40px rgba(120, 80, 40, 0.12);
+
+  /* ── Motion ───────────────────────────────────────────────────────────── */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ── Sizes ───────────────────────────────────────────────────────────── */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-stroke: 1.75;
+  --hit-target: 44px;  /* Minimum tap target */
+
+  /* ── Breakpoints (CSS variables can't be used in @media; only for JS reads and documentation;
+        in @media write 375 / 768 / 1024 / 1280px directly) ───────────────────── */
+  --bp-sm: 375px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+
+  /* ── Tailwind brand scale (orange-* / amber-500/600 in tailwind.config.ts read these)
+        Pages hard-code lots of classes like bg-orange-500; the cafe look overrides this set in look-cafe.css,
+        re-skinning without touching page files. Classic values = the original hex. ─────────────────── */
+  --palette-orange-50: #fff4e3;
+  --palette-orange-100: #fdebd3;
+  --palette-orange-200: #fbddb5;
+  --palette-orange-500: #b35a00;  /* Primary button background */
+  --palette-orange-600: #944a00;  /* Primary button hover, orange text */
+
+  /* ── z-index ───────────────────────────────────────────────────────── */
+  --z-tooltip: 60;
+  --z-overlay: 50;
+  --z-toast: 70;
+
+  color-scheme: light;
+}
+
+/* ── Dark mode: brand primaries stay the same; only neutrals, derived colors and the text brown-dark are overridden ── */
+.bb-theme[data-theme='dark'] {
+  --bg: #1f1a15;
+  --surface: #2a231d;
+  --surface-muted: #342b24;
+  --border: #3d342b;
+  --border-strong: #52463a;
+  --border-control: #8a7d6e;
+  --text: #f3ece2;
+  --text-secondary: #d6ccbf;
+  --text-muted: #b8afa3;          /* on #2A231D 7.15:1 */
+  --overlay: rgba(0, 0, 0, 0.55);
+  --tooltip-bg: #f3ece2;
+  --tooltip-text: #2b2b2b;
+  --surface-inverse: #120d09;
+  --text-on-inverse: #f3ece2;
+  --skeleton-base: #3a3029;
+  --skeleton-shine: rgba(255, 255, 255, 0.06);
+
+  --brand-orange-soft: #43321c;
+  --brand-orange-tint: #2f261c;
+  --brand-orange-text: #f29e0c;   /* on #1F1A15 7.95:1 */
+  /* The dark brown used for emphasized text is only 3.04:1 on a dark background, so dark mode uses a light brown (7.63:1);
+     --brand-brown itself stays the same */
+  --brand-brown-dark: #d9a07f;
+
+  --success-soft: #22322a;  --success-text: #8cc79c;
+  --warning-soft: #3a2f18;  --warning-text: #e8bd6a;
+  --danger-soft:  #3d231d;  --danger-text:  #ec9a88;
+  --info-soft:    #1f2b38;  --info-text:    #a5c0dc;
+  --plum-soft:    #2c2538;  --plum-text:    #c9b8ea;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.4);
+
+  color-scheme: dark;
+}
+
+/* ── prefers-reduced-motion: shorter durations; global.css turns off translate/scale ─────── */
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  .bb-theme {
+    --duration-fast: 0.01ms;
+    --duration-base: 0.01ms;
+    --duration-slow: 0.01ms;
+  }
+}

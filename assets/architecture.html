@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BunnBaa architecture</title>
+<style>
+  :root {
+    --ink: #1f2a24; --muted: #5b6460; --line: #d9dfdb; --bg: #fbfaf7; --card: #ffffff;
+    --blue: #1a73e8; --blue-bg: #e8f0fe; --ai: #7b4fc9; --ai-bg: #f3ecfd; --orange: #d9622b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 1800px; background: var(--bg); color: var(--ink); font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 48px 56px; }
+  h1 { font-size: 34px; font-weight: 700; }
+  .sub { font-size: 18px; color: var(--muted); margin-top: 6px; }
+  .grid { display: grid; grid-template-columns: 220px 1fr; gap: 0 24px; margin-top: 32px; }
+  .label { padding-top: 22px; }
+  .label b { display: block; font-size: 20px; }
+  .label span { font-size: 15px; color: var(--muted); }
+  .layer { background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 18px; display: flex; gap: 14px; }
+  .layer.ai { background: var(--ai-bg); border-color: #d4c2f2; }
+  .box { flex: 1; border: 1.5px solid var(--line); border-radius: 10px; padding: 12px 14px; background: #fff; }
+  .box b { display: block; font-size: 17px; }
+  .box span { display: block; font-size: 14px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+  .box.g { border-color: #b9cff7; background: var(--blue-bg); }
+  .box.ai { border-color: #c8b0f0; background: #fff; }
+  .box.ai b { color: var(--ai); }
+  .box.ext { border-style: dashed; }
+  .arrow { grid-column: 2; height: 46px; display: flex; align-items: center; gap: 10px; padding-left: 40px; font-size: 14px; color: var(--muted); }
+  .arrow i { display: block; width: 2px; height: 30px; background: var(--orange); position: relative; }
+  .arrow i::after { content: ""; position: absolute; left: -6px; bottom: -2px; border: 7px solid transparent; border-top: 9px solid var(--orange); border-bottom: 0; }
+  .arrow.up i::after { bottom: auto; top: -2px; border-top: 0; border-bottom: 9px solid var(--orange); }
+  .legend { margin-top: 26px; display: flex; gap: 28px; font-size: 15px; color: var(--muted); }
+  .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+</style>
+</head>
+<body>
+  <h1>BunnBaa — architecture on Google Cloud</h1>
+  <p class="sub">Fully serverless · region asia-east1 · Gemini served through Vertex AI with a service account (no API keys)</p>
+
+  <div class="grid">
+    <div class="label"><b>① Presentation</b><span>Firebase Hosting, global CDN</span></div>
+    <div class="layer">
+      <div class="box"><b>Diner app</b><span>Pre-order, pay, resell, gift, donate, QR pickup, AI assistant</span></div>
+      <div class="box"><b>Vendor portal</b><span>Photo-to-menu, prep &amp; purchase lists, 7-day forecast, QR scan</span></div>
+      <div class="box"><b>Admin console</b><span>Vendor approval, platform settings, Looker Studio embed</span></div>
+      <div class="box g"><b>Firebase Auth</b><span>Email, phone OTP</span></div>
+    </div>
+
+    <div class="arrow"><i></i>HTTPS callables with Firebase ID token · realtime listeners guarded by Security Rules</div>
+
+    <div class="label"><b>② Compute</b><span>81 Cloud Functions, 2nd gen</span></div>
+    <div class="layer">
+      <div class="box g"><b>Callable functions</b><span>Orders, payments, assistant, photo-to-menu (run on Cloud Run)</span></div>
+      <div class="box g"><b>Firestore triggers</b><span>Eventarc: translation, embeddings, charity meals</span></div>
+      <div class="box g"><b>Cloud Scheduler jobs</b><span>20:00 cut-off, payouts, reminders, forecast write-back</span></div>
+      <div class="box g"><b>Cloud Messaging</b><span>Pickup reminders, resale alerts</span></div>
+      <div class="box ext"><b>LINE Pay API</b><span>Request, confirm, refund (HMAC-SHA256)</span></div>
+    </div>
+
+    <div class="arrow"><i></i>Vertex AI SDK (@google/genai) · IAM service account (roles/aiplatform.user)</div>
+
+    <div class="label"><b>③ AI core</b><span>Vertex AI</span></div>
+    <div class="layer ai">
+      <div class="box ai"><b>gemini-3.6-flash</b><span>Vision (menu photos) · function calling (assistant) · JSON mode (calibration, recipes, explanations, translation)</span></div>
+      <div class="box ai"><b>gemini-embedding-001</b><span>768-dim dish vectors for resale matching</span></div>
+      <div class="box ai"><b>Gen AI Evaluation Service</b><span>Scores the assistant on a 24-question test set</span></div>
+    </div>
+
+    <div class="arrow"><i></i>Firebase Admin SDK</div>
+
+    <div class="label"><b>④ Data</b><span>Operational store</span></div>
+    <div class="layer">
+      <div class="box g"><b>Firestore</b><span>Locks, menus, vendors, wallets, rewards</span></div>
+      <div class="box g"><b>Firestore Vector Search</b><span>KNN over menu_embeddings</span></div>
+      <div class="box g"><b>Cloud Storage</b><span>Menu photos</span></div>
+    </div>
+
+    <div class="arrow"><i></i>Stream Firestore to BigQuery extension (personal and payment fields stripped) · results written back to Firestore</div>
+
+    <div class="label"><b>⑤ Analytics</b><span>Decisions from history</span></div>
+    <div class="layer">
+      <div class="box g"><b>BigQuery</b><span>bunnbaa_analytics dataset, typed views</span></div>
+      <div class="box ai"><b>BigQuery AI</b><span>AI.FORECAST (7-day demand) · ML.KMEANS (segments) · AI.GENERATE (segment names)</span></div>
+      <div class="box g"><b>Looker Studio</b><span>Meals saved, forecast vs. actual, segment mix</span></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><i class="sw" style="background:#fff;border:1.5px solid var(--line)"></i>BunnBaa app (React + TypeScript)</span>
+    <span><i class="sw" style="background:var(--blue-bg);border:1.5px solid #b9cff7"></i>Google Cloud / Firebase service</span>
+    <span><i class="sw" style="background:#fff;border:1.5px solid #c8b0f0"></i>Google AI</span>
+    <span><i class="sw" style="background:#fff;border:1.5px dashed var(--line)"></i>External service</span>
+  </div>
+</body>
+</html>
