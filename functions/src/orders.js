@@ -31,7 +31,15 @@ const { taipeiToday, taipeiTime, addDays, mondayOf, at, splitWindow } = require(
 const { recordMatchedClaim } = require("./resaleMatch").helpers;
 const wallet = require("./wallet").helpers;
 
-const APP_BASE_URL = () => process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app";
+// LINE Pay sends the buyer back to the site they paid from (bunnbaa.com or web.app); unknown origins fall back to APP_BASE_URL
+const APP_ORIGINS = new Set([
+  "https://bunnbaa.com", "https://www.bunnbaa.com",
+  "https://bunnbaa-mvp-5474.web.app", "https://bunnbaa-mvp-5474.firebaseapp.com",
+]);
+const appBaseUrl = (request) => {
+  const origin = request?.rawRequest?.headers?.origin;
+  return APP_ORIGINS.has(origin) ? origin : (process.env.APP_BASE_URL || "https://bunnbaa-mvp-5474.web.app");
+};
 const MAX_CART_UNITS = 50;
 
 // Repeated no-shows used to set users/{uid}.orderBanned (old scheme; no-shows now become charity meals
@@ -278,7 +286,7 @@ async function reserve(request, drafts, productName) {
   const points = request.data?.use_points ? await wallet.holdPoints(request.auth.uid, orderId, total) : { used: 0, sources: [] };
   const amount = total - points.used;
   let transactionId = null;
-  let paymentUrl = `${APP_BASE_URL()}/#/payment/confirm/${orderId}`;
+  let paymentUrl = `${appBaseUrl(request)}/#/payment/confirm/${orderId}`;
   if (amount > 0) {
     // LINE Pay's products must sum to amount; lines with the same price are merged. When points are applied, everything becomes one "amount after points" line
     const byPrice = new Map();
@@ -297,8 +305,8 @@ async function reserve(request, drafts, productName) {
       // ?transactionId=... by plain string concatenation (see App.tsx).
       info = await requestPayment({
         orderId, amount, products,
-        confirmUrl: `${APP_BASE_URL()}/#/payment/confirm/${orderId}`,
-        cancelUrl: `${APP_BASE_URL()}/#/payment/cancel/${orderId}`,
+        confirmUrl: `${appBaseUrl(request)}/#/payment/confirm/${orderId}`,
+        cancelUrl: `${appBaseUrl(request)}/#/payment/cancel/${orderId}`,
       });
     } catch (err) {
       logger.error("LINE Pay request failed", err);
@@ -778,14 +786,14 @@ exports.createResaleLinePayReservation = onCall({}, async (request) => {
   const points = request.data?.use_points ? await wallet.holdPoints(request.auth.uid, orderId, total) : { used: 0, sources: [] };
   const amount = total - points.used;
   let transactionId = null;
-  let paymentUrl = `${APP_BASE_URL()}/#/payment/confirm/${orderId}`;
+  let paymentUrl = `${appBaseUrl(request)}/#/payment/confirm/${orderId}`;
   if (amount > 0) {
     try {
       const info = await requestPayment({
         orderId, amount,
         products: [{ name: t(`接手：${lock.item_name}`, `Take over: ${lock.item_name_en || lock.item_name}`), quantity: 1, price: amount }],
-        confirmUrl: `${APP_BASE_URL()}/#/payment/confirm/${orderId}`,
-        cancelUrl: `${APP_BASE_URL()}/#/payment/cancel/${orderId}`,
+        confirmUrl: `${appBaseUrl(request)}/#/payment/confirm/${orderId}`,
+        cancelUrl: `${appBaseUrl(request)}/#/payment/cancel/${orderId}`,
       });
       transactionId = String(info.transactionId);
       paymentUrl = info.paymentUrl.web;
